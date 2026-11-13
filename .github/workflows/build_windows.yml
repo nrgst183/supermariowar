@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: 'recursive'
+          fetch-depth: 0
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -54,6 +55,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: 'recursive'
+          fetch-depth: 0
       - uses: ilammy/msvc-dev-cmd@v1
       - uses: mozilla/sccache-action@v0.0.9
 
@@ -93,3 +95,25 @@ jobs:
         with:
           name: supermariowar_windows-msvc
           path: supermariowar_*_windows-msvc.zip
+
+  vs-solution:
+    name: Visual Studio solution
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0
+
+      # Same path a developer takes locally: generate the solution with the
+      # newest installed Visual Studio and let CMake build the bundled
+      # dependencies (SDL3, SDL3_image, SDL3_mixer, enet, toml11, zlib).
+      - name: Generate solution
+        shell: cmd
+        run: generate-vs-solution.bat
+
+      - name: Build (Debug)
+        run: cmake --build build/vs --config Debug --parallel
+
+      - name: Test (Debug)
+        run: ctest --test-dir build/vs/tests --build-config Debug --output-on-failure

@@ -31,7 +31,11 @@ option(SMW_INSTALL_PORTABLE "Install to a single directory" ${SMW_INSTALL_PORTAB
 # Additional CMake search path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
-if (NOT CMAKE_BUILD_TYPE)
+# Visual Studio, Xcode and "Ninja Multi-Config" pick the configuration at build
+# time, so CMAKE_BUILD_TYPE only applies to single-configuration generators.
+get_property(SMW_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+
+if (NOT SMW_IS_MULTI_CONFIG AND NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE "Release" CACHE STRING
 		"Build type (Release/Debug/RelWithDebInfo/MinSizeRel)" FORCE)
 endif()
@@ -65,21 +69,38 @@ include(BundledDeps)
 #
 #-----------------------------------------------------------------------------
 
-# Debugging CFLAGS. Turn optimizations off; turn debugging symbols on.
-if (CMAKE_BUILD_TYPE STREQUAL Debug)
-	add_definitions(-DDEBUG -D_DEBUG -DPNG_DEBUG=1)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -g -O0")
-else()
-	add_definitions(-DNDEBUG)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -O3")
+# Debug/release defines. Generator expressions keep these correct for
+# multi-configuration generators too (e.g. the Debug config of a VS solution).
+add_compile_definitions(
+	"$<$<CONFIG:Debug>:DEBUG>"
+	"$<$<CONFIG:Debug>:_DEBUG>"
+	"$<$<CONFIG:Debug>:PNG_DEBUG=1>"
+	"$<$<NOT:$<CONFIG:Debug>>:NDEBUG>"
+)
 
-	# Strip binaries
-	if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s")
-		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s")
+# Optimization flags for single-configuration GCC/Clang builds.
+# MSVC and multi-configuration generators use CMake's per-configuration
+# defaults (CMAKE_<LANG>_FLAGS_<CONFIG>), e.g. /Od for Debug and /O2 for Release.
+if (NOT MSVC AND NOT SMW_IS_MULTI_CONFIG)
+	if (CMAKE_BUILD_TYPE STREQUAL Debug)
+		# Turn optimizations off; turn debugging symbols on.
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -g -O0")
+	else()
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -O3")
+
+		# Strip binaries
+		if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s")
+			set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s")
+		endif()
 	endif()
+endif()
+
+if (MSVC AND CMAKE_GENERATOR MATCHES "Visual Studio")
+	# Compile the files of each project in parallel inside Visual Studio
+	add_compile_options(/MP)
 endif()
 
 if (EMSCRIPTEN)
@@ -96,7 +117,7 @@ include(CheckCXXCompilerFlag)
 macro(check_and_add_flag var flag)
 	CHECK_CXX_COMPILER_FLAG(${flag} FLAG_${var})
 	if(FLAG_${var})
-		set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} ${flag}")
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${flag}")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${flag}")
 	endif()
 endmacro()
@@ -210,6 +231,18 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTS)
 	include(dependencies/doctest/doctest.cmake)
 	add_subdirectory(dependencies/doctest)
 	add_subdirectory(tests)
+endif()
+
+# Visual Studio: start the game when pressing F5, and run the game and the
+# editors against the repository's data folder
+if (CMAKE_GENERATOR MATCHES "Visual Studio")
+	set_property(DIRECTORY "${PROJECT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT smw)
+	foreach(smw_target IN ITEMS smw smw-leveledit smw-worldedit)
+		set_target_properties(${smw_target} PROPERTIES
+			VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+			VS_DEBUGGER_COMMAND_ARGUMENTS "--datadir \"${PROJECT_SOURCE_DIR}/data\""
+		)
+	endforeach()
 endif()
 
 #-----------------------------------------------------------------------------

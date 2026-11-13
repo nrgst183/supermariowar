@@ -150,6 +150,10 @@ You'll probably need Xcode and its command line tools; you can install SDL and C
 
 If you're using MinGW Shell/MSYS or Cygwin, you can follow the Linux guide. You can also generate a project file with CMake for various IDEs, such as CodeBlocks, Eclipse or Visual Studio.
 
+**Visual Studio solution:** run `generate-vs-solution.bat` in the repository root. It generates `build\vs\smw.sln` (`smw.slnx` with Visual Studio 2026) for the newest installed Visual Studio and opens it. SDL3 and the other libraries are downloaded and built automatically on the first run. `smw` is the startup project and runs against the repository's `data` folder, so F5 starts the game. Re-run the script after adding or removing source files.
+
+**Visual Studio "Open Folder":** opening the repository folder directly also works; pick the `Windows x64 Debug (MSVC)` or `Windows x64 Release (MSVC)` configuration from `CMakePresets.json`.
+
 For more details, see the wiki: [Building on Windows](https://github.com/mmatyas/supermariowar/wiki/Building-on-Windows).
 
 ### ARM devices
@@ -189,6 +193,13 @@ You can change the build configuration by setting various CMake flags. The simpl
 Alternatively, you can pass these options directly to CMake as `-DFLAGNAME=VALUE` (eg. `cmake .. -DUSE_BUNDLED_SDL=ON`).
 
 *TODO: expand this section*
+
+### Releases
+
+Every push is built for Linux, macOS, Windows (MinGW and MSVC) and the web by GitHub Actions.
+
+- Pushing a version tag, e.g. `git tag v2.1.0 && git push origin v2.1.0`, publishes a GitHub release with the packages of every platform and generated release notes. Tags with a suffix, such as `v2.1.0-beta.1`, are published as pre-releases.
+- Every push to the default branch updates the `continuous` pre-release with the latest build.
 
 ## How to play
 

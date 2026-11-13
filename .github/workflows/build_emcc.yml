@@ -8,6 +8,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: 'recursive'
+          fetch-depth: 0
 
       - name: Install Emscripten
         working-directory: /tmp
@@ -23,3 +24,16 @@ jobs:
           emcc -v
           emcmake cmake -B build -G Ninja -DNO_NETWORK=ON -DBUILD_SHARED_LIBS=OFF
           cmake --build build --target smw
+
+      - name: Package
+        run: |
+          mkdir supermariowar-web
+          cp build/smw.html build/smw.js build/smw.wasm build/smw.data supermariowar-web/
+          cp build/smw.html supermariowar-web/index.html
+          zip -9 -r "supermariowar_$(date +%F)_web.zip" supermariowar-web
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: supermariowar_web
+          path: supermariowar_*_web.zip
