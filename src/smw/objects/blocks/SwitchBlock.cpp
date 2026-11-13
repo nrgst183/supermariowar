@@ -4,7 +4,6 @@
 #include "objects/moving/MovingObject.h"
 #include "player.h"
 
-extern CMap* g_map;
 
 B_SwitchBlock::B_SwitchBlock(gfxSprite *nspr, Vec2s pos, SwitchColor color, short iState) :
     IO_Block(nspr, pos)

@@ -8,10 +8,6 @@
 
 #include <cmath>
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern CEyecandyContainer eyecandy[3];
 
 struct STextAward {
     const char *name;
@@ -227,7 +223,7 @@ void PlayerAwardEffects::addKillerAward(CPlayer& killer, CPlayer* killed, KillSt
         if (game_values.awardstyle == AwardStyle::Text) {
             if (killer.killsinrow >= 2) {
                 char    text[128];              //text to show
-                sprintf(text, "%d - %s", killer.killsinrow, awardtexts[awardIndex].name);
+                snprintf(text, sizeof(text), "%d - %s", killer.killsinrow, awardtexts[awardIndex].name);
 
                 //now add the eyecandy
                 eyecandy[2].emplace<EC_GravText>(awardtexts[awardIndex].large ? &rm->game_font_large : &rm->game_font_small, killer.centerX(), killer.bottomY(), text, -VELJUMP);
@@ -237,7 +233,7 @@ void PlayerAwardEffects::addKillerAward(CPlayer& killer, CPlayer* killed, KillSt
             if (killed && killed->killsinrow >= 2) {
                 short a = (killed->killsinrow - 2) >= PAWARD_LAST ? PAWARD_LAST -1 : (killed->killsinrow - 2);
                 char text[128];
-                sprintf(text, "%s Stopped!",  awardtexts[a].name);
+                snprintf(text, sizeof(text), "%s Stopped!",  awardtexts[a].name);
 
                 eyecandy[2].emplace<EC_GravText>(awardtexts[a].large ? &rm->game_font_large : &rm->game_font_small, killed->centerX(), killed->bottomY(), text, -VELJUMP*1.3f);
             }

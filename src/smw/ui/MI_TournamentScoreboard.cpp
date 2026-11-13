@@ -13,9 +13,6 @@
 
 #include <cmath>
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-extern CScore* score[4];
 
 namespace {
 const short iScoreboardPlayerOffsetsX[3][3] = {{40, 0, 0}, {19, 59, 0}, {6, 40, 74}};
@@ -184,13 +181,13 @@ void MI_TournamentScoreboard::Update()
             if (--iWinnerTextCounter < 0) {
                 iWinnerTextCounter = (short)(RANDOM_INT(35) + 15);
 
-                char szWinnerText[64];
+                char szWinnerText[64] = "";
                 if (iTournamentWinner == -2)
-                    sprintf(szWinnerText, "Tied Game!");
+                    snprintf(szWinnerText, sizeof(szWinnerText), "Tied Game!");
                 else if (iTeamCounts[iTournamentWinner] == 1)
-                    sprintf(szWinnerText, "Player %d Wins!", iTeamIDs[iTournamentWinner][0] + 1);
+                    snprintf(szWinnerText, sizeof(szWinnerText), "Player %d Wins!", iTeamIDs[iTournamentWinner][0] + 1);
                 else if (iTeamCounts[iTournamentWinner] > 1)
-                    sprintf(szWinnerText, "Team %d Wins!", iTournamentWinner + 1);
+                    snprintf(szWinnerText, sizeof(szWinnerText), "Team %d Wins!", iTournamentWinner + 1);
 
                 short iStringWidth = (short)rm->menu_font_large.getWidth(szWinnerText);
                 short iRandX = (short)(RANDOM_INT(App::screenWidth - iStringWidth) + (iStringWidth >> 1));

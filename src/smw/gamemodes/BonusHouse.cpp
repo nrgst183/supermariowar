@@ -9,11 +9,6 @@
 #include "WorldTourStop.h"
 #include "objects/moving/MO_BonusHouseChest.h"
 
-extern CObjectContainer objectcontainer[3];
-extern std::vector<CPlayer*> players;
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 //Bonus Mode (not really a game mode, but involves using the map so we need a mode to play)
 CGM_Bonus::CGM_Bonus() : CGameMode()

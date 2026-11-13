@@ -5,7 +5,6 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
 
 UI_PlayerControlsSelectMenu::UI_PlayerControlsSelectMenu()
     : UI_Menu()
@@ -29,11 +28,11 @@ UI_PlayerControlsSelectMenu::UI_PlayerControlsSelectMenu()
     miPlayerControlsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miPlayerControlsMenuHeaderText = new MI_HeaderText("Player Controls Menu", 320, 5);
 
-    AddControl(miPlayer1ControlsButton, miPlayerControlsBackButton, miPlayer2ControlsButton, NULL, miPlayerControlsBackButton);
-    AddControl(miPlayer2ControlsButton, miPlayer1ControlsButton, miPlayer3ControlsButton, NULL, miPlayerControlsBackButton);
-    AddControl(miPlayer3ControlsButton, miPlayer2ControlsButton, miPlayer4ControlsButton, NULL, miPlayerControlsBackButton);
-    AddControl(miPlayer4ControlsButton, miPlayer3ControlsButton, miPlayerControlsBackButton, NULL, miPlayerControlsBackButton);
-    AddControl(miPlayerControlsBackButton, miPlayer4ControlsButton, miPlayer1ControlsButton, miPlayer1ControlsButton, NULL);
+    AddControl(miPlayer1ControlsButton, miPlayerControlsBackButton, miPlayer2ControlsButton, nullptr, miPlayerControlsBackButton);
+    AddControl(miPlayer2ControlsButton, miPlayer1ControlsButton, miPlayer3ControlsButton, nullptr, miPlayerControlsBackButton);
+    AddControl(miPlayer3ControlsButton, miPlayer2ControlsButton, miPlayer4ControlsButton, nullptr, miPlayerControlsBackButton);
+    AddControl(miPlayer4ControlsButton, miPlayer3ControlsButton, miPlayerControlsBackButton, nullptr, miPlayerControlsBackButton);
+    AddControl(miPlayerControlsBackButton, miPlayer4ControlsButton, miPlayer1ControlsButton, miPlayer1ControlsButton, nullptr);
 
     AddNonControl(miPlayerControlsLeftHeaderBar);
     AddNonControl(miPlayerControlsMenuRightHeaderBar);

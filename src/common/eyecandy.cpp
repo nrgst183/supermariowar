@@ -11,17 +11,6 @@
 #include <cmath>
 #include <cstring>
 
-extern CEyecandyContainer eyecandy[3];
-
-extern CMap* g_map;
-
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
-/*extern SDL_Rect rectSuperStompLeftSrc[8];
-extern SDL_Rect rectSuperStompRightSrc[8];
-extern SDL_Rect rectSuperStompLeftDst[8];
-extern SDL_Rect rectSuperStompRightDst[8];*/
 
 EC_StillImage::EC_StillImage(gfxSprite* nspr, short dstx, short dsty, short srcx, short srcy, short w, short h)
 {
@@ -616,31 +605,6 @@ void EC_LoopingAnimation::update()
 //------------------------------------------------------------------------------
 // class award
 //------------------------------------------------------------------------------
-/*
-EC_Award::EC_Award(gfxSprite *nspr, short ix, short iy, short destx, short desty, short iframes, short irate) :
-        EC_LoopingAnimation(nspr, ix, iy, iframes, irate, 0)
-{
-        dx = (float)destx;
-        dy = (float)desty;
-
-        velx = (dx - x) / 100.0f;
-        vely = (dy - y) / 100.0f;
-}
-
-
-void EC_Award::update()
-{
-        EC_LoopingAnimation::update();
-
-        x += velx;
-        y += vely;
-
-        if ( fabsf(dx - x) < fabsf(velx) && fabsf(dy - y) < fabsf(vely))
-        {
-                dead = true;
-        }
-}
-*/
 
 
 //------------------------------------------------------------------------------
@@ -999,56 +963,6 @@ void EC_Door::draw() const
 //------------------------------------------------------------------------------
 // class EC_BossPeeker
 //------------------------------------------------------------------------------
-/*
-EC_BossPeeker::EC_BossPeeker(gfxSprite *nspr, short speed, short bossType)
-    : CEyecandy()
-{
-    spr = nspr;
-    iSpeed = speed;
-    iBossColorOffsetY = bossType * 64;
-
-    timer = 0;
-    state = 0;
-    ix = 592;
-    iy = App::screenHeight;
-
-    game_values.bosspeeking = bossType;
-}
-
-
-void EC_BossPeeker::update()
-{
-    if (state == 0)
-    {
-        iy -= 2;
-        if (iy <= 432)
-        {
-            iy = 432;
-            state = 1;
-        }
-    }
-    else if (state == 1)
-    {
-        if (++timer == iSpeed)
-            state = 2;
-    }
-    else if (state == 2)
-    {
-        iy += 2;
-        if (iy >= App::screenHeight)
-        {
-            dead = true;
-            game_values.bosspeeking = -1;
-        }
-    }
-}
-
-
-void EC_BossPeeker::draw() const
-{
-    spr->draw(ix, iy, 192, iBossColorOffsetY, 48, 64);
-}
-*/
 
 //------------------------------------------------------------------------------
 // class EC_SuperStompExplosion
@@ -1190,56 +1104,12 @@ void Spotlight::Draw()
         SDL_Rect rDstWrap = { ix - iHalfWidth - App::screenWidth, iy - iHalfWidth, iWidth, iWidth };
         rm->spr_overlayhole.draw(rSrc, rm->spr_overlay.getSurface(), rDstWrap);
     }
-
-#if 0
-    //Transparency fade in effect. Unfortunately, the perf was too slow
-    //Might be useful later if alpha fading perf is better
-    short iWidth = iSpotlightValues[iSize][0];
-    short iHalfWidth = iSpotlightValues[iSize][1];
-
-    rm->spr_overlayhole.setalpha(255);
-
-    SDL_Rect rSrc = {iSpotlightValues[iSize][2], 0, iWidth, iWidth};
-    SDL_Rect rDst = {ix - iHalfWidth, iy - iHalfWidth, iWidth, iWidth};
-    rm->spr_overlayhole.draw(rSrc, rm->spr_overlay.getSurface(), rDst);
-
-    if (ix - iHalfWidth < 0)
-    {
-        SDL_Rect rDstWrap = {ix - iHalfWidth + App::screenWidth, iy - iHalfWidth, iWidth, iWidth};
-        rm->spr_overlayhole.draw(rSrc, rm->spr_overlay.getSurface(), rDstWrap);
-    }
-    else if (ix + iHalfWidth >= App::screenWidth)
-    {
-        SDL_Rect rDstWrap = {ix - iHalfWidth - App::screenWidth, iy - iHalfWidth, iWidth, iWidth};
-        rm->spr_overlayhole.draw(rSrc, rm->spr_overlay.getSurface(), rDstWrap);
-    }
-
-    if (iTransparency <= 255 && iTransparency > 0)
-    {
-        rm->spr_overlayhole.setalpha((Uint8)iTransparency);
-
-        SDL_Rect rTransSrc = {iSpotlightValues[iSize][2], 128, iWidth, iWidth};
-        SDL_Rect rTransDst = {ix - iHalfWidth, iy - iHalfWidth, iWidth, iWidth};
-        rm->spr_overlayhole.draw(rTransSrc, blitdest, rTransDst);
-
-        if (ix - iHalfWidth < 0)
-        {
-            SDL_Rect rTransDstWrap = {ix - iHalfWidth + App::screenWidth, iy - iHalfWidth, iWidth, iWidth};
-            rm->spr_overlayhole.draw(rTransSrc, blitdest, rTransDstWrap);
-        }
-        else if (ix + iHalfWidth >= App::screenWidth)
-        {
-            SDL_Rect rTransDstWrap = {ix - iHalfWidth - App::screenWidth, iy - iHalfWidth, iWidth, iWidth};
-            rm->spr_overlayhole.draw(rTransSrc, blitdest, rTransDstWrap);
-        }
-    }
-#endif
 }
 
 Spotlight* SpotlightManager::AddSpotlight(short ix, short iy, short iSize)
 {
     if (!game_values.spotlights)
-        return NULL;
+        return nullptr;
 
     Spotlight* s = new Spotlight(ix, iy, iSize);
     spotlightList.push_back(s);
@@ -1249,7 +1119,7 @@ Spotlight* SpotlightManager::AddSpotlight(short ix, short iy, short iSize)
 void SpotlightManager::DrawSpotlights()
 {
     // Clear the overlay surface again with black
-    SDL_FillSurfaceRect(rm->spr_overlay.getSurface(), NULL, 0x0);
+    SDL_FillSurfaceRect(rm->spr_overlay.getSurface(), nullptr, 0x0);
 
     std::vector<Spotlight*>::iterator iter = spotlightList.begin(), lim = spotlightList.end();
 

@@ -16,13 +16,6 @@
 #include "objects/moving/MO_SuperFireball.h"
 #include "objects/overmap/WO_Thwomp.h"
 
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
-
-extern CObjectContainer objectcontainer[3];
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 namespace {
 void pushBombs(CObjectContainer& container, short x, short y)
@@ -169,15 +162,6 @@ void MO_SledgeBrother::update()
                     objectcontainer[2].add(new OMO_Thwomp(&rm->spr_thwomp, (short)(RANDOM_INT(591)), 2.0f + (float)(RANDOM_INT(20)) / 10.0f));
                 }
 
-                // short numBombs = RANDOM_INT(5) + 6;
-
-                // for (short iBomb = 0; iBomb < numBombs; iBomb++)
-                //{
-                //	short iRandomX = RANDOM_INT(612);
-                //	short iRandomY = RANDOM_INT(442);
-                //	eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, iRandomX - 2, iRandomY + 3, 3, 8);
-                //	objectcontainer[2].add(new CO_Bomb(&rm->spr_bomb, iRandomX, iRandomY, 0.0f, 0.0f, 4, -1, -1, -1, RANDOM_INT(30) + 30));
-                // }
             } else if (iType == 2) {
                 // Spawn lots of podobos
                 ifSoundOnPlay(rm->sfx_thunder);
@@ -344,15 +328,15 @@ void MO_SledgeBrother::throwprojectile()
 
     if (iType == 0) {
         float fHammerVelX = ((float)(RANDOM_INT(9) + 2)) / 2.0f - (face_right ? 0.0f : 6.0f);
-        objectcontainer[2].add(new MO_SledgeHammer(&rm->spr_sledgehammer, {(face_right ? ix + 32 : ix) - collisionOffsetX, iy}, 8, {fHammerVelX, -HAMMERTHROW}, 5, -1, -1, -1, false));
+        objectcontainer[2].add(new MO_SledgeHammer(&rm->spr_sledgehammer, {static_cast<short>((face_right ? ix + 32 : ix) - collisionOffsetX), iy}, 8, {fHammerVelX, -HAMMERTHROW}, 5, -1, -1, -1, false));
     } else if (iType == 1) {
         float fBombVelX = ((float)(RANDOM_INT(5) + 12)) / 2.0f - (face_right ? 0.0f : 14.0f);
         float fBombVelY = -(float)(RANDOM_INT(13)) / 2.0f - 6.0f;
-        objectcontainer[2].add(new CO_Bomb(&rm->spr_bomb, {face_right ? ix + iw - 32 : ix - 20, iy}, {fBombVelX, fBombVelY}, 4, -1, -1, -1, RANDOM_INT(60) + 120));
+        objectcontainer[2].add(new CO_Bomb(&rm->spr_bomb, {static_cast<short>(face_right ? ix + iw - 32 : ix - 20), iy}, {fBombVelX, fBombVelY}, 4, -1, -1, -1, RANDOM_INT(60) + 120));
     } else if (iType == 2) {
         float fFireVelX = ((float)(RANDOM_INT(9) + 6)) / 2.0f - (face_right ? 0.0f : 10.0f);
         float fFireVelY = (float)(RANDOM_INT(17)) / 2.0f - 4.0f;
-        objectcontainer[2].add(new MO_SuperFireball(&rm->spr_superfireball, {face_right ? ix + iw - 32 : ix - 16, iy}, 4, {fFireVelX, fFireVelY}, 4, -1, -1, -1));
+        objectcontainer[2].add(new MO_SuperFireball(&rm->spr_superfireball, {static_cast<short>(face_right ? ix + iw - 32 : ix - 16), iy}, 4, {fFireVelX, fFireVelY}, 4, -1, -1, -1));
     }
 
     need_action[1] = 0;

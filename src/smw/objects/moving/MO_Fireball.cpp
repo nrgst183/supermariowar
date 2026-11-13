@@ -4,8 +4,6 @@
 #include "GameValues.h"
 #include "player.h"
 
-extern SpotlightManager spotlightManager;
-extern CGameValues game_values;
 
 //------------------------------------------------------------------------------
 // class fireball
@@ -33,7 +31,7 @@ MO_Fireball::MO_Fireball(gfxSprite* nspr, Vec2s pos, short iNumSpr, bool moveToR
 
     ttl = game_values.fireballttl;
 
-    sSpotlight = NULL;
+    sSpotlight = nullptr;
 }
 
 void MO_Fireball::update()

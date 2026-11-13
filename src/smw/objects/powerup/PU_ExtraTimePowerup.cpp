@@ -5,8 +5,6 @@
 #include "ResourceManager.h"
 #include "gamemodes/TimeLimit.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class special extra time powerup for timed or star mode

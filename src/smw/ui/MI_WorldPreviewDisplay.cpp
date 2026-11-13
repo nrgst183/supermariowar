@@ -2,16 +2,10 @@
 
 #include "FileList.h"
 #include "GameValues.h"
+#include "gfx.h"
 #include "GlobalConstants.h"
 #include "world.h"
 #include "world/WorldMapIO.h"
-
-extern SDL_Surface* blitdest;
-extern SDL_Surface* screen;
-
-extern CGameValues game_values;
-extern WorldMap g_worldmap;
-extern WorldList *worldlist;
 
 
 MI_WorldPreviewDisplay::MI_WorldPreviewDisplay(short x, short y, short cols, short rows)

@@ -80,8 +80,8 @@
 
 
 //------ system stuff ------
-SDL_Surface		*screen = NULL;		//for gfx (maybe the gfx system should be improved -> resource manager)
-SDL_Surface		*blitdest = NULL;	//the destination surface for all drawing (can be swapped from screen to another surface)
+SDL_Surface		*screen = nullptr;		//for gfx (maybe the gfx system should be improved -> resource manager)
+SDL_Surface		*blitdest = nullptr;	//the destination surface for all drawing (can be swapped from screen to another surface)
 
 short			x_shake = 0;
 short			y_shake = 0;
@@ -100,32 +100,13 @@ short g_iSwirlSpawnLocations[4][2][25];
 
 
 CGameMode			*gamemodes[GAMEMODE_LAST];
-CGM_Bonus			*bonushousemode = NULL;
-CGM_Pipe_MiniGame	*pipegamemode = NULL;
-CGM_Boss_MiniGame	*bossgamemode = NULL;
-CGM_Boxes_MiniGame	*boxesgamemode = NULL;
+CGM_Bonus			*bonushousemode = nullptr;
+CGM_Pipe_MiniGame	*pipegamemode = nullptr;
+CGM_Boss_MiniGame	*bossgamemode = nullptr;
+CGM_Boxes_MiniGame	*boxesgamemode = nullptr;
 
 short currentgamemode = 0;
 
-extern CMap* g_map;
-extern CTilesetManager* g_tilesetmanager;
-
-extern FiltersList* filterslist;
-extern MapList* maplist;
-extern SkinList* skinlist;
-extern AnnouncerList* announcerlist;
-extern MusicList* musiclist;
-extern WorldMusicList* worldmusiclist;
-extern GraphicsList* menugraphicspacklist;
-extern GraphicsList* worldgraphicspacklist;
-extern GraphicsList* gamegraphicspacklist;
-extern SoundsList* soundpacklist;
-extern TourList* tourlist;
-extern WorldList* worldlist;
-
-extern std::string RootDataDirectory;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //*************************************
 //  MAIN LOOP
@@ -352,7 +333,7 @@ void main_game()
     //currently this only sets the title, not the icon.
     //setting the icon isn't implemented in sdl ->  i'll ask on the mailing list
     char title[128];
-    sprintf(title, "%s %s %s", TITLESTRING, GIT_REVISION, GIT_DATE);
+    snprintf(title, sizeof(title), "%s %s %s", TITLESTRING, GIT_REVISION, GIT_DATE);
     gfx_settitle(title);
     SDL_HideCursor();
 
@@ -387,18 +368,7 @@ void main_game()
         gfx_loadpalette(convertPath("gfx/packs/palette.bmp", gamegraphicspacklist->currentPath()));
     }
 
-    srand((unsigned int)time(NULL));
-/*
-    bool fLoadOK = LoadAndSplashScreenState();
-
-    if (!fLoadOK) {
-        printf("\n---------------- EXIT DURING LOADING ----------------\n\n");
-        sfx_close();
-        gfx_close();
-        net_close();
-        return 0;
-    }
-*/
+    srand((unsigned int)time(nullptr));
 
 
     //**********************************************************

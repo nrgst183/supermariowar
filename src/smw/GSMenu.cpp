@@ -2,7 +2,9 @@
 
 #include "FileList.h"
 #include "Game.h"
+#include "GameMode.h"
 #include "GameValues.h"
+#include "gfx.h"
 #include "GSGameplay.h"
 #include "GameplayStyles.h"
 #include "joystick.h"
@@ -66,50 +68,7 @@
 #include <sstream>
 
 
-extern SDL_Surface* screen;
-extern SDL_Surface* blitdest;
 
-#ifdef _DEBUG
-extern bool	g_fAutoTest;
-extern bool g_fRecordTest;
-#endif
-
-extern void SetGameModeSettingsFromMenu();
-extern void LoadMapObjects(bool fPreview);
-extern void UpdateScoreBoard();
-extern short LookupTeamID(short id);
-
-extern WorldMap g_worldmap;
-
-extern void LoadCurrentMapBackground();
-
-extern CMap* g_map;
-
-extern CScore *score[4];
-extern short score_cnt;
-
-extern CGameMode * gamemodes[GAMEMODE_LAST];
-extern CGM_Bonus * bonushousemode;
-extern CGM_Pipe_MiniGame * pipegamemode;
-extern CGM_Boss_MiniGame * bossgamemode;
-extern CGM_Boxes_MiniGame * boxesgamemode;
-extern short currentgamemode;
-
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
-extern FiltersList *filterslist;
-extern MapList *maplist;
-extern SkinList *skinlist;
-extern AnnouncerList *announcerlist;
-extern MusicList *musiclist;
-extern WorldMusicList *worldmusiclist;
-extern GraphicsList *menugraphicspacklist;
-extern GraphicsList *worldgraphicspacklist;
-extern GraphicsList *gamegraphicspacklist;
-extern SoundsList *soundpacklist;
-extern TourList *tourlist;
-extern WorldList *worldlist;
 
 // std::uniue_ptr requires that the special member function have access
 // to the complete types.
@@ -216,11 +175,6 @@ void MenuState::onEnterState()
                 }
             }
         }
-        /*else if (game_values.tournamentwinner > -1) //World is completed
-        {
-            miBonusWheel->Reset(true);
-            mCurrentMenu = mBonusWheelMenu;
-        }*/
 
         UpdateScoreBoard();
 
@@ -511,38 +465,6 @@ void MenuState::update()
     }
 
     //Watch for the konami code to unlock the minigames match type
-    /*
-    if (!game_values.minigameunlocked && mCurrentMenu == mMatchSelectionMenu) {
-        if (!mCurrentMenu->GetCurrentControl()->IsModifying()) {
-            int keymask =
-                (game_values.playerInput.outputControls[0].menu_up.fPressed?1:0) |
-                (game_values.playerInput.outputControls[0].menu_down.fPressed?2:0) |
-                (game_values.playerInput.outputControls[0].menu_left.fPressed?4:0) |
-                (game_values.playerInput.outputControls[0].menu_right.fPressed?8:0) |
-                (game_values.playerInput.outputControls[0].menu_random.fPressed?16:0);
-
-            if (iUnlockMinigameOptionIndex < 11) {
-                static const int konami_code[11] = {1,1,2,2,4,8,4,8,16,16,16};
-
-                if (keymask & konami_code[iUnlockMinigameOptionIndex])
-                    iUnlockMinigameOptionIndex++;
-                else if (keymask & ~konami_code[iUnlockMinigameOptionIndex]) {
-                    iUnlockMinigameOptionIndex = 0;
-
-                    if (keymask & konami_code[iUnlockMinigameOptionIndex])
-                        iUnlockMinigameOptionIndex++;
-                }
-
-                if (iUnlockMinigameOptionIndex == 11) {
-                    ifSoundOnPlay(rm->sfx_transform);
-                    game_values.minigameunlocked = true;
-
-                    mMatchSelectionMenu->ActivateMinigameField();
-                }
-            }
-        }
-    }
-    */
 
 #ifdef _DEBUG
     if (g_fAutoTest)
@@ -1245,8 +1167,6 @@ void MenuState::update()
             }
         }
 
-        /*if (code != MENU_CODE_NONE)
-            printf("Code: %d\n", code);*/
     }
 
     //--------------- draw everything ----------------------
@@ -1255,7 +1175,7 @@ void MenuState::update()
     if (mCurrentMenu != mWorldMenu.get())
         rm->menu_backdrop.draw(0, 0);
     else
-        SDL_FillSurfaceRect(screen, NULL, SDL_MapSurfaceRGB(screen, 0, 0, 0));
+        SDL_FillSurfaceRect(screen, nullptr, SDL_MapSurfaceRGB(screen, 0, 0, 0));
 
     mCurrentMenu->Update();
     mCurrentMenu->Draw();
@@ -1489,15 +1409,15 @@ bool MenuState::ReadTourFile()
             if (psz)
                 version.major = atoi(psz);
 
-            psz = strtok(NULL, ".\n");
+            psz = strtok(nullptr, ".\n");
             if (psz)
                 version.minor = atoi(psz);
 
-            psz = strtok(NULL, ".\n");
+            psz = strtok(nullptr, ".\n");
             if (psz)
                 version.patch = atoi(psz);
 
-            psz = strtok(NULL, ".\n");
+            psz = strtok(nullptr, ".\n");
             if (psz)
                 version.build = atoi(psz);
 
@@ -1659,11 +1579,11 @@ void MenuState::DisplayControllingTeamMessage(short iControlTeam)
     //Display the team that is in control of selecting the next game
     char szMessage[128];
     if (iControlTeam < 0)
-        sprintf(szMessage, "All Teams Are In Control");
+        snprintf(szMessage, sizeof(szMessage), "All Teams Are In Control");
     else if (game_values.teamcounts[iControlTeam] <= 1)
-        sprintf(szMessage, "Player %d Is In Control", game_values.teamids[iControlTeam][0] + 1);
+        snprintf(szMessage, sizeof(szMessage), "Player %d Is In Control", game_values.teamids[iControlTeam][0] + 1);
     else
-        sprintf(szMessage, "Team %d Is In Control", iControlTeam + 1);
+        snprintf(szMessage, sizeof(szMessage), "Team %d Is In Control", iControlTeam + 1);
 
     mCurrentMenu->AddEyeCandy<EC_Announcement>(&rm->menu_font_large, &rm->spr_announcementicons, szMessage, iControlTeam < 0 ? 4 : game_values.colorids[game_values.teamids[iControlTeam][0]], 120, 100);
 }
@@ -1700,9 +1620,9 @@ void MenuState::LoadScript(const char * szScriptFile)
 
     FILE * fp = fopen(szScriptFile, "r");
 
-    if (fp != NULL) {
+    if (fp != nullptr) {
         char buffer[256];
-        while (fgets(buffer, 256, fp) != NULL) {
+        while (fgets(buffer, 256, fp) != nullptr) {
             if (buffer[0] == '#' || buffer[0] == '\n' || buffer[0] == ' ' || buffer[0] == '\t')
                 continue;
 
@@ -1712,11 +1632,11 @@ void MenuState::LoadScript(const char * szScriptFile)
             op->iController = atoi(strtok(buffer, ",\n"));
 
             //Get iterations on this operation
-            op->iIterations = atoi(strtok(NULL, ",\n"));
+            op->iIterations = atoi(strtok(nullptr, ",\n"));
 
             //Get input operations to perform
             for (short i = 0; i < 8; i++) {
-                op->fInput[i] = atoi(strtok(NULL, ",\n")) != 0;
+                op->fInput[i] = atoi(strtok(nullptr, ",\n")) != 0;
             }
 
             operations.push_back(op);
@@ -1975,24 +1895,5 @@ void MenuState::SetNextScriptOperation()
     }
 }
 
-
-/*
-void EnterBossMode(short type)
-{
-    if (game_values.gamestate == GS_GAME && game_values.gamemode->gamemode != game_mode_boss_minigame)
-    {
-        bossgamemode->SetBossType(type);
-
-        game_values.screenfade = 2;
-        game_values.screenfadespeed = 2;
-
-        rm->backgroundmusic[0].stop();
-        ifsoundonstop(rm->sfx_invinciblemusic);
-        ifsoundonstop(rm->sfx_timewarning);
-        ifsoundonstop(rm->sfx_slowdownmusic);
-
-        game_values.gamestate = GS_START_GAME;
-    }
-}*/
 
 #endif

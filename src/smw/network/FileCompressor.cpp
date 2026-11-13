@@ -36,9 +36,9 @@ bool CompressedData::is_valid() {
 
 CompressedData FileCompressor::compress(const std::string& input_path, const size_t output_header_offset)
 {
-    FILE* input_file = NULL;
-    uint8_t* input_buffer = NULL;
-    uint8_t* compressed_buffer = NULL;
+    FILE* input_file = nullptr;
+    uint8_t* input_buffer = nullptr;
+    uint8_t* compressed_buffer = nullptr;
 
     try {
         // Open the file
@@ -83,7 +83,7 @@ CompressedData FileCompressor::compress(const std::string& input_path, const siz
         }
 
         fclose(input_file);
-        input_file = NULL;
+        input_file = nullptr;
 
         // Compress
 
@@ -123,7 +123,7 @@ CompressedData FileCompressor::compress(const std::string& input_path, const siz
     if (input_file) fclose(input_file);
     if (input_buffer) free(input_buffer);
     if (compressed_buffer) free(compressed_buffer);
-    return CompressedData(NULL, 0);
+    return CompressedData(nullptr, 0);
 }
 
 /*
@@ -133,7 +133,7 @@ CompressedData FileCompressor::compress(const std::string& input_path, const siz
 
 bool FileCompressor::decompress(const uint8_t* input_buffer, const std::string& output_path)
 {
-    assert(input_buffer != NULL);
+    assert(input_buffer != nullptr);
     assert(output_path.length() >= 5);
 
     FILE* output_file = fopen(output_path.c_str(), "wb");
@@ -142,7 +142,7 @@ bool FileCompressor::decompress(const uint8_t* input_buffer, const std::string& 
         return false;
     }
 
-    uint8_t* output_buffer = NULL;
+    uint8_t* output_buffer = nullptr;
 
     try {
         // Read file sizes stored in first 4 bytes

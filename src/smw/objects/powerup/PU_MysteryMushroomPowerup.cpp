@@ -2,13 +2,10 @@
 
 #include "eyecandy.h"
 #include "GameValues.h"
+#include "GSGameplay.h"
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CEyecandyContainer eyecandy[3];
-extern CResourceManager* rm;
-
-extern bool SwapPlayers(short iUsingPlayerID);
 
 //------------------------------------------------------------------------------
 // class mystery mushroom powerup

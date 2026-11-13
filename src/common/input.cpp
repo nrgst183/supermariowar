@@ -3,7 +3,6 @@
 #include "GameValues.h"
 #include "GlobalConstants.h"
 
-extern CGameValues game_values;
 
 CPlayerInput::CPlayerInput()
 {
@@ -153,7 +152,7 @@ void CPlayerInput::Update(SDL_Event event, short iGameState)
 				}
             } else if (SDL_EVENT_MOUSE_BUTTON_DOWN == event.type) {
                 for (int iKey = 0; iKey < NUM_KEYS && !fFound; iKey++) {
-                    if (inputControl->keys[iKey] == event.button.button + MOUSE_BUTTON_START) {
+                    if (inputControl->keys[iKey] == static_cast<SDL_Keycode>(event.button.button + MOUSE_BUTTON_START)) {
 						fFound = true;
 
 						//Ignore input for cpu controlled players
@@ -168,7 +167,7 @@ void CPlayerInput::Update(SDL_Event event, short iGameState)
 				}
             } else if (SDL_EVENT_MOUSE_BUTTON_UP == event.type) {
                 for (int iKey = 0; iKey < NUM_KEYS && !fFound; iKey++) {
-                    if (inputControl->keys[iKey] == event.button.button + MOUSE_BUTTON_START) {
+                    if (inputControl->keys[iKey] == static_cast<SDL_Keycode>(event.button.button + MOUSE_BUTTON_START)) {
 						fFound = true;
 
 						//Mouse scroll wheel up/down events happen on same frame so ignore up event (and clear it in the ClearPressedKeys() method)
@@ -218,7 +217,7 @@ void CPlayerInput::Update(SDL_Event event, short iGameState)
 					continue;
 
                 for (int iKey = 0; iKey < NUM_KEYS && !fFound; iKey++) {
-                    if (inputControl->keys[iKey] == event.jbutton.button + JOY_BUTTON_START) {
+                    if (inputControl->keys[iKey] == static_cast<SDL_Keycode>(event.jbutton.button + JOY_BUTTON_START)) {
 						fFound = true;
 
 						//Ignore input for cpu controlled players
@@ -236,7 +235,7 @@ void CPlayerInput::Update(SDL_Event event, short iGameState)
 					continue;
 
                 for (int iKey = 0; iKey < NUM_KEYS && !fFound; iKey++) {
-                    if (inputControl->keys[iKey] == event.jbutton.button + JOY_BUTTON_START) {
+                    if (inputControl->keys[iKey] == static_cast<SDL_Keycode>(event.jbutton.button + JOY_BUTTON_START)) {
 						fFound = true;
 
 						//Ignore input for cpu controlled players

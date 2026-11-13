@@ -119,4 +119,7 @@ public:
     size_t iFilteredMapCount;
 };
 
+// Defined in global.cpp
+extern MapList* maplist;
+
 #endif // MAPLIST_H

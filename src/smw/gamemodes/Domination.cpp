@@ -7,12 +7,6 @@
 #include "Score.h"
 #include "objects/overmap/WO_Area.h"
 
-extern CScore *score[4];
-extern CObjectContainer objectcontainer[3];
-extern std::vector<CPlayer*> players;
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 namespace {
 void adjustPlayerAreas(CObjectContainer& container, CPlayer* player, CPlayer* other)

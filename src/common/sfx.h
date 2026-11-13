@@ -65,3 +65,6 @@ private:
     MixAudioPtr m_audio;
     bool m_paused = false;
 };
+
+// Defined separately by each executable (smw, the editors)
+void SDLCALL musicfinished(void*, MIX_Track* rawptr);

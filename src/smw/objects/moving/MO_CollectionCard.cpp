@@ -8,11 +8,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CObjectContainer objectcontainer[3];
-extern CMap* g_map;
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class collection card (for card collection mode)
@@ -68,7 +63,7 @@ bool MO_CollectionCard::collide(CPlayer* player)
         state = 2;
         animationspeed = 4;
         animationtimer = 0;
-        animationOffsetY = animationOffsetY = (value + 1) << 5;  // FIXME
+        animationOffsetY = (value + 1) << 5;  // FIXME
         drawframe = 96;
     }
 

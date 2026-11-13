@@ -3,7 +3,6 @@
 #include "GameMode.h"
 #include "GameValues.h"
 
-extern CGameValues game_values;
 
 void PlayerShield::reset()
 {

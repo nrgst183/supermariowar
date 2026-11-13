@@ -5,8 +5,6 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_PlayerSelect.h"
 
-extern CResourceManager* rm;
-
 
 UI_MainMenu::UI_MainMenu()
     : UI_Menu()
@@ -40,27 +38,27 @@ UI_MainMenu::UI_MainMenu()
     miControlsButton->SetCode(MENU_CODE_TO_CONTROLS_MENU);
 
 #ifdef __EMSCRIPTEN__
-    miExitButton = NULL;
+    miExitButton = nullptr;
 #else
     miExitButton = new MI_Button(&rm->spr_selectfield, 120, 402, "Exit", 640 * 0.625f);
     miExitButton->SetCode(MENU_CODE_EXIT_APPLICATION);
 #endif
 
 #ifndef __EMSCRIPTEN__
-    AddControl(miMainStartButton, miExitButton, miPlayerSelect, NULL, miQuickGameButton);
-    AddControl(miQuickGameButton, miExitButton, miPlayerSelect, miMainStartButton, NULL);
-    AddControl(miPlayerSelect, miMainStartButton, miMultiplayerButton, NULL, NULL);
-    AddControl(miMultiplayerButton, miPlayerSelect, miOptionsButton, NULL, NULL);
+    AddControl(miMainStartButton, miExitButton, miPlayerSelect, nullptr, miQuickGameButton);
+    AddControl(miQuickGameButton, miExitButton, miPlayerSelect, miMainStartButton, nullptr);
+    AddControl(miPlayerSelect, miMainStartButton, miMultiplayerButton, nullptr, nullptr);
+    AddControl(miMultiplayerButton, miPlayerSelect, miOptionsButton, nullptr, nullptr);
     AddControl(miOptionsButton, miMultiplayerButton, miExitButton, miControlsButton, miControlsButton);
     AddControl(miControlsButton, miMultiplayerButton, miExitButton, miOptionsButton, miOptionsButton);
-    AddControl(miExitButton, miOptionsButton, miMainStartButton, NULL, NULL);
+    AddControl(miExitButton, miOptionsButton, miMainStartButton, nullptr, nullptr);
 #else
-    AddControl(miMainStartButton, miControlsButton, miPlayerSelect, NULL, miQuickGameButton);
-    AddControl(miQuickGameButton, miControlsButton, miPlayerSelect, miMainStartButton, NULL);
+    AddControl(miMainStartButton, miControlsButton, miPlayerSelect, nullptr, miQuickGameButton);
+    AddControl(miQuickGameButton, miControlsButton, miPlayerSelect, miMainStartButton, nullptr);
     AddNonControl(miMultiplayerButton);
-    AddControl(miPlayerSelect, miMainStartButton, miOptionsButton, NULL, NULL);
-    AddControl(miOptionsButton, miPlayerSelect, miControlsButton, NULL, NULL);
-    AddControl(miControlsButton, miOptionsButton, miMainStartButton, NULL, NULL);
+    AddControl(miPlayerSelect, miMainStartButton, miOptionsButton, nullptr, nullptr);
+    AddControl(miOptionsButton, miPlayerSelect, miControlsButton, nullptr, nullptr);
+    AddControl(miControlsButton, miOptionsButton, miMainStartButton, nullptr, nullptr);
 #endif
 
     setInitialFocus(miMainStartButton);

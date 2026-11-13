@@ -2,8 +2,6 @@
 
 #include "ResourceManager.h"
 
-extern CResourceManager* rm;
-
 
 MI_ScoreText::MI_ScoreText(short x, short y)
     : UI_Control(x, y)

@@ -5,8 +5,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CEyecandyContainer eyecandy[3];
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class kuribo's shoe

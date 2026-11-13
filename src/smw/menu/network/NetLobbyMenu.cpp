@@ -8,8 +8,6 @@
 #include "ui/MI_TextField.h"
 #include "ui/NetworkListScroll.h"
 
-extern CResourceManager* rm;
-
 
 UI_NetLobbyMenu::UI_NetLobbyMenu()
     : UI_Menu()
@@ -49,11 +47,11 @@ UI_NetLobbyMenu::UI_NetLobbyMenu()
     miNetLobbyRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miNetLobbyHeaderText = new MI_HeaderText("Multiplayer Lobby Menu", 320, 5);
 
-    AddControl(miNetLobbyScroll, NULL, NULL, NULL, miNetLobbyNewRoomButton);
-    AddControl(miNetLobbyNewRoomButton, miNetLobbyBackButton, miNetLobbyFilterField, miNetLobbyScroll, NULL);
-    AddControl(miNetLobbyFilterField, miNetLobbyNewRoomButton, miNetLobbyRefreshButton, miNetLobbyScroll, NULL);
-    AddControl(miNetLobbyRefreshButton, miNetLobbyFilterField, miNetLobbyBackButton, miNetLobbyScroll, NULL);
-    AddControl(miNetLobbyBackButton, miNetLobbyRefreshButton, miNetLobbyNewRoomButton, miNetLobbyScroll, NULL);
+    AddControl(miNetLobbyScroll, nullptr, nullptr, nullptr, miNetLobbyNewRoomButton);
+    AddControl(miNetLobbyNewRoomButton, miNetLobbyBackButton, miNetLobbyFilterField, miNetLobbyScroll, nullptr);
+    AddControl(miNetLobbyFilterField, miNetLobbyNewRoomButton, miNetLobbyRefreshButton, miNetLobbyScroll, nullptr);
+    AddControl(miNetLobbyRefreshButton, miNetLobbyFilterField, miNetLobbyBackButton, miNetLobbyScroll, nullptr);
+    AddControl(miNetLobbyBackButton, miNetLobbyRefreshButton, miNetLobbyNewRoomButton, miNetLobbyScroll, nullptr);
 
     AddNonControl(miNetLobbyJoiningDialogImage);
     AddNonControl(miNetLobbyJoiningDialogText);

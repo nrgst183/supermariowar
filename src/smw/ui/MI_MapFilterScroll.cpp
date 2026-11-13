@@ -1,12 +1,8 @@
 #include "MI_MapFilterScroll.h"
 
 #include "GameValues.h"
+#include "GSGameplay.h"
 #include "ResourceManager.h"
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern short LookupTeamID(short id);
 
 
 MI_MapFilterScroll::MI_MapFilterScroll(gfxSprite* nspr, short x, short y, short width, short numlines)

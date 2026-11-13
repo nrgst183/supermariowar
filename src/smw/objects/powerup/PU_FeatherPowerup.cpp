@@ -8,8 +8,6 @@
 
 #include <cmath>
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class feather powerup

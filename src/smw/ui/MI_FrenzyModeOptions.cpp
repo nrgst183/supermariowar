@@ -5,8 +5,6 @@
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 /**************************************
  * MI_FrenzyModeOptions Class
@@ -91,45 +89,45 @@ MI_FrenzyModeOptions::MI_FrenzyModeOptions(short x, short y, short width, short 
     miDownArrow = new MI_Image(&rm->menu_verticalarrows, 310, 402, 0, 0, 20, 20, 1, 4, 8);
     miUpArrow->setVisible(false);
 
-    mMenu->AddControl(miQuantityField, NULL, miRateField, NULL, NULL);
-    mMenu->AddControl(miRateField, miQuantityField, miStoredShellsField, NULL, NULL);
-    mMenu->AddControl(miStoredShellsField, miRateField, miPowerupSlider[0], NULL, NULL);
+    mMenu->AddControl(miQuantityField, nullptr, miRateField, nullptr, nullptr);
+    mMenu->AddControl(miRateField, miQuantityField, miStoredShellsField, nullptr, nullptr);
+    mMenu->AddControl(miStoredShellsField, miRateField, miPowerupSlider[0], nullptr, nullptr);
 
     for (short iPowerup = 0; iPowerup < NUMFRENZYCARDS; iPowerup++) {
-        UI_Control * upcontrol = NULL;
+        UI_Control * upcontrol = nullptr;
         if (iPowerup == 0)
             upcontrol = miStoredShellsField;
         else
             upcontrol = miPowerupSlider[iPowerup - 2];
 
-        UI_Control * lDownControl1 = NULL;
+        UI_Control * lDownControl1 = nullptr;
         if (iPowerup >= NUMFRENZYCARDS - 2)
             lDownControl1 = miBackButton;
         else
             lDownControl1 = miPowerupSlider[iPowerup + 2];
 
-        UI_Control * rightcontrol = NULL;
+        UI_Control * rightcontrol = nullptr;
         if (iPowerup + 1 < NUMFRENZYCARDS)
             rightcontrol = miPowerupSlider[iPowerup + 1];
         else
             rightcontrol = miBackButton;
 
-        mMenu->AddControl(miPowerupSlider[iPowerup], upcontrol, lDownControl1, NULL, rightcontrol);
+        mMenu->AddControl(miPowerupSlider[iPowerup], upcontrol, lDownControl1, nullptr, rightcontrol);
 
         if (++iPowerup < NUMFRENZYCARDS) {
-            upcontrol = NULL;
+            upcontrol = nullptr;
             if (iPowerup == 1)
                 upcontrol = miStoredShellsField;
             else
                 upcontrol = miPowerupSlider[iPowerup - 2];
 
-            UI_Control * lDownControl2 = NULL;
+            UI_Control * lDownControl2 = nullptr;
             if (iPowerup >= NUMFRENZYCARDS - 2)
                 lDownControl2 = miBackButton;
             else
                 lDownControl2 = miPowerupSlider[iPowerup + 2];
 
-            mMenu->AddControl(miPowerupSlider[iPowerup], upcontrol, lDownControl2, miPowerupSlider[iPowerup - 1], NULL);
+            mMenu->AddControl(miPowerupSlider[iPowerup], upcontrol, lDownControl2, miPowerupSlider[iPowerup - 1], nullptr);
         }
     }
 
@@ -139,7 +137,7 @@ MI_FrenzyModeOptions::MI_FrenzyModeOptions(short x, short y, short width, short 
     mMenu->AddNonControl(miUpArrow);
     mMenu->AddNonControl(miDownArrow);
 
-    mMenu->AddControl(miBackButton, miPowerupSlider[NUMFRENZYCARDS - 1], NULL, miPowerupSlider[NUMFRENZYCARDS - 1], NULL);
+    mMenu->AddControl(miBackButton, miPowerupSlider[NUMFRENZYCARDS - 1], nullptr, miPowerupSlider[NUMFRENZYCARDS - 1], nullptr);
 
     mMenu->setInitialFocus(miQuantityField);
     mMenu->SetCancelCode(MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS);

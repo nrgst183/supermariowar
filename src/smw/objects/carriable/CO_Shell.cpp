@@ -9,13 +9,6 @@
 #include "objects/carriable/CO_ThrowBlock.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
-
-extern SpotlightManager spotlightManager;
-extern CMap* g_map;
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class shell projectile
@@ -65,7 +58,7 @@ CO_Shell::CO_Shell(ShellType type, Vec2s pos, bool dieOnMovingPlayerCollision, b
     frozenvelocity = 0.0f;
     frozenanimationspeed = 4;
 
-    sSpotlight = NULL;
+    sSpotlight = nullptr;
 }
 
 bool CO_Shell::collide(CPlayer* player)
@@ -135,11 +128,11 @@ bool CO_Shell::HitTop(CPlayer* player)
         player->setYi(iy - PH - 1);
         player->bouncejump();
         player->collisions.checktop(*player);
-        player->platform = NULL;
+        player->platform = nullptr;
     } else if (state == 3) {  // Holding
         if (player != owner && (game_values.teamcollision == TeamCollisionStyle::On || player->teamID != owner->teamID)) {
             if (owner)
-                owner->carriedItem = NULL;
+                owner->carriedItem = nullptr;
 
             Kick();
             fSmoking = false;
@@ -147,7 +140,7 @@ bool CO_Shell::HitTop(CPlayer* player)
             player->setYi(iy - PH - 1);
             player->bouncejump();
             player->collisions.checktop(*player);
-            player->platform = NULL;
+            player->platform = nullptr;
         }
     }
 
@@ -157,7 +150,7 @@ bool CO_Shell::HitTop(CPlayer* player)
 bool CO_Shell::HitOther(CPlayer* player)
 {
     if (state == 2) {  // Sitting
-        if (owner == NULL && player->isready()) {
+        if (owner == nullptr && player->isready()) {
             if (player->AcceptItem(this)) {
                 owner = player;
                 iPlayerID = owner->globalID;
@@ -321,8 +314,8 @@ void CO_Shell::update()
                 ifSoundOnPlay(rm->sfx_kicksound);
 
                 if (owner) {
-                    owner->carriedItem = NULL;
-                    owner = NULL;
+                    owner->carriedItem = nullptr;
+                    owner = nullptr;
                 }
 
                 return;
@@ -368,7 +361,7 @@ void CO_Shell::update()
                 sSpotlight->UpdatePosition(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1));
             }
         } else {
-            sSpotlight = NULL;
+            sSpotlight = nullptr;
         }
     }
 }
@@ -399,7 +392,7 @@ void CO_Shell::draw()
 void CO_Shell::Drop()
 {
     if (owner) {
-        owner->carriedItem = NULL;
+        owner->carriedItem = nullptr;
         setXi(owner->ix + (owner->isFacingRight() ? PW + 1 : -31));
     }
 
@@ -409,7 +402,7 @@ void CO_Shell::Drop()
         setYi(owner->iy + PH - 32 + collisionOffsetY);
         Die();
     } else {
-        owner = NULL;
+        owner = nullptr;
         state = 2;
     }
 }
@@ -448,7 +441,7 @@ void CO_Shell::Kick()
     iPlayerID = owner->globalID;
     iTeamID = owner->teamID;
 
-    owner = NULL;
+    owner = nullptr;
     iNoOwnerKillTime = 30;
 
     state = 1;
@@ -480,8 +473,8 @@ void CO_Shell::Die()
     iKillCounter = 0;
 
     if (owner) {
-        owner->carriedItem = NULL;
-        owner = NULL;
+        owner->carriedItem = nullptr;
+        owner = nullptr;
     }
 }
 
@@ -492,8 +485,8 @@ void CO_Shell::ShatterDie()
     iKillCounter = 0;
 
     if (owner) {
-        owner->carriedItem = NULL;
-        owner = NULL;
+        owner->carriedItem = nullptr;
+        owner = nullptr;
     }
 
     short iBrokenIceX = ix - collisionOffsetX, iBrokenIceY = iy - collisionOffsetY;
@@ -538,7 +531,7 @@ void CO_Shell::Flip()
 
 void CO_Shell::Stop()
 {
-    owner = NULL;
+    owner = nullptr;
     velx = 0.0f;
     state = 2;
     fSmoking = false;

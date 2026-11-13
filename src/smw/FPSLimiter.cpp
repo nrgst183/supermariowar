@@ -8,10 +8,6 @@
 #include <format>
 
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-
 FPSLimiter::FPSLimiter()
     : framestart(0)
     , ticks(0)
@@ -94,22 +90,5 @@ void FPSLimiter::afterFlip()
 
     realfps = 1000.0f / (float)ticks;
 
-    /*
-    static float avgFPS = 0.0f;
-    static short outputtimer = 0;
-
-    avgFPS += realfps;
-
-    if (++outputtimer == 1)
-    {
-        FILE * out = fopen("fps.txt", "a+");
-
-        fprintf(out, "%.2f\n", avgFPS / (float)outputtimer);
-
-        fclose(out);
-
-        avgFPS = 0.0f;
-        outputtimer = 0;
-    }*/
 }
 #endif

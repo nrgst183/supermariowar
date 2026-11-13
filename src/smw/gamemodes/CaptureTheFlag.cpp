@@ -7,11 +7,6 @@
 #include "objects/moving/MO_FlagBase.h"
 #include "ResourceManager.h"
 
-extern CObjectContainer objectcontainer[3];
-extern std::vector<CPlayer*> players;
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 //Capture The Flag mode - each team has a base and a flag
 //Protect your colored flag from being taken and score a point
@@ -47,7 +42,7 @@ void CGM_CaptureTheFlag::init()
     }
 
     if (game_values.gamemodesettings.flag.centerflag) {
-        CO_Flag * centerflag = new CO_Flag(&rm->spr_flags, NULL, -1, -1);
+        CO_Flag * centerflag = new CO_Flag(&rm->spr_flags, nullptr, -1, -1);
         objectcontainer[1].add(centerflag);
     }
 }

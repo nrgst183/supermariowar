@@ -3,9 +3,6 @@
 #include "GameValues.h"
 #include "ResourceManager.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 MI_StoredPowerupResetButton::MI_StoredPowerupResetButton(gfxSprite* nspr, short x, short y, std::string name, short width, TextAlign align) :
     MI_Button(nspr, x, y, std::move(name), width, align)

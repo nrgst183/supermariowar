@@ -9,8 +9,6 @@
 
 #include <cstring>
 
-extern CResourceManager* rm;
-
 
 UI_NetNewRoomMenu::UI_NetNewRoomMenu()
     : UI_Menu()
@@ -27,10 +25,10 @@ UI_NetNewRoomMenu::UI_NetNewRoomMenu()
     miNetNewRoomBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miNetNewRoomBackButton->SetCode(MENU_CODE_TO_NET_NEW_ROOM_LEVEL_SELECT_MENU);
 
-    AddControl(miNetNewRoomNameField, miNetNewRoomBackButton, miNetNewRoomPasswordField, NULL, NULL);
-    AddControl(miNetNewRoomPasswordField, miNetNewRoomNameField, miNetNewRoomCreateButton, NULL, NULL);
-    AddControl(miNetNewRoomCreateButton, miNetNewRoomPasswordField, miNetNewRoomBackButton, NULL, NULL);
-    AddControl(miNetNewRoomBackButton, miNetNewRoomCreateButton, miNetNewRoomNameField, NULL, NULL);
+    AddControl(miNetNewRoomNameField, miNetNewRoomBackButton, miNetNewRoomPasswordField, nullptr, nullptr);
+    AddControl(miNetNewRoomPasswordField, miNetNewRoomNameField, miNetNewRoomCreateButton, nullptr, nullptr);
+    AddControl(miNetNewRoomCreateButton, miNetNewRoomPasswordField, miNetNewRoomBackButton, nullptr, nullptr);
+    AddControl(miNetNewRoomBackButton, miNetNewRoomCreateButton, miNetNewRoomNameField, nullptr, nullptr);
 
     miNetNewRoomCreatingDialogImage = new MI_Image(&rm->spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);
     miNetNewRoomCreatingDialogText = new MI_HeaderText("Creating...", 320, 240 - 12);

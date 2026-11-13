@@ -41,7 +41,7 @@ private:
 // default random number generator, using system
 class SystemRandomNumberGenerator : public RandomNumberGeneratorType {
 public:
-    int getInteger(int rMin, int rMax);
+    int getInteger(int rMin, int rMax) override;
 };
 
 
@@ -62,8 +62,8 @@ private:
 public:
 
     Well512RandomNumberGenerator();
-    void reseed(unsigned seed);
-    int getInteger(int rMin, int rMax);
+    void reseed(unsigned seed) override;
+    int getInteger(int rMin, int rMax) override;
 };
 
 #endif // RANDOMNUMBERGENERATOR_H

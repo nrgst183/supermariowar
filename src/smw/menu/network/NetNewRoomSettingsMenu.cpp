@@ -13,8 +13,6 @@
 
 #include <cassert>
 
-extern CResourceManager* rm;
-
 
 UI_NetNewRoomSettingsMenu::UI_NetNewRoomSettingsMenu(const UI_GameSettingsMenu* gsm) : UI_Menu()
 {
@@ -29,32 +27,32 @@ UI_NetNewRoomSettingsMenu::UI_NetNewRoomSettingsMenu(const UI_GameSettingsMenu* 
     netplay.mapfilepath = getCurrentMapPath();
 
 
-    //AddControl(miModeField, miContinueButton, miGoalField[0], NULL, NULL);
+    //AddControl(miModeField, miContinueButton, miGoalField[0], nullptr, nullptr);
 
-/*    AddControl(miGoalField[0], miModeField, miGoalField[1], NULL, miModeSettingsButton);
+/*    AddControl(miGoalField[0], miModeField, miGoalField[1], nullptr, miModeSettingsButton);
 
     for (short iGoalField = 1; iGoalField < GAMEMODE_LAST - 1; iGoalField++)
-        AddControl(miGoalField[iGoalField], miGoalField[iGoalField - 1], miGoalField[iGoalField + 1], miGoalField[iGoalField - 1], NULL);
+        AddControl(miGoalField[iGoalField], miGoalField[iGoalField - 1], miGoalField[iGoalField + 1], miGoalField[iGoalField - 1], nullptr);
 
-    AddControl(miGoalField[GAMEMODE_LAST - 1], miGoalField[GAMEMODE_LAST - 2], miMapField, miGoalField[GAMEMODE_LAST - 2], NULL);
+    AddControl(miGoalField[GAMEMODE_LAST - 1], miGoalField[GAMEMODE_LAST - 2], miMapField, miGoalField[GAMEMODE_LAST - 2], nullptr);
 */
 
     miModeSettingsButton = new MI_Button(&rm->spr_selectfield, 430, 125, "Settings", 140);
     miModeSettingsButton->SetCode(MENU_CODE_TO_MODE_SETTINGS_MENU);
 
 
-    AddControl(miContinueButton, miMapField, miModeField, NULL, NULL);
-    AddControl(miModeField, miContinueButton, miGoalField[0], NULL, NULL);
-    AddControl(miGoalField[0], miModeField, miGoalField[1], NULL, miModeSettingsButton);
+    AddControl(miContinueButton, miMapField, miModeField, nullptr, nullptr);
+    AddControl(miModeField, miContinueButton, miGoalField[0], nullptr, nullptr);
+    AddControl(miGoalField[0], miModeField, miGoalField[1], nullptr, miModeSettingsButton);
     for (short iGoalField = 1; iGoalField < GAMEMODE_LAST - 1; iGoalField++)
         AddControl(miGoalField[iGoalField],
             miGoalField[iGoalField - 1],
             miGoalField[iGoalField + 1],
             miGoalField[iGoalField - 1],
             miModeSettingsButton);
-    AddControl(miGoalField[GAMEMODE_LAST - 1], miGoalField[GAMEMODE_LAST - 2], miMapField, miGoalField[GAMEMODE_LAST - 2], NULL);
-    AddControl(miModeSettingsButton, miModeField, miMapField, miGoalField[GAMEMODE_LAST - 1], NULL);
-    AddControl(miMapField, miGoalField[GAMEMODE_LAST - 1], miContinueButton, NULL, NULL);
+    AddControl(miGoalField[GAMEMODE_LAST - 1], miGoalField[GAMEMODE_LAST - 2], miMapField, miGoalField[GAMEMODE_LAST - 2], nullptr);
+    AddControl(miModeSettingsButton, miModeField, miMapField, miGoalField[GAMEMODE_LAST - 1], nullptr);
+    AddControl(miMapField, miGoalField[GAMEMODE_LAST - 1], miContinueButton, nullptr, nullptr);
 
     miLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
     miRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);

@@ -6,13 +6,10 @@
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "objects/moving/MO_Coin.h"
+#include "Score.h"
 
 #include <cmath>
 
-extern short score_cnt;
-extern CScore *score[4];
-extern CObjectContainer objectcontainer[3];
-extern CResourceManager* rm;
 
 /*
 TODO

@@ -7,12 +7,7 @@
 #include "ResourceManager.h"
 #include "objects/overmap/WO_PipeBonus.h"
 #include "objects/overmap/WO_PipeCoin.h"
-
-
-extern short score_cnt;
-extern CObjectContainer objectcontainer[3];
-extern CResourceManager* rm;
-extern CGameValues game_values;
+#include "Score.h"
 
 
 //Pipe Bonus Mini Game (used in world mode)

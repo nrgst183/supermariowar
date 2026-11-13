@@ -17,11 +17,14 @@
 #endif
 
 #include "CmdArgs.h"
+#include "eyecandy.h"
 #include "FileIO.h"
 #include "FileList.h"
 #include "GameMode.h"
 #include "GameModeSettingsSerialization.h"
 #include "GameValues.h"
+#include "gfx.h"
+#include "GSGameplay.h"
 #include "map.h"
 #include "MapList.h"
 #include "menu/ModeOptionsMenu.h"
@@ -141,7 +144,6 @@ WorldVehicle g_wvVehicleStamp;
 gfxSprite		spr_warplock;
 short			x_shake = 0;
 short			y_shake = 0;
-extern CGameValues game_values;
 
 void CPlayer::flipsidesifneeded() {}
 bool CPlayer::isInvincible() const { return false; }
@@ -189,13 +191,9 @@ void AddAwardKill(CPlayer * killer, CPlayer * killed, KillStyle style) {}
 
 CPlayer * GetPlayerFromGlobalID(short id)
 {
-    return NULL;
+    return nullptr;
 }
 
-/*float CapFallingVelocity(float f)
-{
-    return 0.0f;
-}*/
 void removeifprojectile(IO_MovingObject * object, bool playsound, bool forcedead) {}
 bool LoadMenuSkin(short playerID, short skinID, short colorID, bool fLoadBothDirections)
 {
@@ -219,16 +217,6 @@ sfxSound		sfx_transform;
 gfxSprite		**spr_player[4];
 CGameMode		*gamemodes[GAMEMODE_LAST];
 
-extern FiltersList *filterslist;
-extern MapList* maplist;
-extern GraphicsList *menugraphicspacklist;
-extern GraphicsList *gamegraphicspacklist;
-
-extern CMap* g_map;
-extern CTilesetManager* g_tilesetmanager;
-
-extern CResourceManager* rm;
-extern std::string RootDataDirectory;
 
 gfxSprite		spr_overlay, spr_overlayhole;
 
@@ -283,8 +271,6 @@ void WriteWarpsIntoWorld();
 void AddWarpToTile(short iCol, short iRow, short iType);
 void RemoveWarpFromTile(short iCol, short iRow);
 
-extern WorldMap g_worldmap;
-extern WorldList *worldlist;
 void loadcurrentworld();
 int savecurrentworld();
 int findcurrentstring();
@@ -330,9 +316,6 @@ void SetDisplayMessage(short iTime,
                        const char *szLine2,
                        const char *szLine3);
 void DrawMessage();
-
-//Menu keys to use for menus
-extern SDL_Keycode controlkeys[2][2][4][NUM_KEYS];
 
 //Vehicle stuff
 std::vector<WorldVehicle*> vehiclelist;
@@ -422,7 +405,7 @@ void SetStageMode(short iIndex, const char * szModeName, const char * szGoalName
 
     for (short iModeOption = 0; iModeOption < GAMEMODE_NUM_OPTIONS - 1; iModeOption++) {
 		sm->options[iModeOption].iValue = (iModeOption + 1) * iIncrement;
-		sprintf(sm->options[iModeOption].szName, "%d", sm->options[iModeOption].iValue);
+		snprintf(sm->options[iModeOption].szName, sizeof(sm->options[iModeOption].szName), "%d", sm->options[iModeOption].iValue);
 	}
 }
 
@@ -437,7 +420,7 @@ int main(int argc, char *argv[])
     }
     if (cmd.show_help) {
         char title[128];
-        sprintf(title, "%s %s", TITLESTRING, MAPTITLESTRING);
+        snprintf(title, sizeof(title), "%s %s", TITLESTRING, MAPTITLESTRING);
         cmd::print_help(title, "");
         return 0;
     }
@@ -515,7 +498,7 @@ void inner_main()
         game_values.music = false;
 
 	char title[128];
-	sprintf(title, "%s %s", TITLESTRING, MAPTITLESTRING);
+	snprintf(title, sizeof(title), "%s %s", TITLESTRING, MAPTITLESTRING);
 	gfx_settitle(title);
 
 	game_values.toplayer = true;
@@ -671,7 +654,7 @@ void inner_main()
 	miNameField->SetDisallowedChars(",");
 
 	miModeField = new MI_ImageSelectField(&rm->spr_selectfield, &rm->menu_mode_small, 70, 60, "Mode", 500, 120, 16, 16);
-	//miModeField->SetData(game_values.tourstops[0]->iMode, NULL, NULL);
+	//miModeField->SetData(game_values.tourstops[0]->iMode, nullptr, nullptr);
 	//miModeField->SetKey(0);
 	miModeField->setItemChangedCode(MENU_CODE_MODE_CHANGED);
 
@@ -686,7 +669,7 @@ void inner_main()
 			miGoalField[iGameMode]->add(option->szName, option->iValue);
 		}
 
-		//miGoalField[iGameMode]->SetData(&gamemodes[iGameMode]->goal, NULL, NULL);
+		//miGoalField[iGameMode]->SetData(&gamemodes[iGameMode]->goal, nullptr, nullptr);
 		//miGoalField[iGameMode]->SetKey(gamemodes[iGameMode]->goal);
 	}
 
@@ -702,7 +685,7 @@ void inner_main()
     for (short iGameModeOption = 0; iGameModeOption < GAMEMODE_NUM_OPTIONS - 1; iGameModeOption++) {
 		short iValue = 10 + iGameModeOption * 10;
 		char szName[16];
-		sprintf(szName, "%d", iValue);
+		snprintf(szName, sizeof(szName), "%d", iValue);
 		miSpecialGoalField[0]->add(szName, iValue);
 	}
 
@@ -712,7 +695,7 @@ void inner_main()
 
     for (short iGameLives = 1; iGameLives <= 30; iGameLives++) {
 		char szName[16];
-		sprintf(szName, "%d", iGameLives);
+		snprintf(szName, sizeof(szName), "%d", iGameLives);
 		miSpecialGoalField[1]->add(szName, iGameLives);
 	}
 
@@ -722,7 +705,7 @@ void inner_main()
 
     for (short iGameLives = 1; iGameLives <= 30; iGameLives++) {
 		char szName[16];
-		sprintf(szName, "%d", iGameLives);
+		snprintf(szName, sizeof(szName), "%d", iGameLives);
 		miSpecialGoalField[2]->add(szName, iGameLives);
 	}
 
@@ -734,7 +717,7 @@ void inner_main()
 	miPointsField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 140, "Points", 245, 120);
     for (short iPoints = 0; iPoints <= 20; iPoints++) {
 		char szPoints[8];
-		sprintf(szPoints, "%d", iPoints);
+		snprintf(szPoints, sizeof(szPoints), "%d", iPoints);
 		miPointsField->add(szPoints, iPoints);
 	}
 
@@ -791,13 +774,13 @@ void inner_main()
 	miDeleteStageDialogNoButton->setVisible(false);
 
 	//Add Name Field
-	mStageSettingsMenu.AddControl(miNameField, miDeleteStageButton, miModeField, NULL, NULL);
+	mStageSettingsMenu.AddControl(miNameField, miDeleteStageButton, miModeField, nullptr, nullptr);
 
 	//Add Mode Field
-	mStageSettingsMenu.AddControl(miModeField, miNameField, miGoalField[0], NULL, NULL);
+	mStageSettingsMenu.AddControl(miModeField, miNameField, miGoalField[0], nullptr, nullptr);
 
 	//Add Mode Goal Fields
-	mStageSettingsMenu.AddControl(miGoalField[0], miModeField, miGoalField[1], NULL, miModeSettingsButton);
+	mStageSettingsMenu.AddControl(miGoalField[0], miModeField, miGoalField[1], nullptr, miModeSettingsButton);
 
 	for (short iGoalField = 1; iGoalField < GAMEMODE_LAST - 1; iGoalField++)
 		mStageSettingsMenu.AddControl(miGoalField[iGoalField], miGoalField[iGoalField - 1], miGoalField[iGoalField + 1], miGoalField[iGoalField - 1], miModeSettingsButton);
@@ -809,38 +792,38 @@ void inner_main()
 	mStageSettingsMenu.AddControl(miSpecialGoalField[2], miSpecialGoalField[1], miPointsField, miSpecialGoalField[1], miModeSettingsButton);
 
 	//Add Mode Settings Button
-	mStageSettingsMenu.AddControl(miModeSettingsButton, miModeField, miFinalStageField, miSpecialGoalField[2], NULL);
+	mStageSettingsMenu.AddControl(miModeSettingsButton, miModeField, miFinalStageField, miSpecialGoalField[2], nullptr);
 
 	//Add Points Field
-	mStageSettingsMenu.AddControl(miPointsField, miSpecialGoalField[2], miMapField, NULL, miFinalStageField);
+	mStageSettingsMenu.AddControl(miPointsField, miSpecialGoalField[2], miMapField, nullptr, miFinalStageField);
 
 	//Add Final Stage Field
-	mStageSettingsMenu.AddControl(miFinalStageField, miSpecialGoalField[2], miMapField, miPointsField, NULL);
+	mStageSettingsMenu.AddControl(miFinalStageField, miSpecialGoalField[2], miMapField, miPointsField, nullptr);
 
 	//Add Map Field
-	mStageSettingsMenu.AddControl(miMapField, miFinalStageField, miBonusType, NULL, miBonusItemsButton);
+	mStageSettingsMenu.AddControl(miMapField, miFinalStageField, miBonusType, nullptr, miBonusItemsButton);
 
 	//Add Bonus House Fields
-	mStageSettingsMenu.AddControl(miBonusType, miMapField, miBonusTextField[0], NULL, NULL);
-	mStageSettingsMenu.AddControl(miBonusTextField[0], miBonusType, miBonusTextField[1], NULL, NULL);
-	mStageSettingsMenu.AddControl(miBonusTextField[1], miBonusTextField[0], miBonusTextField[2], NULL, NULL);
-	mStageSettingsMenu.AddControl(miBonusTextField[2], miBonusTextField[1], miBonusTextField[3], NULL, NULL);
-	mStageSettingsMenu.AddControl(miBonusTextField[3], miBonusTextField[2], miBonusTextField[4], NULL, NULL);
-	mStageSettingsMenu.AddControl(miBonusTextField[4], miBonusTextField[3], miBonusItemsButton, NULL, NULL);
+	mStageSettingsMenu.AddControl(miBonusType, miMapField, miBonusTextField[0], nullptr, nullptr);
+	mStageSettingsMenu.AddControl(miBonusTextField[0], miBonusType, miBonusTextField[1], nullptr, nullptr);
+	mStageSettingsMenu.AddControl(miBonusTextField[1], miBonusTextField[0], miBonusTextField[2], nullptr, nullptr);
+	mStageSettingsMenu.AddControl(miBonusTextField[2], miBonusTextField[1], miBonusTextField[3], nullptr, nullptr);
+	mStageSettingsMenu.AddControl(miBonusTextField[3], miBonusTextField[2], miBonusTextField[4], nullptr, nullptr);
+	mStageSettingsMenu.AddControl(miBonusTextField[4], miBonusTextField[3], miBonusItemsButton, nullptr, nullptr);
 
 	//Add Bonus Button
-	mStageSettingsMenu.AddControl(miBonusItemsButton, miBonusTextField[4], miDeleteStageButton, miMapField, NULL);
+	mStageSettingsMenu.AddControl(miBonusItemsButton, miBonusTextField[4], miDeleteStageButton, miMapField, nullptr);
 
 	//Add Delete Stage Button
-	mStageSettingsMenu.AddControl(miDeleteStageButton, miBonusItemsButton, miNameField, miMapField, NULL);
+	mStageSettingsMenu.AddControl(miDeleteStageButton, miBonusItemsButton, miNameField, miMapField, nullptr);
 
 	//Add Are You Sure Dialog
 	mStageSettingsMenu.AddNonControl(miDeleteStageDialogImage);
 	mStageSettingsMenu.AddNonControl(miDeleteStageDialogAreYouText);
 	mStageSettingsMenu.AddNonControl(miDeleteStageDialogSureText);
 
-	mStageSettingsMenu.AddControl(miDeleteStageDialogYesButton, NULL, NULL, NULL, miDeleteStageDialogNoButton);
-	mStageSettingsMenu.AddControl(miDeleteStageDialogNoButton, NULL, NULL, miDeleteStageDialogYesButton, NULL);
+	mStageSettingsMenu.AddControl(miDeleteStageDialogYesButton, nullptr, nullptr, nullptr, miDeleteStageDialogNoButton);
+	mStageSettingsMenu.AddControl(miDeleteStageDialogNoButton, nullptr, nullptr, miDeleteStageDialogYesButton, nullptr);
 
 	mStageSettingsMenu.setInitialFocus(miNameField);
 	mStageSettingsMenu.SetCancelCode(MENU_CODE_EXIT_APPLICATION);
@@ -879,7 +862,7 @@ void inner_main()
 
     for (short iMinMoves = 0; iMinMoves <= 100; iMinMoves++) {
 		char szMinMoves[8];
-		sprintf(szMinMoves, "%d", iMinMoves);
+		snprintf(szMinMoves, sizeof(szMinMoves), "%d", iMinMoves);
 		miVehicleMinMovesField->add(szMinMoves, iMinMoves);
 	}
 
@@ -893,7 +876,7 @@ void inner_main()
 
     for (short iMaxMoves = 0; iMaxMoves <= 100; iMaxMoves++) {
 		char szMaxMoves[8];
-		sprintf(szMaxMoves, "%d", iMaxMoves);
+		snprintf(szMaxMoves, sizeof(szMaxMoves), "%d", iMaxMoves);
 		miVehicleMaxMovesField->add(szMaxMoves, iMaxMoves);
 	}
 
@@ -922,7 +905,7 @@ void inner_main()
 
     for (short iBoundary = 1; iBoundary <= 100; iBoundary++) {
 		char szBoundary[8];
-		sprintf(szBoundary, "%d", iBoundary);
+		snprintf(szBoundary, sizeof(szBoundary), "%d", iBoundary);
 		miVehicleBoundaryField->add(szBoundary, iBoundary);
 	}
 
@@ -937,14 +920,14 @@ void inner_main()
 
 	mVehicleMenu.AddNonControl(miTitleText);
 
-	mVehicleMenu.AddControl(miVehicleSpriteField, miVehicleCreateButton, miVehicleStageField, NULL, NULL);
-	mVehicleMenu.AddControl(miVehicleStageField, miVehicleSpriteField, miVehicleMinMovesField, NULL, NULL);
-	mVehicleMenu.AddControl(miVehicleMinMovesField, miVehicleStageField, miVehicleMaxMovesField, NULL, NULL);
-	mVehicleMenu.AddControl(miVehicleMaxMovesField, miVehicleMinMovesField, miVehiclePacesField, NULL, NULL);
-	mVehicleMenu.AddControl(miVehiclePacesField, miVehicleMaxMovesField, miVehicleDirectionField, NULL, NULL);
-	mVehicleMenu.AddControl(miVehicleDirectionField, miVehiclePacesField, miVehicleBoundaryField, NULL, NULL);
-	mVehicleMenu.AddControl(miVehicleBoundaryField, miVehicleDirectionField, miVehicleCreateButton, NULL, NULL);
-	mVehicleMenu.AddControl(miVehicleCreateButton, miVehicleBoundaryField, miVehicleSpriteField, NULL, NULL);
+	mVehicleMenu.AddControl(miVehicleSpriteField, miVehicleCreateButton, miVehicleStageField, nullptr, nullptr);
+	mVehicleMenu.AddControl(miVehicleStageField, miVehicleSpriteField, miVehicleMinMovesField, nullptr, nullptr);
+	mVehicleMenu.AddControl(miVehicleMinMovesField, miVehicleStageField, miVehicleMaxMovesField, nullptr, nullptr);
+	mVehicleMenu.AddControl(miVehicleMaxMovesField, miVehicleMinMovesField, miVehiclePacesField, nullptr, nullptr);
+	mVehicleMenu.AddControl(miVehiclePacesField, miVehicleMaxMovesField, miVehicleDirectionField, nullptr, nullptr);
+	mVehicleMenu.AddControl(miVehicleDirectionField, miVehiclePacesField, miVehicleBoundaryField, nullptr, nullptr);
+	mVehicleMenu.AddControl(miVehicleBoundaryField, miVehicleDirectionField, miVehicleCreateButton, nullptr, nullptr);
+	mVehicleMenu.AddControl(miVehicleCreateButton, miVehicleBoundaryField, miVehicleSpriteField, nullptr, nullptr);
 
 	mVehicleMenu.setInitialFocus(miVehicleSpriteField);
 	mVehicleMenu.SetCancelCode(MENU_CODE_EXIT_APPLICATION);
@@ -1121,7 +1104,7 @@ int editor_edit()
 					}
 
                 case SDL_EVENT_KEY_DOWN: {
-                    const bool* keystate = SDL_GetKeyboardState(NULL);
+                    const bool* keystate = SDL_GetKeyboardState(nullptr);
                     if (event.key.key == SDLK_ESCAPE) {
 							if (g_musiccategorydisplaytimer > 0)
 								g_musiccategorydisplaytimer = 0;
@@ -1993,7 +1976,7 @@ void WriteVehiclesIntoWorld()
 void AddVehicleToTile(short iCol, short iRow, short iType)
 {
 	std::vector<WorldVehicle*>::iterator itr = vehiclelist.begin(), lim = vehiclelist.end();
-	WorldVehicle * newvehicle = NULL;
+	WorldVehicle * newvehicle = nullptr;
     while (itr != lim) {
 		WorldVehicle * vehicle = *itr;
         if (vehicle->getCurrentTile().x == iCol && vehicle->getCurrentTile().y == iRow) {
@@ -2067,7 +2050,7 @@ void WriteWarpsIntoWorld()
 void AddWarpToTile(short iCol, short iRow, short iType)
 {
 	std::vector<WorldWarp*>::iterator itr = warplist.begin(), lim = warplist.end();
-	WorldWarp * newwarp = NULL;
+	WorldWarp * newwarp = nullptr;
     while (itr != lim) {
 		WorldWarp * warp = *itr;
         if (warp->id == iType) {
@@ -2466,7 +2449,7 @@ void updateworldsurface()
 void drawmap(bool fScreenshot, short iBlockSize)
 {
 	if (fNeedBlackBackground)
-		SDL_FillSurfaceRect(screen, NULL, 0x0);
+		SDL_FillSurfaceRect(screen, nullptr, 0x0);
 
 	sMapSurface.draw(rectSrcSurface, blitdest, rectDstSurface);
 }
@@ -2851,7 +2834,7 @@ int editor_water()
 			}
 		}
 
-		SDL_FillSurfaceRect(screen, NULL, 0x0);
+		SDL_FillSurfaceRect(screen, nullptr, 0x0);
 
 		for (short iWater = 0; iWater < 3; iWater++)
 			rm->spr_worldbackground[0].draw(iWater << 5, 0, {512 + (iWater << 7), 0, 32, 32});
@@ -2941,7 +2924,7 @@ int editor_background()
 			}
 		}
 
-		SDL_FillSurfaceRect(screen, NULL, 0x0);
+		SDL_FillSurfaceRect(screen, nullptr, 0x0);
 
 		rm->spr_worldbackground[0].draw(0, 0, {iPage * 640, 32, 640, 480});
 
@@ -3013,7 +2996,7 @@ int editor_stageforeground()
 			}
 		}
 
-		SDL_FillSurfaceRect(screen, NULL, 0x0);
+		SDL_FillSurfaceRect(screen, nullptr, 0x0);
 
         for (short iRow = 0; iRow < 10; iRow++) {
             for (short iCol = 0; iCol < 10; iCol++) {
@@ -3084,7 +3067,7 @@ int editor_bridges()
 			}
 		}
 
-		SDL_FillSurfaceRect(screen, NULL, 0x0);
+		SDL_FillSurfaceRect(screen, nullptr, 0x0);
 
 		rm->spr_worldforegroundspecial[0].draw(0, 0, {320, 224, 128, 32});
 
@@ -3155,7 +3138,7 @@ int editor_structureforeground()
 			}
 		}
 
-		SDL_FillSurfaceRect(screen, NULL, 0x0);
+		SDL_FillSurfaceRect(screen, nullptr, 0x0);
 
 		rm->spr_worldforeground[0].draw(0, 0, {0, 0, 416, 480});
 		rm->spr_worldforeground[0].draw(416, 0, {512, 0, 32, 480});
@@ -3218,7 +3201,7 @@ int editor_pathsprite()
 			}
 		}
 
-		SDL_FillSurfaceRect(screen, NULL, 0x0);
+		SDL_FillSurfaceRect(screen, nullptr, 0x0);
 
         for (short iPath = 0; iPath < 8; iPath++) {
 			rm->spr_worldpaths[0].draw(iPath << 5, 0, {(iPath % 4) * 160, (iPath / 4) * 320, 32, 192});
@@ -3403,7 +3386,7 @@ int editor_path()
 			}
 		}
 
-		SDL_FillSurfaceRect(screen, NULL, 0x0);
+		SDL_FillSurfaceRect(screen, nullptr, 0x0);
 		spr_path.draw(0, 0, {0, 0, 480, 32});
 
 		DrawMessage();
@@ -3480,13 +3463,13 @@ void DisplayStageDetails(bool fForce, short iStageId, short iMouseX, short iMous
 
 	char szPrint[128];
     if (iMode != 24) {
-		sprintf(szPrint, "Goal: %d", ts->iGoal);
+		snprintf(szPrint, sizeof(szPrint), "Goal: %d", ts->iGoal);
 		rm->menu_font_small.drawChopRight(iMouseX + 52, iMouseY + 34, 164, szPrint);
 
-		sprintf(szPrint, "Points: %d", ts->iPoints);
+		snprintf(szPrint, sizeof(szPrint), "Points: %d", ts->iPoints);
 		rm->menu_font_small.drawChopRight(iMouseX + 16, iMouseY + 176, 100, szPrint);
 
-		sprintf(szPrint, "End: %s", ts->fEndStage ? "Yes" : "No");
+		snprintf(szPrint, sizeof(szPrint), "End: %s", ts->fEndStage ? "Yes" : "No");
 		rm->menu_font_small.drawChopRight(iMouseX + 126, iMouseY + 176, 80, szPrint);
 
         for (short iBonus = 0; iBonus < ts->iNumBonuses; iBonus++) {
@@ -3504,12 +3487,12 @@ void DisplayStageDetails(bool fForce, short iStageId, short iMouseX, short iMous
             sMapThumbnail.draw(rSrc, blitdest, rDst);
         }
     } else {
-		sprintf(szPrint, "Sort: %s", ts->iBonusType == 0 ? "Fixed" : "Random");
+		snprintf(szPrint, sizeof(szPrint), "Sort: %s", ts->iBonusType == 0 ? "Fixed" : "Random");
 		rm->menu_font_small.drawChopRight(iMouseX + 52, iMouseY + 34, 164, szPrint);
 
         for (short iBonus = 0; iBonus < ts->iNumBonuses; iBonus++) {
 			short iBonusIcon = ts->wsbBonuses[iBonus].iBonus;
-			gfxSprite * spr_icon = NULL;
+			gfxSprite * spr_icon = nullptr;
 			short iSrcX = 0, iSrcY = 0;
 
             if (iBonusIcon < NUM_POWERUPS) {
@@ -4360,24 +4343,6 @@ int display_help()
 	rm->menu_font_small.draw(offsetx, offsety, "[Right Mouse Button] - Remove Item");
 	offsety += rm->menu_font_small.getHeight() + 20;
 
-	/*
-	rm->menu_font_small.draw(offsetx, offsety, "Move Mode:");
-	offsety += rm->menu_font_small.getHeight() + 2;
-	rm->menu_font_small.draw(offsetx, offsety, "[Right Mouse Button] - Select Area");
-	offsety += rm->menu_font_small.getHeight() + 2;
-	rm->menu_font_small.draw(offsetx, offsety, "[Left Mouse Button] - Unselect Area");
-	offsety += rm->menu_font_small.getHeight() + 2;
-	rm->menu_font_small.draw(offsetx, offsety, "Select And Drag - Move Selections");
-	offsety += rm->menu_font_small.getHeight() + 2;
-	rm->menu_font_small.draw(offsetx, offsety, "Hold [shift] - Multiple Selections");
-	offsety += rm->menu_font_small.getHeight() + 2;
-	rm->menu_font_small.draw(offsetx, offsety, "Hold [ctrl] - Freehand Selections");
-	offsety += rm->menu_font_small.getHeight() + 2;
-	rm->menu_font_small.draw(offsetx, offsety, "[delete] - Delete Selection");
-	offsety += rm->menu_font_small.getHeight() + 2;
-	rm->menu_font_small.draw(offsetx, offsety, "[c] - Copy Selection");
-	offsety += rm->menu_font_small.getHeight() + 20;
-	*/
 
 	rm->menu_font_small.draw(offsetx, offsety, "Miscellaneous:");
 	offsety += rm->menu_font_small.getHeight() + 2;
@@ -4498,7 +4463,7 @@ bool dialog(const char * title, const char * instructions, char * input, int inp
 							//insert character into fileName and onScreenText and increment current char
 							Uint8 key = event.key.key;
 
-                        const bool* keystate = SDL_GetKeyboardState(NULL);
+                        const bool* keystate = SDL_GetKeyboardState(nullptr);
                         if (CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT)) {
 								if (event.key.key == 45)
 									key = 95;

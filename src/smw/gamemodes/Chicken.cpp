@@ -5,10 +5,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 //capture the chicken
 //one player is the chicken
@@ -99,7 +95,7 @@ PlayerKillType CGM_Chicken::playerkilledself(CPlayer &player, KillStyle style)
         player.SetCorpseType(1); //flag to use chocobo corpse sprite
 
         if (!gameover)
-            m_chicken = NULL;
+            m_chicken = nullptr;
     }
 
     return PlayerKillType::Normal;

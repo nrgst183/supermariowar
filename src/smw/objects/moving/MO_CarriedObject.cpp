@@ -4,7 +4,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class CarriedObject - all objects players can carry inheirit from this class
@@ -24,12 +23,12 @@ MO_CarriedObject::MO_CarriedObject(gfxSprite* nspr, Vec2s pos, short iNumSpr, sh
 MO_CarriedObject::~MO_CarriedObject()
 {
     if (owner)
-        owner->carriedItem = NULL;
+        owner->carriedItem = nullptr;
 }
 
 void MO_CarriedObject::init()
 {
-    owner = NULL;
+    owner = nullptr;
     fSmoking = false;
 
     dKickX = 2.0f;
@@ -61,9 +60,9 @@ void MO_CarriedObject::MoveToOwner()
 void MO_CarriedObject::Drop()
 {
     if (owner)
-        owner->carriedItem = NULL;
+        owner->carriedItem = nullptr;
 
-    owner = NULL;
+    owner = nullptr;
 
     collision_detection_checksides();
 }

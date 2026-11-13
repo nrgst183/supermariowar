@@ -7,9 +7,6 @@
 #include "PlayerKillStyles.h"
 #include "ResourceManager.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-extern CEyecandyContainer eyecandy[3];
 
 PlayerBurnupTimer::PlayerBurnupTimer()
     : timer(0)

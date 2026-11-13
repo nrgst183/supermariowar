@@ -10,12 +10,6 @@
 
 #include <cmath>
 
-extern CScore *score[4];
-extern short score_cnt;
-extern CObjectContainer objectcontainer[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 namespace {
 constexpr short killStyleDamage(KillStyle style) {

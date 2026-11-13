@@ -164,4 +164,7 @@ private:
     friend WorldMap loadWorldMap(const std::string& path, short tilesize);
 };
 
+// Defined in world.cpp
+extern WorldMap g_worldmap;
+
 #endif // WORLD_H

@@ -146,16 +146,16 @@ class MenuState : public GameState
 		std::unique_ptr<UI_NetNewRoomSettingsMenu> mNetNewRoomSettingsMenu;
 		std::unique_ptr<UI_NetRoomMenu> mNetRoomMenu;
 
-		DisplayError iDisplayError;
-		short iDisplayErrorTimer;
-		bool fNeedMenuMusicReset;
+		DisplayError iDisplayError = DISPLAY_ERROR_NONE;
+		short iDisplayErrorTimer = 0;
+		bool fNeedMenuMusicReset = false;
 
-		const char * szCurrentMapName;
+		const char * szCurrentMapName = nullptr;
 
-		short iUnlockMinigameOptionIndex;
+		short iUnlockMinigameOptionIndex = 0;
 
-		short iTournamentAIStep;
-		short iTournamentAITimer;
+		short iTournamentAIStep = 0;
+		short iTournamentAITimer = 0;
 
 		friend class GameplayState;
 };

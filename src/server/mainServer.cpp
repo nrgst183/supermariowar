@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
             interruptHandler.sa_handler = interrupt;
             sigemptyset(&interruptHandler.sa_mask);
             interruptHandler.sa_flags = 0;
-        sigaction(SIGINT, &interruptHandler, NULL);
+        sigaction(SIGINT, &interruptHandler, nullptr);
     #endif
 
     printf("Ready!\n");

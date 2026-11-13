@@ -6,8 +6,6 @@
 #include "gfx/gfxSprite.h"
 #include "ui/MI_Image.h"
 
-extern CResourceManager* rm;
-
 
 template<typename T>
 MI_SelectField<T>::MI_SelectField(gfxSprite* nspr, short x, short y, std::string name, short width, short indent)

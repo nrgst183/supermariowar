@@ -74,13 +74,6 @@
 
 // see docs/development/HowAIWorks.txt for more information
 
-extern CObjectContainer objectcontainer[3];
-
-extern std::vector<CPlayer*> players;
-
-extern CMap* g_map;
-extern CGameValues game_values;
-
 
 CPlayerAI::CPlayerAI()
 {

@@ -8,12 +8,6 @@
 #include "ResourceManager.h"
 #include "objects/blocks/WeaponBreakableBlock.h"
 
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
-
-extern SpotlightManager spotlightManager;
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class boomerang
@@ -57,7 +51,7 @@ MO_Boomerang::MO_Boomerang(gfxSprite* nspr, Vec2s pos, short iNumSpr, bool moveT
 
     fObjectCollidesWithMap = false;
 
-    sSpotlight = NULL;
+    sSpotlight = nullptr;
 }
 
 void MO_Boomerang::update()

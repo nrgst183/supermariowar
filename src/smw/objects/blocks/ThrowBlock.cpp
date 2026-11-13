@@ -8,11 +8,6 @@
 #include "ResourceManager.h"
 #include "objects/carriable/CO_ThrowBlock.h"
 
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
-extern CEyecandyContainer eyecandy[3];
-extern CObjectContainer objectcontainer[3];
 
 B_ThrowBlock::B_ThrowBlock(gfxSprite *nspr, Vec2s pos, short iNumSpr, short aniSpeed, ThrowBlockType type) :
     IO_Block(nspr, pos)
@@ -117,7 +112,7 @@ void B_ThrowBlock::GiveBlockToPlayer(CPlayer * player)
     CO_ThrowBlock * block = new CO_ThrowBlock(&rm->spr_blueblock, {ix, iy}, iType);
     if (player->AcceptItem(block)) {
         dead = true;
-        g_map->blockdata[col][row] = NULL;
+        g_map->blockdata[col][row] = nullptr;
         g_map->UpdateTileGap(col, row);
 
         block->owner = player;
@@ -131,7 +126,7 @@ void B_ThrowBlock::GiveBlockToPlayer(CPlayer * player)
 void B_ThrowBlock::triggerBehavior()
 {
     dead = true;
-    g_map->blockdata[col][row] = NULL;
+    g_map->blockdata[col][row] = nullptr;
     g_map->UpdateTileGap(col, row);
 
     const int srcY = static_cast<int>(iType) * 16;

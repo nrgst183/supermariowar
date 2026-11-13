@@ -3,9 +3,6 @@
 #include "GameValues.h"
 #include "player.h"
 
-extern CGameValues game_values;
-
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
 
 //------------------------------------------------------------------------------
 // class Bowser Fire (for survival mode)
@@ -31,7 +28,7 @@ void OMO_BowserFire::update()
     if ((velx < 0 && ix < -iw) || (velx > 0 && ix > App::screenWidth)) {
         CPlayer* player = GetPlayerFromGlobalID(iPlayerID);
 
-        if (player != NULL)
+        if (player != nullptr)
             player->decreaseProjectilesCount();
 
         dead = true;

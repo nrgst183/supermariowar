@@ -13,7 +13,7 @@ namespace {
 template<typename T>
 bool ReadTourStopSetting(T& output, T defaultVal)
 {
-    char* tok = strtok(NULL, ",\n");
+    char* tok = strtok(nullptr, ",\n");
     if (tok) {
         output = static_cast<T>(atoi(tok));
         return true;

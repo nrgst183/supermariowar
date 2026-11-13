@@ -8,10 +8,6 @@
 #include "objects/carriable/CO_PhantoKey.h"
 #include "objects/overmap/WO_Phanto.h"
 
-extern CObjectContainer objectcontainer[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 //Chase (hold a key for points while phantos chase you)
 CGM_Chase::CGM_Chase() : CGameMode()
@@ -29,7 +25,7 @@ void CGM_Chase::init()
     //Add phantos based on settings
     for (short iPhanto = 0; iPhanto < 3; iPhanto++) {
         for (short iNumPhantos = 0; iNumPhantos < game_values.gamemodesettings.chase.phantoquantity[iPhanto]; iNumPhantos++)
-            objectcontainer[1].add(new OMO_Phanto(&rm->spr_phanto, {RANDOM_INT(App::screenWidth), RANDOM_BOOL() ? -32 - CRUNCHMAX : App::screenHeight}, 0.0f, 0.0f, iPhanto));
+            objectcontainer[1].add(new OMO_Phanto(&rm->spr_phanto, {static_cast<short>(RANDOM_INT(App::screenWidth)), static_cast<short>(RANDOM_BOOL() ? -32 - CRUNCHMAX : App::screenHeight)}, 0.0f, 0.0f, iPhanto));
     }
 
     //Add a key

@@ -5,8 +5,6 @@
 #include "ResourceManager.h"
 #include "gamemodes/Star.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class star (for star mode)
@@ -48,7 +46,7 @@ bool CO_Star::collide(CPlayer* player)
     CGM_Star* starmode = (CGM_Star*)game_values.gamemode;
 
     timer = 0;
-    if (owner == NULL && player->isready()) {
+    if (owner == nullptr && player->isready()) {
         if (player->throw_star == 0 && player->AcceptItem(this)) {
             owner = player;
         }

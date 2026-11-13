@@ -1,5 +1,7 @@
 #pragma once
 
+#include "GlobalConstants.h"
+
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -316,3 +318,18 @@ private:
 
 /// Adds music overrides to the music lists
 void UpdateMusicWithOverrides(MusicList& musiclist, WorldMusicList& worldmusiclist);
+
+// Defined in global.cpp
+extern FiltersList* filterslist;
+extern SkinList* skinlist;
+extern AnnouncerList* announcerlist;
+extern MusicList* musiclist;
+extern WorldMusicList* worldmusiclist;
+extern GraphicsList* menugraphicspacklist;
+extern GraphicsList* worldgraphicspacklist;
+extern GraphicsList* gamegraphicspacklist;
+extern SoundsList* soundpacklist;
+extern TourList* tourlist;
+extern WorldList* worldlist;
+
+extern const char* g_szMusicCategoryNames[MAXMUSICCATEGORY];

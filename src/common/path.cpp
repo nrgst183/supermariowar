@@ -11,8 +11,6 @@
 namespace fs = std::filesystem;
 
 
-extern std::string RootDataDirectory;
-
 std::string SMW_Root_Data_Dir;
 
 

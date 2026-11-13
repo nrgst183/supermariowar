@@ -8,10 +8,6 @@
 
 #include <cassert>
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern CEyecandyContainer eyecandy[3];
 
 PlayerTanookiSuit::PlayerTanookiSuit() {
     reset();

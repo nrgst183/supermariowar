@@ -1,12 +1,9 @@
 #include "MI_StringScroll.h"
 
 #include "GameValues.h"
+#include "GSGameplay.h"
 #include "ResourceManager.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern short LookupTeamID(short id);
 
 StringScrollElement::StringScrollElement(const std::string& text)
     : str(text)
@@ -15,7 +12,6 @@ StringScrollElement::StringScrollElement(const std::string& text)
 void StringScrollElement::draw(int x, int y, unsigned max_w) {
     rm->menu_font_large.drawChopRight(x + 28, y + 5, max_w, str.c_str());
 }
-
 
 
 MI_StringScroll::MI_StringScroll(gfxSprite * nspr, short x, short y, short width, short numlines)

@@ -1,12 +1,8 @@
 #include "NetworkListScroll.h"
 
 #include "GameValues.h"
+#include "GSGameplay.h"
 #include "ResourceManager.h"
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern short LookupTeamID(short id);
 
 
 NLS_ListItem::NLS_ListItem()

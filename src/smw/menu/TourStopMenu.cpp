@@ -6,7 +6,6 @@
 #include "ui/MI_Text.h"
 #include "ui/MI_TourStop.h"
 
-extern CResourceManager* rm;
 
 UI_TourStopMenu::UI_TourStopMenu()
     : UI_Menu()
@@ -28,13 +27,13 @@ UI_TourStopMenu::UI_TourStopMenu()
     miTourStopExitDialogYesButton->setVisible(false);
     miTourStopExitDialogNoButton->setVisible(false);
 
-    AddControl(miTourStop, NULL, NULL, NULL, NULL);
+    AddControl(miTourStop, nullptr, nullptr, nullptr, nullptr);
 
     AddNonControl(miTourStopExitDialogImage);
     AddNonControl(miTourStopExitDialogExitTourText);
 
-    AddControl(miTourStopExitDialogYesButton, NULL, NULL, NULL, miTourStopExitDialogNoButton);
-    AddControl(miTourStopExitDialogNoButton, NULL, NULL, miTourStopExitDialogYesButton, NULL);
+    AddControl(miTourStopExitDialogYesButton, nullptr, nullptr, nullptr, miTourStopExitDialogNoButton);
+    AddControl(miTourStopExitDialogNoButton, nullptr, nullptr, miTourStopExitDialogYesButton, nullptr);
 
     setInitialFocus(miTourStop);
     SetCancelCode(MENU_CODE_BACK_TEAM_SELECT_MENU);

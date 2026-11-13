@@ -9,12 +9,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
-extern GraphicsList* menugraphicspacklist;
-extern GraphicsList* worldgraphicspacklist;
-extern GraphicsList* gamegraphicspacklist;
-
 
 UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     : UI_Menu()
@@ -75,15 +69,15 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miGraphicsOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miGraphicsOptionsMenuHeaderText = new MI_HeaderText("Graphics Options Menu", 320, 5);
 
-    AddControl(miTopLayerField, miGraphicsOptionsMenuBackButton, miFrameLimiterField, NULL, miGraphicsOptionsMenuBackButton);
+    AddControl(miTopLayerField, miGraphicsOptionsMenuBackButton, miFrameLimiterField, nullptr, miGraphicsOptionsMenuBackButton);
 
-    AddControl(miFrameLimiterField, miTopLayerField, miFullscreenField, NULL, miGraphicsOptionsMenuBackButton);
-    AddControl(miFullscreenField, miFrameLimiterField, miMenuGraphicsPackField, NULL, miGraphicsOptionsMenuBackButton);
-    AddControl(miMenuGraphicsPackField, miFullscreenField, miWorldGraphicsPackField, NULL, miGraphicsOptionsMenuBackButton);
+    AddControl(miFrameLimiterField, miTopLayerField, miFullscreenField, nullptr, miGraphicsOptionsMenuBackButton);
+    AddControl(miFullscreenField, miFrameLimiterField, miMenuGraphicsPackField, nullptr, miGraphicsOptionsMenuBackButton);
+    AddControl(miMenuGraphicsPackField, miFullscreenField, miWorldGraphicsPackField, nullptr, miGraphicsOptionsMenuBackButton);
 
-    AddControl(miWorldGraphicsPackField, miMenuGraphicsPackField, miGameGraphicsPackField, NULL, miGraphicsOptionsMenuBackButton);
-    AddControl(miGameGraphicsPackField, miWorldGraphicsPackField, miGraphicsOptionsMenuBackButton, NULL, miGraphicsOptionsMenuBackButton);
-    AddControl(miGraphicsOptionsMenuBackButton, miGameGraphicsPackField, miTopLayerField, miGameGraphicsPackField, NULL);
+    AddControl(miWorldGraphicsPackField, miMenuGraphicsPackField, miGameGraphicsPackField, nullptr, miGraphicsOptionsMenuBackButton);
+    AddControl(miGameGraphicsPackField, miWorldGraphicsPackField, miGraphicsOptionsMenuBackButton, nullptr, miGraphicsOptionsMenuBackButton);
+    AddControl(miGraphicsOptionsMenuBackButton, miGameGraphicsPackField, miTopLayerField, miGameGraphicsPackField, nullptr);
 
     AddNonControl(miGraphicsOptionsMenuLeftHeaderBar);
     AddNonControl(miGraphicsOptionsMenuRightHeaderBar);

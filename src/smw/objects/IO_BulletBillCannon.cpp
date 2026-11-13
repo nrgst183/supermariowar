@@ -6,15 +6,13 @@
 #include "ResourceManager.h"
 #include "objects/moving/MO_BulletBill.h"
 
-extern CObjectContainer objectcontainer[3];
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class IO_BulletBillCannon - gets update calls and shoots bullet bills based on timer
 //------------------------------------------------------------------------------
 
 IO_BulletBillCannon::IO_BulletBillCannon(Vec2s pos, short freq, float vel, bool preview)
-    : CObject(NULL, pos)
+    : CObject(nullptr, pos)
     , m_freq(freq)
     , m_vel(vel)
     , m_preview(preview)

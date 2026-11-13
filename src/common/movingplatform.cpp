@@ -1,5 +1,6 @@
 #include "movingplatform.h"
 
+#include "gfx.h"
 #include "IO_Block.h"
 #include "Game.h"
 #include "GameValues.h"
@@ -10,21 +11,6 @@
 #include "TilesetManager.h"
 #include "objects/moving/MovingObject.h"
 
-extern SDL_Surface* screen;
-extern SDL_Surface* blitdest;
-
-extern short x_shake;
-extern short y_shake;
-
-extern short g_iCurrentDrawIndex;
-
-extern CMap* g_map;
-extern CTilesetManager* g_tilesetmanager;
-
-extern std::vector<CPlayer*> players;
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 enum CollisionStyle {collision_none, collision_normal, collision_overlap_left, collision_overlap_right};
 
@@ -73,7 +59,7 @@ MovingPlatform::MovingPlatform(std::vector<TilesetTile>&& tiledata, std::vector<
         if (!SDL_SetSurfaceColorKey(sprites[iSurface].getSurface(), true, SDL_MapSurfaceRGB(sprites[iSurface].getSurface(), 255, 0, 255)))
             printf("\n ERROR: Couldn't set ColorKey for moving platform: %s\n", SDL_GetError());
 
-        SDL_FillSurfaceRect(sprites[iSurface].getSurface(), NULL, SDL_MapSurfaceRGB(sprites[iSurface].getSurface(), 255, 0, 255));
+        SDL_FillSurfaceRect(sprites[iSurface].getSurface(), nullptr, SDL_MapSurfaceRGB(sprites[iSurface].getSurface(), 255, 0, 255));
     }
 
     //Run through all tiles in the platform, detect unknown and blank tiles,
@@ -155,12 +141,6 @@ void MovingPlatform::draw()
     rDstRect.h = iHeight;
 
     sprites[1 - g_iCurrentDrawIndex].draw(rSrcRect, blitdest, rDstRect);
-
-    /*
-    char szVel[256];
-    sprintf(szVel, "%.2f, %.2f", pPath->dVelX, pPath->dVelY);
-    menu_font_large.draw(20, 20, szVel);
-    */
 }
 
 //Draw path for map preview
@@ -214,15 +194,8 @@ void MovingPlatform::collide(CPlayer * player)
     short coldec = coldec_player(player);
     if (coldec == collision_none) {
         if (player->platform == this)
-            player->platform = NULL;
+            player->platform = nullptr;
 
-        /*
-        printf("player->fx: %.5f  player->fy: %.5f  player->fPrecalcualtedY: %.5f\n", player->fx, player->fy, player->fPrecalculatedY);
-        printf("player->fx + PW: %.5f  player->fy + PH: %.5f  player->fPrecalculatedY + PH: %.5f\n", player->fx + PW, player->fy + PH, player->fPrecalculatedY + PH);
-        printf("fx: %.5f  fy: %.5f  fOldY: %.5f\n", fx - iHalfWidth, fy - iHalfHeight, fOldY - iHalfHeight);
-        printf("fx + iWidth: %.5f  fy + iHeight: %.5f  fOldY + iHeight: %.5f\n",  fx + iHalfWidth, fy + iHalfHeight, fOldY + iHalfHeight);
-        printf("fVelY: %.5f  fOldVelY: %.5f  player->vely: %.5f\n\n",  fVelY, fOldVelY, player->vely);
-        */
         return;
     }
 
@@ -238,12 +211,6 @@ void MovingPlatform::collide(CPlayer * player)
         if (player->velx < -0.6f || player->velx > 0.6f)
             fColVelX += player->platform->fOldVelX;
 
-        /*
-        if (player->platform != this)
-        	fColVelX += player->platform->fOldVelX;
-        else if (player->platform == this && (player->velx < -0.6f || player->velx > 0.6f))
-        	fColVelX += player->platform->fOldVelX;
-        */
     } else if (!player->inair) {
         fColVelY -= GRAVITATION;  //Ignore the gravity if the player is on the ground
     }
@@ -259,14 +226,6 @@ void MovingPlatform::collide(CPlayer * player)
         fRelativeY2 = player->fy + PH - fy + iHalfHeight;
     }
 
-    /*
-    printf("\n>>>>Platform Collision! fCorVelX: %.5f  fCorVelY: %.5f\n", fColVelX, fColVelY);
-    printf(">>>>player->fx: %.5f  player->fy: %.5f  player->fPrecalcualtedY: %.5f\n", player->fx, player->fy, player->fPrecalculatedY);
-    printf(">>>>player->fx + PW: %.5f  player->fy + PH: %.5f  player->fPrecalculatedY + PH: %.5f\n", player->fx + PW, player->fy + PH, player->fPrecalculatedY + PH);
-    printf(">>>>fx: %.5f  fy: %.5f  fOldY: %.5f\n", fx - iHalfWidth, fy - iHalfHeight, fOldY - iHalfHeight);
-    printf(">>>>fx + iWidth: %.5f  fy + iHeight: %.5f  fOldY + iHeight: %.5f\n",  fx + iHalfWidth, fy + iHalfHeight, fOldY + iHalfHeight);
-    printf(">>>>fVelY: %.5f  fOldVelY: %.5f  player->vely: %.5f\n\n",  fVelY, fOldVelY, player->vely);
-    */
 
     if (fColVelX > 0.01f || player->iHorizontalPlatformCollision == 3) {
         float fRelativeX;
@@ -403,7 +362,7 @@ void MovingPlatform::collide(CPlayer * player)
     coldec = coldec_player(player);
     if (coldec == collision_none) {
         if (player->platform == this)
-            player->platform = NULL;
+            player->platform = nullptr;
 
         return;
     } else if (coldec == collision_normal) {
@@ -501,7 +460,7 @@ void MovingPlatform::collide(CPlayer * player)
                 if (player->fallthrough && !fSolidTileUnderPlayer) {
                     player->fPrecalculatedY = (ty << 5) - PH + (fVelY > 0.0f ? fVelY : 0.0f) + 0.2f + fy - iHalfHeight;
                     player->inair = true;
-                    player->platform = NULL;
+                    player->platform = nullptr;
                     //printf("Fell Through Solid On Top Platform\n");
                 } else {
                     if (player->iVerticalPlatformCollision == 0) {
@@ -575,7 +534,7 @@ void MovingPlatform::collide(CPlayer * player)
                     return;
             } else {
                 if (player->platform == this)
-                    player->platform = NULL;
+                    player->platform = nullptr;
             }
         }
     }
@@ -980,7 +939,7 @@ void MovingPlatform::collide(IO_MovingObject * object)
     short coldec = coldec_object(object);
     if (coldec == collision_none) {
         if (object->platform == this)
-            object->platform = NULL;
+            object->platform = nullptr;
 
         return;
     }
@@ -996,12 +955,6 @@ void MovingPlatform::collide(IO_MovingObject * object)
         if (object->velx < -0.6f || object->velx > 0.6f)
             fColVelX += object->platform->fOldVelX;
 
-        /*
-        if (object->platform != this)
-        	fColVelX += object->platform->fOldVelX;
-        else if (object->platform == this && object->velx != 0.0f)
-        	fColVelX += object->platform->fOldVelX;
-        	*/
     } else if (!object->inair) {
         fColVelY -= GRAVITATION;  //Ignore the gravity if the object is on the ground
     }
@@ -1151,7 +1104,7 @@ void MovingPlatform::collide(IO_MovingObject * object)
     coldec = coldec_object(object);
     if (coldec == collision_none) {
         if (object->platform == this)
-            object->platform = NULL;
+            object->platform = nullptr;
 
         return;
     } else if (coldec == collision_normal) {
@@ -1273,7 +1226,7 @@ void MovingPlatform::collide(IO_MovingObject * object)
                 return;
             } else {
                 if (object->platform == this)
-                    object->platform = NULL;
+                    object->platform = nullptr;
             }
         }
     }

@@ -11,10 +11,6 @@
 
 #include <cmath>
 
-extern CObjectContainer objectcontainer[3];
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class flag base (for CTF mode)
@@ -40,7 +36,7 @@ MO_FlagBase::MO_FlagBase(gfxSprite* nspr, short iTeamID, short iColorID)
     velx = sin(angle);
     vely = cos(angle);
 
-    homeflag = NULL;
+    homeflag = nullptr;
 
     placeFlagBase(true);
 
@@ -155,7 +151,7 @@ void MO_FlagBase::scoreFlag(CO_Flag* flag, CPlayer* player)
     if (flag->teamID == teamID) {
         flag->placeFlag();
         ifSoundOnPlay(rm->sfx_areatag);
-    } else if (!game_values.gamemodesettings.flag.homescore || homeflag != NULL || game_values.gamemodesettings.flag.centerflag) {
+    } else if (!game_values.gamemodesettings.flag.homescore || homeflag != nullptr || game_values.gamemodesettings.flag.centerflag) {
         flag->placeFlag();
         if (!game_values.gamemode->gameover) {
             player->Score().AdjustScore(1);

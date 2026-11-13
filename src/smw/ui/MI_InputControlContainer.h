@@ -15,11 +15,11 @@ class MI_InputControlField : public UI_Control
 		MI_InputControlField(gfxSprite * nspr, short x, short y, std::string name, short width, short indent);
         virtual ~MI_InputControlField();
 
-		void Draw();
-		MenuCodeEnum SendInput(CPlayerInput * playerInput);
+		void Draw() override;
+		MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
 		void SetKey(SDL_Keycode * iSetKey, SDL_Keycode key, SDL_JoystickID device);
 
-		MenuCodeEnum Modify(bool modify);
+		MenuCodeEnum Modify(bool modify) override;
 
     void SetDevice(SDL_JoystickID device) {
         iDevice = device;
@@ -61,11 +61,11 @@ class MI_InputControlContainer : public UI_Control
 		MI_InputControlContainer(gfxSprite * spr_button, short x, short y, short playerID);
 		virtual ~MI_InputControlContainer();
 
-		void Update();
-		void Draw();
+		void Update() override;
+		void Draw() override;
 
-		MenuCodeEnum SendInput(CPlayerInput * playerInput);
-		MenuCodeEnum Modify(bool modify);
+		MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
+		MenuCodeEnum Modify(bool modify) override;
 
 		void SetPlayer(short iPlayerID);
 

@@ -9,9 +9,6 @@
 #include "ui/MI_PowerupSlider.h"
 #include "ui/MI_Text.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     : UI_Menu()
@@ -40,9 +37,9 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miClassicModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miClassicModeHeaderText = new MI_HeaderText("Classic Mode Menu", 320, 5);
 
-    mModeSettingsMenu[0].AddControl(miClassicModeStyleField, miClassicModeBackButton, miClassicModeScoringField, NULL, miClassicModeBackButton);
-    mModeSettingsMenu[0].AddControl(miClassicModeScoringField, miClassicModeStyleField, miClassicModeBackButton, NULL, miClassicModeBackButton);
-    mModeSettingsMenu[0].AddControl(miClassicModeBackButton, miClassicModeScoringField, miClassicModeStyleField, miClassicModeScoringField, NULL);
+    mModeSettingsMenu[0].AddControl(miClassicModeStyleField, miClassicModeBackButton, miClassicModeScoringField, nullptr, miClassicModeBackButton);
+    mModeSettingsMenu[0].AddControl(miClassicModeScoringField, miClassicModeStyleField, miClassicModeBackButton, nullptr, miClassicModeBackButton);
+    mModeSettingsMenu[0].AddControl(miClassicModeBackButton, miClassicModeScoringField, miClassicModeStyleField, miClassicModeScoringField, nullptr);
 
     mModeSettingsMenu[0].AddNonControl(miClassicModeLeftHeaderBar);
     mModeSettingsMenu[0].AddNonControl(miClassicModeRightHeaderBar);
@@ -75,9 +72,9 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miFragModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miFragModeHeaderText = new MI_HeaderText("Frag Mode Menu", 320, 5);
 
-    mModeSettingsMenu[1].AddControl(miFragModeStyleField, miFragModeBackButton, miFragModeScoringField, NULL, miFragModeBackButton);
-    mModeSettingsMenu[1].AddControl(miFragModeScoringField, miFragModeStyleField, miFragModeBackButton, NULL, miFragModeBackButton);
-    mModeSettingsMenu[1].AddControl(miFragModeBackButton, miFragModeScoringField, miFragModeStyleField, miFragModeScoringField, NULL);
+    mModeSettingsMenu[1].AddControl(miFragModeStyleField, miFragModeBackButton, miFragModeScoringField, nullptr, miFragModeBackButton);
+    mModeSettingsMenu[1].AddControl(miFragModeScoringField, miFragModeStyleField, miFragModeBackButton, nullptr, miFragModeBackButton);
+    mModeSettingsMenu[1].AddControl(miFragModeBackButton, miFragModeScoringField, miFragModeStyleField, miFragModeScoringField, nullptr);
 
     mModeSettingsMenu[1].AddNonControl(miFragModeLeftHeaderBar);
     mModeSettingsMenu[1].AddNonControl(miFragModeRightHeaderBar);
@@ -136,10 +133,10 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miTimeLimitModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miTimeLimitModeHeaderText = new MI_HeaderText("Time Mode Menu", 320, 5);
 
-    mModeSettingsMenu[2].AddControl(miTimeLimitModeStyleField, miTimeLimitModeBackButton, miTimeLimitModeScoringField, NULL, miTimeLimitModeBackButton);
-    mModeSettingsMenu[2].AddControl(miTimeLimitModeScoringField, miTimeLimitModeStyleField, miTimeLimitModePercentExtraTime, NULL, miTimeLimitModeBackButton);
-    mModeSettingsMenu[2].AddControl(miTimeLimitModePercentExtraTime, miTimeLimitModeScoringField, miTimeLimitModeBackButton, NULL, miTimeLimitModeBackButton);
-    mModeSettingsMenu[2].AddControl(miTimeLimitModeBackButton, miTimeLimitModePercentExtraTime, miTimeLimitModeStyleField, miTimeLimitModePercentExtraTime, NULL);
+    mModeSettingsMenu[2].AddControl(miTimeLimitModeStyleField, miTimeLimitModeBackButton, miTimeLimitModeScoringField, nullptr, miTimeLimitModeBackButton);
+    mModeSettingsMenu[2].AddControl(miTimeLimitModeScoringField, miTimeLimitModeStyleField, miTimeLimitModePercentExtraTime, nullptr, miTimeLimitModeBackButton);
+    mModeSettingsMenu[2].AddControl(miTimeLimitModePercentExtraTime, miTimeLimitModeScoringField, miTimeLimitModeBackButton, nullptr, miTimeLimitModeBackButton);
+    mModeSettingsMenu[2].AddControl(miTimeLimitModeBackButton, miTimeLimitModePercentExtraTime, miTimeLimitModeStyleField, miTimeLimitModePercentExtraTime, nullptr);
 
     mModeSettingsMenu[2].AddNonControl(miTimeLimitModeLeftHeaderBar);
     mModeSettingsMenu[2].AddNonControl(miTimeLimitModeRightHeaderBar);
@@ -217,11 +214,11 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miJailModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miJailModeHeaderText = new MI_HeaderText("Jail Mode Menu", 320, 5);
 
-    mModeSettingsMenu[3].AddControl(miJailModeStyleField, miJailModeBackButton, miJailModeTimeFreeField, NULL, miJailModeBackButton);
-    mModeSettingsMenu[3].AddControl(miJailModeTimeFreeField, miJailModeStyleField, miJailModeTagFreeField, NULL, miJailModeBackButton);
-    mModeSettingsMenu[3].AddControl(miJailModeTagFreeField, miJailModeTimeFreeField, miJailModeJailKeyField, NULL, miJailModeBackButton);
-    mModeSettingsMenu[3].AddControl(miJailModeJailKeyField, miJailModeTagFreeField, miJailModeBackButton, NULL, miJailModeBackButton);
-    mModeSettingsMenu[3].AddControl(miJailModeBackButton, miJailModeJailKeyField, miJailModeStyleField, miJailModeJailKeyField, NULL);
+    mModeSettingsMenu[3].AddControl(miJailModeStyleField, miJailModeBackButton, miJailModeTimeFreeField, nullptr, miJailModeBackButton);
+    mModeSettingsMenu[3].AddControl(miJailModeTimeFreeField, miJailModeStyleField, miJailModeTagFreeField, nullptr, miJailModeBackButton);
+    mModeSettingsMenu[3].AddControl(miJailModeTagFreeField, miJailModeTimeFreeField, miJailModeJailKeyField, nullptr, miJailModeBackButton);
+    mModeSettingsMenu[3].AddControl(miJailModeJailKeyField, miJailModeTagFreeField, miJailModeBackButton, nullptr, miJailModeBackButton);
+    mModeSettingsMenu[3].AddControl(miJailModeBackButton, miJailModeJailKeyField, miJailModeStyleField, miJailModeJailKeyField, nullptr);
 
     mModeSettingsMenu[3].AddNonControl(miJailModeLeftHeaderBar);
     mModeSettingsMenu[3].AddNonControl(miJailModeRightHeaderBar);
@@ -289,10 +286,10 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miCoinModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miCoinModeHeaderText = new MI_HeaderText("Coin Collection Mode Menu", 320, 5);
 
-    mModeSettingsMenu[4].AddControl(miCoinModePenaltyField, miCoinModeBackButton, miCoinModeQuantityField, NULL, miCoinModeBackButton);
-    mModeSettingsMenu[4].AddControl(miCoinModeQuantityField, miCoinModePenaltyField, miCoinModePercentExtraCoin, NULL, miCoinModeBackButton);
-    mModeSettingsMenu[4].AddControl(miCoinModePercentExtraCoin, miCoinModeQuantityField, miCoinModeBackButton, NULL, miCoinModeBackButton);
-    mModeSettingsMenu[4].AddControl(miCoinModeBackButton, miCoinModePercentExtraCoin, miCoinModePenaltyField, miCoinModePercentExtraCoin, NULL);
+    mModeSettingsMenu[4].AddControl(miCoinModePenaltyField, miCoinModeBackButton, miCoinModeQuantityField, nullptr, miCoinModeBackButton);
+    mModeSettingsMenu[4].AddControl(miCoinModeQuantityField, miCoinModePenaltyField, miCoinModePercentExtraCoin, nullptr, miCoinModeBackButton);
+    mModeSettingsMenu[4].AddControl(miCoinModePercentExtraCoin, miCoinModeQuantityField, miCoinModeBackButton, nullptr, miCoinModeBackButton);
+    mModeSettingsMenu[4].AddControl(miCoinModeBackButton, miCoinModePercentExtraCoin, miCoinModePenaltyField, miCoinModePercentExtraCoin, nullptr);
 
     mModeSettingsMenu[4].AddNonControl(miCoinModeLeftHeaderBar);
     mModeSettingsMenu[4].AddNonControl(miCoinModeRightHeaderBar);
@@ -343,19 +340,19 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miStompModeHeaderText = new MI_HeaderText("Stomp Mode Menu", 320, 5);
 
 
-    mModeSettingsMenu[5].AddControl(miStompModeRateField, miStompModeBackButton, miStompModeEnemySlider[0], NULL, miStompModeBackButton);
+    mModeSettingsMenu[5].AddControl(miStompModeRateField, miStompModeBackButton, miStompModeEnemySlider[0], nullptr, miStompModeBackButton);
 
-    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[0], miStompModeRateField, miStompModeEnemySlider[1], NULL, miStompModeBackButton);
-    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[1], miStompModeEnemySlider[0], miStompModeEnemySlider[2], NULL, miStompModeBackButton);
-    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[2], miStompModeEnemySlider[1], miStompModeEnemySlider[3], NULL, miStompModeBackButton);
-    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[3], miStompModeEnemySlider[2], miStompModeEnemySlider[4], NULL, miStompModeBackButton);
-    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[4], miStompModeEnemySlider[3], miStompModeEnemySlider[5], NULL, miStompModeBackButton);
-    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[5], miStompModeEnemySlider[4], miStompModeEnemySlider[6], NULL, miStompModeBackButton);
-    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[6], miStompModeEnemySlider[5], miStompModeEnemySlider[7], NULL, miStompModeBackButton);
-    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[7], miStompModeEnemySlider[6], miStompModeEnemySlider[8], NULL, miStompModeBackButton);
-    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[8], miStompModeEnemySlider[7], miStompModeBackButton, NULL, miStompModeBackButton);
+    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[0], miStompModeRateField, miStompModeEnemySlider[1], nullptr, miStompModeBackButton);
+    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[1], miStompModeEnemySlider[0], miStompModeEnemySlider[2], nullptr, miStompModeBackButton);
+    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[2], miStompModeEnemySlider[1], miStompModeEnemySlider[3], nullptr, miStompModeBackButton);
+    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[3], miStompModeEnemySlider[2], miStompModeEnemySlider[4], nullptr, miStompModeBackButton);
+    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[4], miStompModeEnemySlider[3], miStompModeEnemySlider[5], nullptr, miStompModeBackButton);
+    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[5], miStompModeEnemySlider[4], miStompModeEnemySlider[6], nullptr, miStompModeBackButton);
+    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[6], miStompModeEnemySlider[5], miStompModeEnemySlider[7], nullptr, miStompModeBackButton);
+    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[7], miStompModeEnemySlider[6], miStompModeEnemySlider[8], nullptr, miStompModeBackButton);
+    mModeSettingsMenu[5].AddControl(miStompModeEnemySlider[8], miStompModeEnemySlider[7], miStompModeBackButton, nullptr, miStompModeBackButton);
 
-    mModeSettingsMenu[5].AddControl(miStompModeBackButton, miStompModeEnemySlider[8], miStompModeRateField, miStompModeEnemySlider[8], NULL);
+    mModeSettingsMenu[5].AddControl(miStompModeBackButton, miStompModeEnemySlider[8], miStompModeRateField, miStompModeEnemySlider[8], nullptr);
 
     mModeSettingsMenu[5].AddNonControl(miStompModeLeftHeaderBar);
     mModeSettingsMenu[5].AddNonControl(miStompModeRightHeaderBar);
@@ -411,19 +408,19 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miEggModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miEggModeHeaderText = new MI_HeaderText("Yoshi's Eggs Mode Menu", 320, 5);
 
-    mModeSettingsMenu[6].AddControl(miEggModeEggQuantityField[0], miEggModeBackButton, miEggModeEggQuantityField[1], NULL, miEggModeBackButton);
-    mModeSettingsMenu[6].AddControl(miEggModeEggQuantityField[1], miEggModeEggQuantityField[0], miEggModeEggQuantityField[2], NULL, miEggModeBackButton);
-    mModeSettingsMenu[6].AddControl(miEggModeEggQuantityField[2], miEggModeEggQuantityField[1], miEggModeEggQuantityField[3], NULL, miEggModeBackButton);
-    mModeSettingsMenu[6].AddControl(miEggModeEggQuantityField[3], miEggModeEggQuantityField[2], miEggModeYoshiQuantityField[0], NULL, miEggModeBackButton);
+    mModeSettingsMenu[6].AddControl(miEggModeEggQuantityField[0], miEggModeBackButton, miEggModeEggQuantityField[1], nullptr, miEggModeBackButton);
+    mModeSettingsMenu[6].AddControl(miEggModeEggQuantityField[1], miEggModeEggQuantityField[0], miEggModeEggQuantityField[2], nullptr, miEggModeBackButton);
+    mModeSettingsMenu[6].AddControl(miEggModeEggQuantityField[2], miEggModeEggQuantityField[1], miEggModeEggQuantityField[3], nullptr, miEggModeBackButton);
+    mModeSettingsMenu[6].AddControl(miEggModeEggQuantityField[3], miEggModeEggQuantityField[2], miEggModeYoshiQuantityField[0], nullptr, miEggModeBackButton);
 
-    mModeSettingsMenu[6].AddControl(miEggModeYoshiQuantityField[0], miEggModeEggQuantityField[3], miEggModeYoshiQuantityField[1], NULL, miEggModeBackButton);
-    mModeSettingsMenu[6].AddControl(miEggModeYoshiQuantityField[1], miEggModeYoshiQuantityField[0], miEggModeYoshiQuantityField[2], NULL, miEggModeBackButton);
-    mModeSettingsMenu[6].AddControl(miEggModeYoshiQuantityField[2], miEggModeYoshiQuantityField[1], miEggModeYoshiQuantityField[3], NULL, miEggModeBackButton);
-    mModeSettingsMenu[6].AddControl(miEggModeYoshiQuantityField[3], miEggModeYoshiQuantityField[2], miEggModeExplosionTimeField, NULL, miEggModeBackButton);
+    mModeSettingsMenu[6].AddControl(miEggModeYoshiQuantityField[0], miEggModeEggQuantityField[3], miEggModeYoshiQuantityField[1], nullptr, miEggModeBackButton);
+    mModeSettingsMenu[6].AddControl(miEggModeYoshiQuantityField[1], miEggModeYoshiQuantityField[0], miEggModeYoshiQuantityField[2], nullptr, miEggModeBackButton);
+    mModeSettingsMenu[6].AddControl(miEggModeYoshiQuantityField[2], miEggModeYoshiQuantityField[1], miEggModeYoshiQuantityField[3], nullptr, miEggModeBackButton);
+    mModeSettingsMenu[6].AddControl(miEggModeYoshiQuantityField[3], miEggModeYoshiQuantityField[2], miEggModeExplosionTimeField, nullptr, miEggModeBackButton);
 
-    mModeSettingsMenu[6].AddControl(miEggModeExplosionTimeField, miEggModeYoshiQuantityField[3], miEggModeBackButton, NULL, miEggModeBackButton);
+    mModeSettingsMenu[6].AddControl(miEggModeExplosionTimeField, miEggModeYoshiQuantityField[3], miEggModeBackButton, nullptr, miEggModeBackButton);
 
-    mModeSettingsMenu[6].AddControl(miEggModeBackButton, miEggModeExplosionTimeField, miEggModeEggQuantityField[0], miEggModeExplosionTimeField, NULL);
+    mModeSettingsMenu[6].AddControl(miEggModeBackButton, miEggModeExplosionTimeField, miEggModeEggQuantityField[0], miEggModeExplosionTimeField, nullptr);
 
     mModeSettingsMenu[6].AddNonControl(miEggModeLeftHeaderBar);
     mModeSettingsMenu[6].AddNonControl(miEggModeRightHeaderBar);
@@ -503,14 +500,14 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miFlagModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miFlagModeHeaderText = new MI_HeaderText("Capture The Flag Mode Menu", 320, 5);
 
-    mModeSettingsMenu[7].AddControl(miFlagModeSpeedField, miFlagModeBackButton, miFlagModeTouchReturnField, NULL, miFlagModeBackButton);
-    mModeSettingsMenu[7].AddControl(miFlagModeTouchReturnField, miFlagModeSpeedField, miFlagModePointMoveField, NULL, miFlagModeBackButton);
-    mModeSettingsMenu[7].AddControl(miFlagModePointMoveField, miFlagModeTouchReturnField, miFlagModeAutoReturnField, NULL, miFlagModeBackButton);
-    mModeSettingsMenu[7].AddControl(miFlagModeAutoReturnField, miFlagModePointMoveField, miFlagModeHomeScoreField, NULL, miFlagModeBackButton);
-    mModeSettingsMenu[7].AddControl(miFlagModeHomeScoreField, miFlagModeAutoReturnField, miFlagModeCenterFlagField, NULL, miFlagModeBackButton);
-    mModeSettingsMenu[7].AddControl(miFlagModeCenterFlagField, miFlagModeHomeScoreField, miFlagModeBackButton, NULL, miFlagModeBackButton);
+    mModeSettingsMenu[7].AddControl(miFlagModeSpeedField, miFlagModeBackButton, miFlagModeTouchReturnField, nullptr, miFlagModeBackButton);
+    mModeSettingsMenu[7].AddControl(miFlagModeTouchReturnField, miFlagModeSpeedField, miFlagModePointMoveField, nullptr, miFlagModeBackButton);
+    mModeSettingsMenu[7].AddControl(miFlagModePointMoveField, miFlagModeTouchReturnField, miFlagModeAutoReturnField, nullptr, miFlagModeBackButton);
+    mModeSettingsMenu[7].AddControl(miFlagModeAutoReturnField, miFlagModePointMoveField, miFlagModeHomeScoreField, nullptr, miFlagModeBackButton);
+    mModeSettingsMenu[7].AddControl(miFlagModeHomeScoreField, miFlagModeAutoReturnField, miFlagModeCenterFlagField, nullptr, miFlagModeBackButton);
+    mModeSettingsMenu[7].AddControl(miFlagModeCenterFlagField, miFlagModeHomeScoreField, miFlagModeBackButton, nullptr, miFlagModeBackButton);
 
-    mModeSettingsMenu[7].AddControl(miFlagModeBackButton, miFlagModeCenterFlagField, miFlagModeSpeedField, miFlagModeCenterFlagField, NULL);
+    mModeSettingsMenu[7].AddControl(miFlagModeBackButton, miFlagModeCenterFlagField, miFlagModeSpeedField, miFlagModeCenterFlagField, nullptr);
 
     mModeSettingsMenu[7].AddNonControl(miFlagModeLeftHeaderBar);
     mModeSettingsMenu[7].AddNonControl(miFlagModeRightHeaderBar);
@@ -546,9 +543,9 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miChickenModeHeaderText = new MI_HeaderText("Chicken Mode Menu", 320, 5);
 
 
-    mModeSettingsMenu[8].AddControl(miChickenModeShowTargetField, miChickenModeBackButton, miChickenModeGlideField, NULL, miChickenModeBackButton);
-    mModeSettingsMenu[8].AddControl(miChickenModeGlideField, miChickenModeShowTargetField, miChickenModeBackButton, NULL, miChickenModeBackButton);
-    mModeSettingsMenu[8].AddControl(miChickenModeBackButton, miChickenModeGlideField, miChickenModeShowTargetField, miChickenModeGlideField, NULL);
+    mModeSettingsMenu[8].AddControl(miChickenModeShowTargetField, miChickenModeBackButton, miChickenModeGlideField, nullptr, miChickenModeBackButton);
+    mModeSettingsMenu[8].AddControl(miChickenModeGlideField, miChickenModeShowTargetField, miChickenModeBackButton, nullptr, miChickenModeBackButton);
+    mModeSettingsMenu[8].AddControl(miChickenModeBackButton, miChickenModeGlideField, miChickenModeShowTargetField, miChickenModeGlideField, nullptr);
 
     mModeSettingsMenu[8].AddNonControl(miChickenModeLeftHeaderBar);
     mModeSettingsMenu[8].AddNonControl(miChickenModeRightHeaderBar);
@@ -577,8 +574,8 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miTagModeHeaderText = new MI_HeaderText("Tag Mode Menu", 320, 5);
 
 
-    mModeSettingsMenu[9].AddControl(miTagModeTagOnTouchField, miTagModeBackButton, miTagModeBackButton, NULL, miTagModeBackButton);
-    mModeSettingsMenu[9].AddControl(miTagModeBackButton, miTagModeTagOnTouchField, miTagModeTagOnTouchField, miTagModeTagOnTouchField, NULL);
+    mModeSettingsMenu[9].AddControl(miTagModeTagOnTouchField, miTagModeBackButton, miTagModeBackButton, nullptr, miTagModeBackButton);
+    mModeSettingsMenu[9].AddControl(miTagModeBackButton, miTagModeTagOnTouchField, miTagModeTagOnTouchField, miTagModeTagOnTouchField, nullptr);
 
     mModeSettingsMenu[9].AddNonControl(miTagModeLeftHeaderBar);
     mModeSettingsMenu[9].AddNonControl(miTagModeRightHeaderBar);
@@ -649,10 +646,10 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miStarModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miStarModeHeaderText = new MI_HeaderText("Star Mode Menu", 320, 5);
 
-    mModeSettingsMenu[10].AddControl(miStarModeTimeField, miStarModeBackButton, miStarModeShineField, NULL, miStarModeBackButton);
-    mModeSettingsMenu[10].AddControl(miStarModeShineField, miStarModeTimeField, miStarModePercentExtraTime, NULL, miStarModeBackButton);
-    mModeSettingsMenu[10].AddControl(miStarModePercentExtraTime, miStarModeShineField, miStarModeBackButton, NULL, miStarModeBackButton);
-    mModeSettingsMenu[10].AddControl(miStarModeBackButton, miStarModePercentExtraTime, miStarModeTimeField, miStarModePercentExtraTime, NULL);
+    mModeSettingsMenu[10].AddControl(miStarModeTimeField, miStarModeBackButton, miStarModeShineField, nullptr, miStarModeBackButton);
+    mModeSettingsMenu[10].AddControl(miStarModeShineField, miStarModeTimeField, miStarModePercentExtraTime, nullptr, miStarModeBackButton);
+    mModeSettingsMenu[10].AddControl(miStarModePercentExtraTime, miStarModeShineField, miStarModeBackButton, nullptr, miStarModeBackButton);
+    mModeSettingsMenu[10].AddControl(miStarModeBackButton, miStarModePercentExtraTime, miStarModeTimeField, miStarModePercentExtraTime, nullptr);
 
     mModeSettingsMenu[10].AddNonControl(miStarModeLeftHeaderBar);
     mModeSettingsMenu[10].AddNonControl(miStarModeRightHeaderBar);
@@ -741,13 +738,13 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miDominationModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miDominationModeHeaderText = new MI_HeaderText("Domination Mode Menu", 320, 5);
 
-    mModeSettingsMenu[11].AddControl(miDominationModeQuantityField, miDominationModeBackButton, miDominationModeRelocateFrequencyField, NULL, miDominationModeBackButton);
-    mModeSettingsMenu[11].AddControl(miDominationModeRelocateFrequencyField, miDominationModeQuantityField, miDominationModeLoseOnDeathField, NULL, miDominationModeBackButton);
-    mModeSettingsMenu[11].AddControl(miDominationModeLoseOnDeathField, miDominationModeRelocateFrequencyField, miDominationModeRelocateOnDeathField, NULL, miDominationModeBackButton);
-    mModeSettingsMenu[11].AddControl(miDominationModeRelocateOnDeathField, miDominationModeLoseOnDeathField, miDominationModeStealOnDeathField, NULL, miDominationModeBackButton);
-    mModeSettingsMenu[11].AddControl(miDominationModeStealOnDeathField, miDominationModeRelocateOnDeathField, miDominationModeBackButton, NULL, miDominationModeBackButton);
+    mModeSettingsMenu[11].AddControl(miDominationModeQuantityField, miDominationModeBackButton, miDominationModeRelocateFrequencyField, nullptr, miDominationModeBackButton);
+    mModeSettingsMenu[11].AddControl(miDominationModeRelocateFrequencyField, miDominationModeQuantityField, miDominationModeLoseOnDeathField, nullptr, miDominationModeBackButton);
+    mModeSettingsMenu[11].AddControl(miDominationModeLoseOnDeathField, miDominationModeRelocateFrequencyField, miDominationModeRelocateOnDeathField, nullptr, miDominationModeBackButton);
+    mModeSettingsMenu[11].AddControl(miDominationModeRelocateOnDeathField, miDominationModeLoseOnDeathField, miDominationModeStealOnDeathField, nullptr, miDominationModeBackButton);
+    mModeSettingsMenu[11].AddControl(miDominationModeStealOnDeathField, miDominationModeRelocateOnDeathField, miDominationModeBackButton, nullptr, miDominationModeBackButton);
 
-    mModeSettingsMenu[11].AddControl(miDominationModeBackButton, miDominationModeStealOnDeathField, miDominationModeQuantityField, miDominationModeStealOnDeathField, NULL);
+    mModeSettingsMenu[11].AddControl(miDominationModeBackButton, miDominationModeStealOnDeathField, miDominationModeQuantityField, miDominationModeStealOnDeathField, nullptr);
 
     mModeSettingsMenu[11].AddNonControl(miDominationModeLeftHeaderBar);
     mModeSettingsMenu[11].AddNonControl(miDominationModeRightHeaderBar);
@@ -804,11 +801,11 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miKingOfTheHillModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miKingOfTheHillModeHeaderText = new MI_HeaderText("King of the Hill Mode Menu", 320, 5);
 
-    mModeSettingsMenu[12].AddControl(miKingOfTheHillModeSizeField, miKingOfTheHillModeBackButton, miKingOfTheHillModeRelocateFrequencyField, NULL, miKingOfTheHillModeBackButton);
-    mModeSettingsMenu[12].AddControl(miKingOfTheHillModeRelocateFrequencyField, miKingOfTheHillModeSizeField, miKingOfTheHillModeMultiplierField, NULL, miKingOfTheHillModeBackButton);
-    mModeSettingsMenu[12].AddControl(miKingOfTheHillModeMultiplierField, miKingOfTheHillModeRelocateFrequencyField, miKingOfTheHillModeBackButton, NULL, miKingOfTheHillModeBackButton);
+    mModeSettingsMenu[12].AddControl(miKingOfTheHillModeSizeField, miKingOfTheHillModeBackButton, miKingOfTheHillModeRelocateFrequencyField, nullptr, miKingOfTheHillModeBackButton);
+    mModeSettingsMenu[12].AddControl(miKingOfTheHillModeRelocateFrequencyField, miKingOfTheHillModeSizeField, miKingOfTheHillModeMultiplierField, nullptr, miKingOfTheHillModeBackButton);
+    mModeSettingsMenu[12].AddControl(miKingOfTheHillModeMultiplierField, miKingOfTheHillModeRelocateFrequencyField, miKingOfTheHillModeBackButton, nullptr, miKingOfTheHillModeBackButton);
 
-    mModeSettingsMenu[12].AddControl(miKingOfTheHillModeBackButton, miKingOfTheHillModeMultiplierField, miKingOfTheHillModeSizeField, miKingOfTheHillModeMultiplierField, NULL);
+    mModeSettingsMenu[12].AddControl(miKingOfTheHillModeBackButton, miKingOfTheHillModeMultiplierField, miKingOfTheHillModeSizeField, miKingOfTheHillModeMultiplierField, nullptr);
 
     mModeSettingsMenu[12].AddNonControl(miKingOfTheHillModeLeftHeaderBar);
     mModeSettingsMenu[12].AddNonControl(miKingOfTheHillModeRightHeaderBar);
@@ -859,11 +856,11 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miRaceModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miRaceModeHeaderText = new MI_HeaderText("Race Mode Menu", 320, 5);
 
-    mModeSettingsMenu[13].AddControl(miRaceModeQuantityField, miRaceModeBackButton, miRaceModeSpeedField, NULL, miRaceModeBackButton);
-    mModeSettingsMenu[13].AddControl(miRaceModeSpeedField, miRaceModeQuantityField, miRaceModePenaltyField, NULL, miRaceModeBackButton);
-    mModeSettingsMenu[13].AddControl(miRaceModePenaltyField, miRaceModeSpeedField, miRaceModeBackButton, NULL, miRaceModeBackButton);
+    mModeSettingsMenu[13].AddControl(miRaceModeQuantityField, miRaceModeBackButton, miRaceModeSpeedField, nullptr, miRaceModeBackButton);
+    mModeSettingsMenu[13].AddControl(miRaceModeSpeedField, miRaceModeQuantityField, miRaceModePenaltyField, nullptr, miRaceModeBackButton);
+    mModeSettingsMenu[13].AddControl(miRaceModePenaltyField, miRaceModeSpeedField, miRaceModeBackButton, nullptr, miRaceModeBackButton);
 
-    mModeSettingsMenu[13].AddControl(miRaceModeBackButton, miRaceModePenaltyField, miRaceModeQuantityField, miRaceModePenaltyField, NULL);
+    mModeSettingsMenu[13].AddControl(miRaceModeBackButton, miRaceModePenaltyField, miRaceModeQuantityField, miRaceModePenaltyField, nullptr);
 
     mModeSettingsMenu[13].AddNonControl(miRaceModeLeftHeaderBar);
     mModeSettingsMenu[13].AddNonControl(miRaceModeRightHeaderBar);
@@ -884,7 +881,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miFrenzyModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miFrenzyModeHeaderText = new MI_HeaderText("Frenzy Mode Menu", 320, 5);
 
-    mModeSettingsMenu[15].AddControl(miFrenzyModeOptions, NULL, NULL, NULL, NULL);
+    mModeSettingsMenu[15].AddControl(miFrenzyModeOptions, nullptr, nullptr, nullptr, nullptr);
 
     mModeSettingsMenu[15].AddNonControl(miFrenzyModeLeftHeaderBar);
     mModeSettingsMenu[15].AddNonControl(miFrenzyModeRightHeaderBar);
@@ -952,13 +949,13 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miSurvivalModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miSurvivalModeHeaderText = new MI_HeaderText("Survival Mode Menu", 320, 5);
 
-    mModeSettingsMenu[16].AddControl(miSurvivalModeEnemySlider[0], miSurvivalModeBackButton, miSurvivalModeEnemySlider[1], NULL, miSurvivalModeBackButton);
-    mModeSettingsMenu[16].AddControl(miSurvivalModeEnemySlider[1], miSurvivalModeEnemySlider[0], miSurvivalModeEnemySlider[2], NULL, miSurvivalModeBackButton);
-    mModeSettingsMenu[16].AddControl(miSurvivalModeEnemySlider[2], miSurvivalModeEnemySlider[1], miSurvivalModeDensityField, NULL, miSurvivalModeBackButton);
-    mModeSettingsMenu[16].AddControl(miSurvivalModeDensityField, miSurvivalModeEnemySlider[2], miSurvivalModeSpeedField, NULL, miSurvivalModeBackButton);
-    mModeSettingsMenu[16].AddControl(miSurvivalModeSpeedField, miSurvivalModeDensityField, miSurvivalModeShieldField, NULL, miSurvivalModeBackButton);
-    mModeSettingsMenu[16].AddControl(miSurvivalModeShieldField, miSurvivalModeSpeedField, miSurvivalModeBackButton, NULL, miSurvivalModeBackButton);
-    mModeSettingsMenu[16].AddControl(miSurvivalModeBackButton, miSurvivalModeShieldField, miSurvivalModeEnemySlider[0], miSurvivalModeShieldField, NULL);
+    mModeSettingsMenu[16].AddControl(miSurvivalModeEnemySlider[0], miSurvivalModeBackButton, miSurvivalModeEnemySlider[1], nullptr, miSurvivalModeBackButton);
+    mModeSettingsMenu[16].AddControl(miSurvivalModeEnemySlider[1], miSurvivalModeEnemySlider[0], miSurvivalModeEnemySlider[2], nullptr, miSurvivalModeBackButton);
+    mModeSettingsMenu[16].AddControl(miSurvivalModeEnemySlider[2], miSurvivalModeEnemySlider[1], miSurvivalModeDensityField, nullptr, miSurvivalModeBackButton);
+    mModeSettingsMenu[16].AddControl(miSurvivalModeDensityField, miSurvivalModeEnemySlider[2], miSurvivalModeSpeedField, nullptr, miSurvivalModeBackButton);
+    mModeSettingsMenu[16].AddControl(miSurvivalModeSpeedField, miSurvivalModeDensityField, miSurvivalModeShieldField, nullptr, miSurvivalModeBackButton);
+    mModeSettingsMenu[16].AddControl(miSurvivalModeShieldField, miSurvivalModeSpeedField, miSurvivalModeBackButton, nullptr, miSurvivalModeBackButton);
+    mModeSettingsMenu[16].AddControl(miSurvivalModeBackButton, miSurvivalModeShieldField, miSurvivalModeEnemySlider[0], miSurvivalModeShieldField, nullptr);
 
     mModeSettingsMenu[16].AddNonControl(miSurvivalModeLeftHeaderBar);
     mModeSettingsMenu[16].AddNonControl(miSurvivalModeRightHeaderBar);
@@ -1041,12 +1038,12 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miGreedModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miGreedModeHeaderText = new MI_HeaderText("Greed Mode Menu", 320, 5);
 
-    mModeSettingsMenu[17].AddControl(miGreedModeCoinLife, miGreedModeBackButton, miGreedModeOwnCoins, NULL, miGreedModeBackButton);
-    mModeSettingsMenu[17].AddControl(miGreedModeOwnCoins, miGreedModeCoinLife, miGreedModeMultiplier, NULL, miGreedModeBackButton);
-    mModeSettingsMenu[17].AddControl(miGreedModeMultiplier, miGreedModeOwnCoins, miGreedModePercentExtraCoin, NULL, miGreedModeBackButton);
-    mModeSettingsMenu[17].AddControl(miGreedModePercentExtraCoin, miGreedModeMultiplier, miGreedModeBackButton, NULL, miGreedModeBackButton);
+    mModeSettingsMenu[17].AddControl(miGreedModeCoinLife, miGreedModeBackButton, miGreedModeOwnCoins, nullptr, miGreedModeBackButton);
+    mModeSettingsMenu[17].AddControl(miGreedModeOwnCoins, miGreedModeCoinLife, miGreedModeMultiplier, nullptr, miGreedModeBackButton);
+    mModeSettingsMenu[17].AddControl(miGreedModeMultiplier, miGreedModeOwnCoins, miGreedModePercentExtraCoin, nullptr, miGreedModeBackButton);
+    mModeSettingsMenu[17].AddControl(miGreedModePercentExtraCoin, miGreedModeMultiplier, miGreedModeBackButton, nullptr, miGreedModeBackButton);
 
-    mModeSettingsMenu[17].AddControl(miGreedModeBackButton, miGreedModePercentExtraCoin, miGreedModeCoinLife, miGreedModePercentExtraCoin, NULL);
+    mModeSettingsMenu[17].AddControl(miGreedModeBackButton, miGreedModePercentExtraCoin, miGreedModeCoinLife, miGreedModePercentExtraCoin, nullptr);
 
     mModeSettingsMenu[17].AddNonControl(miGreedModeLeftHeaderBar);
     mModeSettingsMenu[17].AddNonControl(miGreedModeRightHeaderBar);
@@ -1122,10 +1119,10 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miHealthModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miHealthModeHeaderText = new MI_HeaderText("Health Mode Menu", 320, 5);
 
-    mModeSettingsMenu[18].AddControl(miHealthModeStartLife, miHealthModeBackButton, miHealthModeMaxLife, NULL, miHealthModeBackButton);
-    mModeSettingsMenu[18].AddControl(miHealthModeMaxLife, miHealthModeStartLife, miHealthModePercentExtraLife, NULL, miHealthModeBackButton);
-    mModeSettingsMenu[18].AddControl(miHealthModePercentExtraLife, miHealthModeMaxLife, miHealthModeBackButton, NULL, miHealthModeBackButton);
-    mModeSettingsMenu[18].AddControl(miHealthModeBackButton, miHealthModePercentExtraLife, miHealthModeStartLife, miHealthModePercentExtraLife, NULL);
+    mModeSettingsMenu[18].AddControl(miHealthModeStartLife, miHealthModeBackButton, miHealthModeMaxLife, nullptr, miHealthModeBackButton);
+    mModeSettingsMenu[18].AddControl(miHealthModeMaxLife, miHealthModeStartLife, miHealthModePercentExtraLife, nullptr, miHealthModeBackButton);
+    mModeSettingsMenu[18].AddControl(miHealthModePercentExtraLife, miHealthModeMaxLife, miHealthModeBackButton, nullptr, miHealthModeBackButton);
+    mModeSettingsMenu[18].AddControl(miHealthModeBackButton, miHealthModePercentExtraLife, miHealthModeStartLife, miHealthModePercentExtraLife, nullptr);
 
     mModeSettingsMenu[18].AddNonControl(miHealthModeLeftHeaderBar);
     mModeSettingsMenu[18].AddNonControl(miHealthModeRightHeaderBar);
@@ -1209,11 +1206,11 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miCollectionModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miCollectionModeHeaderText = new MI_HeaderText("Card Collection Mode Menu", 320, 5);
 
-    mModeSettingsMenu[19].AddControl(miCollectionModeQuantityField, miCollectionModeBackButton, miCollectionModeRateField, NULL, miCollectionModeBackButton);
-    mModeSettingsMenu[19].AddControl(miCollectionModeRateField, miCollectionModeQuantityField, miCollectionModeBankTimeField, NULL, miCollectionModeBackButton);
-    mModeSettingsMenu[19].AddControl(miCollectionModeBankTimeField, miCollectionModeRateField, miCollectionModeCardLifeField, NULL, miCollectionModeBackButton);
-    mModeSettingsMenu[19].AddControl(miCollectionModeCardLifeField, miCollectionModeBankTimeField, miCollectionModeBackButton, NULL, miCollectionModeBackButton);
-    mModeSettingsMenu[19].AddControl(miCollectionModeBackButton, miCollectionModeCardLifeField, miCollectionModeQuantityField, miCollectionModeCardLifeField, NULL);
+    mModeSettingsMenu[19].AddControl(miCollectionModeQuantityField, miCollectionModeBackButton, miCollectionModeRateField, nullptr, miCollectionModeBackButton);
+    mModeSettingsMenu[19].AddControl(miCollectionModeRateField, miCollectionModeQuantityField, miCollectionModeBankTimeField, nullptr, miCollectionModeBackButton);
+    mModeSettingsMenu[19].AddControl(miCollectionModeBankTimeField, miCollectionModeRateField, miCollectionModeCardLifeField, nullptr, miCollectionModeBackButton);
+    mModeSettingsMenu[19].AddControl(miCollectionModeCardLifeField, miCollectionModeBankTimeField, miCollectionModeBackButton, nullptr, miCollectionModeBackButton);
+    mModeSettingsMenu[19].AddControl(miCollectionModeBackButton, miCollectionModeCardLifeField, miCollectionModeQuantityField, miCollectionModeCardLifeField, nullptr);
 
     mModeSettingsMenu[19].AddNonControl(miCollectionModeLeftHeaderBar);
     mModeSettingsMenu[19].AddNonControl(miCollectionModeRightHeaderBar);
@@ -1257,13 +1254,13 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miChaseModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miChaseModeHeaderText = new MI_HeaderText("Phanto Mode Menu", 320, 5);
 
-    mModeSettingsMenu[20].AddControl(miChaseModeSpeedField, miChaseModeBackButton, miChaseModeQuantitySlider[0], NULL, miChaseModeBackButton);
+    mModeSettingsMenu[20].AddControl(miChaseModeSpeedField, miChaseModeBackButton, miChaseModeQuantitySlider[0], nullptr, miChaseModeBackButton);
 
-    mModeSettingsMenu[20].AddControl(miChaseModeQuantitySlider[0], miChaseModeSpeedField, miChaseModeQuantitySlider[1], NULL, miChaseModeBackButton);
-    mModeSettingsMenu[20].AddControl(miChaseModeQuantitySlider[1], miChaseModeQuantitySlider[0], miChaseModeQuantitySlider[2], NULL, miChaseModeBackButton);
-    mModeSettingsMenu[20].AddControl(miChaseModeQuantitySlider[2], miChaseModeQuantitySlider[1], miChaseModeBackButton, NULL, miChaseModeBackButton);
+    mModeSettingsMenu[20].AddControl(miChaseModeQuantitySlider[0], miChaseModeSpeedField, miChaseModeQuantitySlider[1], nullptr, miChaseModeBackButton);
+    mModeSettingsMenu[20].AddControl(miChaseModeQuantitySlider[1], miChaseModeQuantitySlider[0], miChaseModeQuantitySlider[2], nullptr, miChaseModeBackButton);
+    mModeSettingsMenu[20].AddControl(miChaseModeQuantitySlider[2], miChaseModeQuantitySlider[1], miChaseModeBackButton, nullptr, miChaseModeBackButton);
 
-    mModeSettingsMenu[20].AddControl(miChaseModeBackButton, miChaseModeQuantitySlider[2], miChaseModeSpeedField, miChaseModeQuantitySlider[2], NULL);
+    mModeSettingsMenu[20].AddControl(miChaseModeBackButton, miChaseModeQuantitySlider[2], miChaseModeSpeedField, miChaseModeQuantitySlider[2], nullptr);
 
     mModeSettingsMenu[20].AddNonControl(miChaseModeLeftHeaderBar);
     mModeSettingsMenu[20].AddNonControl(miChaseModeRightHeaderBar);
@@ -1313,10 +1310,10 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miShyGuyTagModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miShyGuyTagModeHeaderText = new MI_HeaderText("Shyguy Tag Mode Menu", 320, 5);
 
-    mModeSettingsMenu[21].AddControl(miShyGuyTagModeTagOnSuicideField, miShyGuyTagModeBackButton, miShyGuyTagModeTagOnStompField, NULL, miShyGuyTagModeBackButton);
-    mModeSettingsMenu[21].AddControl(miShyGuyTagModeTagOnStompField, miShyGuyTagModeTagOnSuicideField, miShyGuyTagModeFreeTimeField, NULL, miShyGuyTagModeBackButton);
-    mModeSettingsMenu[21].AddControl(miShyGuyTagModeFreeTimeField, miShyGuyTagModeTagOnStompField, miShyGuyTagModeBackButton, NULL, miShyGuyTagModeBackButton);
-    mModeSettingsMenu[21].AddControl(miShyGuyTagModeBackButton, miShyGuyTagModeFreeTimeField, miShyGuyTagModeTagOnSuicideField, miShyGuyTagModeFreeTimeField, NULL);
+    mModeSettingsMenu[21].AddControl(miShyGuyTagModeTagOnSuicideField, miShyGuyTagModeBackButton, miShyGuyTagModeTagOnStompField, nullptr, miShyGuyTagModeBackButton);
+    mModeSettingsMenu[21].AddControl(miShyGuyTagModeTagOnStompField, miShyGuyTagModeTagOnSuicideField, miShyGuyTagModeFreeTimeField, nullptr, miShyGuyTagModeBackButton);
+    mModeSettingsMenu[21].AddControl(miShyGuyTagModeFreeTimeField, miShyGuyTagModeTagOnStompField, miShyGuyTagModeBackButton, nullptr, miShyGuyTagModeBackButton);
+    mModeSettingsMenu[21].AddControl(miShyGuyTagModeBackButton, miShyGuyTagModeFreeTimeField, miShyGuyTagModeTagOnSuicideField, miShyGuyTagModeFreeTimeField, nullptr);
 
     mModeSettingsMenu[21].AddNonControl(miShyGuyTagModeLeftHeaderBar);
     mModeSettingsMenu[21].AddNonControl(miShyGuyTagModeRightHeaderBar);
@@ -1377,10 +1374,10 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miBossModeRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miBossModeHeaderText = new MI_HeaderText("Boss Minigame Menu", 320, 5);
 
-    mBossSettingsMenu.AddControl(miBossModeTypeField, miBossModeBackButton, miBossModeDifficultyField, NULL, miBossModeBackButton);
-    mBossSettingsMenu.AddControl(miBossModeDifficultyField, miBossModeTypeField, miBossModeHitPointsField, NULL, miBossModeBackButton);
-    mBossSettingsMenu.AddControl(miBossModeHitPointsField, miBossModeDifficultyField, miBossModeBackButton, NULL, miBossModeBackButton);
-    mBossSettingsMenu.AddControl(miBossModeBackButton, miBossModeHitPointsField, miBossModeTypeField, miBossModeHitPointsField, NULL);
+    mBossSettingsMenu.AddControl(miBossModeTypeField, miBossModeBackButton, miBossModeDifficultyField, nullptr, miBossModeBackButton);
+    mBossSettingsMenu.AddControl(miBossModeDifficultyField, miBossModeTypeField, miBossModeHitPointsField, nullptr, miBossModeBackButton);
+    mBossSettingsMenu.AddControl(miBossModeHitPointsField, miBossModeDifficultyField, miBossModeBackButton, nullptr, miBossModeBackButton);
+    mBossSettingsMenu.AddControl(miBossModeBackButton, miBossModeHitPointsField, miBossModeTypeField, miBossModeHitPointsField, nullptr);
 
     mBossSettingsMenu.AddNonControl(miBossModeLeftHeaderBar);
     mBossSettingsMenu.AddNonControl(miBossModeRightHeaderBar);

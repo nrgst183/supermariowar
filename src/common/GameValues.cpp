@@ -22,19 +22,6 @@
 
 // TODO: Refactor externs
 
-extern CGameMode * gamemodes[GAMEMODE_LAST];
-
-extern FiltersList *filterslist;
-extern MapList *maplist;
-extern SkinList *skinlist;
-extern AnnouncerList *announcerlist;
-extern MusicList *musiclist;
-extern WorldMusicList *worldmusiclist;
-extern GraphicsList *menugraphicspacklist;
-extern GraphicsList *worldgraphicspacklist;
-extern GraphicsList *gamegraphicspacklist;
-extern SoundsList *soundpacklist;
-
 
 //[Keyboard/Joystick][Game/Menu][NumPlayers][NumKeys]  left, right, jump, down, turbo, powerup, start, cancel
 SDL_Keycode controlkeys[2][2][4][NUM_KEYS] = { { { {SDLK_LEFT, SDLK_RIGHT, SDLK_UP, SDLK_DOWN, SDLK_RCTRL, SDLK_RSHIFT, SDLK_RETURN, SDLK_ESCAPE},
@@ -129,7 +116,6 @@ std::string GetControlsBinPath() {
 }
 } // namespace
 
-extern CGameValues game_values;
 void ifSoundOnPlay(sfxSound& sfx)
 {
     if (game_values.sound)

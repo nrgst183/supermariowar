@@ -15,10 +15,6 @@
 #include "objects/carriable/CO_ThrowBlock.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-extern CMap* g_map;
-extern CResourceManager* rm;
-extern CGameValues game_values;
-extern CEyecandyContainer eyecandy[3];
 
 B_WeaponBreakableBlock::B_WeaponBreakableBlock(gfxSprite *nspr, Vec2s pos, WeaponDamageType type)
     : IO_Block(nspr, pos)
@@ -43,7 +39,7 @@ void B_WeaponBreakableBlock::update()
         } else if (state == 2) {
             iBumpPlayerID = -1;
             dead = true;
-            g_map->blockdata[col][row] = NULL;
+            g_map->blockdata[col][row] = nullptr;
             g_map->UpdateTileGap(col, row);
         }
     }

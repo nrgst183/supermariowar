@@ -9,8 +9,8 @@
 
 NetworkLayerENet::NetworkLayerENet()
     : NetworkLayer()
-    , local_client(NULL)
-    , local_gamehost(NULL)
+    , local_client(nullptr)
+    , local_gamehost(nullptr)
 {
 }
 
@@ -47,7 +47,7 @@ bool NetworkLayerENet::client_restart()
     // two connections (lobby server and game host)
     // two channels (a reliable and an unreliable)
     // no up/down speed limit
-    local_client = enet_host_create(NULL, 2, 2, 0, 0);
+    local_client = enet_host_create(nullptr, 2, 2, 0, 0);
     if (!local_client) {
         fprintf(stderr, "[error][net] Could not open client connection port.\n");
         return false;
@@ -205,7 +205,7 @@ void NetworkLayerENet::client_shutdown()
 
     // Shut down
     enet_host_destroy(local_client);
-    local_client = NULL;
+    local_client = nullptr;
 }
 
 void NetworkLayerENet::gamehost_shutdown()
@@ -215,5 +215,5 @@ void NetworkLayerENet::gamehost_shutdown()
 
     // Shut down
     enet_host_destroy(local_gamehost);
-    local_gamehost = NULL;
+    local_gamehost = nullptr;
 }

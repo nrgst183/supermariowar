@@ -13,10 +13,6 @@
 
 namespace fs = std::filesystem;
 
-extern SDL_Surface * blitdest;
-extern SDL_Surface * screen;
-extern short x_shake;
-extern short y_shake;
 
 namespace {
 SdlSurfacePtr loadImage(
@@ -174,7 +170,7 @@ void gfxSprite::drawStretch(const SDL_Rect& srcRect, SDL_Surface* dst, const SDL
 
 void gfxSprite::setalpha(Uint8 alpha)
 {
-    assert(m_picture != NULL);
+    assert(m_picture != nullptr);
 
     if (!SDL_SetSurfaceBlendMode(m_picture.get(), SDL_BLENDMODE_BLEND)) {
         fprintf(stderr, "\n ERROR: couldn't set blend mode on sprite: %s\n", SDL_GetError());

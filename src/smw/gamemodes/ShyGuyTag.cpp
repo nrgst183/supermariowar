@@ -2,21 +2,10 @@
 
 #include "eyecandy.h"
 #include "GameValues.h"
+#include "GSGameplay.h"
 #include "player.h"
 #include "ResourceManager.h"
 #include "Score.h"
-
-extern CScore *score[4];
-extern short score_cnt;
-
-extern CEyecandyContainer eyecandy[3];
-
-extern std::vector<CPlayer*> players;
-
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
-extern short CountAliveTeams(short * lastteam);
 
 
 //shyguy tag mode
@@ -87,7 +76,7 @@ void CGM_ShyGuyTag::think()
         if (++scorecounter >= game_values.pointspeed) {
             scorecounter = 0;
 
-            CPlayer * pCheckWinner = NULL;
+            CPlayer * pCheckWinner = nullptr;
             bool fAlreadyScored[4] = {false, false, false, false};
             for (CPlayer* player : players) {
                 if (!player->shyguy) {

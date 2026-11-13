@@ -36,13 +36,6 @@
 #include "objects/powerup/PU_StarPowerup.h"
 #include "objects/powerup/PU_Tanooki.h"
 
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
-
-extern CObjectContainer objectcontainer[3];
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 namespace {
 IO_MovingObject* spawnRegularPowerup(PowerupType type, Vec2s spawnPos, bool movesRight)
@@ -130,7 +123,7 @@ void removeifprojectile(IO_MovingObject * object, bool playsound, bool forcedead
         if (fDie || forcedead) {
         	CPlayer * player = GetPlayerFromGlobalID(iPlayerID);
 
-        	if (player != NULL)
+            if (player != nullptr)
         		player->decreaseProjectilesCount();
 
             object->dead = true;
@@ -211,7 +204,7 @@ IO_MovingObject* createpowerup(short iType, Vec2s pos, bool side, bool spawn)
         }
     } else {
         //If no powerups were selected for this block, then fire out a podobo
-        IO_MovingObject * podobo = new MO_Podobo(&rm->spr_podobo, {pos.x + 2, pos.y}, -(float(RANDOM_INT(5)) / 2.0f) - 6.0f, -1, -1, -1, true);
+        IO_MovingObject * podobo = new MO_Podobo(&rm->spr_podobo, {static_cast<short>(pos.x + 2), pos.y}, -(float(RANDOM_INT(5)) / 2.0f) - 6.0f, -1, -1, -1, true);
         objectcontainer[2].add(podobo);
         return podobo;
     }

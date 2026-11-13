@@ -12,13 +12,6 @@
 #include "ui/MI_SliderField.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
-extern AnnouncerList* announcerlist;
-extern MusicList* musiclist;
-extern WorldMusicList* worldmusiclist;
-extern SoundsList* soundpacklist;
 
 UI_SoundOptionsMenu::UI_SoundOptionsMenu()
     : UI_Menu()
@@ -83,14 +76,14 @@ UI_SoundOptionsMenu::UI_SoundOptionsMenu()
     miSoundOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miSoundOptionsMenuHeaderText = new MI_HeaderText("Sound Options Menu", 320, 5);
 
-    AddControl(miSoundVolumeField, miSoundOptionsMenuBackButton, miMusicVolumeField, NULL, miSoundOptionsMenuBackButton);
-    AddControl(miMusicVolumeField, miSoundVolumeField, miPlayNextMusicField, NULL, miSoundOptionsMenuBackButton);
-    AddControl(miPlayNextMusicField, miMusicVolumeField, miAnnouncerField, NULL, miSoundOptionsMenuBackButton);
-    AddControl(miAnnouncerField, miPlayNextMusicField, miSoundPackField, NULL, miSoundOptionsMenuBackButton);
-    AddControl(miSoundPackField, miAnnouncerField, miPlaylistField, NULL, miSoundOptionsMenuBackButton);
-    AddControl(miPlaylistField, miSoundPackField, miWorldMusicField, NULL, miSoundOptionsMenuBackButton);
-    AddControl(miWorldMusicField, miPlaylistField, miSoundOptionsMenuBackButton, NULL, miSoundOptionsMenuBackButton);
-    AddControl(miSoundOptionsMenuBackButton, miWorldMusicField, miSoundVolumeField, miSoundPackField, NULL);
+    AddControl(miSoundVolumeField, miSoundOptionsMenuBackButton, miMusicVolumeField, nullptr, miSoundOptionsMenuBackButton);
+    AddControl(miMusicVolumeField, miSoundVolumeField, miPlayNextMusicField, nullptr, miSoundOptionsMenuBackButton);
+    AddControl(miPlayNextMusicField, miMusicVolumeField, miAnnouncerField, nullptr, miSoundOptionsMenuBackButton);
+    AddControl(miAnnouncerField, miPlayNextMusicField, miSoundPackField, nullptr, miSoundOptionsMenuBackButton);
+    AddControl(miSoundPackField, miAnnouncerField, miPlaylistField, nullptr, miSoundOptionsMenuBackButton);
+    AddControl(miPlaylistField, miSoundPackField, miWorldMusicField, nullptr, miSoundOptionsMenuBackButton);
+    AddControl(miWorldMusicField, miPlaylistField, miSoundOptionsMenuBackButton, nullptr, miSoundOptionsMenuBackButton);
+    AddControl(miSoundOptionsMenuBackButton, miWorldMusicField, miSoundVolumeField, miSoundPackField, nullptr);
 
     AddNonControl(miSoundOptionsMenuLeftHeaderBar);
     AddNonControl(miSoundOptionsMenuRightHeaderBar);

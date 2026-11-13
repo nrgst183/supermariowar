@@ -6,10 +6,6 @@
 #include "ResourceManager.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-extern SpotlightManager spotlightManager;
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class throwable block projectile
@@ -43,7 +39,7 @@ CO_ThrowBlock::CO_ThrowBlock(gfxSprite* nspr, Vec2s pos, ThrowBlockType type)
     frozenvelocity = 0.0f;
     frozenanimationspeed = 2;
 
-    sSpotlight = NULL;
+    sSpotlight = nullptr;
 }
 
 bool CO_ThrowBlock::collide(CPlayer* player)
@@ -69,14 +65,14 @@ bool CO_ThrowBlock::HitTop(CPlayer* player)
         } else if (state == 2) {  // Holding
             if (player != owner) {
                 if (owner)
-                    owner->carriedItem = NULL;
+                    owner->carriedItem = nullptr;
 
                 Kick();
 
                 player->setYi(iy - PH - 1);
                 player->bouncejump();
                 player->collisions.checktop(*player);
-                player->platform = NULL;
+                player->platform = nullptr;
             }
         }
     }
@@ -178,8 +174,8 @@ void CO_ThrowBlock::update()
         dead = true;
 
         if (owner) {
-            owner->carriedItem = NULL;
-            owner = NULL;
+            owner->carriedItem = nullptr;
+            owner = nullptr;
         }
 
         return;
@@ -267,7 +263,7 @@ void CO_ThrowBlock::Kick()
     iPlayerID = owner->globalID;
     iTeamID = owner->teamID;
 
-    owner = NULL;
+    owner = nullptr;
     iNoOwnerKillTime = 30;
 
     state = 1;
@@ -324,8 +320,8 @@ void CO_ThrowBlock::DieHelper()
     ifSoundOnPlay(rm->sfx_breakblock);
 
     if (owner) {
-        owner->carriedItem = NULL;
-        owner = NULL;
+        owner->carriedItem = nullptr;
+        owner = nullptr;
     }
 }
 

@@ -7,8 +7,6 @@
 #include "ResourceManager.h"
 #include "gamemodes/Chase.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class Phanto (for phanto mode)

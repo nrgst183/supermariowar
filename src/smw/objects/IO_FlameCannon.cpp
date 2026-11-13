@@ -1,19 +1,17 @@
 #include "IO_FlameCannon.h"
 
 #include "GameValues.h"
+#include "map.h"
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
-
-extern SDL_Rect g_rFlameRects[4][4];
-extern CResourceManager* rm;
 
 
 //------------------------------------------------------------------------------
 // class IO_FlameCannon - shoots a flame
 //------------------------------------------------------------------------------
 IO_FlameCannon::IO_FlameCannon(Vec2s pos, short freq, short direction)
-    : CObject(NULL, pos)
+    : CObject(nullptr, pos)
     , iFreq(freq)
     , iDirection(direction)
 {

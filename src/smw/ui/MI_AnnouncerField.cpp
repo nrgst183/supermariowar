@@ -6,8 +6,6 @@
 #include "ResourceManager.h"
 #include "ui/MI_Image.h"
 
-extern CResourceManager* rm;
-
 
 MI_AnnouncerField::MI_AnnouncerField(gfxSprite* nspr, short x, short y, std::string name, short width, short indent, SimpleFileList * pList)
     : UI_Control(x, y)

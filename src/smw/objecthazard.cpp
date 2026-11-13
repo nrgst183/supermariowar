@@ -8,11 +8,6 @@
 #include "objects/moving/MO_PirhanaPlant.h"
 #include "objects/overmap/WO_OrbitHazard.h"
 
-extern CObjectContainer noncolcontainer;
-extern CObjectContainer objectcontainer[3];
-extern CMap* g_map;
-extern CResourceManager* rm;
-
 
 void LoadMapHazards(bool fPreview)
 {

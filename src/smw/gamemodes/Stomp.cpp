@@ -13,12 +13,6 @@
 #include "objects/walkingenemy/WE_Spiny.h"
 
 
-extern CObjectContainer objectcontainer[3];
-extern std::vector<CPlayer*> players;
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-
 //Stomp mode:
 //Kill randomly appearing goomobas on map
 //First one to kill the limit wins

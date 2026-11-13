@@ -17,10 +17,6 @@ public:
 private:
     MI_PowerupSelection* miPowerupSelection;
 
-    // MI_PowerupSlider * miPowerupSlider[NUM_POWERUPS];
-    // MI_Button * miPowerupSelectionBackButton;
-    // MI_Button * miPowerupSelectionRestoreDefaultsButton;
-
     MI_Image* miPowerupSelectionLeftHeaderBar;
     MI_Image* miPowerupSelectionMenuRightHeaderBar;
     MI_Text* miPowerupSelectionMenuHeaderText;

@@ -8,7 +8,6 @@
 #include <cstring>
 #include <format>
 
-extern CGameValues game_values;
 
 JoystickManager& JoystickManager::instance()
 {
@@ -97,7 +96,7 @@ std::vector<SDL_JoystickID> JoystickManager::instanceIdsForGuid(const SDL_GUID& 
 SDL_Joystick* JoystickManager::handleFor(SDL_JoystickID deviceId)
 {
     const auto it = m_opened.find(deviceId);
-    return it != m_opened.end() ? it->second : NULL;
+    return it != m_opened.end() ? it->second : nullptr;
 }
 
 bool JoystickManager::open(SDL_JoystickID deviceId)

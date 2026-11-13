@@ -2,6 +2,7 @@
 
 #include "eyecandy.h"
 #include "GameValues.h"
+#include "map.h"
 #include "ObjectContainer.h"
 #include "player.h"
 #include "RandomNumberGenerator.h"
@@ -11,18 +12,13 @@
 
 #include <cmath>
 
-extern CEyecandyContainer eyecandy[3];
-extern CObjectContainer objectcontainer[3];
-extern std::vector<CPlayer*> players;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class IO_PirhanaPlant - pirhana plant that appears on a certain frequency
 //------------------------------------------------------------------------------
-extern SDL_Rect g_rPirhanaRects[4][4][4];
 
 MO_PirhanaPlant::MO_PirhanaPlant(Vec2s pos, short type, short freq, short direction, bool preview)
-    : IO_MovingObject(NULL, pos, 1, 0)
+    : IO_MovingObject(nullptr, pos, 1, 0)
 {
     iType = type;
     iDirection = direction;
@@ -188,7 +184,7 @@ void MO_PirhanaPlant::update()
 
     // Fire a fireball
     if (iType <= 1 && state == 2 && iTimer == 30) {
-        objectcontainer[1].add(new OMO_StraightPathHazard(&rm->spr_hazard_fireball[fPreview ? 1 : 0], {iDirection != 3 ? ix + 7 : ix + iw - 23, iDirection != 1 ? iy + 7 : iy + ih - 23}, GetFireballAngle(), 3.0f, 4, 8, 18, 18, 0, 0, 0, iFrame <= 1 ? 18 : 0, 18, 18));
+        objectcontainer[1].add(new OMO_StraightPathHazard(&rm->spr_hazard_fireball[fPreview ? 1 : 0], {static_cast<short>(iDirection != 3 ? ix + 7 : ix + iw - 23), static_cast<short>(iDirection != 1 ? iy + 7 : iy + ih - 23)}, GetFireballAngle(), 3.0f, 4, 8, 18, 18, 0, 0, 0, iFrame <= 1 ? 18 : 0, 18, 18));
     }
 }
 

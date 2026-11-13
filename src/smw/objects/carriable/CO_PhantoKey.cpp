@@ -4,8 +4,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CMap* g_map;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class phanto key (for chase mode)
@@ -30,7 +28,7 @@ CO_PhantoKey::CO_PhantoKey(gfxSprite* nspr)
 
 bool CO_PhantoKey::collide(CPlayer* player)
 {
-    if (owner == NULL && player->isready()) {
+    if (owner == nullptr && player->isready()) {
         if (player->AcceptItem(this)) {
             owner = player;
         }

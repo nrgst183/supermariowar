@@ -7,15 +7,6 @@
 #include "Score.h"
 #include "objects/overmap/WO_Area.h"
 
-extern CScore *score[4];
-extern short score_cnt;
-
-extern std::vector<CPlayer*> players;
-
-extern CEyecandyContainer eyecandy[3];
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 //Owned:
 //Frag limit death match, but players get bonus frags for the number of players they have "owned"

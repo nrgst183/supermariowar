@@ -7,8 +7,6 @@
 
 #include <cmath>
 
-extern CEyecandyContainer eyecandy[3];
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class OMO Straight Path Hazard - straight path fireball

@@ -229,19 +229,6 @@ private:
     short iLoops;
 };
 
-/*
-//actual eyecandy implementations
-class EC_Award : public EC_LoopingAnimation {
-public:
-    EC_Award(gfxSprite *nspr, short ix, short iy, short destx, short desty, short iframes, short irate);
-
-    void update() override;
-
-private:
-    float dx, dy;
-    float vely, velx;
-};
-*/
 
 class EC_ExplodingAward : public CEyecandy {
 public:
@@ -356,22 +343,6 @@ protected:
     short colorOffset;
 };
 
-/*
-class EC_BossPeeker : public CEyecandy {
-public:
-    EC_BossPeeker(gfxSprite *nspr, short speed, short bossType);
-    void draw();
-    void update();
-
-private:
-    gfxSprite *spr;
-    int iSpeed;
-    int iBossColorOffsetY;
-    int timer;
-    int state;
-    int ix, iy;
-};
-*/
 
 class EC_SuperStompExplosion : public CEyecandy {
 public:
@@ -453,3 +424,9 @@ public:
 private:
     std::vector<Spotlight*> spotlightList;
 };
+
+// Defined separately by each executable (smw, the editors)
+extern CEyecandyContainer eyecandy[3];
+
+// Defined in smw/GSGameplay.cpp
+extern SpotlightManager spotlightManager;

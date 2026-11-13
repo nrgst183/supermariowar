@@ -8,11 +8,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CObjectContainer objectcontainer[3];
-extern CMap* g_map;
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class coin (for coin mode)

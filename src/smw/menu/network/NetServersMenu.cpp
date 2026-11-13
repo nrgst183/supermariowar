@@ -8,8 +8,6 @@
 #include "ui/MI_TextField.h"
 #include "ui/NetworkListScroll.h"
 
-extern CResourceManager* rm;
-
 
 UI_NetServersMenu::UI_NetServersMenu()
     : UI_Menu()
@@ -66,12 +64,12 @@ UI_NetServersMenu::UI_NetServersMenu()
     miNetServersConnectionDetector->SuccessCode(MENU_CODE_NET_CONNECT_SUCCESS);
     miNetServersConnectionDetector->WaitingCode(MENU_CODE_NET_CONNECT_IN_PROGRESS);*/
 
-    AddControl(miNetServersNicknameField, miNetServersBackButton, miNetServersSelectButton, NULL, NULL);
-    AddControl(miNetServersSelectButton, miNetServersNicknameField, miNetServersConnectButton, NULL, NULL);
+    AddControl(miNetServersNicknameField, miNetServersBackButton, miNetServersSelectButton, nullptr, nullptr);
+    AddControl(miNetServersSelectButton, miNetServersNicknameField, miNetServersConnectButton, nullptr, nullptr);
     AddNonControl(miNetServersSelectedHostText);
-    AddControl(miNetServersConnectButton, miNetServersSelectButton, miNetServersAddRemoveButton, NULL, NULL);
-    AddControl(miNetServersAddRemoveButton, miNetServersConnectButton, miNetServersBackButton, NULL, NULL);
-    AddControl(miNetServersBackButton, miNetServersAddRemoveButton, miNetServersNicknameField, NULL, NULL);
+    AddControl(miNetServersConnectButton, miNetServersSelectButton, miNetServersAddRemoveButton, nullptr, nullptr);
+    AddControl(miNetServersAddRemoveButton, miNetServersConnectButton, miNetServersBackButton, nullptr, nullptr);
+    AddControl(miNetServersBackButton, miNetServersAddRemoveButton, miNetServersNicknameField, nullptr, nullptr);
 
     AddNonControl(miNetServersLeftHeaderBar);
     AddNonControl(miNetServersRightHeaderBar);
@@ -80,9 +78,9 @@ UI_NetServersMenu::UI_NetServersMenu()
     AddNonControl(miNetServersConnectingDialogImage);
     AddNonControl(miNetServersConnectingDialogText);
 
-    AddControl(miNetServersScroll, NULL, NULL, NULL, NULL);
+    AddControl(miNetServersScroll, nullptr, nullptr, nullptr, nullptr);
     // AddNonControl(miNetServersConnectingDialogImage);
-    // AddControl(miNetServersConnectionDetector, NULL, NULL, NULL, NULL);
+    // AddControl(miNetServersConnectionDetector, nullptr, nullptr, nullptr, nullptr);
 
     setInitialFocus(miNetServersSelectButton);
     SetCancelCode(MENU_CODE_TO_MAIN_MENU);

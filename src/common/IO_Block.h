@@ -8,8 +8,8 @@ class IO_Block : public CObject
 	public:
 		IO_Block(gfxSprite* nspr, Vec2s pos);
 
-		virtual void draw();
-		virtual void update();
+		virtual void draw() override;
+		virtual void update() override;
 		virtual void reset();
 
 		//Returns true if we should continue to check for collisions in this direction

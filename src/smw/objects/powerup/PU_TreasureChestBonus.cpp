@@ -6,11 +6,6 @@
 #include "map.h"
 #include "ResourceManager.h"
 
-extern CMap* g_map;
-extern CEyecandyContainer eyecandy[3];
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class treasure chest powerup
@@ -74,10 +69,6 @@ bool PU_TreasureChestBonus::collide(CPlayer* player)
 {
     if (state == 1) {
         ifSoundOnPlay(rm->sfx_treasurechest);
-        // if (game_values.worldpowerupcount[player->teamID] < 32)
-        //     game_values.worldpowerups[player->teamID][game_values.worldpowerupcount[player->teamID]++] = bonusitem;
-        // else
-        //	game_values.worldpowerups[player->teamID][31] = bonusitem;
 
         state = 3;
 

@@ -8,10 +8,12 @@
 #include <cstdio>
 #include <cstring>
 
-#define REMOTE_PKG_SIZE_LIMIT 20000 /* bytes in worst case */
+constexpr size_t REMOTE_PKG_SIZE_LIMIT = 20000; // bytes in worst case
 
 Room::Room()
     : roomID(0)
+    , name{}
+    , password{}
     , visible(true)
     , players{}
     , hostPlayerNumber(0)
@@ -23,6 +25,8 @@ Room::Room()
 
 Room::Room(uint32_t roomID, const char* name, const char* password, Player* host)
     : roomID(roomID)
+    , name{}
+    , password{}
     , visible(true) // TODO
     , players{}
     , hostPlayerNumber(0)
@@ -44,7 +48,7 @@ Room::~Room()
 {
     // Players are freed by the server
     for (unsigned short p = 0; p < 4; p++) {
-        players[p] = NULL;
+        players[p] = nullptr;
     }
 
     mapPackage.free();
@@ -82,7 +86,7 @@ void Room::removePlayer(Player* player)
     bool searching = true;
     for (uint8_t p = 0; p < 4 && searching; p++) {
         if (players[p] == player) {
-            players[p] = NULL;
+            players[p] = nullptr;
             playerCount--;
             assert(playerCount <= 4);
             searching = false;
@@ -268,11 +272,6 @@ void Room::sendStartSignal()
 
 
     printf("sendStartSignal\n");
-    /*printf("  p0: %p\n", players[0]);
-    printf("  p1: %p\n", players[1]);
-    printf("  p2: %p\n", players[2]);
-    printf("  p3: %p\n", players[3]);
-    printf("  H: %d -> %p\n", hostPlayerNumber, players[hostPlayerNumber]);*/
 
 
     NetPeer* gh_netclient = gamehost->network_client;
@@ -306,38 +305,8 @@ void Room::sendStartSignal()
 
     visible = false;
 
-/*
-    NetPkgs::StartSync package;
-        package.protocolVersion = NET_PROTOCOL_VERSION;
-        package.packageType = NET_NOTICE_GAME_SYNC;
-        package.commonRandomSeed = rand();
-
-    for (uint8_t p = 0; p < 4; p++) {
-        if (players[p])
-            players[p]->sendData(&package, sizeof(NetPkgs::StartSync));
-    }
-*/
 }
 
 void Room::startGameIfEverybodyReady()
 {
-/*    uint8_t readyPlayers = 0;
-    for (uint8_t p = 0; p < 4; p++) {
-        if (players[p]) {
-            if (players[p]->synchOK)
-                readyPlayers++;
-        }
-    }
-
-    // If everyone is ready, start the room
-    if (playerCount == readyPlayers) {
-        for (uint8_t p = 0; p < 4; p++) {
-            if (players[p]) {
-                players[p]->sendCode(NET_NOTICE_GAME_STARTED);
-                players[p]->isPlaying = true;
-            }
-        }
-    }
-
-    visible = false;*/
 }

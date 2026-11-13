@@ -9,11 +9,6 @@
 
 #include <cassert>
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern CEyecandyContainer eyecandy[3];
-extern CObjectContainer objectcontainer[3];
 
 static const unsigned short SSTOMP_STRENGTH_TIMER = 40;
 
@@ -47,8 +42,8 @@ void PlayerSuperStomp::update_onGroundHit(CPlayer &player)
         ifSoundOnPlay(rm->sfx_bobombsound);
         is_stomping = false;
 
-        objectcontainer[1].add(new MO_AttackZone(player.getGlobalID(), player.getTeamID(), {player.leftX() - 32, player.topY() + 10}, {32, 15}, 8, KillStyle::KuriboShoe, false));
-        objectcontainer[1].add(new MO_AttackZone(player.getGlobalID(), player.getTeamID(), {player.rightX(), player.topY() + 10}, {32, 15}, 8, KillStyle::KuriboShoe, false));
+        objectcontainer[1].add(new MO_AttackZone(player.getGlobalID(), player.getTeamID(), {static_cast<short>(player.leftX() - 32), static_cast<short>(player.topY() + 10)}, {32, 15}, 8, KillStyle::KuriboShoe, false));
+        objectcontainer[1].add(new MO_AttackZone(player.getGlobalID(), player.getTeamID(), {player.rightX(), static_cast<short>(player.topY() + 10)}, {32, 15}, 8, KillStyle::KuriboShoe, false));
     }
 }
 

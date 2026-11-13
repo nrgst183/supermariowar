@@ -6,9 +6,6 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 UI_OptionsMenu::UI_OptionsMenu()
     : UI_Menu()
@@ -67,18 +64,18 @@ UI_OptionsMenu::UI_OptionsMenu()
     miGenerateThumbsDialogYesButton->setVisible(false);
     miGenerateThumbsDialogNoButton->setVisible(false);
 
-    AddControl(miGameplayOptionsMenuButton, miOptionsMenuBackButton, miTeamOptionsMenuButton, NULL, miOptionsMenuBackButton);
-    AddControl(miTeamOptionsMenuButton, miGameplayOptionsMenuButton, miPowerupOptionsMenuButton, NULL, miOptionsMenuBackButton);
-    AddControl(miPowerupOptionsMenuButton, miTeamOptionsMenuButton, miPowerupSettingsMenuButton, NULL, miOptionsMenuBackButton);
-    AddControl(miPowerupSettingsMenuButton, miPowerupOptionsMenuButton, miProjectilesOptionsMenuButton, NULL, miOptionsMenuBackButton);
-    AddControl(miProjectilesOptionsMenuButton, miPowerupSettingsMenuButton, miProjectilesLimitsMenuButton, NULL, miOptionsMenuBackButton);
-    AddControl(miProjectilesLimitsMenuButton, miProjectilesOptionsMenuButton, miGraphicsOptionsMenuButton, NULL, miOptionsMenuBackButton);
-    AddControl(miGraphicsOptionsMenuButton, miProjectilesLimitsMenuButton, miEyeCandyOptionsMenuButton, NULL, miOptionsMenuBackButton);
-    AddControl(miEyeCandyOptionsMenuButton, miGraphicsOptionsMenuButton, miSoundOptionsMenuButton, NULL, miOptionsMenuBackButton);
-    AddControl(miSoundOptionsMenuButton, miEyeCandyOptionsMenuButton, miGenerateMapThumbsButton, NULL, miOptionsMenuBackButton);
-    AddControl(miGenerateMapThumbsButton, miSoundOptionsMenuButton, miOptionsMenuBackButton, NULL, miOptionsMenuBackButton);
+    AddControl(miGameplayOptionsMenuButton, miOptionsMenuBackButton, miTeamOptionsMenuButton, nullptr, miOptionsMenuBackButton);
+    AddControl(miTeamOptionsMenuButton, miGameplayOptionsMenuButton, miPowerupOptionsMenuButton, nullptr, miOptionsMenuBackButton);
+    AddControl(miPowerupOptionsMenuButton, miTeamOptionsMenuButton, miPowerupSettingsMenuButton, nullptr, miOptionsMenuBackButton);
+    AddControl(miPowerupSettingsMenuButton, miPowerupOptionsMenuButton, miProjectilesOptionsMenuButton, nullptr, miOptionsMenuBackButton);
+    AddControl(miProjectilesOptionsMenuButton, miPowerupSettingsMenuButton, miProjectilesLimitsMenuButton, nullptr, miOptionsMenuBackButton);
+    AddControl(miProjectilesLimitsMenuButton, miProjectilesOptionsMenuButton, miGraphicsOptionsMenuButton, nullptr, miOptionsMenuBackButton);
+    AddControl(miGraphicsOptionsMenuButton, miProjectilesLimitsMenuButton, miEyeCandyOptionsMenuButton, nullptr, miOptionsMenuBackButton);
+    AddControl(miEyeCandyOptionsMenuButton, miGraphicsOptionsMenuButton, miSoundOptionsMenuButton, nullptr, miOptionsMenuBackButton);
+    AddControl(miSoundOptionsMenuButton, miEyeCandyOptionsMenuButton, miGenerateMapThumbsButton, nullptr, miOptionsMenuBackButton);
+    AddControl(miGenerateMapThumbsButton, miSoundOptionsMenuButton, miOptionsMenuBackButton, nullptr, miOptionsMenuBackButton);
 
-    AddControl(miOptionsMenuBackButton, miGenerateMapThumbsButton, miGameplayOptionsMenuButton, miGenerateMapThumbsButton, NULL);
+    AddControl(miOptionsMenuBackButton, miGenerateMapThumbsButton, miGameplayOptionsMenuButton, miGenerateMapThumbsButton, nullptr);
 
     AddNonControl(miOptionsMenuLeftHeaderBar);
     AddNonControl(miOptionsMenuRightHeaderBar);
@@ -88,8 +85,8 @@ UI_OptionsMenu::UI_OptionsMenu()
     AddNonControl(miGenerateThumbsDialogAreYouText);
     AddNonControl(miGenerateThumbsDialogSureText);
 
-    AddControl(miGenerateThumbsDialogYesButton, NULL, NULL, NULL, miGenerateThumbsDialogNoButton);
-    AddControl(miGenerateThumbsDialogNoButton, NULL, NULL, miGenerateThumbsDialogYesButton, NULL);
+    AddControl(miGenerateThumbsDialogYesButton, nullptr, nullptr, nullptr, miGenerateThumbsDialogNoButton);
+    AddControl(miGenerateThumbsDialogNoButton, nullptr, nullptr, miGenerateThumbsDialogYesButton, nullptr);
 
     setInitialFocus(miGameplayOptionsMenuButton);
     SetCancelCode(MENU_CODE_TO_MAIN_MENU);

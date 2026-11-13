@@ -4,8 +4,6 @@
 #include "GameValues.h"
 #include "player.h"
 
-extern SpotlightManager spotlightManager;
-extern CGameValues game_values;
 
 //------------------------------------------------------------------------------
 // class Ice Blast
@@ -32,7 +30,7 @@ MO_IceBlast::MO_IceBlast(gfxSprite* nspr, Vec2s pos, float fVelyX, short iGlobal
 
     fObjectCollidesWithMap = false;
 
-    sSpotlight = NULL;
+    sSpotlight = nullptr;
 }
 
 void MO_IceBlast::update()

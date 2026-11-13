@@ -7,11 +7,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CObjectContainer objectcontainer[3];
-extern std::vector<CPlayer*> players;
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class area (for Domination mode)
@@ -36,7 +31,7 @@ bool OMO_Area::collide(CPlayer* player)
         if (totalTouchingPlayers == 1) {
             touchingPlayer = player;
         } else {
-            touchingPlayer = NULL;
+            touchingPlayer = nullptr;
             reset();
         }
     }
@@ -70,7 +65,7 @@ void OMO_Area::update()
     }
 
     totalTouchingPlayers = 0;
-    touchingPlayer = NULL;
+    touchingPlayer = nullptr;
 }
 
 void OMO_Area::placeArea()

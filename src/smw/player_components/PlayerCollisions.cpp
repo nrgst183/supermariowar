@@ -7,10 +7,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CMap* g_map;
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 bool PlayerCollisions::checktop(CPlayer& player)
 {
@@ -364,7 +360,7 @@ bool PlayerCollisions::is_stomping(CPlayer& player, CPlayer& other)
         if (player.isready()) {
             player.setYi(other.iy - PH);      //set new position to top of other player
             player.collisions.checktop(player);
-            player.platform = NULL;
+            player.platform = nullptr;
         }
 
         bool fKillPotential = false;

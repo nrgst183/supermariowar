@@ -11,11 +11,6 @@
 
 #include <cmath>
 
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
-
-extern CObjectContainer objectcontainer[3];
-extern CEyecandyContainer eyecandy[3];
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class sledge hammer
@@ -89,7 +84,7 @@ bool MO_SledgeHammer::collide(CPlayer* player)
 void MO_SledgeHammer::explode()
 {
     if (fSuper) {
-        objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {ix + (iw >> 2) - 96, iy + (ih >> 2) - 64}, 2, 4, -1, -1, KillStyle::Hammer));
+        objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(ix + (iw >> 2) - 96), static_cast<short>(iy + (ih >> 2) - 64)}, 2, 4, -1, -1, KillStyle::Hammer));
         ifSoundOnPlay(rm->sfx_bobombsound);
     } else {
         short iCenterX = ix + (iw >> 1) - 14;

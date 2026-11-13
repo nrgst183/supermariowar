@@ -4,10 +4,6 @@
 #include "GameValues.h"
 #include "ResourceManager.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern SkinList *skinlist;
 
 WorldPlayer::WorldPlayer()
     : WorldPlayer(0, 0)

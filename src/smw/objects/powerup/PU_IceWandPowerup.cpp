@@ -4,7 +4,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class ice wand powerup

@@ -23,11 +23,11 @@ class MI_NetworkListScroll : public UI_Control
         MI_NetworkListScroll(gfxSprite * nspr, short x, short y, short width, short numlines, const std::string& title, MenuCodeEnum acceptCode, MenuCodeEnum cancelCode);
         virtual ~MI_NetworkListScroll();
 
-        void Update();
-        void Draw();
+        void Update() override;
+        void Draw() override;
 
-        MenuCodeEnum SendInput(CPlayerInput * playerInput);
-        MenuCodeEnum Modify(bool modify);
+        MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
+        MenuCodeEnum Modify(bool modify) override;
 
         void Add(const std::string& left, const std::string& right);
         void Clear();

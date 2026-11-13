@@ -12,15 +12,6 @@
 #include "objects/carriable/CO_ThrowBox.h"
 #include "objects/walkingenemy/WalkingEnemy.h"
 
-extern CMap* g_map;
-extern CObjectContainer objectcontainer[3];
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern std::vector<CPlayer*> players;
-
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
 
 //------------------------------------------------------------------------------
 // class Block base class
@@ -204,7 +195,7 @@ void IO_Block::BounceMovingObject(IO_MovingObject * object)
             CPlayer * player = GetPlayerFromGlobalID(iBumpPlayerID);
 
             if (player) {
-                player->AddKillerAward(NULL, style);
+                player->AddKillerAward(nullptr, style);
                 player->score->AdjustScore(1);
             }
         }

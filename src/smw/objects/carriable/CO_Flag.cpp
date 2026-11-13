@@ -6,9 +6,6 @@
 #include "ResourceManager.h"
 #include "objects/moving/MO_FlagBase.h"
 
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class flag (for Capture the Flag mode)
@@ -21,7 +18,7 @@ CO_Flag::CO_Flag(gfxSprite* nspr, MO_FlagBase* base, short iTeamID, short iColor
     flagbase = base;
     teamID = iTeamID;
     fLastFlagDirection = false;
-    owner_throw = NULL;
+    owner_throw = nullptr;
     owner_throw_timer = 0;
 
     centerflag = teamID == -1;
@@ -37,7 +34,7 @@ CO_Flag::CO_Flag(gfxSprite* nspr, MO_FlagBase* base, short iTeamID, short iColor
 
 bool CO_Flag::collide(CPlayer* player)
 {
-    if (owner == NULL && player->isready() && (!fInBase || teamID != player->teamID)) {
+    if (owner == nullptr && player->isready() && (!fInBase || teamID != player->teamID)) {
         if (game_values.gamemodesettings.flag.touchreturn && teamID == player->teamID) {
             placeFlag();
             ifSoundOnPlay(rm->sfx_areatag);
@@ -46,7 +43,7 @@ bool CO_Flag::collide(CPlayer* player)
             owner_throw = player;
 
             if (flagbase)
-                flagbase->setFlag(NULL);
+                flagbase->setFlag(nullptr);
         }
     }
 
@@ -66,15 +63,15 @@ void CO_Flag::update()
             setYf(flagbase->fy);
         }
 
-        owner_throw = NULL;
+        owner_throw = nullptr;
     } else if (game_values.gamemodesettings.flag.autoreturn > 0 && ++timer > game_values.gamemodesettings.flag.autoreturn) {
         timer = 0;
         placeFlag();
-        owner_throw = NULL;
+        owner_throw = nullptr;
     } else {
         if (owner_throw && --owner_throw_timer < 0) {
             owner_throw_timer = 0;
-            owner_throw = NULL;
+            owner_throw = nullptr;
         }
 
         applyfriction();
@@ -145,7 +142,7 @@ void CO_Flag::placeFlag()
         flagbase->setFlag(this);
     }
 
-    owner_throw = NULL;
+    owner_throw = nullptr;
     owner_throw_timer = 0;
 
     timer = 0;

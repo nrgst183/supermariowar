@@ -11,8 +11,6 @@
 #include <cassert>
 #include <cstring>
 
-extern CResourceManager* rm;
-
 
 UI_NetEditServersMenu::UI_NetEditServersMenu()
     : UI_Menu()
@@ -58,10 +56,10 @@ UI_NetEditServersMenu::UI_NetEditServersMenu()
     miDialogOK->setVisible(false);
     miDialogCancel->setVisible(false);
 
-    AddControl(miAddButton, miBackButton, miEditButton, NULL, NULL);
-    AddControl(miEditButton, miAddButton, miRemoveButton, NULL, NULL);
-    AddControl(miRemoveButton, miEditButton, miBackButton, NULL, NULL);
-    AddControl(miBackButton, miRemoveButton, miAddButton, NULL, NULL);
+    AddControl(miAddButton, miBackButton, miEditButton, nullptr, nullptr);
+    AddControl(miEditButton, miAddButton, miRemoveButton, nullptr, nullptr);
+    AddControl(miRemoveButton, miEditButton, miBackButton, nullptr, nullptr);
+    AddControl(miBackButton, miRemoveButton, miAddButton, nullptr, nullptr);
 
     AddNonControl(miLeftHeaderBar);
     AddNonControl(miRightHeaderBar);
@@ -69,10 +67,10 @@ UI_NetEditServersMenu::UI_NetEditServersMenu()
     AddNonControl(miInstructionsText1);
     AddNonControl(miInstructionsText2);
 
-    AddControl(miServerScroll, NULL, NULL, NULL, NULL);
+    AddControl(miServerScroll, nullptr, nullptr, nullptr, nullptr);
 
     AddNonControl(miDialogTitle);
-    AddControl(miDialogTextField, miDialogOK, miDialogOK, NULL, NULL);
+    AddControl(miDialogTextField, miDialogOK, miDialogOK, nullptr, nullptr);
     AddControl(miDialogOK, miDialogTextField, miDialogTextField, miDialogCancel, miDialogCancel);
     AddControl(miDialogCancel, miDialogTextField, miDialogTextField, miDialogOK, miDialogOK);
 

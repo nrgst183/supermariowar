@@ -18,10 +18,6 @@
 #include <sys/stat.h>  // FIXME
 #endif
 
-extern CMap* g_map;
-extern FiltersList* filterslist;
-extern CGameValues game_values;
-
 
 namespace {
 void addMapsFrom(const std::string& dirpath, std::multimap<std::string, MapListNode>& container)
@@ -140,8 +136,7 @@ bool MapList::find(const std::string& name)
 
 bool MapList::findexact(const char * name, bool fWorld)
 {
-    char * szLookForName = new char[strlen(name) + 1];
-    strcpy(szLookForName, name);
+    std::string szLookForName = name;
     inPlaceLowerCase(szLookForName);
 
     bool fFound = false;
@@ -152,24 +147,19 @@ bool MapList::findexact(const char * name, bool fWorld)
         auto iterateAll = worldmaps.begin(), lim = worldmaps.end();
 
         while (iterateAll != lim && !fFound) {
-            char * szCurrentName = new char[iterateAll->first.length() + 1];
-            strcpy(szCurrentName, iterateAll->first.c_str());
+            std::string szCurrentName = iterateAll->first;
             inPlaceLowerCase(szCurrentName);
 
-            if (!strcmp(szCurrentName, szLookForName)) {
+            if (szCurrentName == szLookForName) {
                 fFound = true;
                 outercurrent = iterateAll;
             }
 
-            delete[] szCurrentName;
-
             iterateAll++;
         }
 
-        if (fFound) {
-            delete[] szLookForName;
+        if (fFound)
             return true;
-        }
     }
 
     auto oldCurrent = current;
@@ -178,17 +168,12 @@ bool MapList::findexact(const char * name, bool fWorld)
     do {
         next(false);	//sets us to the beginning if we hit the end -> loop through the maps
 
-        char * szCurrentName = new char[current->first.length() + 1];
-        strcpy(szCurrentName, current->first.c_str());
+        std::string szCurrentName = current->first;
         inPlaceLowerCase(szCurrentName);
 
-        if (!strcmp(szCurrentName, szLookForName))
+        if (szCurrentName == szLookForName)
             fFound = true;
-
-        delete[] szCurrentName;
     } while (current != oldCurrent && !fFound);
-
-    delete[] szLookForName;
 
     return fFound;
 }
@@ -372,12 +357,15 @@ void MapList::ReadFilters()
     if (mfp) {
         while (fgets(buffer, 256, mfp)) {
             char * pszMapName = strtok(buffer, ",\n");
-            MapListNode& node = maps.find(pszMapName)->second;
+            if (!pszMapName)
+                continue;
 
-            if (maps.find(pszMapName) != maps.end()) {
+            auto mapIt = maps.find(pszMapName);
+            if (mapIt != maps.end()) {
+                MapListNode& node = mapIt->second;
                 bool fErrorReading = false;
                 for (size_t iFilter = 0; iFilter < NUM_AUTO_FILTERS; iFilter++) {
-                    char * psz = strtok(NULL, ",\n");
+                    char * psz = strtok(nullptr, ",\n");
 
                     if (psz) {
                         node.pfFilters[iFilter] = strcmp(psz, "0") != 0;

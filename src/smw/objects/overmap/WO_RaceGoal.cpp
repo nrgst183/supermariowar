@@ -7,14 +7,10 @@
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "gamemodes/Race.h"
+#include "Score.h"
 
 #include <cmath>
 
-extern CObjectContainer objectcontainer[3];
-extern short score_cnt;
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class race goal (for Race mode)

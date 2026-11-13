@@ -3,7 +3,6 @@
 #include "../player.h"
 
 #include "ResourceManager.h"
-extern CResourceManager* rm;
 
 void PlayerWings::reset()
 {

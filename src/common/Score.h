@@ -55,3 +55,7 @@ private:
         iDigitRight = iDigits % 10 * 16;
     }
 };
+
+// Defined in smw/main.cpp
+extern CScore* score[4];
+extern short score_cnt;

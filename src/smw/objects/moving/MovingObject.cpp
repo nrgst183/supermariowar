@@ -17,13 +17,6 @@
 #include "objects/carriable/CO_ThrowBox.h"
 #include "objects/moving/MO_Coin.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern CMap* g_map;
-extern CEyecandyContainer eyecandy[3];
-
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
 
 //------------------------------------------------------------------------------
 // class MovingObject (all moving objects inheirit from this class)
@@ -79,7 +72,7 @@ IO_MovingObject::IO_MovingObject(gfxSprite* nspr, Vec2s pos, short iNumSpr, shor
     inair = false;
     onice = false;
 
-    platform = NULL;
+    platform = nullptr;
     iHorizontalPlatformCollision = -1;
     iVerticalPlatformCollision = -1;
 
@@ -443,7 +436,7 @@ void IO_MovingObject::collision_detection_map()
                     onice = false;
                 }
 
-                platform = NULL;
+                platform = nullptr;
 
                 if (iVerticalPlatformCollision == 0)
                     KillObjectMapHazard();
@@ -468,7 +461,7 @@ void IO_MovingObject::collision_detection_map()
                     onice = false;
             }
 
-            platform = NULL;
+            platform = nullptr;
 
             if (iVerticalPlatformCollision == 0)
                 KillObjectMapHazard();
@@ -795,7 +788,7 @@ void IO_MovingObject::KillObjectMapHazard(short playerID)
             if (!game_values.gamemode->gameover) {
                 CPlayer* player = GetPlayerFromGlobalID(playerID);
 
-                if (NULL != player) {
+                if (nullptr != player) {
                     player->score->AdjustScore(1);
                 }
             }

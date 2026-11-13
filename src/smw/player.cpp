@@ -2,6 +2,8 @@
 
 #include "eyecandy.h"
 #include "GameValues.h"
+#include "gfx.h"
+#include "GSGameplay.h"
 #include "map.h"
 #include "movingplatform.h"
 #include "net.h"
@@ -26,26 +28,6 @@
 
 #include <cassert>
 #include <cmath>
-
-extern bool SwapPlayers(short iUsingPlayerID);
-extern void EnterBossMode(short bossType);
-extern short g_iWinningPlayer;
-extern short g_iSwirlSpawnLocations[4][2][25];
-extern SpotlightManager spotlightManager;
-
-extern CObjectContainer noncolcontainer;
-extern CObjectContainer objectcontainer[3];
-
-extern CMap* g_map;
-extern CEyecandyContainer eyecandy[3];
-
-extern std::vector<CPlayer*> players;
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern short x_shake;
-extern short y_shake;
 
 
 void CScore::AdjustScore(short iValue)
@@ -85,7 +67,7 @@ CPlayer * GetPlayerFromGlobalID(short iGlobalID)
             return player;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 CPlayer::CPlayer(short iGlobalID, short iLocalID, short iTeamID, short iSubTeamID, short iColorID,
@@ -110,7 +92,7 @@ CPlayer::CPlayer(short iGlobalID, short iLocalID, short iTeamID, short iSubTeamI
     , powerupangle(0.0f)
     , fAcceptingItem(false)
     , fPressedAcceptItem(false)
-    , carriedItem(NULL)
+    , carriedItem(nullptr)
     , ownerPlayerID(-1)
     , ownerColorOffsetX(0)
     , spawntext(20)  // set it to 20 so there is an immediate text spawned upon winning
@@ -164,7 +146,8 @@ void CPlayer::Init()
 void CPlayer::updateFrozenStatus(int keymask)
 {
     if (frozen) {
-        if ((~(sprite_state & 0x1) && (keymask & 4)) || ((sprite_state & 0x1) && (keymask & 8)))
+        // NOTE: the original condition was ~(sprite_state & 1), which is always true, so the left-key test is unconditional.
+        if ((keymask & 4) || ((sprite_state & 0x1) && (keymask & 8)))
             frozentimer -= 5;
 
         if (--frozentimer <= 0) {
@@ -314,322 +297,6 @@ void CPlayer::SetCorpseType(short type) {
     diedas = type;
 }
 
-#if 0
-void reference_code() {
-    if (game_values.secrets)
-    {
-        for (short bossType = 0; bossType < 3; bossType++)
-        {
-            if (game_values.bosspeeking == bossType)
-            {
-                static const int boss_code[3][7] = { {2,1,4,8,16,16,32},
-                                                     {1,1,4,8,2,2,32},
-                                                     {4,8,4,8,16,16,0} };
-
-                static const int boss_code_length[3] = {7, 7, 6};
-
-                if (keymask & boss_code[bossType][boss_index[bossType]])
-                    boss_index[bossType]++;
-                else if (keymask & ~boss_code[bossType][boss_index[bossType]])
-                    boss_index[bossType] = 0;
-
-                if (boss_index[bossType] == boss_code_length[bossType])
-                {
-                    boss_index[bossType] = 0;
-                    EnterBossMode(bossType);
-                }
-            }
-            else
-            {
-                boss_index[bossType] = 0;
-            }
-        }
-
-        if (konamiIndex < 11)
-        {
-            static const int konami_code[11] = {1,1,2,2,4,8,4,8,48,48,48};
-
-            if (keymask & konami_code[konamiIndex])
-                konamiIndex++;
-            else if (keymask & ~konami_code[konamiIndex])
-                konamiIndex = 0;
-
-            extern int g_tanookiFlag;
-            if (konamiIndex == 11)
-            {
-                ifSoundOnPlay(rm->sfx_transform);
-                g_tanookiFlag++;
-            }
-        }
-
-        //Super kick shells and BTBs
-        if (keymask & 2)
-            superKickIndex++;
-        else if (keymask & ~2)
-            superKickIndex = 0;
-
-        int keymaskdown =
-            (playerKeys->game_jump.fDown?1:0) |
-            (playerKeys->game_down.fDown?2:0) |
-            (playerKeys->game_left.fDown?4:0) |
-            (playerKeys->game_right.fDown?8:0) |
-            (playerKeys->game_turbo.fDown?16:0) |
-            (playerKeys->game_powerup.fDown?32:0);
-
-        //Invincible Dash
-        if (invincible)
-        {
-            if (keymask & 4)
-                dashLeftIndex++;
-            else if (keymask & ~4)
-                dashLeftIndex = 0;
-
-            if (dashLeftIndex >= 3 && keymaskdown == 20)
-            {
-                dashLeftIndex = 0;
-                dashLeft = true;
-            }
-
-            if (keymaskdown != 20)
-                dashLeft = false;
-
-
-            if (keymask & 8)
-                dashRightIndex++;
-            else if (keymask & ~8)
-                dashRightIndex = 0;
-
-            if (dashRightIndex >= 3 && keymaskdown == 24)
-            {
-                dashRightIndex = 0;
-                dashRight = true;
-            }
-
-            if (keymaskdown != 24)
-                dashRight = false;
-        }
-        else
-        {
-            dashLeft = false;
-            dashRight = false;
-        }
-
-        //Keep this code -> good for items that destroy blocks on the map
-
-        //Active Super POW destroys and triggers blocks
-        if (super_pow && (game_values.flags.screenshaketimer > 0 || powerupused == PowerupType::Pow))
-        {
-            if (game_values.flags.screenshaketimer > 0)
-            {
-                if (++super_pow_timer >= 60)
-                {
-                    game_values.flags.screenshaketimer = 0;
-                    super_pow_timer = 0;
-                    super_pow = false;
-                }
-
-                if (keymask & 16)
-                {
-                    game_values.flags.screenshaketimer += 10;
-
-                    IO_Block * block = (IO_Block*)noncolcontainer.getRandomObject();
-
-                    if (block)
-                        block->triggerBehavior();
-                }
-            }
-        }
-        else
-        {
-            super_pow = false;
-            super_pow_timer = 0;
-        }
-
-        //Active Super MOd Destroys and triggers blocks
-        if (super_mod && (game_values.flags.screenshaketimer > 0 || powerupused == PowerupType::Mod))
-        {
-            if (game_values.flags.screenshaketimer > 0)
-            {
-                if (++super_mod_timer >= 60)
-                {
-                    game_values.flags.screenshaketimer = 0;
-                    super_mod_timer = 0;
-                    super_mod = false;
-                }
-
-                if (keymask & 16)
-                {
-                    game_values.flags.screenshaketimer += 10;
-
-                    IO_Block * block = (IO_Block*)noncolcontainer.getRandomObject();
-
-                    if (block)
-                        block->triggerBehavior();
-                }
-            }
-        }
-        else
-        {
-            super_mod = false;
-            super_mod_timer = 0;
-        }
-
-        //Super Pow
-        if (game_values.gamepowerups[globalID] == PowerupType::Pow)
-        {
-            static const int super_pow_code[3] = {2, 2, 32};
-
-            if (keymask & super_pow_code[super_pow_index])
-                super_pow_index++;
-            else if (keymask & ~super_pow_code[super_pow_index])
-                super_pow_index = 0;
-
-            if (super_pow_index >= 3)
-            {
-                super_pow_index = 0;
-                ifSoundOnPlay(rm->sfx_transform);
-                super_pow = true;
-            }
-        }
-
-        //Super Mod
-        if (game_values.gamepowerups[globalID] == PowerupType::Mod)
-        {
-            static const int super_mod_code[3] = {1, 1, 32};
-
-            if (keymask & super_mod_code[super_mod_index])
-                super_mod_index++;
-            else if (keymask & ~super_mod_code[super_mod_index])
-                super_mod_index = 0;
-
-            if (super_mod_index >= 3)
-            {
-                super_mod_index = 0;
-                ifSoundOnPlay(rm->sfx_transform);
-                super_mod = true;
-            }
-        }
-        if (game_values.gamemode->gamemode == game_mode_stomp && !game_values.redkoopas)
-        {
-            if (redKoopaIndex < 7)
-            {
-                static const int red_koopa_code[7] = {2,2,4,2,8,2,1};
-
-                if (keymask & red_koopa_code[redKoopaIndex])
-                    redKoopaIndex++;
-                else if (keymask & ~red_koopa_code[redKoopaIndex])
-                    redKoopaIndex = 0;
-
-                if (redKoopaIndex == 7)
-                {
-                    ifSoundOnPlay(rm->sfx_transform);
-                    game_values.redkoopas = true;
-                }
-            }
-        }
-
-        if (!game_values.redthrowblocks)
-        {
-            if (redThrowBlockIndex < 8)
-            {
-                static const int red_throw_block_code[8] = {1,2,1,2,8,4,1,2};
-
-                if (keymask & red_throw_block_code[redThrowBlockIndex])
-                    redThrowBlockIndex++;
-                else if (keymask & ~red_throw_block_code[redThrowBlockIndex])
-                    redThrowBlockIndex = 0;
-
-                if (redThrowBlockIndex == 8)
-                {
-                    ifSoundOnPlay(rm->sfx_transform);
-                    game_values.redthrowblocks = true;
-
-                    for (short iBlock = 0; iBlock < noncolcontainer.list_end; iBlock++)
-                    {
-                        if (((IO_Block*)noncolcontainer.list[iBlock])->getBlockType() == block_throw)
-                        {
-                            ((B_ThrowBlock*)noncolcontainer.list[iBlock])->SetType(true);
-                        }
-                    }
-                }
-            }
-        }
-
-
-        //Keep this code for later reference:
-        //It is good code to swap out blocks on the fly
-        if (!game_values.viewblocks)
-        {
-            if (viewBlockIndex < 7)
-            {
-                static const int view_block_code[7] = {8,2,4,2,1,1,1};
-
-                if (keymask & view_block_code[viewBlockIndex])
-                    viewBlockIndex++;
-                else if (keymask & ~view_block_code[viewBlockIndex])
-                    viewBlockIndex = 0;
-
-                if (viewBlockIndex == 7)
-                {
-                    ifSoundOnPlay(rm->sfx_transform);
-                    game_values.viewblocks = true;
-
-                    for (short iBlock = 0; iBlock < noncolcontainer.list_end; iBlock++)
-                    {
-                        IO_Block * block = (IO_Block*)noncolcontainer.list[iBlock];
-                        if (block->getBlockType() == block_powerup)
-                        {
-                            block->dead = true;
-                            B_ViewBlock * viewBlock = new B_ViewBlock(&rm->spr_viewblock, block->col << 5, block->row << 5);
-
-                            if (block->state != 0)
-                            {
-                                viewBlock->state = 3;
-                                viewBlock->timer = ((B_PowerupBlock*)block)->timer;
-                            }
-
-                            g_map->blockdata[block->col][block->row] = viewBlock;
-                            noncolcontainer.add(viewBlock);
-                        }
-                    }
-                }
-            }
-        }
-
-        if (secret_spring_index < 9)
-        {
-            static const int secret_spring_code[9] = {2,1,2,1,2,1,2,2,16};
-
-            if (keymask & secret_spring_code[secret_spring_index])
-                secret_spring_index++;
-            else if (keymask & ~secret_spring_code[secret_spring_index])
-                secret_spring_index = 0;
-
-            if (secret_spring_index == 9)
-            {
-                ifSoundOnPlay(rm->sfx_transform);
-                objectcontainer[1].add(new CO_Spring(&rm->spr_spring));
-            }
-        }
-
-        if (secret_spike_index < 6)
-        {
-            static const int secret_spike_code[6] = {16,2,4,8,1,16};
-
-            if (keymask & secret_spike_code[secret_spike_index])
-                secret_spike_index++;
-            else if (keymask & ~secret_spike_code[secret_spike_index])
-                secret_spike_index = 0;
-
-            if (secret_spike_index == 6)
-            {
-                ifSoundOnPlay(rm->sfx_transform);
-                objectcontainer[1].add(new CO_Spike(&rm->spr_spike));
-            }
-        }
-    }
-}
-#endif
 
 void CPlayer::update_waitingForRespawn()
 {
@@ -1051,7 +718,7 @@ void CPlayer::tryReleasingPowerup()
 
 void CPlayer::useSpecialPowerup()
 {
-    fAcceptingItem = carriedItem == NULL;
+    fAcceptingItem = carriedItem == nullptr;
 
     if (!lockfire) {
         if (bobomb) { //If we're a bob-omb, explode
@@ -1111,7 +778,7 @@ void CPlayer::releaseCarriedItem()
             carriedItem->Kick();
         }
 
-        carriedItem = NULL;
+        carriedItem = nullptr;
     }
 }
 
@@ -1197,9 +864,6 @@ void CPlayer::move()
     if (keymask || (keymaskdown && (velx < -1.0f || velx > 1.0f)))
         suicidetimer.reset();
 
-#if	0
-    reference_code();
-#endif
 
     secretcode.update(*this, keymask);
     kuriboshoe.update(*this, keymask);
@@ -1368,10 +1032,10 @@ void CPlayer::CommitAction()
 {
     if (PlayerAction::Bobomb == action) {
         bobomb = false;
-        objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {ix + HALFPW - 96, iy + HALFPH - 64}, 2, 4, globalID, teamID, KillStyle::Bobomb));
+        objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(ix + HALFPW - 96), static_cast<short>(iy + HALFPH - 64)}, 2, 4, globalID, teamID, KillStyle::Bobomb));
         ifSoundOnPlay(rm->sfx_bobombsound);
     } else if (PlayerAction::Fireball == action) {
-        objectcontainer[0].add(new MO_Fireball(&rm->spr_fireball, {ix + 6, iy}, 4, isFacingRight(), 5, globalID, teamID, colorID));
+        objectcontainer[0].add(new MO_Fireball(&rm->spr_fireball, {static_cast<short>(ix + 6), iy}, 4, isFacingRight(), 5, globalID, teamID, colorID));
         ifSoundOnPlay(rm->sfx_fireball);
 
         projectiles++;
@@ -1380,9 +1044,9 @@ void CPlayer::CommitAction()
             DecreaseProjectileLimit();
     } else if (PlayerAction::Hammer == action) {
         if (isFacingRight()) {
-            objectcontainer[2].add(new MO_Hammer(&rm->spr_hammer, {ix + 8, iy}, 6, {(game_values.reversewalk ? -velx : velx) + 2.0f, -HAMMERTHROW}, 5, globalID, teamID, colorID, false));
+            objectcontainer[2].add(new MO_Hammer(&rm->spr_hammer, {static_cast<short>(ix + 8), iy}, 6, {(game_values.reversewalk ? -velx : velx) + 2.0f, -HAMMERTHROW}, 5, globalID, teamID, colorID, false));
         } else {
-            objectcontainer[2].add(new MO_Hammer(&rm->spr_hammer, {ix - 14, iy}, 6, {(game_values.reversewalk ? -velx : velx) - 2.0f, -HAMMERTHROW}, 5, globalID, teamID, colorID, false));
+            objectcontainer[2].add(new MO_Hammer(&rm->spr_hammer, {static_cast<short>(ix - 14), iy}, 6, {(game_values.reversewalk ? -velx : velx) - 2.0f, -HAMMERTHROW}, 5, globalID, teamID, colorID, false));
         }
         projectiles++;
 
@@ -1392,16 +1056,16 @@ void CPlayer::CommitAction()
         if (game_values.hammerlimit > 0)
             DecreaseProjectileLimit();
     } else if (PlayerAction::Boomerang == action) {
-        objectcontainer[2].add(new MO_Boomerang(&rm->spr_boomerang, {ix, iy + HALFPH - 16}, 4, isFacingRight(), 5, globalID, teamID, colorID));
+        objectcontainer[2].add(new MO_Boomerang(&rm->spr_boomerang, {ix, static_cast<short>(iy + HALFPH - 16)}, 4, isFacingRight(), 5, globalID, teamID, colorID));
         projectiles++;
 
         if (game_values.boomeranglimit > 0)
             DecreaseProjectileLimit();
     } else if (PlayerAction::Iceblast == action) {
         if (isFacingRight())
-            objectcontainer[2].add(new MO_IceBlast(&rm->spr_iceblast, {ix + HALFPW - 2, iy + HALFPH - 16}, 5.0f, globalID, teamID, colorID));
+            objectcontainer[2].add(new MO_IceBlast(&rm->spr_iceblast, {static_cast<short>(ix + HALFPW - 2), static_cast<short>(iy + HALFPH - 16)}, 5.0f, globalID, teamID, colorID));
         else
-            objectcontainer[2].add(new MO_IceBlast(&rm->spr_iceblast, {ix + HALFPW - 30, iy + HALFPH - 16}, -5.0f, globalID, teamID, colorID));
+            objectcontainer[2].add(new MO_IceBlast(&rm->spr_iceblast, {static_cast<short>(ix + HALFPW - 30), static_cast<short>(iy + HALFPH - 16)}, -5.0f, globalID, teamID, colorID));
 
         projectiles++;
 
@@ -1410,7 +1074,7 @@ void CPlayer::CommitAction()
         if (game_values.wandlimit > 0)
             DecreaseProjectileLimit();
     } else if (PlayerAction::Bomb == action) {
-        CO_Bomb * bomb = new CO_Bomb(&rm->spr_bomb, {ix + HALFPW - 14, iy - 8}, {isFacingRight() ? 3.0f : -3.0f, -3.0f}, 4, globalID, teamID, colorID, RANDOM_INT(120) + 120);
+        CO_Bomb * bomb = new CO_Bomb(&rm->spr_bomb, {static_cast<short>(ix + HALFPW - 14), static_cast<short>(iy - 8)}, {isFacingRight() ? 3.0f : -3.0f, -3.0f}, 4, globalID, teamID, colorID, RANDOM_INT(120) + 120);
 
         if (AcceptItem(bomb)) {
             bomb->owner = this;
@@ -1608,7 +1272,7 @@ void CPlayer::Jump(short iMove, float jumpModifier, bool fKuriboBounce)
         //if (platform->fVelY < 0.0f)
         //	setYf(fy + platform->fVelY);
 
-        platform = NULL;
+        platform = nullptr;
     }
 
     //printf("Player Jumped!\n");
@@ -1659,12 +1323,12 @@ void CPlayer::die(PlayerDeathStyle deathStyle, bool fTeamRemoved, bool fKillCarr
         else
             carriedItem->Drop();
 
-        carriedItem = NULL;
+        carriedItem = nullptr;
     }
 
     //Drop a shoe item if the player died in one
     if (kuriboshoe.is_on()) {
-        CO_KuriboShoe * shoe = new CO_KuriboShoe(&rm->spr_kuriboshoe, {ix - PWOFFSET, iy - PHOFFSET}, kuriboshoe.getType() == STICKY);
+        CO_KuriboShoe * shoe = new CO_KuriboShoe(&rm->spr_kuriboshoe, {static_cast<short>(ix - PWOFFSET), static_cast<short>(iy - PHOFFSET)}, kuriboshoe.getType() == STICKY);
         shoe->collision_detection_checksides();
 
         objectcontainer[1].add(shoe);
@@ -1690,7 +1354,7 @@ void CPlayer::SetKuriboShoe(KuriboShoeType type)
 
     if (carriedItem && !carriedItem->IsCarriedByKuriboShoe()) {
         carriedItem->Drop();
-        carriedItem = NULL;
+        carriedItem = nullptr;
     }
 
     //Clear out powerup states that the player might be in the middle of
@@ -1731,7 +1395,7 @@ void CPlayer::SetupNewPlayer()
     StripPowerups();
     ClearPowerupStates();
 
-    sSpotlight = NULL;
+    sSpotlight = nullptr;
 
     cape.reset();
 
@@ -1750,7 +1414,7 @@ void CPlayer::SetupNewPlayer()
 
     outofarena.reset();
 
-    platform = NULL;
+    platform = nullptr;
     iHorizontalPlatformCollision = -1;
     iVerticalPlatformCollision = -1;
     iPlatformCollisionPlayerId = -1;
@@ -1954,7 +1618,7 @@ void CPlayer::BounceAssistPlayer(CPlayer* o2)
     if (o1->state == PlayerState::Ready && o1->fOldY + PH <= o2->fOldY && o1->iy + PH >= o2->iy && o1->playerKeys->game_jump.fDown) {
         o1->setYi(o2->iy - PH);		//set new position to top of other player
         o1->collisions.checktop(*o1);
-        o1->platform = NULL;
+        o1->platform = nullptr;
         o1->vely = -VELSUPERJUMP;
 
         o1->superstomp.reset();
@@ -2191,7 +1855,7 @@ bool CPlayer::mapcolldet_handleOutOfScreen()
 
         if (platform) {
             vely = platform->fVelY;
-            platform = NULL;
+            platform = nullptr;
         }
 
         return true;
@@ -2399,7 +2063,7 @@ void CPlayer::mapcolldet_moveUpward(short txl, short txc, short txr,
     }
 
     if (leftblock && !leftblock->isTransparent()) { //then left
-        bool useBehavior = alignedBlockX == txl || rightblock == NULL || rightblock->isTransparent() || rightblock->isHidden();
+        bool useBehavior = alignedBlockX == txl || rightblock == nullptr || rightblock->isTransparent() || rightblock->isHidden();
 
         if (netplay.active && netplay.theHostIsMe)
             netplay.client.local_gamehost.prepareMapCollisionEvent(*this);
@@ -2417,7 +2081,7 @@ void CPlayer::mapcolldet_moveUpward(short txl, short txc, short txr,
     }
 
     if (rightblock && !rightblock->isTransparent()) { //then right
-        bool useBehavior = alignedBlockX == txr || leftblock == NULL || leftblock->isTransparent() || leftblock->isHidden();
+        bool useBehavior = alignedBlockX == txr || leftblock == nullptr || leftblock->isTransparent() || leftblock->isHidden();
 
         if (netplay.active && netplay.theHostIsMe)
             netplay.client.local_gamehost.prepareMapCollisionEvent(*this);
@@ -2473,7 +2137,7 @@ void CPlayer::mapcolldet_moveDownward(short txl, short txc, short txr,
         warpstatus.enterWarp(*this, g_map->warp(txr,ty));
 
         fallthrough = false;
-        platform = NULL;
+        platform = nullptr;
 
         if (ix - PWOFFSET < (txl << 5) + 1)
             setXi((txl << 5) + PHOFFSET + 1);
@@ -2495,7 +2159,7 @@ void CPlayer::mapcolldet_moveDownward(short txl, short txc, short txr,
             netplay.client.local_gamehost.prepareMapCollisionEvent(*this);
 
         if (fLeftBlockSolid) { //collide with left block
-            bool useBehavior = alignedBlockX == txl || rightblock == NULL || rightblock->isTransparent() || rightblock->isHidden();
+            bool useBehavior = alignedBlockX == txl || rightblock == nullptr || rightblock->isTransparent() || rightblock->isHidden();
             collisionresult &= leftblock->collide(this, 2,
                 netplay.active ? (netplay.theHostIsMe || netplay.allowMapCollisionEvent) && useBehavior : useBehavior);
 
@@ -2508,7 +2172,7 @@ void CPlayer::mapcolldet_moveDownward(short txl, short txc, short txr,
         }
 
         if (fRightBlockSolid) { //then right
-            bool useBehavior = alignedBlockX == txr || leftblock == NULL || leftblock->isTransparent() || leftblock->isHidden();
+            bool useBehavior = alignedBlockX == txr || leftblock == nullptr || leftblock->isTransparent() || leftblock->isHidden();
             collisionresult &= rightblock->collide(this, 2,
                 netplay.active ? (netplay.theHostIsMe || netplay.allowMapCollisionEvent) && useBehavior : useBehavior);
 
@@ -2521,7 +2185,7 @@ void CPlayer::mapcolldet_moveDownward(short txl, short txc, short txr,
         }
 
         if (!collisionresult) {
-            platform = NULL;
+            platform = nullptr;
             onice = false;
 
             if (iVerticalPlatformCollision == 0)
@@ -2575,7 +2239,7 @@ void CPlayer::mapcolldet_moveDownward(short txl, short txc, short txr,
         if (!platform)
             fallthrough = false;
 
-        platform = NULL;
+        platform = nullptr;
 
         if (iVerticalPlatformCollision == 0)
             KillPlayerMapHazard(true, KillStyle::Environment, true, iPlatformCollisionPlayerId);
@@ -2611,7 +2275,7 @@ void CPlayer::mapcolldet_moveDownward(short txl, short txc, short txr,
             killsinrowinair = 0;
         }
 
-        platform = NULL;
+        platform = nullptr;
 
         if (iVerticalPlatformCollision == 0) {
             KillPlayerMapHazard(true, KillStyle::Environment, true, iPlatformCollisionPlayerId);

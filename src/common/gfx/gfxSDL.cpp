@@ -1,5 +1,6 @@
 #include "gfxSDL.h"
 
+#include "gfx.h"
 #include "path.h"
 
 #include <SDL3_image/SDL_image.h>
@@ -10,11 +11,10 @@
 #include <cstdio>
 #include <cstdlib>
 
-extern SDL_Surface* screen;
 
-#define GFX_BPP 16
-#define GFX_SCREEN_W 640
-#define GFX_SCREEN_H 480
+constexpr int GFX_BPP = 16;
+constexpr int GFX_SCREEN_W = 640;
+constexpr int GFX_SCREEN_H = 480;
 
 template<typename... Args>
 [[noreturn]] void throw_error(std::format_string<Args...> fmt, Args&&... args) {

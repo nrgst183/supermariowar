@@ -87,3 +87,6 @@ private:
     static const std::array<SDL_Rect, CTileset::MAX_TILES> s_rects_preview;
     static const std::array<SDL_Rect, CTileset::MAX_TILES> s_rects_thumb;
 };
+
+// Defined in global.cpp
+extern CTilesetManager* g_tilesetmanager;

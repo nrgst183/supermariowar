@@ -254,4 +254,10 @@ public:
     bool		unlocksecretunlocked[4];
 };
 
+// Defined in global.cpp
+extern CGameValues game_values;
+
+// Defined in GameValues.cpp
+extern SDL_Keycode controlkeys[2][2][4][NUM_KEYS];
+
 #endif // GAMEVALUES_H

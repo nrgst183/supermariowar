@@ -2,8 +2,6 @@
 
 #include "ResourceManager.h"
 
-extern CResourceManager* rm;
-
 
 MI_Text::MI_Text(std::string text, short x, short y, short w, bool use_large_font, TextAlign align)
     : UI_Control(x, y)

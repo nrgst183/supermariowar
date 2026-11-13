@@ -10,11 +10,6 @@
 #include "objects/carriable/CO_Shell.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
-
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class cheep cheep
@@ -74,7 +69,7 @@ void MO_CheepCheep::draw()
 bool MO_CheepCheep::collide(CPlayer* player)
 {
     if (player->isInvincible() || frozen) {
-        player->AddKillerAward(NULL, KillStyle::CheepCheep);
+        player->AddKillerAward(nullptr, KillStyle::CheepCheep);
 
         if (game_values.gamemode->gamemode == game_mode_stomp && !game_values.gamemode->gameover)
             player->Score().AdjustScore(1);
@@ -101,9 +96,9 @@ bool MO_CheepCheep::hittop(CPlayer* player)
     player->setYi(iy - PH - 1);
     player->bouncejump();
     player->collisions.checktop(*player);
-    player->platform = NULL;
+    player->platform = nullptr;
 
-    player->AddKillerAward(NULL, KillStyle::CheepCheep);
+    player->AddKillerAward(nullptr, KillStyle::CheepCheep);
 
     if (game_values.gamemode->gamemode == game_mode_stomp && !game_values.gamemode->gameover)
         player->Score().AdjustScore(1);
@@ -143,7 +138,7 @@ void MO_CheepCheep::collide(IO_MovingObject* object)
                 CPlayer* killer = GetPlayerFromGlobalID(object->iPlayerID);
 
                 if (killer) {
-                    killer->AddKillerAward(NULL, KillStyle::CheepCheep);
+                    killer->AddKillerAward(nullptr, KillStyle::CheepCheep);
                     killer->Score().AdjustScore(1);
 
                     if (type == movingobject_shell)

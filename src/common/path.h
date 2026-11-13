@@ -31,3 +31,6 @@ std::string GetRootDirectory();
 std::string GetNameFromFileName(const std::string& path, bool stripAuthor = false);
 std::string stripCreatorAndExt(const std::string& filename);
 std::string stripPathAndExtension(const std::string& path);
+
+// Defined in global.cpp
+extern std::string RootDataDirectory;

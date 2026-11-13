@@ -8,11 +8,6 @@
 #include "ResourceManager.h"
 #include "objects/carriable/CO_KuriboShoe.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern CEyecandyContainer eyecandy[3];
-extern CObjectContainer objectcontainer[3];
 
 static const uint8_t kuriboShoe_exitCode[4] = {4, 8, 4, 8};
 
@@ -67,7 +62,7 @@ void PlayerKuriboShoe::update_gettingOutOfTheShoe(CPlayer& player, uint8_t keyma
         }
 
         if (exitIndex == 4 && exitTimer < 32) {
-            CO_KuriboShoe * shoe = new CO_KuriboShoe(&rm->spr_kuriboshoe, {player.ix - PWOFFSET, player.iy - PHOFFSET - 2}, type == STICKY);
+            CO_KuriboShoe * shoe = new CO_KuriboShoe(&rm->spr_kuriboshoe, {static_cast<short>(player.ix - PWOFFSET), static_cast<short>(player.iy - PHOFFSET - 2)}, type == STICKY);
             shoe->collision_detection_checksides();
             objectcontainer[1].add(shoe);
             eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, player.centerX() - 16, player.centerY() - 16, 3, 8);

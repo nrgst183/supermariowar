@@ -7,10 +7,6 @@
 #include "ResourceManager.h"
 #include "objects/moving/MO_Explosion.h"
 
-extern CObjectContainer objectcontainer[3];
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class egg (for egg mode)
@@ -21,7 +17,7 @@ CO_Egg::CO_Egg(gfxSprite* nspr, short iColor)
     state = 1;
     movingObjectType = movingobject_egg;
 
-    owner_throw = NULL;
+    owner_throw = nullptr;
     owner_throw_timer = 0;
 
     sparkleanimationtimer = 0;
@@ -47,7 +43,7 @@ CO_Egg::CO_Egg(gfxSprite* nspr, short iColor)
 
 bool CO_Egg::collide(CPlayer* player)
 {
-    if (owner == NULL && player->isready()) {
+    if (owner == nullptr && player->isready()) {
         if (player->AcceptItem(this)) {
             owner = player;
             owner_throw = player;
@@ -65,11 +61,11 @@ void CO_Egg::update()
         owner_throw = owner;
     } else if (++relocatetimer > 1500) {
         placeEgg();
-        owner_throw = NULL;
+        owner_throw = nullptr;
     } else {
         if (owner_throw && --owner_throw_timer <= 0) {
             owner_throw_timer = 0;
-            owner_throw = NULL;
+            owner_throw = nullptr;
         }
 
         applyfriction();
@@ -93,7 +89,7 @@ void CO_Egg::update()
         if (--explosiondrawtimer <= 0) {
             explosiondrawtimer = 62;
             if (--explosiondrawframe < 0) {
-                objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {ix + (iw >> 1) - 96, iy + (ih >> 1) - 64}, 2, 4, -1, -1, KillStyle::Bomb));
+                objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(ix + (iw >> 1) - 96), static_cast<short>(iy + (ih >> 1) - 64)}, 2, 4, -1, -1, KillStyle::Bomb));
                 placeEgg();
 
                 ifSoundOnPlay(rm->sfx_bobombsound);
@@ -149,7 +145,7 @@ void CO_Egg::placeEgg()
     vely = GRAVITATION;
     velx = 0.0f;
 
-    owner_throw = NULL;
+    owner_throw = nullptr;
     owner_throw_timer = 0;
 
     Drop();

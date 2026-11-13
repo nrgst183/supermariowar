@@ -1,13 +1,9 @@
 #include "TimeLimit.h"
 
 #include "GameValues.h"
+#include "GSGameplay.h"
 #include "player.h"
 #include "ResourceManager.h"
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern short CountAliveTeams(short * lastteam);
 
 
 //timelimit

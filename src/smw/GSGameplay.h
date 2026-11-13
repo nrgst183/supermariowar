@@ -7,14 +7,14 @@
 class GameplayState : public GameState
 {
     public:
-        void update();
+        void update() override;
 
         static GameplayState& instance();
 
     private:
         GameplayState();
 
-        void onEnterState();
+        void onEnterState() override;
 
         void createPlayers();
         void initScoreDisplayPosition();
@@ -46,17 +46,17 @@ class GameplayState : public GameState
         void update_countdown_timer();
         void update_world();
 
-        short iCountDownState;
-        short iCountDownTimer;
-        short iWindTimer;
-        float dNextWind;
-        short iScoreTextOffset[4];
+        short iCountDownState = 0;
+        short iCountDownTimer = 0;
+        short iWindTimer = 0;
+        float dNextWind = 0.0f;
+        short iScoreTextOffset[4] = {};
 
         short respawnCount[4];
         short respawnanimationtimer[4];
         short respawnanimationframe[4];
 
-        COutputControl* current_playerKeys;
+        COutputControl* current_playerKeys = nullptr;
         COutputControl previous_playerKeys;
 
         static short scoreoffsets[3];
@@ -69,5 +69,21 @@ class GameplayState : public GameState
         short spintimer;
 
 };
+
+// Defined in GSGameplay.cpp
+extern short g_iWinningPlayer;
+extern short scorepowerupoffsets[3][3];
+extern bool g_fAutoTest;
+extern bool g_fRecordTest;
+
+// Defined in GSGameplay.cpp and separately in the world editor
+short LookupTeamID(short id);
+
+// Defined in GSGameplay.cpp
+short CountAliveTeams(short* lastteam);
+bool SwapPlayers(short iUsingPlayerID);
+void UpdateScoreBoard();
+void SetGameModeSettingsFromMenu();
+void LoadMapObjects(bool fPreview);
 
 #endif // GAMESTATE_GAMEPLAY_H

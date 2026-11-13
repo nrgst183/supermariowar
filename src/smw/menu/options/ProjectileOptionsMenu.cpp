@@ -7,9 +7,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     : UI_Menu()
@@ -203,26 +200,26 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miWandText = new MI_Text("Wand", 10, 370, 0, true, TextAlign::LEFT);
     miBlueBlockText = new MI_Text("Throwable Blocks", 325, 200, 0, true, TextAlign::LEFT);
 
-    AddControl(miFireballLifeField, miProjectileOptionsMenuBackButton, miFeatherJumpsField, NULL, miHammerLifeField);
+    AddControl(miFireballLifeField, miProjectileOptionsMenuBackButton, miFeatherJumpsField, nullptr, miHammerLifeField);
 
-    AddControl(miFeatherJumpsField, miFireballLifeField, miBoomerangStyleField, NULL, miHammerOneKillField);
+    AddControl(miFeatherJumpsField, miFireballLifeField, miBoomerangStyleField, nullptr, miHammerOneKillField);
 
-    AddControl(miBoomerangStyleField, miFeatherJumpsField, miBoomerangLifeField, NULL, miBlueBlockLifeField);
-    AddControl(miBoomerangLifeField, miBoomerangStyleField, miShellLifeField, NULL, miGrayBlockLifeField);
+    AddControl(miBoomerangStyleField, miFeatherJumpsField, miBoomerangLifeField, nullptr, miBlueBlockLifeField);
+    AddControl(miBoomerangLifeField, miBoomerangStyleField, miShellLifeField, nullptr, miGrayBlockLifeField);
 
-    AddControl(miShellLifeField, miBoomerangLifeField, miWandFreezeTimeField, NULL, miRedBlockLifeField);
+    AddControl(miShellLifeField, miBoomerangLifeField, miWandFreezeTimeField, nullptr, miRedBlockLifeField);
 
-    AddControl(miWandFreezeTimeField, miShellLifeField, miHammerLifeField, NULL, miProjectileOptionsMenuBackButton);
+    AddControl(miWandFreezeTimeField, miShellLifeField, miHammerLifeField, nullptr, miProjectileOptionsMenuBackButton);
 
-    AddControl(miHammerLifeField, miWandFreezeTimeField, miHammerDelayField, miFireballLifeField, NULL);
-    AddControl(miHammerDelayField, miHammerLifeField, miHammerOneKillField, miFireballLifeField, NULL);
-    AddControl(miHammerOneKillField, miHammerDelayField, miBlueBlockLifeField, miFeatherJumpsField, NULL);
+    AddControl(miHammerLifeField, miWandFreezeTimeField, miHammerDelayField, miFireballLifeField, nullptr);
+    AddControl(miHammerDelayField, miHammerLifeField, miHammerOneKillField, miFireballLifeField, nullptr);
+    AddControl(miHammerOneKillField, miHammerDelayField, miBlueBlockLifeField, miFeatherJumpsField, nullptr);
 
-    AddControl(miBlueBlockLifeField, miHammerOneKillField, miGrayBlockLifeField, miBoomerangStyleField, NULL);
-    AddControl(miGrayBlockLifeField, miBlueBlockLifeField, miRedBlockLifeField, miBoomerangLifeField, NULL);
-    AddControl(miRedBlockLifeField, miGrayBlockLifeField, miProjectileOptionsMenuBackButton, miShellLifeField, NULL);
+    AddControl(miBlueBlockLifeField, miHammerOneKillField, miGrayBlockLifeField, miBoomerangStyleField, nullptr);
+    AddControl(miGrayBlockLifeField, miBlueBlockLifeField, miRedBlockLifeField, miBoomerangLifeField, nullptr);
+    AddControl(miRedBlockLifeField, miGrayBlockLifeField, miProjectileOptionsMenuBackButton, miShellLifeField, nullptr);
 
-    AddControl(miProjectileOptionsMenuBackButton, miRedBlockLifeField, miFireballLifeField, miWandFreezeTimeField, NULL);
+    AddControl(miProjectileOptionsMenuBackButton, miRedBlockLifeField, miFireballLifeField, miWandFreezeTimeField, nullptr);
 
     AddNonControl(miFireballText);
     AddNonControl(miFeatherText);

@@ -68,4 +68,10 @@ void gfx_setjoystickteamcolor(SDL_Joystick * joystick, short team, float brightn
 Uint32 getRawPixel(SDL_Surface* surf, int x, int y);
 RGB getRgb(SDL_Surface* surf, int x, int y);
 
+// Defined separately by each executable (smw, the editors, the tests)
+extern SDL_Surface* screen;
+extern SDL_Surface* blitdest;  // the destination surface for all drawing
+extern short x_shake;
+extern short y_shake;
+
 #endif // GFX_H

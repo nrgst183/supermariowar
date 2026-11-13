@@ -5,7 +5,7 @@
 #include <chrono>
 #include <cstdio>
 
-#define SKINPKG_SIZE_LIMIT 20000 /* bytes in worst case */
+constexpr size_t SKINPKG_SIZE_LIMIT = 20000; // bytes in worst case
 
 void PlayerSkin::setPlayerID(uint8_t id)
 {
@@ -25,7 +25,7 @@ Player::Player()
     synchOK = false;
 
     name = "Anonymous";
-    network_client = NULL;
+    network_client = nullptr;
 
     joinTime = time_now();
     lastActivityTime = joinTime;
@@ -39,7 +39,7 @@ Player::~Player()
 
 void Player::setClient(NetPeer* client)
 {
-    assert(network_client == NULL);
+    assert(network_client == nullptr);
     network_client = client;
 
     lastActivityTime = time_now();

@@ -8,15 +8,13 @@
 
 #include <cmath>
 
-extern CGameValues game_values;
-extern std::vector<CPlayer*> players;
 
 namespace {
 Vec2f calcVelocity(float speed, float angle)
 {
     Vec2f vel {
-        speed * cos(angle),
-        speed * sin(angle),
+        static_cast<float>(speed * cos(angle)),
+        static_cast<float>(speed * sin(angle)),
     };
 
     // Fix rounding errors

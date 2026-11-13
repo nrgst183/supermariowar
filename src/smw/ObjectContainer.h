@@ -29,3 +29,7 @@ public:
 private:
     std::vector<std::unique_ptr<CObject>> m_list;
 };
+
+// Defined in smw/GSGameplay.cpp and separately in the world editor
+extern CObjectContainer noncolcontainer;
+extern CObjectContainer objectcontainer[3];

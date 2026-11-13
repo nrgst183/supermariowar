@@ -7,6 +7,8 @@
 class Blob {
 public:
     Blob();
+    Blob(const Blob& other);
+    Blob& operator=(const Blob& other);
     virtual ~Blob();
 
     bool empty() const;

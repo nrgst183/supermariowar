@@ -12,7 +12,7 @@ public:
     void Init(short iCol, short iRow, short iAction, short iSprite, short iMinMoves, short iMaxMoves, bool fSpritePaces, short iInitialDirection, short iBoundary, short tilesize);
     void Move();
 
-    bool Update();
+    bool Update() override;
     void Draw(short iWorldOffsetX, short iWorldOffsetY, bool fVehiclesSleeping) const;
 
     bool isEnabled() const { return fEnabled; }

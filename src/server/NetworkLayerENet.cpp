@@ -9,7 +9,7 @@
 
 NetworkLayerENet::NetworkLayerENet()
     : NetworkLayer()
-    , server_host(NULL)
+    , server_host(nullptr)
 {
 }
 
@@ -44,7 +44,7 @@ bool NetworkLayerENet::init(uint64_t max_players)
         return false;
     }
 
-    enet_host_compress(server_host, NULL);
+    enet_host_compress(server_host, nullptr);
     return true;
 }
 
@@ -53,7 +53,7 @@ void NetworkLayerENet::cleanup()
     // if network code is still active
     if (server_host) {
         enet_host_destroy(server_host);
-        server_host = NULL;
+        server_host = nullptr;
 
         enet_deinitialize();
     }

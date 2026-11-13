@@ -18,7 +18,7 @@ class SplashScreenState : public GameState
         void onLeaveState() override;
 
         SDL_Event loop_event;
-        gfxSprite* menu_credits;
+        gfxSprite* menu_credits = nullptr;
         int alpha;
         int state;
         int timer;

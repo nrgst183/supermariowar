@@ -8,9 +8,6 @@
 
 #include <cassert>
 
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 PlayerWarpStatus::PlayerWarpStatus()
     : warpcounter(0)
@@ -162,7 +159,7 @@ void PlayerWarpStatus::chooseWarpExit(CPlayer& player)
     //Trigger block that we warp into
     short iCol = player.leftX() / TILESIZE;
     short iRow = player.topY() / TILESIZE;
-    IO_Block* block = NULL;
+    IO_Block* block = nullptr;
 
     assert(exit->direction != WARP_EXIT_UNDEFINED);
 

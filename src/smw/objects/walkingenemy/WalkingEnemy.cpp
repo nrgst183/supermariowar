@@ -15,12 +15,6 @@
 
 #include <cmath>
 
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
-
-extern CMap* g_map;
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class walking enemy (base class for goomba and koopa)
@@ -189,7 +183,7 @@ bool MO_WalkingEnemy::collide(CPlayer* player)
         return false;
 
     if (player->isInvincible() || frozen) {
-        player->AddKillerAward(NULL, killStyle);
+        player->AddKillerAward(nullptr, killStyle);
 
         if (game_values.gamemode->gamemode == game_mode_stomp && !game_values.gamemode->gameover)
             player->Score().AdjustScore(1);
@@ -242,7 +236,7 @@ void MO_WalkingEnemy::collide(IO_MovingObject* object)
                 CPlayer* killer = GetPlayerFromGlobalID(object->iPlayerID);
 
                 if (killer) {
-                    killer->AddKillerAward(NULL, killStyle);
+                    killer->AddKillerAward(nullptr, killStyle);
                     killer->Score().AdjustScore(1);
 
                     if (type == movingobject_shell)

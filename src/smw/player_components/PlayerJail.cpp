@@ -7,9 +7,6 @@
 
 #include <cassert>
 
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 PlayerJail::PlayerJail()
     : owner_teamID(-1)

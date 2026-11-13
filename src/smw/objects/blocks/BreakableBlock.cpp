@@ -9,10 +9,6 @@
 #include "ResourceManager.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
-extern CEyecandyContainer eyecandy[3];
 
 //------------------------------------------------------------------------------
 // class breakable block
@@ -43,7 +39,7 @@ void B_BreakableBlock::update()
         } else if (state == 2) {
             iBumpPlayerID = -1;
             dead = true;
-            g_map->blockdata[col][row] = NULL;
+            g_map->blockdata[col][row] = nullptr;
             g_map->UpdateTileGap(col, row);
         }
     }

@@ -18,13 +18,6 @@
 
 WorldMap g_worldmap(0, 0);
 
-extern SDL_Surface* blitdest;
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern SkinList *skinlist;
-
 
 /**********************************
 * WorldMap
@@ -594,7 +587,7 @@ short WorldMap::GetNextInterestingMove(short iCol, short iRow) const
     while (!next.empty()) {
         const WorldMapTile* const tile = next.front();
 
-        if (tile == NULL)
+        if (tile == nullptr)
             return -1;
 
         next.pop();

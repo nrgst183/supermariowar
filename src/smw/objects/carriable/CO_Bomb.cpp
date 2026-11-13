@@ -7,11 +7,6 @@
 #include "ResourceManager.h"
 #include "objects/moving/MO_Explosion.h"
 
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
-extern SpotlightManager spotlightManager;
-extern CObjectContainer objectcontainer[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class bomb
@@ -38,12 +33,12 @@ CO_Bomb::CO_Bomb(gfxSprite* nspr, Vec2s pos, Vec2f vel, short aniSpeed, short iG
     iOwnerLeftOffset = -16;
     iOwnerUpOffset = 40;
 
-    sSpotlight = NULL;
+    sSpotlight = nullptr;
 }
 
 bool CO_Bomb::collide(CPlayer* player)
 {
-    if (state == 1 && owner == NULL) {
+    if (state == 1 && owner == nullptr) {
         if (player->AcceptItem(this)) {
             owner = player;
 
@@ -105,16 +100,16 @@ void CO_Bomb::draw()
 void CO_Bomb::Die()
 {
     if (owner) {
-        owner->carriedItem = NULL;
-        owner = NULL;
+        owner->carriedItem = nullptr;
+        owner = nullptr;
     }
 
     CPlayer* player = GetPlayerFromGlobalID(iPlayerID);
 
-    if (player != NULL)
+    if (player != nullptr)
         player->decreaseProjectilesCount();
 
     dead = true;
-    objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {ix + (iw >> 2) - 96, iy + (ih >> 2) - 64}, 2, 4, iPlayerID, iTeamID, KillStyle::Bomb));
+    objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(ix + (iw >> 2) - 96), static_cast<short>(iy + (ih >> 2) - 64)}, 2, 4, iPlayerID, iTeamID, KillStyle::Bomb));
     ifSoundOnPlay(rm->sfx_bobombsound);
 }

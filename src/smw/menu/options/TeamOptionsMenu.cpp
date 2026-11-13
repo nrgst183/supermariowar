@@ -7,9 +7,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     : UI_Menu()
@@ -47,10 +44,10 @@ UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     miTeamOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miTeamOptionsMenuHeaderText = new MI_HeaderText("Team Options Menu", 320, 5);
 
-    AddControl(miTeamKillsField, miTeamOptionsMenuBackButton, miTeamColorsField, NULL, miTeamOptionsMenuBackButton);
-    AddControl(miTeamColorsField, miTeamKillsField, miTournamentControlField, NULL, miTeamOptionsMenuBackButton);
-    AddControl(miTournamentControlField, miTeamColorsField, miTeamOptionsMenuBackButton, NULL, miTeamOptionsMenuBackButton);
-    AddControl(miTeamOptionsMenuBackButton, miTournamentControlField, miTeamKillsField, miTournamentControlField, NULL);
+    AddControl(miTeamKillsField, miTeamOptionsMenuBackButton, miTeamColorsField, nullptr, miTeamOptionsMenuBackButton);
+    AddControl(miTeamColorsField, miTeamKillsField, miTournamentControlField, nullptr, miTeamOptionsMenuBackButton);
+    AddControl(miTournamentControlField, miTeamColorsField, miTeamOptionsMenuBackButton, nullptr, miTeamOptionsMenuBackButton);
+    AddControl(miTeamOptionsMenuBackButton, miTournamentControlField, miTeamKillsField, miTournamentControlField, nullptr);
 
     AddNonControl(miTeamOptionsMenuLeftHeaderBar);
     AddNonControl(miTeamOptionsMenuRightHeaderBar);

@@ -4,7 +4,6 @@
 #include "movingplatform.h"
 #include "player.h"
 
-extern CMap* g_map;
 
 B_DonutBlock::B_DonutBlock(gfxSprite *nspr, Vec2s pos)
     : IO_Block(nspr, pos)
@@ -74,6 +73,6 @@ void B_DonutBlock::triggerBehavior(short iPlayerId)
     g_map->AddTemporaryPlatform(platform);
 
     dead = true;
-    g_map->blockdata[col][row] = NULL;
+    g_map->blockdata[col][row] = nullptr;
     g_map->UpdateTileGap(col, row);
 }

@@ -6,7 +6,7 @@
 #include <limits>
 #include <cmath>
 
-#define MAXOBJECTS  300
+constexpr int MAXOBJECTS = 300;
 
 //------------------------------------------------------------------------------
 // class object_container

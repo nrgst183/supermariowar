@@ -43,7 +43,7 @@ void log(const char* message, ...)
     char messageBuffer[256];
     va_list vars;
     va_start(vars, message);
-    vsprintf(messageBuffer, message, vars);
+    vsnprintf(messageBuffer, sizeof(messageBuffer), message, vars);
     va_end(vars);
 
     write_log(true, messageBuffer);
@@ -54,7 +54,7 @@ void log_silently(const char* message, ...)
 	char messageBuffer[256];
     va_list vars;
     va_start(vars, message);
-    vsprintf(messageBuffer, message, vars);
+    vsnprintf(messageBuffer, sizeof(messageBuffer), message, vars);
     va_end(vars);
 
     write_log(false, messageBuffer);

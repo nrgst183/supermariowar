@@ -13,11 +13,11 @@ public:
     MI_NetRoomTeamSelect(short x, short y, short player_id, std::function<void()>&& on_change_accepted = [](){});
     virtual ~MI_NetRoomTeamSelect();
 
-    void Update();
-    void Draw();
+    void Update() override;
+    void Draw() override;
 
-    MenuCodeEnum SendInput(CPlayerInput * playerInput);
-    MenuCodeEnum Modify(bool modify);
+    MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
+    MenuCodeEnum Modify(bool modify) override;
 private:
     short x, y;
     short owner_player;

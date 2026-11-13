@@ -6,8 +6,6 @@
 #include "FileIO.h"
 #include "TilesetManager.h"
 
-extern CTilesetManager* g_tilesetmanager;
-
 
 namespace {
 const short g_iMusicCategoryConversion[26] {0, 3, 8, 5, 1, 9, 3, 4, 10, 8, 1, 0, 9, 0, 0, 7, 4, 1, 1, 6, 4, 7, 6, 3, 0, 4};

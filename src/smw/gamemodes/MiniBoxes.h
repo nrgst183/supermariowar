@@ -30,3 +30,6 @@ class CGM_Boxes_MiniGame : public CGameMode
         void ReleaseCoin(CPlayer &player);
         void ReleaseAllCoinsFromTeam(CPlayer &player);
 };
+
+// Defined in smw/main.cpp
+extern CGM_Boxes_MiniGame* boxesgamemode;

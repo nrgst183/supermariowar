@@ -84,7 +84,7 @@ void SMWServer::readConfig(const std::string& config_path)
                 }
                 if (keyword.compare("maxplayers") == 0)
                 {
-                    uint16_t num = (uint16_t) strtol(value.c_str(), NULL, 10);
+                    uint16_t num = (uint16_t) strtol(value.c_str(), nullptr, 10);
                     if (num) {
                         maxPlayerCount = num;
                         serverInfo.maxPlayerCount = num;
@@ -217,10 +217,6 @@ void SMWServer::onReceive(NetPeer& client, const uint8_t* data, size_t dataLengt
             playerStartsRoom(playerID);
             break;
 
-        /*case NET_NOTICE_GAME_SYNC_OK:
-            log("NET_NOTICE_GAME_SYNC_OK!");
-            startRoomIfEveryoneReady(playerID);
-            break;*/
 
         default:
             printf("Unknown: %d", messageType);
@@ -274,6 +270,8 @@ void SMWServer::playerConnectsServer(uint64_t playerID, const void* data, size_t
 
     NetPkgs::ClientConnection package;
     memcpy(&package, data, dataLength);
+    // the sender controls these bytes: make sure the string is terminated
+    package.playerName[NET_MAX_PLAYER_NAME_LENGTH - 1] = '\0';
 
     players[playerID].name = package.playerName;
     players[playerID].sendConnectOK();
@@ -286,12 +284,6 @@ void SMWServer::playerConnectsServer(uint64_t playerID, const void* data, size_t
 void SMWServer::removeInactivePlayers()
 {
     if (maxPlayerCount <= players.size()) {
-        /*for (unsigned p = 0; p < players.size(); ) {
-            if (players[p].lastActivityTime + MAX_INACTIVE_TIME < SDL_GetTicks())
-                players.remove(p);
-            else
-                p++;
-        }*/
     }
 }
 
@@ -356,6 +348,9 @@ void SMWServer::playerCreatesRoom(uint64_t playerID, const void* data, size_t da
     // input
     NetPkgs::NewRoom pkg;
     memcpy(&pkg, data, dataLength);
+    // the sender controls these bytes: make sure the strings are terminated
+    pkg.name[NET_MAX_ROOM_NAME_LENGTH - 1] = '\0';
+    pkg.password[NET_MAX_ROOM_PASSWORD_LENGTH - 1] = '\0';
 
     // create
     Room room(roomCreateID, pkg.name, pkg.password, player);
@@ -516,6 +511,7 @@ void SMWServer::playerSendsChatMsg(uint64_t playerID, const void* data, size_t d
 
     NetPkgs::RoomChatMsg pkg;
     memcpy(&pkg, data, dataLength);
+    pkg.message[NET_MAX_CHAT_MSG_LENGTH - 1] = '\0';
 
     rooms[roomID].sendChatMessage(player, pkg.message);
     player->lastActivityTime = time_now();
@@ -549,21 +545,6 @@ void SMWServer::playerStartsRoom(uint64_t playerID)
 
 void SMWServer::startRoomIfEveryoneReady(uint64_t playerID)
 {
-    /*if (!players.count(playerID))
-        return;
-
-    Player* player = &players[playerID];
-    if (!player->currentRoomID || player->isPlaying)
-        return;
-
-    if (!rooms.count(player->currentRoomID))
-        return;
-
-    player->synchOK = true;
-    player->lastActivityTime = time_now();
-
-    Room* room = &rooms[player->currentRoomID];
-    room->startGameIfEverybodyReady();*/
 }
 
 void SMWServer::cleanup()

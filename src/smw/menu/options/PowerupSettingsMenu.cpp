@@ -8,9 +8,6 @@
 #include "ui/MI_StoredPowerupResetButton.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     : UI_Menu()
@@ -89,15 +86,15 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miPowerupSettingsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miPowerupSettingsMenuHeaderText = new MI_HeaderText("Item Settings Menu", 320, 5);
 
-    AddControl(miStoredPowerupDelayField, miPowerupSettingsMenuBackButton, miItemRespawnField, NULL, miPowerupSettingsMenuBackButton);
-    AddControl(miItemRespawnField, miStoredPowerupDelayField, miHiddenBlockRespawnField, NULL, miPowerupSettingsMenuBackButton);
-    AddControl(miHiddenBlockRespawnField, miItemRespawnField, miSwapStyleField, NULL, miPowerupSettingsMenuBackButton);
-    AddControl(miSwapStyleField, miHiddenBlockRespawnField, miBonusWheelField, NULL, miPowerupSettingsMenuBackButton);
-    AddControl(miBonusWheelField, miSwapStyleField, miKeepPowerupField, NULL, miPowerupSettingsMenuBackButton);
-    AddControl(miKeepPowerupField, miBonusWheelField, miStoredPowerupResetButton, NULL, miPowerupSettingsMenuBackButton);
-    AddControl(miStoredPowerupResetButton, miKeepPowerupField, miPowerupSettingsMenuBackButton, NULL, miPowerupSettingsMenuBackButton);
+    AddControl(miStoredPowerupDelayField, miPowerupSettingsMenuBackButton, miItemRespawnField, nullptr, miPowerupSettingsMenuBackButton);
+    AddControl(miItemRespawnField, miStoredPowerupDelayField, miHiddenBlockRespawnField, nullptr, miPowerupSettingsMenuBackButton);
+    AddControl(miHiddenBlockRespawnField, miItemRespawnField, miSwapStyleField, nullptr, miPowerupSettingsMenuBackButton);
+    AddControl(miSwapStyleField, miHiddenBlockRespawnField, miBonusWheelField, nullptr, miPowerupSettingsMenuBackButton);
+    AddControl(miBonusWheelField, miSwapStyleField, miKeepPowerupField, nullptr, miPowerupSettingsMenuBackButton);
+    AddControl(miKeepPowerupField, miBonusWheelField, miStoredPowerupResetButton, nullptr, miPowerupSettingsMenuBackButton);
+    AddControl(miStoredPowerupResetButton, miKeepPowerupField, miPowerupSettingsMenuBackButton, nullptr, miPowerupSettingsMenuBackButton);
 
-    AddControl(miPowerupSettingsMenuBackButton, miStoredPowerupResetButton, miStoredPowerupDelayField, miStoredPowerupResetButton, NULL);
+    AddControl(miPowerupSettingsMenuBackButton, miStoredPowerupResetButton, miStoredPowerupDelayField, miStoredPowerupResetButton, nullptr);
 
     AddNonControl(miPowerupSettingsMenuLeftHeaderBar);
     AddNonControl(miPowerupSettingsMenuRightHeaderBar);

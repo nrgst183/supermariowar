@@ -4,8 +4,6 @@
 
 #include <cmath>
 
-extern SDL_Surface * blitdest;
-
 
 MI_Image::MI_Image(
         gfxSprite * nspr,

@@ -7,9 +7,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     : UI_Menu()
@@ -165,17 +162,17 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miProjectilesLimitsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miProjectilesLimitsMenuHeaderText = new MI_HeaderText("Weapon Use Limits Menu", 320, 5);
 
-    AddControl(miFireballLimitField, miProjectilesLimitsMenuBackButton, miHammerLimitField, NULL, miProjectilesLimitsMenuBackButton);
-    AddControl(miHammerLimitField, miFireballLimitField, miBoomerangLimitField, NULL, miProjectilesLimitsMenuBackButton);
-    AddControl(miBoomerangLimitField, miHammerLimitField, miFeatherLimitField, NULL, miProjectilesLimitsMenuBackButton);
-    AddControl(miFeatherLimitField, miBoomerangLimitField, miLeafLimitField, NULL, miProjectilesLimitsMenuBackButton);
-    AddControl(miLeafLimitField, miFeatherLimitField, miPwingsLimitField, NULL, miProjectilesLimitsMenuBackButton);
-    AddControl(miPwingsLimitField, miLeafLimitField, miTanookiLimitField, NULL, miProjectilesLimitsMenuBackButton);
-    AddControl(miTanookiLimitField, miPwingsLimitField, miBombLimitField, NULL, miProjectilesLimitsMenuBackButton);
-    AddControl(miBombLimitField, miTanookiLimitField, miWandLimitField, NULL, miProjectilesLimitsMenuBackButton);
-    AddControl(miWandLimitField, miBombLimitField, miProjectilesLimitsMenuBackButton, NULL, miProjectilesLimitsMenuBackButton);
+    AddControl(miFireballLimitField, miProjectilesLimitsMenuBackButton, miHammerLimitField, nullptr, miProjectilesLimitsMenuBackButton);
+    AddControl(miHammerLimitField, miFireballLimitField, miBoomerangLimitField, nullptr, miProjectilesLimitsMenuBackButton);
+    AddControl(miBoomerangLimitField, miHammerLimitField, miFeatherLimitField, nullptr, miProjectilesLimitsMenuBackButton);
+    AddControl(miFeatherLimitField, miBoomerangLimitField, miLeafLimitField, nullptr, miProjectilesLimitsMenuBackButton);
+    AddControl(miLeafLimitField, miFeatherLimitField, miPwingsLimitField, nullptr, miProjectilesLimitsMenuBackButton);
+    AddControl(miPwingsLimitField, miLeafLimitField, miTanookiLimitField, nullptr, miProjectilesLimitsMenuBackButton);
+    AddControl(miTanookiLimitField, miPwingsLimitField, miBombLimitField, nullptr, miProjectilesLimitsMenuBackButton);
+    AddControl(miBombLimitField, miTanookiLimitField, miWandLimitField, nullptr, miProjectilesLimitsMenuBackButton);
+    AddControl(miWandLimitField, miBombLimitField, miProjectilesLimitsMenuBackButton, nullptr, miProjectilesLimitsMenuBackButton);
 
-    AddControl(miProjectilesLimitsMenuBackButton, miWandLimitField, miFireballLimitField, miWandLimitField, NULL);
+    AddControl(miProjectilesLimitsMenuBackButton, miWandLimitField, miFireballLimitField, miWandLimitField, nullptr);
 
     AddNonControl(miProjectilesLimitsMenuLeftHeaderBar);
     AddNonControl(miProjectilesLimitsMenuRightHeaderBar);

@@ -13,9 +13,6 @@
 
 #include <math.h>
 
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 B_OnOffSwitchBlock::B_OnOffSwitchBlock(gfxSprite *nspr, Vec2s pos, SwitchColor color, short iState) :
     IO_Block(nspr, pos)

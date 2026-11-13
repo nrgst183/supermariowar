@@ -17,11 +17,6 @@ using namespace std;
 
 namespace fs = std::filesystem;
 
-extern SDL_Surface * blitdest;
-extern SDL_Surface * screen;
-
-extern short x_shake;
-extern short y_shake;
 
 GraphicsSDL gfx;
 gfxPalette gfx_palette;

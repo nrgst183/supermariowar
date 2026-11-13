@@ -1,5 +1,6 @@
 #include "doctest.h"
 
+#include "gfx.h"
 #include "TomlConfig.h"
 
 #include <string>

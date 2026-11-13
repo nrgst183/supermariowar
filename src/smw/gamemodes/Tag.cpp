@@ -6,14 +6,6 @@
 #include "ResourceManager.h"
 #include "Score.h"
 
-extern CScore *score[4];
-extern short score_cnt;
-
-extern CEyecandyContainer eyecandy[3];
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 //tag mode (leper mode suggestion from ziotok)
 //one player is "it"
@@ -98,7 +90,7 @@ void CGM_Tag::think()
 
         if (m_tagged->Score().score <= 0) {
             RemoveTeam(m_tagged->getTeamID());
-            m_tagged = NULL;
+            m_tagged = nullptr;
         }
     }
 }

@@ -8,7 +8,7 @@ UI_BonusWheelMenu::UI_BonusWheelMenu()
 {
     miBonusWheel = new MI_BonusWheel(144, 38);
 
-    AddControl(miBonusWheel, NULL, NULL, NULL, NULL);
+    AddControl(miBonusWheel, nullptr, nullptr, nullptr, nullptr);
     setInitialFocus(miBonusWheel);
     SetCancelCode(MENU_CODE_BONUS_DONE);
 };

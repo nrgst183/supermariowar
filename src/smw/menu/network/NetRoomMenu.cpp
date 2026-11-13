@@ -15,10 +15,6 @@
 #include <sstream>
 
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
-
 UI_NetRoomMenu::UI_NetRoomMenu()
     : UI_Menu()
 {
@@ -47,7 +43,7 @@ UI_NetRoomMenu::UI_NetRoomMenu()
         miSkinSelector[p] = new MI_NetRoomTeamSelect(16, 72 + p * 60, p, []() {
             netplay.client.sendSkinChange();
         });
-        AddControl(miSkinSelector[p], miNetRoomMessageField, miNetRoomStartButton, NULL, NULL);
+        AddControl(miSkinSelector[p], miNetRoomMessageField, miNetRoomStartButton, nullptr, nullptr);
     }
 
     AddNonControl(miNetRoomMessages);

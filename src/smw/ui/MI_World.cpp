@@ -4,6 +4,8 @@
 #include "FileList.h"
 #include "Game.h"
 #include "GameValues.h"
+#include "gfx.h"
+#include "GSGameplay.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "uimenu.h"
@@ -11,16 +13,6 @@
 #include "WorldTourStop.h"
 
 #include <cmath>
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-extern WorldMap g_worldmap;
-extern WorldMusicList* worldmusiclist;
-
-extern SDL_Surface* screen;
-extern SDL_Surface* blitdest;
-
-extern short LookupTeamID(short id);
 
 
 MI_World::MI_World()
@@ -86,7 +78,7 @@ void MI_World::Init()
     game_values.worldpointsbonus = -1;
 
     iPressSelectTimer = 0;
-    pressSelectKeys = NULL;
+    pressSelectKeys = nullptr;
 
     iDrawWidth = g_worldmap.getWidth() < 20 ? g_worldmap.getWidth() << 5 : App::screenWidth;
     iDrawHeight = g_worldmap.getHeight() < 15 ? g_worldmap.getHeight() << 5 : App::screenHeight;
@@ -116,9 +108,9 @@ void MI_World::DisplayTeamControlAnnouncement()
 {
     char szMessage[128];
     if (game_values.teamcounts[iControllingTeam] <= 1)
-        sprintf(szMessage, "Player %d Is In Control", game_values.teamids[iControllingTeam][0] + 1);
+        snprintf(szMessage, sizeof(szMessage), "Player %d Is In Control", game_values.teamids[iControllingTeam][0] + 1);
     else
-        sprintf(szMessage, "Team %d Is In Control", iControllingTeam + 1);
+        snprintf(szMessage, sizeof(szMessage), "Team %d Is In Control", iControllingTeam + 1);
 
     m_parentMenu->AddEyeCandy<EC_Announcement>(&rm->menu_font_large, &rm->spr_announcementicons, szMessage, game_values.colorids[iControllingPlayerId], 120, 100);
 }
@@ -531,7 +523,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
                     short iNextMove = g_worldmap.GetNextInterestingMove(iPlayerCurrentTile.x, iPlayerCurrentTile.y);
 
                            //Clear out all input from cpu controlled team
-                    COutputControl * playerKeys = NULL;
+                    COutputControl * playerKeys = nullptr;
                     short iTeamMember;
                     for (iTeamMember = 0; iTeamMember < game_values.teamcounts[iControllingTeam]; iTeamMember++) {
                         playerKeys = &game_values.playerInput.outputControls[game_values.teamids[iControllingTeam][iTeamMember]];

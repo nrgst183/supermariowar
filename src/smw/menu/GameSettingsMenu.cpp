@@ -13,12 +13,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-extern CGameMode* gamemodes[GAMEMODE_LAST];
-extern short currentgamemode;
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-extern FiltersList* filterslist;
 
 namespace {
 const char* g_szAutoFilterNames[NUM_AUTO_FILTERS] {
@@ -119,22 +113,22 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     miGameSettingsExitDialogYesButton->setVisible(false);
     miGameSettingsExitDialogNoButton->setVisible(false);
 
-    AddControl(miSettingsStartButton, miMapThumbnailsButton, miModeField, NULL, NULL);
-    AddControl(miModeField, miSettingsStartButton, miGoalField[0], NULL, NULL);
+    AddControl(miSettingsStartButton, miMapThumbnailsButton, miModeField, nullptr, nullptr);
+    AddControl(miModeField, miSettingsStartButton, miGoalField[0], nullptr, nullptr);
 
-    AddControl(miGoalField[0], miModeField, miGoalField[1], NULL, miModeSettingsButton);
+    AddControl(miGoalField[0], miModeField, miGoalField[1], nullptr, miModeSettingsButton);
 
     for (short iGoalField = 1; iGoalField < GAMEMODE_LAST - 1; iGoalField++)
         AddControl(miGoalField[iGoalField], miGoalField[iGoalField - 1], miGoalField[iGoalField + 1], miGoalField[iGoalField - 1], miModeSettingsButton);
 
     AddControl(miGoalField[GAMEMODE_LAST - 1], miGoalField[GAMEMODE_LAST - 2], miMapField, miGoalField[GAMEMODE_LAST - 2], miModeSettingsButton);
 
-    AddControl(miModeSettingsButton, miModeField, miMapField, miGoalField[GAMEMODE_LAST - 1], NULL);
-    AddControl(miMapField, miGoalField[GAMEMODE_LAST - 1], miMapFiltersButton, NULL, NULL);
-    AddControl(miMapFiltersButton, miMapField, miMapThumbnailsButton, NULL, NULL);
-    AddControl(miMapThumbnailsButton, miMapFiltersButton, miSettingsStartButton, NULL, NULL);
+    AddControl(miModeSettingsButton, miModeField, miMapField, miGoalField[GAMEMODE_LAST - 1], nullptr);
+    AddControl(miMapField, miGoalField[GAMEMODE_LAST - 1], miMapFiltersButton, nullptr, nullptr);
+    AddControl(miMapFiltersButton, miMapField, miMapThumbnailsButton, nullptr, nullptr);
+    AddControl(miMapThumbnailsButton, miMapFiltersButton, miSettingsStartButton, nullptr, nullptr);
 
-    AddControl(miMapFilterScroll, NULL, NULL, NULL, NULL);
+    AddControl(miMapFilterScroll, nullptr, nullptr, nullptr, nullptr);
 
     AddNonControl(miGameSettingsLeftHeaderBar);
     AddNonControl(miGameSettingsMenuRightHeaderBar);
@@ -146,8 +140,8 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
 
     AddNonControl(miMapFiltersOnImage);
 
-    AddControl(miGameSettingsExitDialogYesButton, NULL, NULL, NULL, miGameSettingsExitDialogNoButton);
-    AddControl(miGameSettingsExitDialogNoButton, NULL, NULL, miGameSettingsExitDialogYesButton, NULL);
+    AddControl(miGameSettingsExitDialogYesButton, nullptr, nullptr, nullptr, miGameSettingsExitDialogNoButton);
+    AddControl(miGameSettingsExitDialogNoButton, nullptr, nullptr, miGameSettingsExitDialogYesButton, nullptr);
 
     setInitialFocus(miSettingsStartButton);
 

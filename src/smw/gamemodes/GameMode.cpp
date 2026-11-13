@@ -11,17 +11,6 @@
 #include "WorldTourStop.h"
 #include "objects/powerup/PU_TreasureChestBonus.h"
 
-extern CScore *score[4];
-extern short score_cnt;
-
-extern CObjectContainer objectcontainer[3];
-extern CEyecandyContainer eyecandy[3];
-
-extern std::vector<CPlayer*> players;
-
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 void RemovePlayersButTeam(short teamid)
 {

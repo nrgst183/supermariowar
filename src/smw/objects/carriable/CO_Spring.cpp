@@ -5,8 +5,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CMap* g_map;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class spring
@@ -27,7 +25,7 @@ CO_Spring::CO_Spring(gfxSprite* nspr, Vec2s pos, bool fsuper)
 
 bool CO_Spring::collide(CPlayer* player)
 {
-    if (owner == NULL) {
+    if (owner == nullptr) {
         if (player->fOldY + PH <= fOldY && player->iy + PH >= iy)
             hittop(player);
         else if (state == 1)
@@ -44,7 +42,7 @@ void CO_Spring::hittop(CPlayer* player)
 
     player->setYi(iy - PH - 1);
     player->collisions.checktop(*player);
-    player->platform = NULL;
+    player->platform = nullptr;
     player->inair = false;
     player->fallthrough = false;
     player->killsinrowinair = 0;
@@ -59,7 +57,7 @@ void CO_Spring::hittop(CPlayer* player)
 
 void CO_Spring::hitother(CPlayer* player)
 {
-    if (owner == NULL && player->isready()) {
+    if (owner == nullptr && player->isready()) {
         if (player->AcceptItem(this)) {
             owner = player;
         }

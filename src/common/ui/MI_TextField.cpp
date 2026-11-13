@@ -6,9 +6,6 @@
 
 #include <array>
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 namespace {
 constexpr std::array<short, 10> NUMBER_KEY_MAP {41, 33, 64, 35, 36, 37, 94, 38, 42, 40};
@@ -49,7 +46,7 @@ MenuCodeEnum MI_TextField::Modify(bool modify)
 
 MenuCodeEnum MI_TextField::SendInput(CPlayerInput * playerInput)
 {
-    const bool* keystate = SDL_GetKeyboardState(NULL);
+    const bool* keystate = SDL_GetKeyboardState(nullptr);
 
     for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
         // NOTE: copied from UI_Menu::SendInput

@@ -11,10 +11,6 @@
 #include "gamemodes/Frenzy.h"
 #include "objects/carriable/CO_Shell.h"
 
-extern CObjectContainer objectcontainer[3];
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class frenzycard (for fire frenzy mode)

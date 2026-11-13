@@ -7,11 +7,6 @@
 #include "ResourceManager.h"
 #include "objects/moving/MO_FrenzyCard.h"
 
-extern std::vector<CPlayer*> players;
-extern CObjectContainer objectcontainer[3];
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 //Fireball:
 //Frag limit death match, but powerup cards appear randomly
@@ -75,19 +70,19 @@ void CGM_Frenzy::think()
     if (m_frenzyowner) {
         if (0 == iSelectedPowerup) {
             if (!m_frenzyowner->IsBobomb())
-                m_frenzyowner = NULL;
+                m_frenzyowner = nullptr;
         } else if (5 > iSelectedPowerup) {
             if (m_frenzyowner->powerup != iSelectedPowerup)
-                m_frenzyowner = NULL;
+                m_frenzyowner = nullptr;
         } else if (5 == iSelectedPowerup) {
             if (game_values.gamepowerups[m_frenzyowner->getGlobalID()] != static_cast<short>(PowerupType::Pow))
-                m_frenzyowner = NULL;
+                m_frenzyowner = nullptr;
         } else if (6 == iSelectedPowerup) {
             if (game_values.gamepowerups[m_frenzyowner->getGlobalID()] != static_cast<short>(PowerupType::Mod))
-                m_frenzyowner = NULL;
+                m_frenzyowner = nullptr;
         } else if (7 == iSelectedPowerup) {
             if (game_values.gamepowerups[m_frenzyowner->getGlobalID()] != static_cast<short>(PowerupType::BulletBill))
-                m_frenzyowner = NULL;
+                m_frenzyowner = nullptr;
         }
     }
 }

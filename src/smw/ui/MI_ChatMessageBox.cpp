@@ -2,8 +2,6 @@
 
 #include "ResourceManager.h"
 
-extern CResourceManager* rm;
-
 
 MI_ChatMessageBox::MI_ChatMessageBox(short x, short y, short width, short numlines)
     : UI_Control(x, y)

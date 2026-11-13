@@ -5,11 +5,6 @@
 #include "ResourceManager.h"
 #include "Score.h"
 
-extern CScore *score[4];
-extern short score_cnt;
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 //mariowar (x lives - counting down)
 CGM_Classic::CGM_Classic() : CGameMode()

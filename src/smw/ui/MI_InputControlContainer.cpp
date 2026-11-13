@@ -15,9 +15,6 @@
 #include <cstring>
 #include <ranges>
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
 
 namespace {
 const std::array<std::string, NUM_KEYS> GameInputNames {
@@ -58,7 +55,7 @@ MI_InputControlField::MI_InputControlField(gfxSprite * nspr, short x, short y, s
     fSelected = false;
 
     iDevice = DEVICE_KEYBOARD_ID;
-    iKey = NULL;
+    iKey = nullptr;
     iType = 0;
     iKeyIndex = 0;
     iPlayerIndex = 0;
@@ -312,7 +309,7 @@ void MI_InputControlField::Draw()
 
     rm->menu_font_large.drawChopRight(m_pos.x + 16, m_pos.y + 5, iIndent - 8, szName.c_str());
 
-    if (iKey == NULL)
+    if (iKey == nullptr)
         rm->menu_font_large.drawChopRight(m_pos.x + iIndent + 8, m_pos.y + 5, iWidth - iIndent - 16, "Unassigned");
     else if (fModifying)
         rm->menu_font_large.drawChopRight(m_pos.x + iIndent + 8, m_pos.y + 5, iWidth - iIndent - 16, "(Press Button)");
@@ -336,7 +333,7 @@ MI_InputControlContainer::MI_InputControlContainer(gfxSprite * spr_button, short
     iSelectedInputType = 0;
 
     char szTitle[128];
-    sprintf(szTitle, "Player %d Controls", iPlayerID + 1);
+    snprintf(szTitle, sizeof(szTitle), "Player %d Controls", iPlayerID + 1);
     miText = new MI_HeaderText(szTitle, 320, 5);
 
     miImage[0] = new MI_Image(spr_button, 0, 0, 0, 0, 320, 32, 1, 1, 0);
@@ -383,26 +380,26 @@ MI_InputControlContainer::MI_InputControlContainer(gfxSprite * spr_button, short
     mInputMenu->AddNonControl(miImage[1]);
     mInputMenu->AddNonControl(miText);
 
-    mInputMenu->AddControl(miDeviceSelectField, miBackButton, miInputTypeButton, NULL, miBackButton);
-    mInputMenu->AddControl(miInputTypeButton, miDeviceSelectField, miGameInputControlFields[0], NULL, miBackButton);
-    mInputMenu->AddControl(miGameInputControlFields[0], miInputTypeButton, miGameInputControlFields[1], NULL, miBackButton);
-    mInputMenu->AddControl(miGameInputControlFields[1], miGameInputControlFields[0], miGameInputControlFields[2], NULL, miBackButton);
-    mInputMenu->AddControl(miGameInputControlFields[2], miGameInputControlFields[1], miGameInputControlFields[3], NULL, miBackButton);
-    mInputMenu->AddControl(miGameInputControlFields[3], miGameInputControlFields[2], miGameInputControlFields[4], NULL, miBackButton);
-    mInputMenu->AddControl(miGameInputControlFields[4], miGameInputControlFields[3], miGameInputControlFields[5], NULL, miBackButton);
-    mInputMenu->AddControl(miGameInputControlFields[5], miGameInputControlFields[4], miGameInputControlFields[6], NULL, miBackButton);
-    mInputMenu->AddControl(miGameInputControlFields[6], miGameInputControlFields[5], miGameInputControlFields[7], NULL, miBackButton);
-    mInputMenu->AddControl(miGameInputControlFields[7], miGameInputControlFields[6], miMenuInputControlFields[0], NULL, miBackButton);
-    mInputMenu->AddControl(miMenuInputControlFields[0], miGameInputControlFields[7], miMenuInputControlFields[1], NULL, miBackButton);
-    mInputMenu->AddControl(miMenuInputControlFields[1], miMenuInputControlFields[0], miMenuInputControlFields[2], NULL, miBackButton);
-    mInputMenu->AddControl(miMenuInputControlFields[2], miMenuInputControlFields[1], miMenuInputControlFields[3], NULL, miBackButton);
-    mInputMenu->AddControl(miMenuInputControlFields[3], miMenuInputControlFields[2], miMenuInputControlFields[4], NULL, miBackButton);
-    mInputMenu->AddControl(miMenuInputControlFields[4], miMenuInputControlFields[3], miMenuInputControlFields[5], NULL, miBackButton);
-    mInputMenu->AddControl(miMenuInputControlFields[5], miMenuInputControlFields[4], miMenuInputControlFields[6], NULL, miBackButton);
-    mInputMenu->AddControl(miMenuInputControlFields[6], miMenuInputControlFields[5], miMenuInputControlFields[7], NULL, miBackButton);
-    mInputMenu->AddControl(miMenuInputControlFields[7], miMenuInputControlFields[6], miBackButton, NULL, miBackButton);
+    mInputMenu->AddControl(miDeviceSelectField, miBackButton, miInputTypeButton, nullptr, miBackButton);
+    mInputMenu->AddControl(miInputTypeButton, miDeviceSelectField, miGameInputControlFields[0], nullptr, miBackButton);
+    mInputMenu->AddControl(miGameInputControlFields[0], miInputTypeButton, miGameInputControlFields[1], nullptr, miBackButton);
+    mInputMenu->AddControl(miGameInputControlFields[1], miGameInputControlFields[0], miGameInputControlFields[2], nullptr, miBackButton);
+    mInputMenu->AddControl(miGameInputControlFields[2], miGameInputControlFields[1], miGameInputControlFields[3], nullptr, miBackButton);
+    mInputMenu->AddControl(miGameInputControlFields[3], miGameInputControlFields[2], miGameInputControlFields[4], nullptr, miBackButton);
+    mInputMenu->AddControl(miGameInputControlFields[4], miGameInputControlFields[3], miGameInputControlFields[5], nullptr, miBackButton);
+    mInputMenu->AddControl(miGameInputControlFields[5], miGameInputControlFields[4], miGameInputControlFields[6], nullptr, miBackButton);
+    mInputMenu->AddControl(miGameInputControlFields[6], miGameInputControlFields[5], miGameInputControlFields[7], nullptr, miBackButton);
+    mInputMenu->AddControl(miGameInputControlFields[7], miGameInputControlFields[6], miMenuInputControlFields[0], nullptr, miBackButton);
+    mInputMenu->AddControl(miMenuInputControlFields[0], miGameInputControlFields[7], miMenuInputControlFields[1], nullptr, miBackButton);
+    mInputMenu->AddControl(miMenuInputControlFields[1], miMenuInputControlFields[0], miMenuInputControlFields[2], nullptr, miBackButton);
+    mInputMenu->AddControl(miMenuInputControlFields[2], miMenuInputControlFields[1], miMenuInputControlFields[3], nullptr, miBackButton);
+    mInputMenu->AddControl(miMenuInputControlFields[3], miMenuInputControlFields[2], miMenuInputControlFields[4], nullptr, miBackButton);
+    mInputMenu->AddControl(miMenuInputControlFields[4], miMenuInputControlFields[3], miMenuInputControlFields[5], nullptr, miBackButton);
+    mInputMenu->AddControl(miMenuInputControlFields[5], miMenuInputControlFields[4], miMenuInputControlFields[6], nullptr, miBackButton);
+    mInputMenu->AddControl(miMenuInputControlFields[6], miMenuInputControlFields[5], miMenuInputControlFields[7], nullptr, miBackButton);
+    mInputMenu->AddControl(miMenuInputControlFields[7], miMenuInputControlFields[6], miBackButton, nullptr, miBackButton);
 
-    mInputMenu->AddControl(miBackButton, miMenuInputControlFields[7], miDeviceSelectField, miDeviceSelectField, NULL);
+    mInputMenu->AddControl(miBackButton, miMenuInputControlFields[7], miDeviceSelectField, miDeviceSelectField, nullptr);
 
     mInputMenu->setInitialFocus(miDeviceSelectField);
 
@@ -528,7 +525,7 @@ void MI_InputControlContainer::SetPlayer(short playerID)
     SetVisibleInputFields();
 
     char szNewTitle[128];
-    sprintf(szNewTitle, "Player %d Controls", iPlayerID + 1);
+    snprintf(szNewTitle, sizeof(szNewTitle), "Player %d Controls", iPlayerID + 1);
     miText->SetText(szNewTitle);
     mInputMenu->ResetMenu();
 }

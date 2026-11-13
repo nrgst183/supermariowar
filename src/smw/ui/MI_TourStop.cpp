@@ -1,5 +1,6 @@
 #include "MI_TourStop.h"
 
+#include "GameMode.h"
 #include "GameValues.h"
 #include "ResourceManager.h"
 #include "WorldTourStop.h"
@@ -12,14 +13,6 @@
 #include "ui/MI_MapField.h"
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern CGameMode* gamemodes[GAMEMODE_LAST];
-extern CGM_Pipe_MiniGame* pipegamemode;
-extern CGM_Boss_MiniGame* bossgamemode;
-extern CGM_Boxes_MiniGame* boxesgamemode;
 
 
 //Call with x = 70 and y == 80
@@ -133,7 +126,7 @@ void MI_TourStop::Refresh(short iTourStop)
     if (tourstop->iStageType == 0) {
         miModeField->clear();
 
-        CGameMode * gamemode = NULL;
+        CGameMode * gamemode = nullptr;
         short tourstopicon = 0;
         if (tourstop->iMode == game_mode_pipe_minigame) {
             gamemode = pipegamemode;
@@ -154,12 +147,12 @@ void MI_TourStop::Refresh(short iTourStop)
 
         miGoalField->clear();
         char szTemp[16];
-        sprintf(szTemp, "%d", tourstop->iGoal);
+        snprintf(szTemp, sizeof(szTemp), "%d", tourstop->iGoal);
         miGoalField->add(szTemp, 0, false);
         miGoalField->setTitle(gamemode->GetGoalName());
 
         miPointsField->clear();
-        sprintf(szTemp, "%d", tourstop->iPoints);
+        snprintf(szTemp, sizeof(szTemp), "%d", tourstop->iPoints);
         miPointsField->add(szTemp, 0, false);
 
         if (tourstop->iMode == game_mode_pipe_minigame) {

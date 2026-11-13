@@ -18,11 +18,11 @@ public:
     }
 
     void Reset() {
-        player = NULL;
-        goal = NULL;
-        stomp = NULL;
-        teammate = NULL;
-        threat = NULL;
+        player = nullptr;
+        goal = nullptr;
+        stomp = nullptr;
+        teammate = nullptr;
+        threat = nullptr;
 
         playerdistance = App::screenWidth * 1000;
         goaldistance = App::screenWidth * 1000;
@@ -83,10 +83,10 @@ public:
     void DistanceToPlayer(CPlayer * player, CPlayer ** target, int * nearest, bool * wrap);
 
 protected:
-    CPlayer * pPlayer;
+    CPlayer * pPlayer = nullptr;
 
 private:
-    short iFallDanger;
+    short iFallDanger = 0;
     NearestObjects nearestObjects;
 
     std::map<int, AttentionObject*> attentionObjects;
@@ -100,7 +100,7 @@ private:
 class CSimpleAI : public CPlayerAI
 {
 public:
-    void Think(COutputControl * playerKeys);
+    void Think(COutputControl * playerKeys) override;
 
 };
 

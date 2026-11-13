@@ -1,14 +1,10 @@
 #include "WorldVehicle.h"
 
+#include "gfx.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "world.h"
 
-extern WorldMap g_worldmap;
-
-extern SDL_Surface* blitdest;
-
-extern CResourceManager* rm;
 
 WorldVehicle::WorldVehicle() :
     WorldMovingObject()

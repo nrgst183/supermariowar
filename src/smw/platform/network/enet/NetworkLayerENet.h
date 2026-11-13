@@ -14,21 +14,21 @@ class NetworkLayerENet : public NetworkLayer
         NetworkLayerENet();
         ~NetworkLayerENet();
 
-        bool init();
+        bool init() override;
 
-        bool client_restart();
-        void client_listen(NetworkEventHandler&);
-        void client_shutdown();
+        bool client_restart() override;
+        void client_listen(NetworkEventHandler&) override;
+        void client_shutdown() override;
 
-        bool gamehost_restart();
-        void gamehost_listen(NetworkEventHandler&);
-        void gamehost_shutdown();
+        bool gamehost_restart() override;
+        void gamehost_listen(NetworkEventHandler&) override;
+        void gamehost_shutdown() override;
 
-        void cleanup();
+        void cleanup() override;
 
-        bool connectToLobbyServer(const char* hostname, const uint16_t port);
-        bool connectToForeignGameHost(const char* hostname, const uint16_t port);
-        bool natPunch(uint32_t host, uint16_t port);
+        bool connectToLobbyServer(const char* hostname, const uint16_t port) override;
+        bool connectToForeignGameHost(const char* hostname, const uint16_t port) override;
+        bool natPunch(uint32_t host, uint16_t port) override;
 
     private:
         ENetHost* local_client;

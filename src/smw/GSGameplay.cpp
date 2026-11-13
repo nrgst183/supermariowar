@@ -4,6 +4,7 @@
 #include "FileList.h"
 #include "GameMode.h"
 #include "GameValues.h"
+#include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
 #include "net.h"
@@ -66,31 +67,8 @@
 #include <cassert>
 #include <cstring>
 
-#define COUNTDOWN_START_INDEX 4
+constexpr int COUNTDOWN_START_INDEX = 4;
 
-extern SDL_Surface* screen;
-extern SDL_Surface* blitdest;
-
-extern short g_iCurrentDrawIndex;
-extern CPlayer * GetPlayerFromGlobalID(short iGlobalID);
-
-extern CGM_Boss_MiniGame * bossgamemode;
-extern short currentgamemode;
-
-extern CMap* g_map;
-
-extern std::vector<CPlayer*> players;
-extern CScore* score[4];
-extern short score_cnt;
-
-extern MapList *maplist;
-extern MusicList *musiclist;
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern short x_shake;
-extern short y_shake;
 
 CObjectContainer noncolcontainer;
 CObjectContainer objectcontainer[3];
@@ -131,8 +109,6 @@ GameplayState& GameplayState::instance() {
 // THE GAME LOOP
 //-----------------------------------------------------------------------------
 
-extern void SetupScoreBoard(bool fOrderMatters);
-extern void ShowScoreBoard();
 
 constexpr SDL_Rect iCountDownNumbers[4][4][2] =
     {   {{{0, 0, 64, 64},{288, 208, 64, 64}},
@@ -253,7 +229,7 @@ short LookupTeamID(short id, short * teamID, short * subTeamID)
 
 short LookupTeamID(short id)
 {
-    return LookupTeamID(id, NULL, NULL);
+    return LookupTeamID(id, nullptr, nullptr);
 }
 
 void SDLCALL musicfinished(void*, MIX_Track*)
@@ -294,7 +270,7 @@ void GameplayState::createPlayers()
                 short teamid, subteamid;
                 LookupTeamID(iPlayer, &teamid, &subteamid);
 
-                CPlayerAI * ai = NULL;
+                CPlayerAI * ai = nullptr;
                 if (game_values.playercontrol[iPlayer] == 2)
                     ai = new CPlayerAI();
 
@@ -508,7 +484,7 @@ short CountAliveTeams(short * lastteam)
         }
     }
 
-    if (lastteam != NULL) {
+    if (lastteam != nullptr) {
         if (numteams == 1)
             *lastteam = findlastteam;
         else
@@ -924,11 +900,11 @@ void GameplayState::drawScoreboard(short iScoreTextOffset[4])
             char gameovertext[128] = "";
             if (game_values.gamemode->winningteam > -1) {
                 if (game_values.teamcounts[game_values.gamemode->winningteam] == 1)
-                    sprintf(gameovertext, "Player %d Wins!", game_values.teamids[game_values.gamemode->winningteam][0] + 1);
+                    snprintf(gameovertext, sizeof(gameovertext), "Player %d Wins!", game_values.teamids[game_values.gamemode->winningteam][0] + 1);
                 else
-                    sprintf(gameovertext, "Team %d Wins!", game_values.gamemode->winningteam + 1);
+                    snprintf(gameovertext, sizeof(gameovertext), "Team %d Wins!", game_values.gamemode->winningteam + 1);
             } else {
-                sprintf(gameovertext, "Tie Game");
+                snprintf(gameovertext, sizeof(gameovertext), "Tie Game");
             }
 
             rm->game_font_large.drawCentered(App::screenWidth/2, 90, gameovertext);
@@ -1083,9 +1059,9 @@ void GameplayState::drawScreenFade()
             if (game_values.startmodedisplay && game_values.singleplayermode == -1) {
                 char szMode[128];
                 if (game_values.gamemode->goal < 0)
-                    sprintf(szMode, "%s  %s: X", game_values.gamemode->GetModeName().c_str(), game_values.gamemode->GetGoalName().c_str());
+                    snprintf(szMode, sizeof(szMode), "%s  %s: X", game_values.gamemode->GetModeName().c_str(), game_values.gamemode->GetGoalName().c_str());
                 else
-                    sprintf(szMode, "%s  %s: %d", game_values.gamemode->GetModeName().c_str(), game_values.gamemode->GetGoalName().c_str(), game_values.gamemode->goal);
+                    snprintf(szMode, sizeof(szMode), "%s  %s: %d", game_values.gamemode->GetModeName().c_str(), game_values.gamemode->GetGoalName().c_str(), game_values.gamemode->goal);
 
                 short iMode = GetModeIconIndexFromMode(game_values.gamemode->gamemode);
 
@@ -1524,7 +1500,7 @@ void LoadMapObjects(bool fPreview)
     for (short x = 0; x < MAPWIDTH; x++) {
         for (short y = 0; y < MAPHEIGHT; y++) {
             const short typeId = g_map->objectdata[x][y].iType;
-            IO_Block* block = spawnMapBlock(typeId, {x * 32, y * 32}, g_map->objectdata[x][y], g_map->iSwitches);
+            IO_Block* block = spawnMapBlock(typeId, {static_cast<short>(x * 32), static_cast<short>(y * 32)}, g_map->objectdata[x][y], g_map->iSwitches);
             g_map->blockdata[x][y] = block;
 
             if (block)
@@ -1552,7 +1528,7 @@ void LoadMapObjects(bool fPreview)
         iCountWeight += game_values.powerupweights[iPowerup];
 
     short iThrowBoxCount = 0;
-    bool * fBoxHasCoin = NULL;
+    std::vector<bool> fBoxHasCoin;
 
     if (game_values.gamemode->gamemode == game_mode_boxes_minigame) {
         for (const MapItem& item : g_map->mapitems) {
@@ -1560,9 +1536,7 @@ void LoadMapObjects(bool fPreview)
                 iThrowBoxCount++;
         }
 
-        fBoxHasCoin = new bool[iThrowBoxCount];
-        for (short iItem = 0; iItem < iThrowBoxCount; iItem++)
-            fBoxHasCoin[iItem] = false;
+        fBoxHasCoin.assign(iThrowBoxCount, false);
 
         //Randomly choose boxes to put 5 coins in
         for (short iItem = 0; iItem < 5 && iItem < iThrowBoxCount; iItem++) {
@@ -1629,11 +1603,6 @@ void LoadMapObjects(bool fPreview)
             objectcontainer[1].add(new CO_ThrowBox(&rm->spr_throwbox, pos, iItem));
             iAddThrowBoxIndex++;
         }
-    }
-
-    if (fBoxHasCoin) {
-        delete [] fBoxHasCoin;
-        fBoxHasCoin = NULL;
     }
 
     //Set all the 1x1 gaps up so players can run across them
@@ -1882,34 +1851,6 @@ void PlayNextMusicTrack()
     rm->backgroundmusic[0].play(game_values.playnextmusic, false);
 }
 
-/*
-void secretBoss()
-{
-    //This code will help stop a game midway and load a new map and mode
-    //It was used for the secret boss mode in 1.7 AFE
-    game_values.gamemode = bossgamemode;  //boss type has already been set at this point
-    bossgamemode->SetBossType(0);
-
-    if (bossgamemode->GetBossType() == 0)
-        g_map->loadMap(convertPath("maps/special/dungeon.map"), read_type_full);
-    else if (bossgamemode->GetBossType() == 1)
-        g_map->loadMap(convertPath("maps/special/hills.map"), read_type_full);
-    else if (bossgamemode->GetBossType() == 2)
-        g_map->loadMap(convertPath("maps/special/volcano.map"), read_type_full);
-
-    LoadCurrentMapBackground();
-
-    g_map->predrawbackground(rm->spr_background, rm->spr_backmap[0]);
-    g_map->predrawforeground(rm->spr_frontmap[0]);
-
-    g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
-    g_map->predrawforeground(rm->spr_frontmap[1]);
-
-    g_map->SetupAnimatedTiles();
-    LoadMapObjects(false);
-    ///////////////////
-}
-*/
 
 #ifdef _DEBUG
 void debugAutoKillEveryone()
@@ -1939,7 +1880,7 @@ void debug_gameplay()
                 short y = (player->centerY()) / TILESIZE;
 
                 int tile = tile_flag_nonsolid;
-                IO_Block * block = NULL;
+                IO_Block * block = nullptr;
                 short blocktype = -1;
 
                 if (player->centerY() >= 0 && player->centerY() < App::screenHeight) {
@@ -1988,7 +1929,7 @@ void debug_gameplay()
                 for (short i = 0; i < 2; i++) {
                     for (short j = 0; j < 2; j++) {
                         int tile = tile_flag_nonsolid;
-                        IO_Block * block = NULL;
+                        IO_Block * block = nullptr;
                         short blocktype = -1;
 
                         if (actualvalues[0][j] >= 0 && actualvalues[0][j] < App::screenWidth && actualvalues[1][i] > 0 && actualvalues[1][i] < App::screenHeight) {
@@ -2015,25 +1956,6 @@ void debug_gameplay()
                 break;
         }
 
-#if 0
-        //Kill off players to test spawning
-        static short chooseplayer = 0;
-        static short killtimer = 0;
-        if (++killtimer > 20)
-        {
-            killtimer = 0;
-
-            if (++chooseplayer >= list_players_cnt)
-                chooseplayer = 0;
-
-            list_players[chooseplayer]->DeathAwards();
-
-            if ( !game_values.gamemode->playerkilledself(*(list_players[chooseplayer])) )
-            {
-                list_players[chooseplayer]->die(0, false);
-            }
-        }
-#endif
 
         //Automatically run menus
         if (game_values.flags.showscoreboard) {
@@ -2153,74 +2075,74 @@ void GameplayState::handleInput()
                 players[iplayer]->shield.timer = 620;
             } else if (event.key.key == SDLK_1) {
                 if (event.key.mod & (SDL_KMOD_LCTRL | SDL_KMOD_RCTRL))
-                    objectcontainer[0].add(new PU_IceWandPowerup(&rm->spr_icewandpowerup, {players[0]->leftX() + 32, players[0]->topY()}, 1, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_IceWandPowerup(&rm->spr_icewandpowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 1, 0, 30, 30, 1, 1));
                 else if (event.key.mod & (SDL_KMOD_LSHIFT | SDL_KMOD_RSHIFT))
-                    objectcontainer[0].add(new PU_BobombPowerup(&rm->spr_bobombpowerup, {players[0]->leftX() + 32, players[0]->topY() - 1}, 1, true, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_BobombPowerup(&rm->spr_bobombpowerup, {static_cast<short>(players[0]->leftX() + 32), static_cast<short>(players[0]->topY() - 1)}, 1, true, 0, 30, 30, 1, 1));
                 else
-                    objectcontainer[0].add(new PU_StarPowerup(&rm->spr_starpowerup, {players[0]->leftX() + 32, players[0]->topY()}, 4, true, 2, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_StarPowerup(&rm->spr_starpowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 4, true, 2, 30, 30, 1, 1));
             } else if (event.key.key == SDLK_2) {
                 if (event.key.mod & (SDL_KMOD_LCTRL | SDL_KMOD_RCTRL))
-                    objectcontainer[0].add(new PU_BombPowerup(&rm->spr_bombpowerup, {players[0]->leftX() + 32, players[0]->topY()}, 1, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_BombPowerup(&rm->spr_bombpowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 1, 0, 30, 30, 1, 1));
                 else if (event.key.mod & (SDL_KMOD_LSHIFT | SDL_KMOD_RSHIFT))
-                    objectcontainer[0].add(new PU_PowPowerup(&rm->spr_powpowerup, {players[0]->leftX() + 32, players[0]->topY() - 1}, 8, true, 8, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_PowPowerup(&rm->spr_powpowerup, {static_cast<short>(players[0]->leftX() + 32), static_cast<short>(players[0]->topY() - 1)}, 8, true, 8, 30, 30, 1, 1));
                 else
-                    objectcontainer[0].add(new PU_ExtraGuyPowerup(&rm->spr_1uppowerup, {players[0]->leftX() + 32, players[0]->topY()}, 1, true, 0, 30, 30, 1, 1, 1));
+                    objectcontainer[0].add(new PU_ExtraGuyPowerup(&rm->spr_1uppowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 1, true, 0, 30, 30, 1, 1, 1));
             } else if (event.key.key == SDLK_3) {
                 if (event.key.mod & (SDL_KMOD_LCTRL | SDL_KMOD_RCTRL))
-                    objectcontainer[0].add(new PU_PodoboPowerup(&rm->spr_podobopowerup, {players[0]->leftX() + 32, players[0]->topY()}, 1, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_PodoboPowerup(&rm->spr_podobopowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 1, 0, 30, 30, 1, 1));
                 else if (event.key.mod & (SDL_KMOD_LSHIFT | SDL_KMOD_RSHIFT))
-                    objectcontainer[0].add(new PU_BulletBillPowerup(&rm->spr_bulletbillpowerup, {players[0]->leftX() + 32, players[0]->topY() - 1}, 1, true, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_BulletBillPowerup(&rm->spr_bulletbillpowerup, {static_cast<short>(players[0]->leftX() + 32), static_cast<short>(players[0]->topY() - 1)}, 1, true, 0, 30, 30, 1, 1));
                 else
-                    objectcontainer[0].add(new PU_ExtraGuyPowerup(&rm->spr_2uppowerup, {players[0]->leftX() + 32, players[0]->topY()}, 1, true, 0, 30, 30, 1, 1, 2));
+                    objectcontainer[0].add(new PU_ExtraGuyPowerup(&rm->spr_2uppowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 1, true, 0, 30, 30, 1, 1, 2));
             } else if (event.key.key == SDLK_4) {
                 if (event.key.mod & (SDL_KMOD_LCTRL | SDL_KMOD_RCTRL))
-                    objectcontainer[0].add(new PU_Tanooki({players[0]->leftX() + 32, players[0]->topY()}));
+                    objectcontainer[0].add(new PU_Tanooki({static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}));
                 else if (event.key.mod & (SDL_KMOD_LSHIFT | SDL_KMOD_RSHIFT))
-                    objectcontainer[1].add(new CO_Shell(ShellType::Green, {players[0]->leftX() + 32, players[0]->topY()}, true, true, true, false));
+                    objectcontainer[1].add(new CO_Shell(ShellType::Green, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, true, true, true, false));
                 else
-                    objectcontainer[0].add(new PU_ExtraGuyPowerup(&rm->spr_3uppowerup, {players[0]->leftX() + 32, players[0]->topY()}, 1, true, 0, 30, 30, 1, 1, 3));
+                    objectcontainer[0].add(new PU_ExtraGuyPowerup(&rm->spr_3uppowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 1, true, 0, 30, 30, 1, 1, 3));
             } else if (event.key.key == SDLK_5) {
                 if (event.key.mod & (SDL_KMOD_LCTRL | SDL_KMOD_RCTRL))
-                    objectcontainer[0].add(new PU_PWingsPowerup(&rm->spr_pwingspowerup, {players[0]->leftX() + 32, players[0]->topY()}));
+                    objectcontainer[0].add(new PU_PWingsPowerup(&rm->spr_pwingspowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}));
                 else if (event.key.mod & (SDL_KMOD_LSHIFT | SDL_KMOD_RSHIFT))
-                    objectcontainer[1].add(new CO_Shell(ShellType::Red, {players[0]->leftX() + 32, players[0]->topY()}, false, true, true, false));
+                    objectcontainer[1].add(new CO_Shell(ShellType::Red, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, false, true, true, false));
                 else
-                    objectcontainer[0].add(new PU_ExtraGuyPowerup(&rm->spr_5uppowerup, {players[0]->leftX() + 32, players[0]->topY()}, 1, true, 0, 30, 30, 1, 1, 5));
+                    objectcontainer[0].add(new PU_ExtraGuyPowerup(&rm->spr_5uppowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 1, true, 0, 30, 30, 1, 1, 5));
             } else if (event.key.key == SDLK_6) {
                 if (event.key.mod & (SDL_KMOD_LCTRL | SDL_KMOD_RCTRL))
-                    objectcontainer[1].add(new CO_Spring(&rm->spr_spring, {players[0]->leftX() + 32, players[0]->topY()}, true));
+                    objectcontainer[1].add(new CO_Spring(&rm->spr_spring, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, true));
                 else if (event.key.mod & (SDL_KMOD_LSHIFT | SDL_KMOD_RSHIFT))
-                    objectcontainer[1].add(new CO_Shell(ShellType::Spiny, {players[0]->leftX() + 32, players[0]->topY()}, false, false, true, true));
+                    objectcontainer[1].add(new CO_Shell(ShellType::Spiny, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, false, false, true, true));
                 else
-                    objectcontainer[0].add(new PU_FirePowerup(&rm->spr_firepowerup, {players[0]->leftX() + 32, players[0]->topY()}, 1, true, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_FirePowerup(&rm->spr_firepowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 1, true, 0, 30, 30, 1, 1));
             } else if (event.key.key == SDLK_7) {
                 if (event.key.mod & (SDL_KMOD_LCTRL | SDL_KMOD_RCTRL))
-                    objectcontainer[1].add(new CO_ThrowBox(&rm->spr_throwbox, {players[0]->leftX() + 32, players[0]->topY()}, (RANDOM_INT(NUM_POWERUPS) + 3) - 3));
+                    objectcontainer[1].add(new CO_ThrowBox(&rm->spr_throwbox, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, (RANDOM_INT(NUM_POWERUPS) + 3) - 3));
                 else if (event.key.mod & (SDL_KMOD_LSHIFT | SDL_KMOD_RSHIFT))
-                    objectcontainer[1].add(new CO_Shell(ShellType::Buzzy, {players[0]->leftX() + 32, players[0]->topY()}, false, true, false, false));
+                    objectcontainer[1].add(new CO_Shell(ShellType::Buzzy, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, false, true, false, false));
                 else
-                    objectcontainer[0].add(new PU_HammerPowerup(&rm->spr_hammerpowerup, {players[0]->leftX() + 32, players[0]->topY()}, 1, true, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_HammerPowerup(&rm->spr_hammerpowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 1, true, 0, 30, 30, 1, 1));
             } else if (event.key.key == SDLK_8) {
                 if (event.key.mod & (SDL_KMOD_LCTRL | SDL_KMOD_RCTRL))
-                    objectcontainer[1].add(new CO_Spike(&rm->spr_spike, {players[0]->leftX() + 32, players[0]->topY()}));
+                    objectcontainer[1].add(new CO_Spike(&rm->spr_spike, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}));
                 else if (event.key.mod & (SDL_KMOD_LSHIFT | SDL_KMOD_RSHIFT))
-                    objectcontainer[0].add(new PU_ModPowerup(&rm->spr_modpowerup, {players[0]->leftX() + 32, players[0]->topY()}, 8, true, 8, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_ModPowerup(&rm->spr_modpowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 8, true, 8, 30, 30, 1, 1));
                 else
-                    objectcontainer[0].add(new PU_PoisonPowerup(&rm->spr_poisonpowerup, {players[0]->leftX() + 32, players[0]->topY()}, 1, true, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_PoisonPowerup(&rm->spr_poisonpowerup, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, 1, true, 0, 30, 30, 1, 1));
             } else if (event.key.key == SDLK_9) {
                 if (event.key.mod & (SDL_KMOD_LCTRL | SDL_KMOD_RCTRL))
-                    objectcontainer[1].add(new CO_KuriboShoe(&rm->spr_kuriboshoe, {players[0]->leftX() + 32, players[0]->topY()}, true));
+                    objectcontainer[1].add(new CO_KuriboShoe(&rm->spr_kuriboshoe, {static_cast<short>(players[0]->leftX() + 32), players[0]->topY()}, true));
                 else if (event.key.mod & (SDL_KMOD_LSHIFT | SDL_KMOD_RSHIFT))
-                    objectcontainer[0].add(new PU_FeatherPowerup(&rm->spr_featherpowerup, {players[0]->leftX() + 32, players[0]->topY() - 1}, 1, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_FeatherPowerup(&rm->spr_featherpowerup, {static_cast<short>(players[0]->leftX() + 32), static_cast<short>(players[0]->topY() - 1)}, 1, 0, 30, 30, 1, 1));
                 else
-                    objectcontainer[0].add(new PU_ClockPowerup(&rm->spr_clockpowerup, {players[0]->leftX() + 32, players[0]->topY() - 1}, 1, true, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_ClockPowerup(&rm->spr_clockpowerup, {static_cast<short>(players[0]->leftX() + 32), static_cast<short>(players[0]->topY() - 1)}, 1, true, 0, 30, 30, 1, 1));
             } else if (event.key.key == SDLK_0) {
                 if (event.key.mod & (SDL_KMOD_LCTRL | SDL_KMOD_RCTRL))
-                    objectcontainer[0].add(new PU_LeafPowerup(&rm->spr_leafpowerup, {players[0]->leftX() + 32, players[0]->topY() - 1}, 1, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_LeafPowerup(&rm->spr_leafpowerup, {static_cast<short>(players[0]->leftX() + 32), static_cast<short>(players[0]->topY() - 1)}, 1, 0, 30, 30, 1, 1));
                 else if (event.key.mod & (SDL_KMOD_LSHIFT | SDL_KMOD_RSHIFT))
-                    objectcontainer[0].add(new PU_BoomerangPowerup(&rm->spr_boomerangpowerup, {players[0]->leftX() + 32, players[0]->topY() - 1}, 1, true, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_BoomerangPowerup(&rm->spr_boomerangpowerup, {static_cast<short>(players[0]->leftX() + 32), static_cast<short>(players[0]->topY() - 1)}, 1, true, 0, 30, 30, 1, 1));
                 else
-                    objectcontainer[0].add(new PU_MysteryMushroomPowerup(&rm->spr_mysterymushroompowerup, {players[0]->leftX() + 32, players[0]->topY() - 1}, 1, true, 0, 30, 30, 1, 1));
+                    objectcontainer[0].add(new PU_MysteryMushroomPowerup(&rm->spr_mysterymushroompowerup, {static_cast<short>(players[0]->leftX() + 32), static_cast<short>(players[0]->topY() - 1)}, 1, true, 0, 30, 30, 1, 1));
             } else if (event.key.key == SDLK_F8) {
                 g_fAutoTest = !g_fAutoTest;
             }

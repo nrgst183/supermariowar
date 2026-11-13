@@ -2,19 +2,13 @@
 
 #include "Game.h"
 #include "GameValues.h"
+#include "gfx.h"
+#include "GSGameplay.h"
 #include "map.h"
 #include "MapList.h"
 #include "path.h"
 #include "ResourceManager.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-extern CMap* g_map;
-extern MapList* maplist;
-
-extern SDL_Surface* blitdest;
-
-extern short LookupTeamID(short id);
 
 namespace {
 #ifndef __EMSCRIPTEN__

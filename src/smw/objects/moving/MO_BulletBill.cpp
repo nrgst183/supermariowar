@@ -4,18 +4,12 @@
 #include "Game.h"
 #include "GameValues.h"
 #include "gfx.h"
+#include "GSGameplay.h"
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
 #include "objects/carriable/CO_ThrowBox.h"
 #include "objects/moving/MO_Explosion.h"
-
-extern CEyecandyContainer eyecandy[3];
-extern CObjectContainer objectcontainer[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern short LookupTeamID(short id);
 
 
 //------------------------------------------------------------------------------
@@ -121,7 +115,7 @@ bool MO_BulletBill::collide(CPlayer* player)
     }
 
     if (player->isInvincible() || player->shyguy) {
-        player->AddKillerAward(NULL, KillStyle::BulletBill);
+        player->AddKillerAward(nullptr, KillStyle::BulletBill);
         ifSoundOnPlay(rm->sfx_kicksound);
 
         Die();
@@ -141,9 +135,9 @@ bool MO_BulletBill::hittop(CPlayer* player)
     player->setYi(iy - PH - 1);
     player->bouncejump();
     player->collisions.checktop(*player);
-    player->platform = NULL;
+    player->platform = nullptr;
 
-    player->AddKillerAward(NULL, KillStyle::BulletBill);
+    player->AddKillerAward(nullptr, KillStyle::BulletBill);
 
     ifSoundOnPlay(rm->sfx_mip);
 
@@ -192,7 +186,7 @@ void MO_BulletBill::collide(IO_MovingObject* object)
         short iCenterX = ((ix + iOffsetX - bulletbill->ix) >> 1) + (bulletbill->ix + (bulletbill->iw >> 1));
         short iCenterY = ((iy - bulletbill->iy) >> 1) + (bulletbill->iy + (bulletbill->ih >> 1));
 
-        objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {iCenterX - 96, iCenterY - 64}, 2, 4, -1, -1, KillStyle::BulletBill));
+        objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(iCenterX - 96), static_cast<short>(iCenterY - 64)}, 2, 4, -1, -1, KillStyle::BulletBill));
         ifSoundOnPlay(rm->sfx_bobombsound);
     } else if (type == movingobject_shell || type == movingobject_throwblock || type == movingobject_throwbox || type == movingobject_attackzone || type == movingobject_explosion) {
         // Don't kill things with shells that are sitting still

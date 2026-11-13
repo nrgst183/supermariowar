@@ -405,4 +405,13 @@ class CMap
 			friend class MapReader1802;
 };
 
+// Defined in global.cpp
+extern CMap* g_map;
+void LoadCurrentMapBackground();
+
+// Defined in map.cpp
+extern short g_iCurrentDrawIndex;
+extern SDL_Rect g_rFlameRects[4][4];
+extern SDL_Rect g_rPirhanaRects[4][4][4];
+
 #endif // SMW_MAP_H

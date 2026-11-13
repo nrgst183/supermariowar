@@ -8,8 +8,6 @@
 #include "ui/MI_TourStop.h"
 #include "ui/MI_World.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
 
 UI_WorldMenu::UI_WorldMenu()
     : UI_Menu()
@@ -35,15 +33,15 @@ UI_WorldMenu::UI_WorldMenu()
     miWorldExitDialogYesButton->setVisible(false);
     miWorldExitDialogNoButton->setVisible(false);
 
-    AddControl(miWorld, NULL, NULL, NULL, NULL);
+    AddControl(miWorld, nullptr, nullptr, nullptr, nullptr);
 
-    AddControl(miWorldStop, NULL, NULL, NULL, NULL);
+    AddControl(miWorldStop, nullptr, nullptr, nullptr, nullptr);
 
     AddNonControl(miWorldExitDialogImage);
     AddNonControl(miWorldExitDialogExitTourText);
 
-    AddControl(miWorldExitDialogYesButton, NULL, NULL, NULL, miWorldExitDialogNoButton);
-    AddControl(miWorldExitDialogNoButton, NULL, NULL, miWorldExitDialogYesButton, NULL);
+    AddControl(miWorldExitDialogYesButton, nullptr, nullptr, nullptr, miWorldExitDialogNoButton);
+    AddControl(miWorldExitDialogNoButton, nullptr, nullptr, miWorldExitDialogYesButton, nullptr);
 
     setInitialFocus(miWorld);
     SetCancelCode(MENU_CODE_BACK_TEAM_SELECT_MENU);

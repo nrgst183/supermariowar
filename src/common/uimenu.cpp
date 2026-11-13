@@ -1,13 +1,10 @@
 #include "uimenu.h"
 
 #include "GameValues.h" // UI_Menu::SendInput
+#include "GSGameplay.h"
 #include "uicontrol.h"
 
 #include <cassert>
-
-extern short LookupTeamID(short id);
-
-extern CGameValues game_values;
 
 
 namespace {

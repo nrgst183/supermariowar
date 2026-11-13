@@ -7,8 +7,6 @@
 #include <format>
 #include <iostream>
 
-extern SDL_Surface * blitdest;
-extern SDL_Surface * screen;
 
 namespace {
 constexpr int ASCII_FIRST_PRINTABLE = 33;

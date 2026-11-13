@@ -5,7 +5,6 @@
 #include "GameValues.h"
 #include "player.h"
 
-extern CGameValues game_values;
 
 //------------------------------------------------------------------------------
 // class thwomp (for thwomp mode)

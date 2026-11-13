@@ -35,3 +35,6 @@ class CGM_Boss_MiniGame : public CGameMode
         short enemytimer, poweruptimer;
         Boss iBossType = Boss::Hammer;
 };
+
+// Defined in smw/main.cpp
+extern CGM_Boss_MiniGame* bossgamemode;

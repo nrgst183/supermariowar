@@ -61,6 +61,7 @@ void removeifprojectile(IO_MovingObject * object, bool playsound, bool forcedead
 #include <ctype.h>
 #include <cstring>
 #include <cstdlib>
+#include <string>
 
 #ifdef _WIN32
 	#include <windows.h>
@@ -81,22 +82,11 @@ void removeifprojectile(IO_MovingObject * object, bool playsound, bool forcedead
 #define MAPTITLESTRING "Level Editor"
 
 
-extern CMap* g_map;
-extern CTilesetManager* g_tilesetmanager;
-
-extern FiltersList *filterslist;
-extern MapList *maplist;
-
-extern CResourceManager* rm;
-extern std::string RootDataDirectory;
-
-extern CGameValues game_values;
-
 enum {EDITOR_EDIT, EDITOR_TILES, EDITOR_QUIT, SAVE_AS, FIND, CLEAR_MAP, EDITOR_BLOCKS, NEW_MAP, SAVE, EDITOR_WARP, EDITOR_EYECANDY, DISPLAY_HELP, EDITOR_PLATFORM, EDITOR_TILETYPE, EDITOR_BACKGROUNDS, EDITOR_MAPITEMS, EDITOR_ANIMATION, EDITOR_PROPERTIES, EDITOR_MODEITEMS, EDITOR_MAPHAZARDS};
 
-#define MAX_PLATFORMS 32
-#define MAX_PLATFORM_VELOCITY 16
-#define NUMTILETYPES 19
+constexpr int MAX_PLATFORMS = 32;
+constexpr int MAX_PLATFORM_VELOCITY = 16;
+constexpr int NUMTILETYPES = 19;
 constexpr int UI_PLATFORM_ROWS = 4;
 constexpr int UI_PLATFORM_COLS = 8;
 
@@ -188,7 +178,7 @@ void SDLCALL musicfinished(void*, MIX_Track* rawptr){}
 
 IO_MovingObject* createpowerup(short iType, short ix, short iy, bool side, bool spawn)
 {
-    return NULL;
+    return nullptr;
 }
 ///////
 
@@ -206,7 +196,7 @@ class MapPlatform
             SDL_SetSurfaceColorKey(preview.getSurface(), true, SDL_MapSurfaceRGB(preview.getSurface(), 255, 0, 255));
         }
 
-        SDL_FillSurfaceRect(preview.getSurface(), NULL, SDL_MapSurfaceRGB(preview.getSurface(), 255, 0, 255));
+        SDL_FillSurfaceRect(preview.getSurface(), nullptr, SDL_MapSurfaceRGB(preview.getSurface(), 255, 0, 255));
 
         for (short iPlatformX = 0; iPlatformX < MAPWIDTH; iPlatformX++) {
             for (short iPlatformY = 0; iPlatformY < MAPHEIGHT; iPlatformY++) {
@@ -323,7 +313,6 @@ short g_iNumPlatforms = 0;
 MapPlatform g_Platforms[MAX_PLATFORMS];
 
 BackgroundList *backgroundlist;
-extern const char * g_szMusicCategoryNames[MAXMUSICCATEGORY];
 short g_musiccategorydisplaytimer = 0;
 
 short g_messagedisplaytimer = 0;
@@ -367,7 +356,7 @@ int main(int argc, char *argv[])
     }
     if (cmd.show_help) {
         char title[128];
-        sprintf(title, "%s %s", TITLESTRING, MAPTITLESTRING);
+        snprintf(title, sizeof(title), "%s %s", TITLESTRING, MAPTITLESTRING);
         cmd::print_help(title, "");
         return 0;
     }
@@ -439,7 +428,7 @@ void inner_main()
 	//Add all of the maps that are world only so we can edit them
 	maplist->addWorldMaps();
 	char title[128];
-	sprintf(title, "%s %s", TITLESTRING, MAPTITLESTRING);
+	snprintf(title, sizeof(title), "%s %s", TITLESTRING, MAPTITLESTRING);
 	gfx_settitle(title);
 
 	printf("\n---------------- loading graphics ----------------\n");
@@ -770,49 +759,6 @@ int editor_edit()
 {
     init_editor_edit();
 
-	//int iTickStart = 0, iTicks = 0;
-	//int iMax = 0, iMin = 100000000, iTotal = 0;
-	//int iLoops = 0;
-	//bool fTestSwitch = false;
-
-	//maplist->next(false);
-	//maplist->next(false);
-	//maplist->next(false);
-	//maplist->next(false);
-
-		/*
-		//Code to print out map loading times (perf test map loader)
-		if (iLoops < 100)
-		{
-			iTickStart = SDL_GetTicks();
-
-			if (fTestSwitch)
-				maplist->next(false);
-			else
-				maplist->prev(false);
-
-			fTestSwitch = !fTestSwitch;
-
-			loadcurrentmap();
-
-			iTicks = SDL_GetTicks() - iTickStart;
-
-			if (iTicks > iMax)
-				iMax = iTicks;
-
-			if (iTicks < iMin)
-				iMin = iTicks;
-
-			iTotal += iTicks;
-
-			printf("%s: %d\n", maplist->currentShortmapname(), iTicks);
-
-			if (++iLoops >= 100)
-			{
-				printf("Map Load Timer - Avg: %d  Min: %d  Max: %d", iTotal / 100, iMin, iMax);
-			}
-		}
-		*/
 
         if (fExiting) {
 			//handle messages
@@ -842,7 +788,7 @@ int editor_edit()
         } else {
 			//handle messages
             while (SDL_PollEvent(&event)) {
-                const bool* keystate = SDL_GetKeyboardState(NULL);
+                const bool* keystate = SDL_GetKeyboardState(nullptr);
 
                 switch (event.type) {
                 case SDL_EVENT_QUIT:
@@ -1039,37 +985,6 @@ int editor_edit()
 
 							loadcurrentmap();
 
-							//Look for a certain tile in maps for testing
-							/*
-							bool fKeepgoing = true;
-							while (fKeepgoing)
-							{
-								do
-								{
-									maplist->next(false);
-								}
-								while (!maplist->GetValid());
-
-								loadcurrentmap();
-
-								for (short i = 0; i < MAPWIDTH; i++)
-								{
-									for (short j = 0; j < MAPHEIGHT; j++)
-									{
-										for (short k = 0; k < MAPLAYERS; k++)
-										{
-											TilesetTile tile = g_map->mapdata[i][j][k];
-
-											///if (tile.iID == 3 && tile.iRow == 28 && (tile.iCol == 3 || tile.iCol == 4))
-											if (tile.iID == 0 && tile.iRow == 0 && (tile.iCol == 0 || tile.iCol == 1))
-											{
-												fKeepgoing = false;
-											}
-										}
-									}
-								}
-							}
-							*/
 						}
 
                     if (key == SDLK_Y) {
@@ -1081,36 +996,6 @@ int editor_edit()
 							view_only_layer = !view_only_layer;
 						}
 
-	//#ifdef _DEBUG
-	#if 0
-						if (key == SDLK_HOME)
-							convertAll();
-
-						//Move map out of maps dir
-                    if (key == SDLK_F12) {
-							//printf("Path: %s\n", maplist->currentFilename());
-
-							const char * szCurrentPath = maplist->currentFilename();
-							char szNewPath[PATH_MAX];
-							strcpy(szNewPath, "maps/moved/");
-
-							const char * psz = strrchr(szCurrentPath, '/');
-
-							if (!psz)
-								psz = szCurrentPath;
-							else
-								psz++;
-
-							strcat(szNewPath, psz);
-
-							//printf("NewPath: %s\n", szNewPath);
-
-                        if (CopyFile(szCurrentPath, szNewPath, false)) {
-								_unlink(szCurrentPath);
-								maplist->SetValid(false);
-							}
-						}
-	#endif
 
 						//if (key == SDLK_END)
 							//g_map->optimize();
@@ -1461,7 +1346,7 @@ int editor_edit()
         if (maplist->isValid()) {
 			drawmap(false, TILESIZE);
         } else {
-			SDL_FillSurfaceRect(screen, NULL, 0x0);
+			SDL_FillSurfaceRect(screen, nullptr, 0x0);
 			rm->menu_font_large.drawCentered(320, 200, "Map has been deleted.");
 		}
 
@@ -1478,26 +1363,26 @@ int editor_edit()
             if (edit_mode == 0) {
 				rm->menu_font_small.draw(0,0, "Block Mode");
             } else if (edit_mode == 1 || edit_mode == 8) {
-				char modestring[128] = "";
+				std::string modestring;
 
 				if (edit_mode == 1)
-					strcpy(modestring, "Tile Mode - ");
+					modestring = "Tile Mode - ";
 				else
-					strcpy(modestring, "Animated Tile Mode - ");
+					modestring = "Animated Tile Mode - ";
 
 				if (selected_layer == 0)
-					strcat(modestring, "Bottom Background");
+					modestring += "Bottom Background";
 				else if (selected_layer == 1)
-					strcat(modestring, "Top Background");
+					modestring += "Top Background";
 				else if (selected_layer == 2)
-					strcat(modestring, "Bottom Foreground");
+					modestring += "Bottom Foreground";
 				else if (selected_layer == 3)
-					strcat(modestring, "Top Foreground");
+					modestring += "Top Foreground";
 
 				if (view_only_layer)
-					strcat(modestring, " Only");
+					modestring += " Only";
 
-				rm->menu_font_small.draw(0,0, modestring);
+				rm->menu_font_small.draw(0,0, modestring.c_str());
 
 				if (view_only_layer)
 					rm->spr_backgroundlevel.draw(2, 18 + (3 - selected_layer) * 18, {selected_layer * 16, (3 - selected_layer) * 18, 16, 16});
@@ -1628,7 +1513,7 @@ void drawlayer(int layer, bool fUseCopied, short iBlockSize)
 	//draw left to right full vertical
     for (short i = 0; i < MAPWIDTH; i++) {
         for (short j = 0; j < MAPHEIGHT; j++) {
-			TilesetTile * tile = NULL;
+			TilesetTile * tile = nullptr;
 			if ((move_mode == 1 || move_mode == 3) && i - move_offset_x >= 0 && i - move_offset_x < MAPWIDTH &&
 				j - move_offset_y >= 0 && j - move_offset_y < MAPHEIGHT &&
                     selectedtiles[i - move_offset_x][j - move_offset_y]) {
@@ -1705,7 +1590,7 @@ void drawmap(bool fScreenshot, short iBlockSize, bool fWithPlatforms)
 
 		SDL_Rect rSrc = {0, 0, iBlockSize, iBlockSize};
 
-		MapBlock * block = NULL;
+		MapBlock * block = nullptr;
         for (int j = 0; j < MAPHEIGHT; j++) {
             for (int i = 0; i < MAPWIDTH; i++) {
 				if ((move_mode == 1 || move_mode == 3) && i - move_offset_x >= 0 && i - move_offset_x < MAPWIDTH &&
@@ -1796,7 +1681,7 @@ void drawmap(bool fScreenshot, short iBlockSize, bool fWithPlatforms)
     if ((viewwarps && !view_only_layer) || fScreenshot) {
         for (int j = 0; j < MAPHEIGHT; j++) {
             for (int i = 0; i < MAPWIDTH; i++) {
-				Warp * warp = NULL;
+				Warp * warp = nullptr;
 				if ((move_mode == 1 || move_mode == 3) && i - move_offset_x >= 0 && i - move_offset_x < MAPWIDTH &&
 					j - move_offset_y >= 0 && j - move_offset_y < MAPHEIGHT &&
                         selectedtiles[i - move_offset_x][j - move_offset_y]) {
@@ -1818,15 +1703,6 @@ void drawmap(bool fScreenshot, short iBlockSize, bool fWithPlatforms)
 	if (fWithPlatforms)
 		g_map->drawPlatforms(4);
 
-	/*
-	for (int k = 0; k < g_map->numwarpexits; k++)
-	{
-		SDL_Rect rSrc = {g_map->warpexits[k].connection * TILESIZE, g_map->warpexits[k].direction * TILESIZE, TILESIZE, TILESIZE};
-		SDL_Rect rDst = {g_map->warpexits[k].x, g_map->warpexits[k].y, TILESIZE, TILESIZE};
-
-		rm->spr_warps[0].draw(rSrc, screen, rDst);
-	}
-	*/
 }
 
 SDL_Rect r;
@@ -1881,7 +1757,7 @@ int editor_warp()
         return EDITOR_WARP;
 }
 
-#define NUM_EYECANDY 7
+constexpr int NUM_EYECANDY = 7;
 const char * szEyecandyNames[NUM_EYECANDY] = {"Clouds", "Ghosts", "Leaves", "Snow", "Fish", "Rain", "Bubbles"};
 const char * szLayerNames[3] = {"Back Layer", "Mid Layer", "Top Layer"};
 int editor_eyecandy()
@@ -1898,6 +1774,7 @@ int editor_eyecandy()
 					}
 				}
 
+            [[fallthrough]];
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
                 if (event.button.button == SDL_BUTTON_LEFT) {
 						short ix = 165;
@@ -1983,7 +1860,7 @@ short * GetBlockProperty(short x, short y, short iBlockCol, short iBlockRow, sho
 		}
 	}
 
-	return NULL;
+	return nullptr;
 }
 
 short iBlockType;
@@ -2028,7 +1905,7 @@ int editor_properties(short iBlockCol, short iBlockRow)
 						else if (event.key.key == SDLK_D)
 							iValue = defaultPowerupSetting(0, iSettingIndex);
 
-                    const bool* keystate = SDL_GetKeyboardState(NULL);
+                    const bool* keystate = SDL_GetKeyboardState(nullptr);
                     if (CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT)) {
                         for (short iSetting = 0; iSetting < NUM_BLOCK_SETTINGS; iSetting++) {
 								if (event.key.key == SDLK_D)
@@ -2042,6 +1919,7 @@ int editor_properties(short iBlockCol, short iBlockRow)
 					}
 				}
 
+            [[fallthrough]];
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
 					short iHiddenCheckboxY = 0;
                 if (iBlockType == 1 || iBlockType == 15) {
@@ -2049,7 +1927,7 @@ int editor_properties(short iBlockCol, short iBlockRow)
 						short * piSetting = GetBlockProperty(event.button.x, event.button.y, iBlockCol, iBlockRow, &iSettingIndex);
 
                     if (piSetting) {
-							Uint8 iMouseState = SDL_GetMouseState(NULL, NULL);
+							Uint8 iMouseState = SDL_GetMouseState(nullptr, nullptr);
 
 							if ((event.button.button == SDL_BUTTON_RIGHT && (iMouseState & SDL_BUTTON_LMASK)) ||
                                 (event.button.button == SDL_BUTTON_LEFT && (iMouseState & SDL_BUTTON_RMASK))) {
@@ -2121,9 +1999,9 @@ int editor_properties(short iBlockCol, short iBlockRow)
 
 				char szNum[8];
 				if (fUseGame)
-					sprintf(szNum, "X");
+					snprintf(szNum, sizeof(szNum), "X");
 				else
-					sprintf(szNum, "%d", g_map->objectdata[iBlockCol][iBlockRow].iSettings[iSetting]);
+					snprintf(szNum, sizeof(szNum), "%d", g_map->objectdata[iBlockCol][iBlockRow].iSettings[iSetting]);
 
 				rm->menu_font_large.drawCentered(ix + 55, iy + 5, szNum);
 			}
@@ -2580,7 +2458,7 @@ int editor_platforms()
 								g_Platforms[iEditPlatform].types[ix * MAPHEIGHT + iy] = set_tiletype;
 							}
                     } else if (PLATFORM_EDIT_STATE_PATH == iPlatformEditState) {
-                        const bool* keystate = SDL_GetKeyboardState(NULL);
+                        const bool* keystate = SDL_GetKeyboardState(nullptr);
                         if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::Ellipse && (CheckKey(keystate, SDLK_Z) || CheckKey(keystate, SDLK_X) || CheckKey(keystate, SDLK_C))) {
 								UpdatePlatformPathRadius(iEditPlatform, event.button.x, event.button.y, CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT), CheckKey(keystate, SDLK_Z) != 0, CheckKey(keystate, SDLK_C) != 0);
                         } else {
@@ -2599,7 +2477,7 @@ int editor_platforms()
                     } else if (PLATFORM_EDIT_STATE_TILETYPE == iPlatformEditState) {
 							g_Platforms[iEditPlatform].types[ix * MAPHEIGHT + iy] = TileType::NonSolid;
                     } else if (PLATFORM_EDIT_STATE_PATH == iPlatformEditState) {
-                        const bool* keystate = SDL_GetKeyboardState(NULL);
+                        const bool* keystate = SDL_GetKeyboardState(nullptr);
                         if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::Straight) {
 								UpdatePlatformPathEnd(iEditPlatform, event.button.x, event.button.y, CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT));
                         } else if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::StraightContinuous || g_Platforms[iEditPlatform].iPathType == PlatformPathType::Ellipse) {
@@ -2608,6 +2486,7 @@ int editor_platforms()
 						}
 					}
 				}
+            [[fallthrough]];
             case SDL_EVENT_MOUSE_MOTION: {
 					bound_mouse_motion_coords();
 					short ix = bound_to_window_w(event.motion.x) / TILESIZE;
@@ -2641,14 +2520,14 @@ int editor_platforms()
 							g_Platforms[iEditPlatform].types[ix * MAPHEIGHT + iy] = TileType::NonSolid;
                 } else if (PLATFORM_EDIT_STATE_PATH == iPlatformEditState) {
                     if (event.motion.state == SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) {
-                        const bool* keystate = SDL_GetKeyboardState(NULL);
+                        const bool* keystate = SDL_GetKeyboardState(nullptr);
                         if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::Ellipse && (CheckKey(keystate, SDLK_Z) || CheckKey(keystate, SDLK_X) || CheckKey(keystate, SDLK_C))) {
                             UpdatePlatformPathRadius(iEditPlatform, event.button.x, event.button.y, CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT), CheckKey(keystate, SDLK_Z) != 0, CheckKey(keystate, SDLK_C) != 0);
                         } else {
                             UpdatePlatformPathStart(iEditPlatform, event.button.x, event.button.y, CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT));
                         }
                     } else if (event.motion.state == SDL_BUTTON_MASK(SDL_BUTTON_RIGHT)) {
-                        const bool* keystate = SDL_GetKeyboardState(NULL);
+                        const bool* keystate = SDL_GetKeyboardState(nullptr);
                         if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::Straight) {
 								UpdatePlatformPathEnd(iEditPlatform, event.button.x, event.button.y, CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT));
                         } else if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::StraightContinuous || g_Platforms[iEditPlatform].iPathType == PlatformPathType::Ellipse) {
@@ -3285,6 +3164,7 @@ int editor_maphazards()
 						}
 					}
 				}
+            [[fallthrough]];
             case SDL_EVENT_MOUSE_MOTION: {
 					bound_mouse_motion_coords();
 					short iClickX = bound_to_window_w(event.motion.x);
@@ -3468,7 +3348,7 @@ void AdjustMapHazardRadius(MapHazard * hazard, short iClickX, short iClickY)
 	if (angle < 0.0f)
 		angle += TWO_PI;
 
-    const bool* keystate = SDL_GetKeyboardState(NULL);
+    const bool* keystate = SDL_GetKeyboardState(nullptr);
     if (CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT)) {
 		float dSector = TWO_PI / 16;
 		angle += TWO_PI / 32;
@@ -3537,13 +3417,6 @@ int editor_tiles()
 {
     init_editor_tiles();
 
-	/*
-	short iCurrentTile = 0;
-	short iConvertedTile[300];
-
-	for (short iTile = 0; iTile < 300; iTile++)
-		iConvertedTile[iTile] = g_iTileConversion[iTile];
-	*/
 
 		//handle messages
         while (SDL_PollEvent(&event)) {
@@ -3713,7 +3586,7 @@ int editor_tiles()
 
 		//drawmap(false, TILESIZE);
 		//rm->menu_shade.draw(0, 0);
-		SDL_FillSurfaceRect(screen, NULL, 0xFF888888);
+		SDL_FillSurfaceRect(screen, nullptr, 0xFF888888);
 
 		SDL_Rect rectSrc;
 		rectSrc.x = view_tileset_x << 5;
@@ -3746,28 +3619,6 @@ int editor_tiles()
 				}
 			}
 		}
-		/*
-
-		//Test code to help convert old tilesets into new tilesets
-
-		rm->menu_font_small.drawRightJustified(640, 0, "%d", iCurrentTile);
-		rm->spr_OldTileSet.draw(576, 224, iCurrentTile % 20 * 32, iCurrentTile / 20 * 32, 32, 32);
-
-
-		short iTileCol = iConvertedTile[iCurrentTile] % 32;
-		short iTileRow = iConvertedTile[iCurrentTile] / 32;
-
-		if (selected_tileset == 0 && iTileCol < 16 && iTileRow < 15)
-			rm->spr_selectedtile.draw(iTileCol * 32, iTileRow * 32, 0, 0, 32, 32);
-		else if (selected_tileset == 1 && iTileCol >= 16 && iTileRow < 15)
-			rm->spr_selectedtile.draw((iTileCol - 16) * 32, iTileRow * 32, 0, 0, 32, 32);
-		else if (selected_tileset == 2 && iTileCol < 16 && iTileRow >= 15)
-			rm->spr_selectedtile.draw(iTileCol * 32, (iTileRow - 15) * 32, 0, 0, 32, 32);
-		else if (selected_tileset == 3 && iTileCol >= 16 && iTileRow >= 15)
-			rm->spr_selectedtile.draw((iTileCol - 16) * 32, (iTileRow - 15) * 32, 0, 0, 32, 32);
-
-
-		*/
 
 
 		DrawMessage();
@@ -3964,6 +3815,7 @@ int editor_modeitems()
 					}
 				}
 
+            [[fallthrough]];
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
                 if (event.button.button == SDL_BUTTON_LEFT) {
 						short iMouseX = event.button.x;
@@ -4007,7 +3859,7 @@ int editor_modeitems()
             case SDL_EVENT_MOUSE_MOTION: {
                 bound_mouse_motion_coords();
                 if (dragmodeitem >= 0 && event.motion.state == SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) {
-                    const bool* keystate = SDL_GetKeyboardState(NULL);
+                    const bool* keystate = SDL_GetKeyboardState(nullptr);
 						bool fShiftDown = CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT);
 
                     if (modeitemmode == 0) {
@@ -4048,8 +3900,8 @@ int editor_modeitems()
             } else {
                 for (short iGoal = 0; iGoal < g_map->iNumRaceGoals; iGoal++) {
 					rm->spr_racegoals.draw(g_map->racegoallocations[iGoal].x - 16, g_map->racegoallocations[iGoal].y - 18, {0, 0, 68, 54});
-					char szNum[4];
-					sprintf(szNum, "%d", iGoal + 1);
+					char szNum[16];
+					snprintf(szNum, sizeof(szNum), "%d", iGoal + 1);
 					rm->menu_font_large.drawCentered(g_map->racegoallocations[iGoal].x + 18, g_map->racegoallocations[iGoal].y + 6, szNum);
 				}
 			}
@@ -4401,7 +4253,7 @@ int editor_animation()
 
 		//drawmap(false, TILESIZE);
 		//rm->menu_shade.draw(0, 0);
-		SDL_FillSurfaceRect(screen, NULL, 0xFF888888);
+		SDL_FillSurfaceRect(screen, nullptr, 0xFF888888);
 
         for (short iCol = view_animated_tileset_x; iCol < view_animated_tileset_x + 20; iCol++) {
             for (short iRow = 0; iRow < 8; iRow++) {
@@ -4449,7 +4301,7 @@ void LoadBackgroundPage(std::array<gfxSprite, 16>& sBackgrounds, short iPage)
 
 		gfxSprite temp = ImageLoader(path).withoutColorKey().create();
 
-		SDL_FillSurfaceRect(sBackgrounds[iIndex].getSurface(), NULL, 0x0);
+		SDL_FillSurfaceRect(sBackgrounds[iIndex].getSurface(), nullptr, 0x0);
 
 		if (temp.getWidth() != 640 || temp.getHeight() != 480) {
 			printf("WARNING: Background %s is %dx%d but must be 640x480. Skipping.\n",
@@ -4672,7 +4524,7 @@ bool dialog(const char * title, const char * instructions, char * input, int inp
 							//insert character into fileName and onScreenText and increment current char
 							Uint8 key = event.key.key;
 
-                        const bool* keystate = SDL_GetKeyboardState(NULL);
+                        const bool* keystate = SDL_GetKeyboardState(nullptr);
                         if (CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT)) {
 								if (event.key.key == 45)
 									key = 95;
@@ -4905,7 +4757,7 @@ void insert_platforms_into_map()
 		float fStartX = (float)(g_Platforms[iPlatform].iStartX);
 		float fStartY = (float)(g_Platforms[iPlatform].iStartY);
 
-		MovingPlatformPath * path = NULL;
+		MovingPlatformPath * path = nullptr;
 
         if (g_Platforms[iPlatform].iPathType == PlatformPathType::Straight) {
 			float fVelocity = (float)g_Platforms[iPlatform].iVelocity * 0.26f;

@@ -7,8 +7,6 @@
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 
-extern CEyecandyContainer eyecandy[3];
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class super fireball

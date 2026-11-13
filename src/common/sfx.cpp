@@ -11,8 +11,6 @@
 
 namespace fs = std::filesystem;
 
-extern void SDLCALL musicfinished(void*, MIX_Track* rawptr);
-
 
 namespace {
 std::unique_ptr<class AudioSystem> s_audiosys;

@@ -5,8 +5,6 @@
 #include "ui/MI_PowerupSelection.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
-
 
 UI_PowerupDropRatesMenu::UI_PowerupDropRatesMenu()
     : UI_Menu()
@@ -18,7 +16,7 @@ UI_PowerupDropRatesMenu::UI_PowerupDropRatesMenu()
     miPowerupSelectionMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miPowerupSelectionMenuHeaderText = new MI_HeaderText("Item Selection Menu", 320, 5);
 
-    AddControl(miPowerupSelection, NULL, NULL, NULL, NULL);
+    AddControl(miPowerupSelection, nullptr, nullptr, nullptr, nullptr);
 
     AddNonControl(miPowerupSelectionLeftHeaderBar);
     AddNonControl(miPowerupSelectionMenuRightHeaderBar);

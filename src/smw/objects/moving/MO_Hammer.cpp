@@ -5,8 +5,6 @@
 #include "player.h"
 #include "objects/blocks/WeaponBreakableBlock.h"
 
-extern SpotlightManager spotlightManager;
-extern CGameValues game_values;
 
 //------------------------------------------------------------------------------
 // class hammer
@@ -37,7 +35,7 @@ MO_Hammer::MO_Hammer(gfxSprite* nspr, Vec2s pos, short iNumSpr, Vec2f vel, short
 
     fObjectCollidesWithMap = false;
 
-    sSpotlight = NULL;
+    sSpotlight = nullptr;
 }
 
 void MO_Hammer::update()

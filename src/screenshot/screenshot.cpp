@@ -70,7 +70,7 @@ MapPlatform g_Platforms[MAX_PLATFORMS];
 
 BackgroundList backgroundlist;
 
-char * szMapName = NULL;
+char * szMapName = nullptr;
 
 //main main main
 int main(int argc, char *argv[])
@@ -241,7 +241,7 @@ void loadmap(char * szMapFile)
 	g_map->loadMap(szMapFile, read_type_full);
 
 	char filename[128];
-	sprintf(filename, "gfx/packs/Classic/backgrounds/%s", g_map->szBackgroundFile);
+	snprintf(filename, sizeof(filename), "gfx/packs/Classic/backgrounds/%s", g_map->szBackgroundFile);
 	std::string path = convertPath(filename);
 	backgroundlist.SetCurrentName(filename);
 

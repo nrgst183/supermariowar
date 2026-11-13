@@ -27,7 +27,7 @@ public:
 
 class MapReader1500 : public MapReader {
 public:
-    virtual bool load(CMap&, BinaryFile&, ReadType);
+    virtual bool load(CMap&, BinaryFile&, ReadType) override;
 
 protected:
     virtual void read_autofilters(CMap&, BinaryFile&); // compat: autofilters disabled
@@ -43,10 +43,10 @@ protected:
 class MapReader1600 : public MapReader1500 {
 public:
     MapReader1600();
-    virtual bool load(CMap&, BinaryFile&, ReadType);
+    virtual bool load(CMap&, BinaryFile&, ReadType) override;
 
 protected:
-    virtual void read_tiles(CMap&, BinaryFile&); // tiles also contain block and warp data
+    virtual void read_tiles(CMap&, BinaryFile&) override; // tiles also contain block and warp data
     virtual void read_eyecandy(CMap&, BinaryFile&); // simple eyecandy support
     virtual bool read_spawn_areas(CMap&, BinaryFile&);
     virtual void read_warp_exits(CMap&, BinaryFile&);
@@ -68,7 +68,7 @@ public:
 class MapReader1610 : public MapReader160A {
 public:
     MapReader1610();
-    virtual bool load(CMap&, BinaryFile&, ReadType);
+    virtual bool load(CMap&, BinaryFile&, ReadType) override;
 };
 
 /*
@@ -78,14 +78,14 @@ public:
 class MapReader1700 : public MapReader1600 /* ignore 1.6 patches */ {
 public:
     MapReader1700();
-    virtual bool load(CMap&, BinaryFile&, ReadType);
+    virtual bool load(CMap&, BinaryFile&, ReadType) override;
 
 protected:
-    virtual void read_tiles(CMap&, BinaryFile&); // one-tileset mapdata
+    virtual void read_tiles(CMap&, BinaryFile&) override; // one-tileset mapdata
     virtual void set_preview_switches(CMap&, BinaryFile&); // compat: switches disabled
     virtual void read_warp_locations(CMap&, BinaryFile&);
     virtual void read_switches(CMap&, BinaryFile&); // switches stored inverted
-    virtual bool read_spawn_areas(CMap&, BinaryFile&);
+    virtual bool read_spawn_areas(CMap&, BinaryFile&) override;
 
     virtual void read_platforms(CMap&, BinaryFile&, bool preview);
     virtual std::pair<std::vector<TilesetTile>, std::vector<TileType>> read_platform_tiles(CMap&, BinaryFile&, short w, short h);
@@ -99,8 +99,8 @@ public:
     MapReader1701();
 
 protected:
-    virtual void read_background(CMap&, BinaryFile&); // background by underscore-conversion
-    virtual void read_music_category(CMap&, BinaryFile&); // music by category ID
+    virtual void read_background(CMap&, BinaryFile&) override; // background by underscore-conversion
+    virtual void read_music_category(CMap&, BinaryFile&) override; // music by category ID
 };
 
 class MapReader1702 : public MapReader1701 {
@@ -108,8 +108,8 @@ public:
     MapReader1702();
 
 protected:
-    virtual void read_autofilters(CMap& map, BinaryFile& mapfile); // 9 autofilter support
-    virtual void read_background(CMap&, BinaryFile&); // background as string
+    virtual void read_autofilters(CMap& map, BinaryFile& mapfile) override; // 9 autofilter support
+    virtual void read_background(CMap&, BinaryFile&) override; // background as string
 };
 
 /*
@@ -119,28 +119,28 @@ protected:
 class MapReader1800 : public MapReader1702 {
 public:
     MapReader1800();
-    virtual bool load(CMap&, BinaryFile&, ReadType);
+    virtual bool load(CMap&, BinaryFile&, ReadType) override;
 
 protected:
-    virtual void read_autofilters(CMap& map, BinaryFile& mapfile); // 13 autofilters
+    virtual void read_autofilters(CMap& map, BinaryFile& mapfile) override; // 13 autofilters
     virtual void read_tileset(BinaryFile&); // custom tileset support
-    virtual void read_tiles(CMap&, BinaryFile&); // multi-tileset mapdata
-    virtual void read_switches(CMap&, BinaryFile&); // switches stored as-is
+    virtual void read_tiles(CMap&, BinaryFile&) override; // multi-tileset mapdata
+    virtual void read_switches(CMap&, BinaryFile&) override; // switches stored as-is
     virtual void read_items(CMap&, BinaryFile&); // map item support
     virtual void read_hazards(CMap&, BinaryFile&); // map hazard support
-    virtual void read_warp_locations(CMap&, BinaryFile&);
+    virtual void read_warp_locations(CMap&, BinaryFile&) override;
     virtual void read_switchable_blocks(CMap&, BinaryFile&);
-    virtual bool read_spawn_areas(CMap&, BinaryFile&);
+    virtual bool read_spawn_areas(CMap&, BinaryFile&) override;
     virtual void read_extra_tiledata(CMap&, BinaryFile&);
     virtual void read_gamemode_settings(CMap&, BinaryFile&);
-    virtual void read_platforms(CMap&, BinaryFile&, bool preview);
-    virtual std::pair<std::vector<TilesetTile>, std::vector<TileType>> read_platform_tiles(CMap&, BinaryFile&, short w, short h);
+    virtual void read_platforms(CMap&, BinaryFile&, bool preview) override;
+    virtual std::pair<std::vector<TilesetTile>, std::vector<TileType>> read_platform_tiles(CMap&, BinaryFile&, short w, short h) override;
 
 private:
     short iMaxTilesetID;
-    short* translationid;
-    short* tilesetwidths;
-    short* tilesetheights;
+    std::vector<short> translationid;
+    std::vector<short> tilesetwidths;
+    std::vector<short> tilesetheights;
 };
 
 class MapReader1801 : public MapReader1800 {
@@ -153,7 +153,7 @@ public:
     MapReader1802();
 
 protected:
-    virtual void read_eyecandy(CMap&, BinaryFile&); // 3-layer eyecandy support
+    virtual void read_eyecandy(CMap&, BinaryFile&) override; // 3-layer eyecandy support
 };
 
 #endif // SMW_MAP_LOADER_H

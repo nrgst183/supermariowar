@@ -5,8 +5,6 @@
 #include "PlayerKillStyles.h"
 #include "ResourceManager.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 void PlayerOutOfArenaTimer::reset()
 {

@@ -94,4 +94,10 @@ void SetupScoreBoard(bool fOrderMatters);
 void ShowScoreBoard();
 void RemovePlayersButHighestScoring();
 
+// Defined separately by each executable (smw, the editors)
+extern CGameMode* gamemodes[GAMEMODE_LAST];
+
+// Defined in smw/main.cpp
+extern short currentgamemode;
+
 #endif // GAMEMODE_H

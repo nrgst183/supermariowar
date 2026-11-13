@@ -11,16 +11,6 @@
 
 namespace fs = std::filesystem;
 
-extern SkinList *skinlist;
-extern GraphicsList *menugraphicspacklist;
-extern GraphicsList *worldgraphicspacklist;
-extern GraphicsList *gamegraphicspacklist;
-extern SoundsList *soundpacklist;
-
-extern CTilesetManager  *g_tilesetmanager;
-
-extern CGameValues game_values;
-
 
 bool CResourceManager::LoadMenuSkin(short playerID, short skinID, short colorID, bool fLoadBothDirections)
 {

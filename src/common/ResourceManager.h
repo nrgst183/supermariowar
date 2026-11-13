@@ -356,4 +356,7 @@ public:
 
 };
 
+// Defined in global.cpp
+extern CResourceManager* rm;
+
 #endif // RESOURCE_MANAGER_H

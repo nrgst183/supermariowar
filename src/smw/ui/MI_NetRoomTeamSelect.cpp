@@ -6,10 +6,6 @@
 #include "ResourceManager.h"
 #include "ui/MI_Image.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern SkinList *skinlist;
 
 MI_NetRoomTeamSelect::MI_NetRoomTeamSelect(short x, short y, short player_id, std::function<void()>&& on_change_accepted)
     : UI_Control(x, y)

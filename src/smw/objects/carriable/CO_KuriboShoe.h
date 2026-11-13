@@ -7,7 +7,7 @@ public:
     CO_KuriboShoe(gfxSprite* nspr, Vec2s pos, bool fSticky);
 
 private:
-    void hittop(CPlayer* player);
+    void hittop(CPlayer* player) override;
 
     bool fSticky;
 };

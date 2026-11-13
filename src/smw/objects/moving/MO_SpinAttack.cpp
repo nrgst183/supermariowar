@@ -9,10 +9,6 @@
 #include "objects/carriable/CO_ThrowBlock.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-extern CPlayer* GetPlayerFromGlobalID(short iGlobalID);
-
-extern CMap* g_map;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class spin death (spinning cape or tail)
@@ -87,10 +83,10 @@ void MO_SpinAttack::update()
         if (iRight >= 20)
             iRight -= 20;
 
-        IO_Block* topleftblock = NULL;
-        IO_Block* toprightblock = NULL;
-        IO_Block* bottomleftblock = NULL;
-        IO_Block* bottomrightblock = NULL;
+        IO_Block* topleftblock = nullptr;
+        IO_Block* toprightblock = nullptr;
+        IO_Block* bottomleftblock = nullptr;
+        IO_Block* bottomrightblock = nullptr;
 
         if (iTop >= 0 && iTop < 15) {
             topleftblock = g_map->block(iLeft, iTop);

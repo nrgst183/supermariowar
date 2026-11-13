@@ -9,9 +9,6 @@
 
 #include <cstring>
 
-extern MapList *maplist;
-extern CResourceManager* rm;
-extern CObjectContainer objectcontainer[3];
 
 /**************************************
  * MI_MapField Class
@@ -55,37 +52,6 @@ MenuCodeEnum MI_MapField::SendInput(CPlayerInput * playerInput)
 {
     const SDL_Keycode iPressedKey = playerInput->iPressedKey;
 
-    /*
-    if (playerInput->iPressedKey > 0)
-    {
-        else if (playerInput->iPressedKey == SDLK_PAGEUP)
-        {
-            short iOldIndex = maplist->GetCurrent()->second->iIndex;
-            maplist->prev(true);
-
-            if (iOldIndex != maplist->GetCurrent()->second->iIndex)
-            {
-                LoadCurrentMap();
-                return MENU_CODE_MAP_CHANGED;
-            }
-
-            return MENU_CODE_NONE;
-        }
-        else if (playerInput->iPressedKey == SDLK_PAGEDOWN)
-        {
-            short iOldIndex = maplist->GetCurrent()->second->iIndex;
-            maplist->next(true);
-
-            if (iOldIndex != maplist->GetCurrent()->second->iIndex)
-            {
-                LoadCurrentMap();
-                return MENU_CODE_MAP_CHANGED;
-            }
-
-            return MENU_CODE_NONE;
-        }
-    }
-    */
 
     for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
         if (playerInput->outputControls[iPlayer].menu_right.fPressed || playerInput->outputControls[iPlayer].menu_down.fPressed) {

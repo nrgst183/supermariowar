@@ -9,8 +9,6 @@
 #include "ui/MI_Text.h"
 #include "uimenu.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
 
 namespace {
 //Rearrange display of powerups
@@ -145,47 +143,47 @@ MI_PowerupSelection::MI_PowerupSelection(short x, short y, short width, short nu
     miDialogYesButton->setVisible(false);
     miDialogNoButton->setVisible(false);
 
-    mMenu->AddControl(miOverride, NULL, miPreset, NULL, NULL);
-    mMenu->AddControl(miPreset, miOverride, miPowerupSlider[0], NULL, NULL);
+    mMenu->AddControl(miOverride, nullptr, miPreset, nullptr, nullptr);
+    mMenu->AddControl(miPreset, miOverride, miPowerupSlider[0], nullptr, nullptr);
 
     miUpArrow = new MI_Image(&rm->menu_verticalarrows, 310, 128, 20, 0, 20, 20, 1, 4, 8);
     miDownArrow = new MI_Image(&rm->menu_verticalarrows, 310, 406, 0, 0, 20, 20, 1, 4, 8);
     miUpArrow->setVisible(false);
 
     for (short iPowerup = 0; iPowerup < NUM_POWERUPS; iPowerup++) {
-        UI_Control * upcontrol = NULL;
+        UI_Control * upcontrol = nullptr;
         if (iPowerup == 0)
             upcontrol = miPreset;
         else
             upcontrol = miPowerupSlider[iPowerup - 2];
 
-        UI_Control * downcontrol = NULL;
+        UI_Control * downcontrol = nullptr;
         if (iPowerup >= NUM_POWERUPS - 2)
             downcontrol = miRestoreDefaultsButton;
         else
             downcontrol = miPowerupSlider[iPowerup + 2];
 
-        mMenu->AddControl(miPowerupSlider[iPowerup], upcontrol, downcontrol, NULL, miPowerupSlider[iPowerup + 1]);
+        mMenu->AddControl(miPowerupSlider[iPowerup], upcontrol, downcontrol, nullptr, miPowerupSlider[iPowerup + 1]);
 
         if (++iPowerup < NUM_POWERUPS) {
-            upcontrol = NULL;
+            upcontrol = nullptr;
             if (iPowerup == 1)
                 upcontrol = miPreset;
             else
                 upcontrol = miPowerupSlider[iPowerup - 2];
 
-            UI_Control * downcontrol = NULL;
+            UI_Control * downcontrol = nullptr;
             if (iPowerup >= NUM_POWERUPS - 2)
                 downcontrol = miClearButton;
             else
                 downcontrol = miPowerupSlider[iPowerup + 2];
 
-            mMenu->AddControl(miPowerupSlider[iPowerup], upcontrol, downcontrol, miPowerupSlider[iPowerup - 1], NULL);
+            mMenu->AddControl(miPowerupSlider[iPowerup], upcontrol, downcontrol, miPowerupSlider[iPowerup - 1], nullptr);
         }
     }
 
-    mMenu->AddControl(miRestoreDefaultsButton, miPowerupSlider[NUM_POWERUPS - 2], NULL, NULL, miClearButton);
-    mMenu->AddControl(miClearButton, miPowerupSlider[NUM_POWERUPS - 1], NULL, miRestoreDefaultsButton, NULL);
+    mMenu->AddControl(miRestoreDefaultsButton, miPowerupSlider[NUM_POWERUPS - 2], nullptr, nullptr, miClearButton);
+    mMenu->AddControl(miClearButton, miPowerupSlider[NUM_POWERUPS - 1], nullptr, miRestoreDefaultsButton, nullptr);
 
     //Setup positions and visible powerups
     SetupPowerupFields();
@@ -197,8 +195,8 @@ MI_PowerupSelection::MI_PowerupSelection(short x, short y, short width, short nu
     mMenu->AddNonControl(miDialogAreYouText);
     mMenu->AddNonControl(miDialogSureText);
 
-    mMenu->AddControl(miDialogYesButton, NULL, NULL, NULL, miDialogNoButton);
-    mMenu->AddControl(miDialogNoButton, NULL, NULL, miDialogYesButton, NULL);
+    mMenu->AddControl(miDialogYesButton, nullptr, nullptr, nullptr, miDialogNoButton);
+    mMenu->AddControl(miDialogNoButton, nullptr, nullptr, miDialogYesButton, nullptr);
 
     mMenu->AddNonControl(miUpArrow);
     mMenu->AddNonControl(miDownArrow);
@@ -228,7 +226,7 @@ void MI_PowerupSelection::EnablePowerupFields(bool fEnable)
         miPowerupSlider[iPowerup]->Disable(!fEnable);
     }
 
-    miPreset->setNeighbor(MenuNavDirection::Down, fEnable ? miPowerupSlider[0] : NULL);
+    miPreset->setNeighbor(MenuNavDirection::Down, fEnable ? miPowerupSlider[0] : nullptr);
 }
 
 MenuCodeEnum MI_PowerupSelection::Modify(bool modify)

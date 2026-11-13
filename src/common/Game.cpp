@@ -31,7 +31,7 @@ void ensureSettingsDir()
     const std::string smwHome = GetHomeDirectory();
 
 #if	_WIN32
-    const bool success = CreateDirectory(smwHome.c_str(), NULL) || ERROR_ALREADY_EXISTS == GetLastError();
+    const bool success = CreateDirectory(smwHome.c_str(), nullptr) || ERROR_ALREADY_EXISTS == GetLastError();
     if (!success)
         perror("[error] Could not create settings directory");
 

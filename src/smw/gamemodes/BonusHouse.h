@@ -32,3 +32,6 @@ public:
 private:
     TourStop* tsTourStop = nullptr;
 };
+
+// Defined in smw/main.cpp
+extern CGM_Bonus* bonushousemode;

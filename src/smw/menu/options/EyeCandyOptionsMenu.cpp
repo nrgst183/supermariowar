@@ -7,9 +7,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     : UI_Menu()
@@ -80,16 +77,16 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miEyeCandyOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miEyeCandyOptionsMenuHeaderText = new MI_HeaderText("Eye Candy Options Menu", 320, 5);
 
-    AddControl(miSpawnStyleField, miEyeCandyOptionsMenuBackButton, miAwardStyleField, NULL, miEyeCandyOptionsMenuBackButton);
-    AddControl(miAwardStyleField, miSpawnStyleField, miScoreStyleField, NULL, miEyeCandyOptionsMenuBackButton);
-    AddControl(miScoreStyleField, miAwardStyleField, miCrunchField, NULL, miEyeCandyOptionsMenuBackButton);
-    AddControl(miCrunchField, miScoreStyleField, miWinningCrownField, NULL, miEyeCandyOptionsMenuBackButton);
-    AddControl(miWinningCrownField, miCrunchField, miStartCountDownField, NULL, miEyeCandyOptionsMenuBackButton);
-    AddControl(miStartCountDownField, miWinningCrownField, miStartModeDisplayField, NULL, miEyeCandyOptionsMenuBackButton);
-    AddControl(miStartModeDisplayField, miStartCountDownField, miDeadTeamNoticeField, NULL, miEyeCandyOptionsMenuBackButton);
-    AddControl(miDeadTeamNoticeField, miStartModeDisplayField, miEyeCandyOptionsMenuBackButton, NULL, miEyeCandyOptionsMenuBackButton);
+    AddControl(miSpawnStyleField, miEyeCandyOptionsMenuBackButton, miAwardStyleField, nullptr, miEyeCandyOptionsMenuBackButton);
+    AddControl(miAwardStyleField, miSpawnStyleField, miScoreStyleField, nullptr, miEyeCandyOptionsMenuBackButton);
+    AddControl(miScoreStyleField, miAwardStyleField, miCrunchField, nullptr, miEyeCandyOptionsMenuBackButton);
+    AddControl(miCrunchField, miScoreStyleField, miWinningCrownField, nullptr, miEyeCandyOptionsMenuBackButton);
+    AddControl(miWinningCrownField, miCrunchField, miStartCountDownField, nullptr, miEyeCandyOptionsMenuBackButton);
+    AddControl(miStartCountDownField, miWinningCrownField, miStartModeDisplayField, nullptr, miEyeCandyOptionsMenuBackButton);
+    AddControl(miStartModeDisplayField, miStartCountDownField, miDeadTeamNoticeField, nullptr, miEyeCandyOptionsMenuBackButton);
+    AddControl(miDeadTeamNoticeField, miStartModeDisplayField, miEyeCandyOptionsMenuBackButton, nullptr, miEyeCandyOptionsMenuBackButton);
 
-    AddControl(miEyeCandyOptionsMenuBackButton, miDeadTeamNoticeField, miSpawnStyleField, miDeadTeamNoticeField, NULL);
+    AddControl(miEyeCandyOptionsMenuBackButton, miDeadTeamNoticeField, miSpawnStyleField, miDeadTeamNoticeField, nullptr);
 
     AddNonControl(miEyeCandyOptionsMenuLeftHeaderBar);
     AddNonControl(miEyeCandyOptionsMenuRightHeaderBar);

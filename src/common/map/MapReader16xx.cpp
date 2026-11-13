@@ -8,8 +8,6 @@
 
 #include <iostream>
 
-extern CTilesetManager* g_tilesetmanager;
-
 
 namespace {
 // Conversion to switch 1.6 tiles into 1.7 tiles

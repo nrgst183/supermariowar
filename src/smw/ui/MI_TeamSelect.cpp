@@ -9,10 +9,6 @@
 #include "FileList.h"
 #include "ui/MI_Image.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern SkinList *skinlist;
 
 /**************************************
  * MI_TeamSelect Class

@@ -462,20 +462,6 @@ std::optional<MusicPack> MusicPack::load(const fs::path& musicdirectory)
         }
     }
 
-/*#ifndef NDEBUG
-    printf("------ Songlist for %s ------\n", self.m_name.c_str());
-    for (size_t i = 0; i < self.m_all_songs.size(); i++) {
-        printf("%lu: %s\n", i, self.m_all_songs[i].c_str());
-    }
-    printf("\n\n");
-    for (const auto& [category, songlist] : self.m_category_songs) {
-        printf("---- %s ----\n", to_string(category).data());
-        for (size_t i = 0; i < songlist.size(); i++) {
-            const size_t file_idx = songlist[i];
-            printf("%lu: %s\n", i, self.m_all_songs[file_idx].c_str());
-        }
-    }
-#endif*/
 
     return self;
 }
@@ -681,12 +667,6 @@ std::optional<WorldMusicPack> WorldMusicPack::load(const fs::path& musicdirector
 
     file.close();
 
-/*#ifndef NDEBUG
-    printf("------ World Songlist for %s ------\n", self.m_name.c_str());
-    for (const auto& [category, song] : self.m_category_song) {
-        printf("%s: %s\n", to_string(category).data(), song.c_str());
-    }
-#endif*/
     return self;
 }
 

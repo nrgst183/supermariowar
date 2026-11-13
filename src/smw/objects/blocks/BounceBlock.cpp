@@ -11,9 +11,6 @@
 
 #include <cmath>
 
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 B_BounceBlock::B_BounceBlock(gfxSprite *nspr1, Vec2s pos, bool fHidden) :
     IO_Block(nspr1, pos)

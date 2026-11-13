@@ -6,9 +6,6 @@
 #include "player.h"
 #include "objects/blocks/WeaponBreakableBlock.h"
 
-extern CMap* g_map;
-extern CGameValues game_values;
-
 
 //------------------------------------------------------------------------------
 // class explosion (for bob-omb mode)

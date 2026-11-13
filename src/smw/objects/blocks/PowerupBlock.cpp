@@ -13,9 +13,6 @@
 
 #include <cmath>
 
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class powerup block

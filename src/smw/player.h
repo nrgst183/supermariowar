@@ -29,6 +29,7 @@
 #include "player_components/PlayerWings.h"
 
 #include <optional>
+#include <vector>
 
 using SpriteStrip = std::array<gfxSprite, PGFX_LAST>;
 
@@ -283,7 +284,7 @@ private:
 		float fx, fy;
 		float velx, vely;	//velocity on x, y axis
 		float fOldX, fOldY;
-		float fPrecalculatedY;
+		float fPrecalculatedY = 0.0f;
 		float oldvelx;
 
 		float fNewSwapX, fNewSwapY; //For moving players around during player swap effect
@@ -304,8 +305,8 @@ private:
 		short throw_star;
 
 		short extrajumps;	//true when player has used a feather jump in air (only allow one feather jump per time in air)
-		bool flying;
-		short flyingtimer;
+		bool flying = false;
+		short flyingtimer = 0;
 
 		PlayerTail tail;
 		PlayerSpinStatus spin;
@@ -538,5 +539,14 @@ private:
 		friend class PlayerWings;
 		friend class PlayerInvincibility;
 };
+
+// Defined in smw/main.cpp and separately in the editors
+extern std::vector<CPlayer*> players;
+
+// Defined in smw/main.cpp
+extern short g_iSwirlSpawnLocations[4][2][25];
+
+// Defined in player.cpp and separately in the world editor
+CPlayer* GetPlayerFromGlobalID(short iGlobalID);
 
 #endif // PLAYER_H

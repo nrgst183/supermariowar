@@ -8,10 +8,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CMap* g_map;
-extern CResourceManager* rm;
-extern CGameValues game_values;
-extern CEyecandyContainer eyecandy[3];
 
 //------------------------------------------------------------------------------
 // class flip block
@@ -77,7 +73,7 @@ void B_FlipBlock::update()
         state = 3;
     } else if (state == 3) {
         dead = true;
-        g_map->blockdata[col][row] = NULL;
+        g_map->blockdata[col][row] = nullptr;
         g_map->UpdateTileGap(col, row);
     }
 }

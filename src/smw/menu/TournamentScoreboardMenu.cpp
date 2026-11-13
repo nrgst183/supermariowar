@@ -5,7 +5,6 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_TournamentScoreboard.h"
 
-extern CResourceManager* rm;
 
 UI_TournamentScoreboardMenu::UI_TournamentScoreboardMenu()
     : UI_Menu()
@@ -19,7 +18,7 @@ UI_TournamentScoreboardMenu::UI_TournamentScoreboardMenu()
 
     AddNonControl(miTournamentScoreboard);
     AddNonControl(miTournamentScoreboardImage);
-    AddControl(miTournamentScoreboardNextButton, NULL, NULL, NULL, NULL);
+    AddControl(miTournamentScoreboardNextButton, nullptr, nullptr, nullptr, nullptr);
     setInitialFocus(miTournamentScoreboardNextButton);
     SetCancelCode(MENU_CODE_BACK_TO_GAME_SETUP_MENU);
 };

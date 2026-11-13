@@ -5,8 +5,6 @@
 
 #include <cmath>
 
-extern CResourceManager* rm;
-
 
 //------------------------------------------------------------------------------
 // class OMO Orbit Hazard - component of the fireball string or rotodisc
@@ -19,7 +17,7 @@ OMO_OrbitHazard::OMO_OrbitHazard(gfxSprite* nspr, Vec2s pos, float radius, float
     dRadius = radius;
     dVel = vel;
     dAngle = angle;
-    dCenter = {pos.x, pos.y};
+    dCenter = {static_cast<float>(pos.x), static_cast<float>(pos.y)};
 
     CalculatePosition();
 }

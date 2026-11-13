@@ -2,7 +2,22 @@
 
 #include <string.h>
 
-Blob::Blob(): data(0), size(0) {}
+Blob::Blob(): data(nullptr), size(0) {}
+
+Blob::Blob(const Blob& other): data(nullptr), size(0) {
+	if (other.data)
+		replace_with(other.data, other.size);
+}
+
+Blob& Blob::operator=(const Blob& other) {
+	if (this != &other) {
+		if (other.data)
+			replace_with(other.data, other.size);
+		else
+			free();
+	}
+	return *this;
+}
 
 Blob::~Blob() {
 	free();

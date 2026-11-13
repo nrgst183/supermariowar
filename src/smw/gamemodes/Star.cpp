@@ -9,17 +9,6 @@
 #include "Score.h"
 #include "objects/carriable/CO_Star.h"
 
-extern CScore *score[4];
-extern short score_cnt;
-
-extern CObjectContainer objectcontainer[3];
-extern CEyecandyContainer eyecandy[3];
-
-extern std::vector<CPlayer*> players;
-
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 CGM_Star::CGM_Star() : CGM_TimeLimit()
 {
@@ -52,8 +41,8 @@ void CGM_Star::init()
     }
 
     for (short iStar = 0; iStar < 3; iStar++) {
-        starItem[iStar] = NULL;
-        starPlayer[iStar] = NULL;
+        starItem[iStar] = nullptr;
+        starPlayer[iStar] = nullptr;
     }
 
     SetupMode();
@@ -66,10 +55,10 @@ void CGM_Star::SetupMode()
         if (starItem[iStar]) {
             starItem[iStar]->Drop();
             starItem[iStar]->dead = true;
-            starItem[iStar] = NULL;
+            starItem[iStar] = nullptr;
         }
 
-        starPlayer[iStar] = NULL;
+        starPlayer[iStar] = nullptr;
     }
 
     //If multi star, add more stars
@@ -145,7 +134,7 @@ void CGM_Star::think()
 
                 if (starPlayer[0]->Score().score <= 0) {
                     fDisplayTimer = !RemoveTeam(starPlayer[0]->getTeamID());
-                    starPlayer[0] = NULL;
+                    starPlayer[0] = nullptr;
                 }
             }
 
@@ -297,7 +286,7 @@ bool CGM_Star::isplayerstar(const CPlayer * player)
 
 CPlayer * CGM_Star::swapplayer(short id, CPlayer * player)
 {
-    CPlayer * oldstar = NULL;
+    CPlayer * oldstar = nullptr;
     if (starPlayer[id]) {
         oldstar = starPlayer[id];
         oldstar->Shield().turn_on();

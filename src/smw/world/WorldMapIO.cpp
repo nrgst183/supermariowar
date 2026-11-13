@@ -20,7 +20,6 @@
 #include <sys/stat.h>
 #endif
 
-extern CGameValues game_values;
 
 namespace {
 std::string_view popNext(std::list<std::string_view>& list)
@@ -365,7 +364,7 @@ bool saveWorldMap(const WorldMap& world, const std::string& szPath)
     //fprintf(file, "%d.%d.%d.%d\n\n", g_iVersion[0], g_iVersion[1], g_iVersion[2], g_iVersion[3]);
 
     fprintf(file, "#Music Category\n");
-    fprintf(file, "%d\n\n", world.GetMusicCategory());
+    fprintf(file, "%d\n\n", static_cast<int>(world.GetMusicCategory()));
 
     fprintf(file, "#Width\n");
     fprintf(file, "%d\n\n", world.getWidth());

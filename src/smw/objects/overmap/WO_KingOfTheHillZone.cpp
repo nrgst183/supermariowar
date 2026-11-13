@@ -7,10 +7,6 @@
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 
-extern std::vector<CPlayer*> players;
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 namespace {
 constexpr short iKingOfTheHillZoneLimits[4][4] = {{0, 0, 1, 2}, {0, 1, 2, 4}, {0, 2, 4, 7}, {0, 2, 5, 12}};
@@ -36,7 +32,7 @@ OMO_KingOfTheHillZone::OMO_KingOfTheHillZone(gfxSprite* nspr)
     state = 1;
 
     for (short iPlayer = 0; iPlayer < 4; iPlayer++) {
-        playersTouching[iPlayer] = NULL;
+        playersTouching[iPlayer] = nullptr;
         playersTouchingCount[iPlayer] = 0;
     }
 
@@ -130,7 +126,7 @@ void OMO_KingOfTheHillZone::update()
     }
 
     for (short iPlayer = 0; iPlayer < 4; iPlayer++) {
-        playersTouching[iPlayer] = NULL;
+        playersTouching[iPlayer] = nullptr;
         playersTouchingCount[iPlayer] = 0;
     }
 

@@ -3,8 +3,6 @@
 #include "ResourceManager.h"
 #include "ui/MI_InputControlContainer.h"
 
-extern CResourceManager* rm;
-
 
 UI_PlayerControlsMenu::UI_PlayerControlsMenu()
     : UI_Menu()
@@ -12,7 +10,7 @@ UI_PlayerControlsMenu::UI_PlayerControlsMenu()
     miInputContainer = new MI_InputControlContainer(&rm->menu_plain_field, 94, 10, 0);
     miInputContainer->SetAutoModify(true);
 
-    AddControl(miInputContainer, NULL, NULL, NULL, NULL);
+    AddControl(miInputContainer, nullptr, nullptr, nullptr, nullptr);
     setInitialFocus(miInputContainer);
     SetCancelCode(MENU_CODE_BACK_TO_CONTROLS_MENU);
 };

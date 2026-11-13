@@ -8,8 +8,6 @@
 
 #include <iostream>
 
-extern CTilesetManager* g_tilesetmanager;
-
 
 namespace {
 struct TilesetTranslation {
@@ -22,9 +20,6 @@ struct TilesetTranslation {
 MapReader1800::MapReader1800()
     : MapReader1702()
     , iMaxTilesetID(-1)
-    , translationid(NULL)
-    , tilesetwidths(NULL)
-    , tilesetheights(NULL)
 {
     patch_version = 0;
 }
@@ -57,7 +52,7 @@ void MapReader1800::read_tileset(BinaryFile& mapfile)
 
     short iNumTilesets = (short)mapfile.read_i32();
 
-    TilesetTranslation * translation = new TilesetTranslation[iNumTilesets];
+    std::vector<TilesetTranslation> translation(iNumTilesets > 0 ? iNumTilesets : 0);
 
     iMaxTilesetID = 0; //Figure out how big the translation array needs to be
     for (short iTileset = 0; iTileset < iNumTilesets; iTileset++) {
@@ -70,9 +65,9 @@ void MapReader1800::read_tileset(BinaryFile& mapfile)
         translation[iTileset].szName = mapfile.read_string_long(128);
     }
 
-    translationid = new short[iMaxTilesetID + 1];
-    tilesetwidths = new short[iMaxTilesetID + 1];
-    tilesetheights = new short[iMaxTilesetID + 1];
+    translationid.assign(iMaxTilesetID + 1, 0);
+    tilesetwidths.assign(iMaxTilesetID + 1, 0);
+    tilesetheights.assign(iMaxTilesetID + 1, 0);
 
     for (short iTileset = 0; iTileset < iNumTilesets; iTileset++) {
         short iID = translation[iTileset].iID;
@@ -86,8 +81,6 @@ void MapReader1800::read_tileset(BinaryFile& mapfile)
             tilesetheights[iID] = g_tilesetmanager->tileset(translationid[iID])->height();
         }
     }
-
-    delete [] translation;
 }
 
 void MapReader1800::read_tiles(CMap& map, BinaryFile& mapfile)
@@ -298,7 +291,7 @@ void MapReader1800::read_platforms(CMap& map, BinaryFile& mapfile, bool fPreview
 
         //printf("PathType: %d\n", iPathType);
 
-        MovingPlatformPath* path = NULL;
+        MovingPlatformPath* path = nullptr;
         path = read_platform_path_details(mapfile, iPathType, fPreview);
         if (!path)
             continue;
@@ -330,14 +323,14 @@ MapReader1800::read_platform_tiles(CMap& map, BinaryFile& mapfile, short iWidth,
                     tile.iID = 0;
 
                 //Make sure the column and row we read in is within the bounds of the tileset
-                if (tile.iCol < 0 || (tilesetwidths && tile.iCol >= tilesetwidths[tile.iID]))
+                if (tile.iCol < 0 || (!tilesetwidths.empty() && tile.iCol >= tilesetwidths[tile.iID]))
                     tile.iCol = 0;
 
-                if (tile.iRow < 0 || (tilesetheights && tile.iRow >= tilesetheights[tile.iID]))
+                if (tile.iRow < 0 || (!tilesetheights.empty() && tile.iRow >= tilesetheights[tile.iID]))
                     tile.iRow = 0;
 
                 //Convert tileset ids into the current game's tileset's ids
-                if (translationid)
+                if (!translationid.empty())
                     tile.iID = translationid[tile.iID];
             }
 
@@ -361,13 +354,6 @@ bool MapReader1800::load(CMap& map, BinaryFile& mapfile/*, const char* filename*
     map.clearPlatforms();
 
     // FIXME
-    /*cout << "loading map " << filename;
-
-    if (readtype == read_type_preview)
-        cout << " (preview)";
-
-    cout << " [Version " << version[0] << '.' << version[1] << '.'
-         << version[2] << '.' << version[3] << " Map Detected]\n";*/
 
     read_tileset(mapfile);
 
@@ -377,9 +363,9 @@ bool MapReader1800::load(CMap& map, BinaryFile& mapfile/*, const char* filename*
     read_platforms(map, mapfile, readtype == read_type_preview);
 
     //All tiles have been loaded so the translation is no longer needed
-    delete [] translationid;
-    delete [] tilesetwidths;
-    delete [] tilesetheights;
+    translationid = {};
+    tilesetwidths = {};
+    tilesetheights = {};
 
     read_items(map, mapfile);
     read_hazards(map, mapfile);

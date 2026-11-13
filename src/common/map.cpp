@@ -34,15 +34,6 @@ using std::endl;
 
 short g_iCurrentDrawIndex = 0;
 
-extern SDL_Surface* screen;
-extern SDL_Surface* blitdest;
-
-extern CGameValues game_values;
-extern CMap* g_map;
-extern CTilesetManager* g_tilesetmanager;
-extern CResourceManager* rm;
-
-extern GraphicsList* gamegraphicspacklist;
 
 //[Direction][Frame]
 SDL_Rect g_rFlameRects[4][4] = { { {0, 0, 96, 32}, {0, 32, 96, 32}, {0, 64, 96, 32}, {0, 96, 96, 32} },
@@ -457,45 +448,6 @@ CMap::~CMap()
 
 //With the new 32x30 tile set, we need to convert old maps to use the
 //correct indexes into the tile set
-/*
-void CMap::convertMap()
-{
-	int i, j, k;
-
-	bool fTilesNeedConversion = true;
-	bool fBlocksNeedConversion = true;
-
-	for (j = 0; j < MAPHEIGHT; j++)
-	{
-		for (i = 0; i < MAPWIDTH; i++)
-		{
-			for (k = 0; k < MAPLAYERS; k++)
-			{
-				//if we find an empty tile (value 960), then we already have a converted map
-				if (mapdata[i][j][k] == TILESETSIZE)
-					fTilesNeedConversion = false;
-			}
-
-			if (objectdata[i][j.iType == -1)
-				fBlocksNeedConversion = false;
-		}
-	}
-
-	if (!fTilesNeedConversion && !fBlocksNeedConversion)
-		return;
-
-	//Otherwise, convert this map
-	for (j = 0; j < MAPHEIGHT; j++)
-	{
-		for (i = 0; i < MAPWIDTH; i++)
-		{
-			for (k = 0; k < MAPLAYERS; k++)
-			{
-				mapdata[i][j][k] = g_iTileConversion[mapdata[i][j][k]];
-			}
-		}
-	}
-}*/
 
 void CMap::clearMap()
 {
@@ -578,16 +530,6 @@ void CMap::loadMap(const std::string& file, ReadType iReadType)
     mapitems.clear();
     maphazards.clear();
 
-    /*
-    cout << "loading map " << file;
-
-    if (iReadType == read_type_preview)
-    	cout << " (preview)";
-    if (iReadType == read_type_summary)
-    	cout << " (summary)";
-
-    cout << " ...";
-    */
 
     BinaryFile mapfile(file, "rb");
     if (!mapfile.is_open()) {
@@ -619,7 +561,7 @@ void CMap::loadMap(const std::string& file, ReadType iReadType)
     MapReader* reader = MapReader::getLoaderByVersion(version);
     reader->load(*this, mapfile, iReadType);
     delete reader;
-    reader = NULL;
+    reader = nullptr;
 
     if (iReadType == read_type_summary)
         return;
@@ -670,9 +612,9 @@ void CMap::SetTileGap(short i, short j)
     int topCenterTile = 0;
     int topRightTile = 0;
 
-    IO_Block * topLeftBlock = NULL;
-    IO_Block * topCenterBlock = NULL;
-    IO_Block * topRightBlock = NULL;
+    IO_Block * topLeftBlock = nullptr;
+    IO_Block * topCenterBlock = nullptr;
+    IO_Block * topRightBlock = nullptr;
 
     if (j > 0) {
         topLeftTile = tileToFlags(mapdatatop[iLeftTile][j - 1]);
@@ -873,9 +815,7 @@ void CMap::saveMap(const std::string& file)
     //Write tileset names and indexes for translation at load time
     //Number of tilesets used by this map
     short iTilesetCount = g_tilesetmanager->count();
-    bool * fTilesetUsed = new bool[iTilesetCount];
-    for (short iTileset = 0; iTileset < iTilesetCount; iTileset++)
-        fTilesetUsed[iTileset] = false;
+    std::vector<bool> fTilesetUsed(iTilesetCount > 0 ? iTilesetCount : 0, false);
 
     //Scan map to see how many tilesets were used
     for (j = 0; j < MAPHEIGHT; j++) {
@@ -916,8 +856,6 @@ void CMap::saveMap(const std::string& file)
             mapfile.write_string_long(g_tilesetmanager->tileset(iTileset)->name().c_str());
         }
     }
-
-    delete [] fTilesetUsed;
 
     //save map tiles and blocks
     for (j = 0; j < MAPHEIGHT; j++) {
@@ -1308,13 +1246,6 @@ void CMap::saveMap(const std::string& file)
 
     cout << "done" << endl;
 
-    /*
-    	//Save thumbnail
-    	std::string szSaveThumbnail("maps/cache/");
-    	szSaveThumbnail += GetNameFromFileName_STR(file);
-    	szSaveThumbnail += ".png";
-    	saveThumbnail(convertPath(szSaveThumbnail), true);
-    */
 }
 
 gfxSprite CMap::createThumbnailSurface(bool fUseClassicPack)
@@ -1597,7 +1528,7 @@ void CMap::draw(gfxSprite& targetSurface, int layer)
 
                     animatedtile->fBackgroundAnimated = false;
                     animatedtile->fForegroundAnimated = false;
-                    animatedtile->pPlatform = NULL;
+                    animatedtile->pPlatform = nullptr;
 
                     for (short iLayer = 0; iLayer < 4; iLayer++) {
                         TilesetTile * layerTile = &mapdata[i][j][iLayer];
@@ -1797,7 +1728,7 @@ void CMap::preDrawPreviewBackground(const gfxSprite& background, gfxSprite& targ
 void CMap::preDrawPreviewBlocks(gfxSprite& targetSurface, bool fThumbnail)
 {
     if (!fThumbnail) {
-        SDL_FillSurfaceRect(targetSurface.getSurface(), NULL, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
+        SDL_FillSurfaceRect(targetSurface.getSurface(), nullptr, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
         SDL_SetSurfaceColorKey(targetSurface.getSurface(), true, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
         smallDelay();
     }
@@ -1809,7 +1740,7 @@ void CMap::preDrawPreviewBlocks(gfxSprite& targetSurface, bool fThumbnail)
 void CMap::preDrawPreviewForeground(gfxSprite& targetSurface, bool fThumbnail)
 {
     if (!fThumbnail) {
-        SDL_FillSurfaceRect(targetSurface.getSurface(), NULL, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
+        SDL_FillSurfaceRect(targetSurface.getSurface(), nullptr, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
         SDL_SetSurfaceColorKey(targetSurface.getSurface(), true, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
         smallDelay();
     }
@@ -1934,27 +1865,6 @@ void CMap::predrawbackground(gfxSprite &background, gfxSprite &mapspr)
     //Add animated tile objects for each animated tile in a platform (to be used later for drawing)
     addPlatformAnimatedTiles();
 
-    /*
-    //Draws the spawn areas
-    SDL_Rect dest;
-    dest.w = 32;
-    dest.h = 32;
-    short iType = 1; //use [5] for item spawn areas
-
-    for (int m = 0; m < numspawnareas[iType]; m++)
-    {
-    	dest.x = spawnareas[iType][m].left << 5;
-    	dest.y = spawnareas[iType][m].top << 5;
-
-    	dest.w = (spawnareas[iType][m].width << 5) + TILESIZE;
-    	dest.h = (spawnareas[iType][m].height << 5) + TILESIZE;
-
-        //int color = 0x00 << 24 | RANDOM_INT(256) << 16 | RANDOM_INT(256) << 8 | RANDOM_INT(256);
-    	int color = 0x128 << 24 | 0x255 << 8;
-
-        SDL_FillSurfaceRect(mapspr.getSurface(), &dest, color);		//fill empty area with black
-    }
-    */
 }
 
 void CMap::predrawforeground(gfxSprite &foregroundspr)
@@ -1962,7 +1872,7 @@ void CMap::predrawforeground(gfxSprite &foregroundspr)
     if (SDL_MUSTLOCK(foregroundspr.getSurface()))
         SDL_LockSurface(foregroundspr.getSurface());
 
-    SDL_FillSurfaceRect(foregroundspr.getSurface(), NULL, SDL_MapSurfaceRGB(foregroundspr.getSurface(), 255, 0, 255));
+    SDL_FillSurfaceRect(foregroundspr.getSurface(), nullptr, SDL_MapSurfaceRGB(foregroundspr.getSurface(), 255, 0, 255));
     SDL_SetSurfaceColorKey(foregroundspr.getSurface(), true, SDL_MapSurfaceRGB(foregroundspr.getSurface(), 255, 0, 255));
 
     if (SDL_MUSTLOCK(foregroundspr.getSurface()))
@@ -2105,7 +2015,7 @@ void CMap::SetupAnimatedTiles()
 
             tile->fBackgroundAnimated = false;
             tile->fForegroundAnimated = false;
-            tile->pPlatform = NULL;
+            tile->pPlatform = nullptr;
 
             ++iter;
         }
@@ -2239,7 +2149,7 @@ WarpExit * CMap::getRandomWarpExit(int connection, int currentID)
     int indices[MAXWARPS];
     int numIndices = 0;
 
-    WarpExit * currentWarp = NULL;
+    WarpExit * currentWarp = nullptr;
 
     for (int k = 0; k < numwarpexits; k++) {
         if (warpexits[k].connection == connection) {
@@ -2418,24 +2328,12 @@ void CMap::drawfrontlayer()
         rm->spr_frontmap[g_iCurrentDrawIndex].draw(drawareas[k].x, drawareas[k].y, drawareas[k]);
 
     //Draw gaps in pink for debugging
-    /*
-    for (short i = 0; i < MAPHEIGHT; i++)
-    {
-    	for (short j = 0; j < MAPWIDTH; j++)
-    	{
-            if (mapdatatop[j][i].iType == TileType::gap)
-    		{
-    			SDL_Rect r = {j << 5, i << 5, TILESIZE, TILESIZE};
-    			SDL_FillSurfaceRect(blitdest, &r, SDL_MapRGB(blitdest->format, 255, 0, 255));
-    		}
-    	}
-    }*/
 }
 
 bool CMap::checkforwarp(short iData1, short iData2, short iData3, short iDirection)
 {
-    Warp * warp1 = NULL;
-    Warp * warp2 = NULL;
+    Warp * warp1 = nullptr;
+    Warp * warp2 = nullptr;
 
     if (iDirection == 0 || iDirection == 2) {
         warp1 = &warpdata[iData1][iData3];

@@ -7,10 +7,6 @@
 #include "ResourceManager.h"
 #include "objects/moving/MO_SpinAttack.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern CObjectContainer objectcontainer[3];
 
 void PlayerTail::reset() {
     iTailTimer = 0;

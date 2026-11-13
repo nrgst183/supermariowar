@@ -8,10 +8,6 @@
 #include "ResourceManager.h"
 #include "objects/carriable/CO_Shell.h"
 
-extern CObjectContainer objectcontainer[3];
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class koopa
@@ -51,7 +47,7 @@ bool MO_Koopa::hittop(CPlayer* player)
     player->setYi(iy - PH - 1);
     player->bouncejump();
     player->collisions.checktop(*player);
-    player->platform = NULL;
+    player->platform = nullptr;
 
     if (game_values.gamemode->gamemode == game_mode_stomp && !game_values.gamemode->gameover)
         player->Score().AdjustScore(1);
@@ -67,7 +63,7 @@ bool MO_Koopa::hittop(CPlayer* player)
     } else {
         dead = true;
 
-        player->AddKillerAward(NULL, KillStyle::Koopa);
+        player->AddKillerAward(nullptr, KillStyle::Koopa);
 
         DropShell(false, false);
     }

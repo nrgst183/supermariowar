@@ -5,8 +5,6 @@
 #include "ui/MI_TeamSelect.h"
 #include "ui/MI_Text.h"
 
-extern CResourceManager* rm;
-
 
 UI_TeamSelectMenu::UI_TeamSelectMenu()
     : UI_Menu()
@@ -18,7 +16,7 @@ UI_TeamSelectMenu::UI_TeamSelectMenu()
     miTeamSelectRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miTeamSelectHeaderText = new MI_HeaderText("Team and Character Selection", 320, 5);
 
-    AddControl(miTeamSelect, NULL, NULL, NULL, NULL);
+    AddControl(miTeamSelect, nullptr, nullptr, nullptr, nullptr);
 
     AddNonControl(miTeamSelectLeftHeaderBar);
     AddNonControl(miTeamSelectRightHeaderBar);

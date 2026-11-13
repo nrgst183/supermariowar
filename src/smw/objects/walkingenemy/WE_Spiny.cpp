@@ -8,10 +8,6 @@
 #include "ResourceManager.h"
 #include "objects/carriable/CO_Shell.h"
 
-extern CObjectContainer objectcontainer[3];
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class spiny
@@ -44,11 +40,11 @@ bool MO_Spiny::hittop(CPlayer* player)
         player->setYi(iy - PH - 1);
         player->bouncejump();
         player->collisions.checktop(*player);
-        player->platform = NULL;
+        player->platform = nullptr;
 
         dead = true;
 
-        player->AddKillerAward(NULL, KillStyle::Spiny);
+        player->AddKillerAward(nullptr, KillStyle::Spiny);
 
         if (game_values.gamemode->gamemode == game_mode_stomp && !game_values.gamemode->gameover)
             player->Score().AdjustScore(1);
@@ -75,7 +71,7 @@ void MO_Spiny::Die()
 void MO_Spiny::DropShell(bool fBounce, bool fFlip)
 {
     // Give the shell a state 2 so it is already spawned but sitting
-    CO_Shell* shell = new CO_Shell(ShellType::Spiny, {ix - 1, iy}, false, true, false, false);
+    CO_Shell* shell = new CO_Shell(ShellType::Spiny, {static_cast<short>(ix - 1), iy}, false, true, false, false);
     shell->nospawn(iy, fBounce);
 
     if (fFlip)

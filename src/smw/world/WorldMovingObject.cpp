@@ -93,7 +93,7 @@ void WorldMovingObject::FaceDirection(short iDirection)
 
 void WorldMovingObject::SetPosition(short iCol, short iRow)
 {
-    pos = {iCol * iTileSize, iRow * iTileSize};
+    pos = {static_cast<short>(iCol * iTileSize), static_cast<short>(iRow * iTileSize)};
     currentTile = {iCol, iRow};
     destTile = {iCol, iRow};
 

@@ -6,9 +6,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class goomba
@@ -59,7 +56,7 @@ bool MO_Goomba::hittop(CPlayer* player)
     player->setYi(iy - PH - 1);
     player->bouncejump();
     player->collisions.checktop(*player);
-    player->platform = NULL;
+    player->platform = nullptr;
 
     if (game_values.gamemode->gamemode == game_mode_stomp && !game_values.gamemode->gameover)
         player->Score().AdjustScore(1);
@@ -85,7 +82,7 @@ bool MO_Goomba::hittop(CPlayer* player)
     } else {
         dead = true;
 
-        player->AddKillerAward(NULL, killStyle);
+        player->AddKillerAward(nullptr, killStyle);
 
         eyecandy[0].emplace<EC_Corpse>(&rm->spr_goombadead, (float)(ix - collisionOffsetX), (float)(iy + collisionHeight - 32), 0);
     }

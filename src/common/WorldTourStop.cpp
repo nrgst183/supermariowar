@@ -11,10 +11,6 @@
 #include <cstdlib>
 #include <cstring>
 
-extern CGameMode * gamemodes[GAMEMODE_LAST];
-extern CGameValues game_values;
-extern MapList *maplist;
-
 
 namespace {
 constexpr const char* const DELIM_EMPTY = "";
@@ -38,7 +34,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
         if (ts.iStageType < 0 || ts.iStageType > 1)
             ts.iStageType = 0;
 
-        pszTemp = strtok(NULL, ",\n");
+        pszTemp = strtok(nullptr, ",\n");
     }
 
     ts.szBonusText[0].clear();
@@ -48,9 +44,8 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
     ts.szBonusText[4].clear();
 
     if (ts.iStageType == 0) {
-        char* szMap = new char[strlen(pszTemp) + 1];
-        strcpy(szMap, pszTemp);
-        pszTemp = strtok(NULL, ",\n");
+        const std::string szMap = pszTemp;
+        pszTemp = strtok(nullptr, ",\n");
 
         if (pszTemp)
             ts.iMode = atoi(pszTemp);
@@ -68,7 +63,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
             maplist->SaveCurrent();
 
             //If that map is not found
-            bool fMapFound = maplist->findexact(szMap, true);
+            bool fMapFound = maplist->findexact(szMap.c_str(), true);
             if (!fMapFound) {
                 if (isMinigame) {
                     //Get a bogus map name so the mode will know to load the default map
@@ -77,15 +72,13 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
                     maplist->random(false);
                     ts.pszMapFile = maplist->currentShortmapname();
                 }
-                printf("WARNING: No map file found with the name '%s'\n", szMap);
+                printf("WARNING: No map file found with the name '%s'\n", szMap.c_str());
             } else {
                 ts.pszMapFile = maplist->currentShortmapname();
             }
 
             maplist->ResumeCurrent();
         }
-
-        delete [] szMap;
 
         //The pipe minigame was using the value 24 from version 1.8.0.0 to 1.8.0.2
         //It was later switched to 1000 to accomodate new modes easily
@@ -98,7 +91,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
         if (ts.iMode < 0 || (ts.iMode >= GAMEMODE_LAST && !isMinigame))
             ts.iMode = RANDOM_INT(GAMEMODE_LAST);
 
-        pszTemp = strtok(NULL, ",\n");
+        pszTemp = strtok(nullptr, ",\n");
 
         //This gets the closest game mode to what the tour has
         ts.iGoal = -1;
@@ -117,7 +110,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
         }
 
         if (version >= Version {1, 7, 0, 2}) {
-            pszTemp = strtok(NULL, ",\n");
+            pszTemp = strtok(nullptr, ",\n");
 
             //Read in point value for tour stop
             if (pszTemp)
@@ -125,7 +118,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
             else
                 ts.iPoints = 1;
 
-            pszTemp = strtok(NULL, ",\n");
+            pszTemp = strtok(nullptr, ",\n");
 
             if (fIsWorld) {
                 ts.iBonusType = 0;
@@ -133,7 +126,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
 
                 char * pszStart = pszTemp;
 
-                while (pszStart != NULL) {
+                while (pszStart != nullptr) {
                     char * pszEnd = strstr(pszStart, "|");
                     if (pszEnd)
                         *pszEnd = 0;
@@ -167,7 +160,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
                     if (pszEnd)
                         pszStart = pszEnd + 1;
                     else
-                        pszStart = NULL;
+                        pszStart = nullptr;
                 }
             } else {
                 if (pszTemp)
@@ -176,7 +169,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
                     ts.iBonusType = 0;
             }
 
-            pszTemp = strtok(NULL, ",\n");
+            pszTemp = strtok(nullptr, ",\n");
 
             if (pszTemp) {
                 ts.szName = pszTemp;
@@ -192,7 +185,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
         if (version >= Version {1, 8, 0, 0}) {
             if (fIsWorld) {
                 //is this a world ending stage?
-                pszTemp = strtok(NULL, ",\n");
+                pszTemp = strtok(nullptr, ",\n");
 
                 if (pszTemp)
                     ts.fEndStage = pszTemp[0] == '1';
@@ -214,7 +207,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
             ts.szName = "Bonus House " + std::to_string(game_values.tourstops.size() + 1);
         }
 
-        pszTemp = strtok(NULL, ",\n");
+        pszTemp = strtok(nullptr, ",\n");
 
         short iBonusOrdering = atoi(pszTemp);
         if (iBonusOrdering < 0 || iBonusOrdering > 1)
@@ -222,12 +215,12 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
 
         ts.iBonusType = iBonusOrdering;
 
-        pszTemp = strtok(NULL, ",\n");
+        pszTemp = strtok(nullptr, ",\n");
 
         char * pszStart = pszTemp;
 
         ts.iBonusTextLines = 0;
-        while (pszStart != NULL && pszStart[0] != '-') {
+        while (pszStart != nullptr && pszStart[0] != '-') {
             char * pszEnd = strstr(pszStart, "|");
 
             if (pszEnd)
@@ -242,7 +235,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
         }
 
         ts.iNumBonuses = 0;
-        pszTemp = strtok(NULL, ",\n");
+        pszTemp = strtok(nullptr, ",\n");
         while (pszTemp) {
             ts.wsbBonuses[ts.iNumBonuses].szBonusString = pszTemp;
 
@@ -264,7 +257,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
             if (++ts.iNumBonuses >= MAX_BONUS_CHESTS)
                 break;
 
-            pszTemp = strtok(NULL, ",\n");
+            pszTemp = strtok(nullptr, ",\n");
         }
     }
 

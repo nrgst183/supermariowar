@@ -10,11 +10,6 @@
 #include "ui/MI_Text.h"
 #include "ui/MI_WorldPreviewDisplay.h"
 
-extern CGameValues game_values;
-extern CResourceManager* rm;
-
-extern TourList* tourlist;
-extern WorldList* worldlist;
 
 UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     : UI_Menu()
@@ -91,12 +86,12 @@ UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     AddNonControl(miWorldPreviewDisplay);
     AddNonControl(miMatchSelectionDisplayImage);
 
-    AddControl(miMatchSelectionField, miMatchSelectionStartButton, miTournamentField, NULL, NULL);
-    AddControl(miTournamentField, miMatchSelectionField, miTourField, NULL, NULL);
-    AddControl(miTourField, miTournamentField, miWorldField, NULL, NULL);
-    AddControl(miWorldField, miTourField, miMinigameField, NULL, NULL);
-    AddControl(miMinigameField, miWorldField, miMatchSelectionStartButton, NULL, NULL);
-    AddControl(miMatchSelectionStartButton, miMinigameField, miMatchSelectionField, NULL, NULL);
+    AddControl(miMatchSelectionField, miMatchSelectionStartButton, miTournamentField, nullptr, nullptr);
+    AddControl(miTournamentField, miMatchSelectionField, miTourField, nullptr, nullptr);
+    AddControl(miTourField, miTournamentField, miWorldField, nullptr, nullptr);
+    AddControl(miWorldField, miTourField, miMinigameField, nullptr, nullptr);
+    AddControl(miMinigameField, miWorldField, miMatchSelectionStartButton, nullptr, nullptr);
+    AddControl(miMatchSelectionStartButton, miMinigameField, miMatchSelectionField, nullptr, nullptr);
 
     setInitialFocus(miMatchSelectionStartButton);
     SetCancelCode(MENU_CODE_TO_MAIN_MENU);

@@ -6,10 +6,6 @@
 #include "ResourceManager.h"
 #include "objects/moving/MO_Coin.h"
 
-extern CObjectContainer objectcontainer[3];
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 //Coin mode:
 //Collect randomly appearing coins on map

@@ -6,11 +6,6 @@
 #include "ResourceManager.h"
 #include "gamemodes/MiniPipe.h"
 
-extern CGM_Pipe_MiniGame* pipegamemode;
-extern CEyecandyContainer eyecandy[3];
-
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class pipe powerup (for coin pipe minigame)

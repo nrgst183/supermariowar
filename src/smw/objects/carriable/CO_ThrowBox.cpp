@@ -6,10 +6,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-extern SpotlightManager spotlightManager;
-extern CEyecandyContainer eyecandy[3];
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 //------------------------------------------------------------------------------
 // class throwable box - can be used as a shield, thrown at a player, or holds items
@@ -36,7 +32,7 @@ CO_ThrowBox::CO_ThrowBox(gfxSprite* nspr, Vec2s pos, short item)
     frozentimer = 0;
     frozenanimationspeed = 8;
 
-    sSpotlight = NULL;
+    sSpotlight = nullptr;
 }
 
 bool CO_ThrowBox::collide(CPlayer* player)
@@ -64,7 +60,7 @@ bool CO_ThrowBox::collide(CPlayer* player)
     }*/
 
     // Otherwise allow them to pick this box up
-    if (owner == NULL && player->isready()) {
+    if (owner == nullptr && player->isready()) {
         if (player->AcceptItem(this)) {
             owner = player;
         }
@@ -233,8 +229,8 @@ void CO_ThrowBox::DieHelper()
     ifSoundOnPlay(rm->sfx_breakblock);
 
     if (owner) {
-        owner->carriedItem = NULL;
-        owner = NULL;
+        owner->carriedItem = nullptr;
+        owner = nullptr;
     }
 
     // Check to see if we should spawn an item here

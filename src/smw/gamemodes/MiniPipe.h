@@ -33,3 +33,6 @@ class CGM_Pipe_MiniGame : public CGameMode
 
         bool fSlowdown;
 };
+
+// Defined in smw/main.cpp
+extern CGM_Pipe_MiniGame* pipegamemode;

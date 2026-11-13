@@ -92,9 +92,9 @@ class NetGameHost : public NetworkEventHandler
         bool isActive() { return active; }
 
         // Listen to network events
-        void onConnect(NetPeer*);
-        void onReceive(NetPeer&, const uint8_t*, size_t);
-        void onDisconnect(NetPeer& client);
+        void onConnect(NetPeer*) override;
+        void onReceive(NetPeer&, const uint8_t*, size_t) override;
+        void onDisconnect(NetPeer& client) override;
 
         // P2. Join room
         void sendStartRoomMessage();
@@ -185,9 +185,9 @@ class NetClient : public NetworkEventHandler
         void setRoomListUIControl(MI_NetworkListScroll*);
 
         // Listen to network events
-        void onConnect(NetPeer*);
-        void onReceive(NetPeer&, const uint8_t*, size_t);
-        void onDisconnect(NetPeer&);
+        void onConnect(NetPeer*) override;
+        void onReceive(NetPeer&, const uint8_t*, size_t) override;
+        void onDisconnect(NetPeer&) override;
 
         // P1. Connect
         bool sendConnectRequestToSelectedServer();

@@ -9,10 +9,6 @@
 #include "objects/overmap/WO_BowserFire.h"
 #include "objects/overmap/WO_Thwomp.h"
 
-extern CObjectContainer objectcontainer[3];
-extern CResourceManager* rm;
-extern CGameValues game_values;
-
 
 //Survival Mode! - just like mario war classic, but you have
 // to dodge thwomps from the sky.  Idea from ziotok.

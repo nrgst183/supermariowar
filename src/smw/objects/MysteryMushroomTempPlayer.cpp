@@ -1,11 +1,9 @@
 #include "MysteryMushroomTempPlayer.h"
 
 #include "GameValues.h"
+#include "GSGameplay.h"
 #include "player.h"
 #include "objects/moving/MO_CarriedObject.h"
-
-extern CGameValues game_values;
-extern short scorepowerupoffsets[3][3];
 
 
 void MysteryMushroomTempPlayer::SetPlayer(CPlayer* player, short iPowerup)
@@ -31,10 +29,6 @@ void MysteryMushroomTempPlayer::SetPlayer(CPlayer* player, short iPowerup)
     // invincibletimer = player->invincibletimer;
 
     platform = player->platform;
-    // iCapeFrameX = player->iCapeFrameX;
-    // iCapeFrameY = player->iCapeFrameY;
-    // iCapeTimer = player->iCapeTimer;
-    // iCapeYOffset = player->iCapeYOffset;
 
     gamepowerup = iPowerup;
 
@@ -68,10 +62,6 @@ void MysteryMushroomTempPlayer::GetPlayer(CPlayer* player, short* iPowerup)
     // player->invincibletimer = invincibletimer;
 
     player->platform = platform;
-    // player->iCapeFrameX = iCapeFrameX;
-    // player->iCapeFrameY	= iCapeFrameY;
-    // player->iCapeTimer = iCapeTimer;
-    // player->iCapeYOffset = iCapeYOffset;
 
     *iPowerup = gamepowerup;
 

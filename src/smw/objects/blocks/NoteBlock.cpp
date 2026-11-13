@@ -10,9 +10,6 @@
 
 #include <math.h>
 
-extern CMap* g_map;
-extern CGameValues game_values;
-extern CResourceManager* rm;
 
 B_NoteBlock::B_NoteBlock(gfxSprite *nspr, Vec2s pos, short iNumSpr, short aniSpeed, NoteBlockType type, bool fHidden) :
     IO_Block(nspr, pos)
