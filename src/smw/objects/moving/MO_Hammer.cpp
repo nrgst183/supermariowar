@@ -10,7 +10,7 @@
 // class hammer
 //------------------------------------------------------------------------------
 MO_Hammer::MO_Hammer(gfxSprite* nspr, Vec2s pos, short iNumSpr, Vec2f vel, short aniSpeed, short iGlobalID, short teamID, short iColorID, bool superHammer)
-    : IO_MovingObject(nspr, pos, iNumSpr, aniSpeed, (short)nspr->getWidth() / iNumSpr, (short)nspr->getHeight() >> 2, 0, 0)
+    : IO_MovingObject(nspr, pos, iNumSpr, aniSpeed, static_cast<short>(nspr->getWidth()) / iNumSpr, static_cast<short>(nspr->getHeight()) >> 2, 0, 0)
 {
     ih = ih >> 2;
 

@@ -5,6 +5,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_Coin.h"
 #include "Score.h"
 
@@ -35,9 +36,9 @@ void CGM_Boxes_MiniGame::init()
 
     fReverseScoring = false;
 
-    for (short iScore = 0; iScore < score_cnt; iScore++) {
-        score[iScore]->SetScore(goal);
-        score[iScore]->subscore[0] = 0;
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
+        g_sim.score[iScore].SetScore(goal);
+        g_sim.score[iScore].subscore[0] = 0;
     }
 }
 
@@ -61,11 +62,11 @@ PlayerKillType CGM_Boxes_MiniGame::playerkilledplayer(CPlayer &inflictor, CPlaye
 
     if (!playedwarningsound) {
         short countscore = 0;
-        for (short k = 0; k < score_cnt; k++) {
-            if (&inflictor.Score() == score[k])
+        for (short k = 0; k < g_sim.score_cnt; k++) {
+            if (&inflictor.Score() == &g_sim.score[k])
                 continue;
 
-            countscore += score[k]->score;
+            countscore += g_sim.score[k].score;
         }
 
         if (countscore <= 2) {
@@ -94,12 +95,12 @@ PlayerKillType CGM_Boxes_MiniGame::playerkilledself(CPlayer &player, KillStyle s
     if (!playedwarningsound) {
         short countscore = 0;
         bool playwarning = false;
-        for (short j = 0; j < score_cnt; j++) {
-            for (short k = 0; k < score_cnt; k++) {
+        for (short j = 0; j < g_sim.score_cnt; j++) {
+            for (short k = 0; k < g_sim.score_cnt; k++) {
                 if (j == k)
                     continue;
 
-                countscore += score[k]->score;
+                countscore += g_sim.score[k].score;
             }
 
             if (countscore <= 2) {
@@ -156,13 +157,13 @@ void CGM_Boxes_MiniGame::ReleaseCoin(CPlayer &player)
 
         Vec2s pos(player.centerX() - 16, player.centerY() - 16);
 
-        float speed = 7.0f + (float)RANDOM_INT(9) / 2.0f;
-        float angle = -(float)RANDOM_INT(314) / 100.0f;
+        float speed = 7.0f + static_cast<float>(RANDOM_INT(9)) / 2.0f;
+        float angle = -static_cast<float>(RANDOM_INT(314)) / 100.0f;
         Vec2f vel(speed * cos(angle), speed * sin(angle));
 
         ifSoundOnPlay(rm->sfx_coin);
 
-        objectcontainer[1].add(new MO_Coin(&rm->spr_coin, vel, pos, 2, -1, 2, 30, false));
+        g_sim.objectcontainer[1].add(new MO_Coin(&rm->spr_coin, vel, pos, 2, -1, 2, 30, false));
     }
 }
 

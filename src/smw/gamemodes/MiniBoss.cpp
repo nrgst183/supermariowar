@@ -5,6 +5,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_FrenzyCard.h"
 #include "objects/moving/MO_Podobo.h"
 #include "objects/moving/MO_SledgeBrother.h"
@@ -26,19 +27,19 @@ void CGM_Boss_MiniGame::init()
 
     fReverseScoring = false;
 
-    enemytimer = (short)(RANDOM_INT(120) + 120);
+    enemytimer = static_cast<short>(RANDOM_INT(120) + 120);
     poweruptimer = 120;
 
-    for (short iScore = 0; iScore < score_cnt; iScore++)
-        score[iScore]->SetScore(goal);
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++)
+        g_sim.score[iScore].SetScore(goal);
 
-    objectcontainer[0].add(new MO_SledgeBrother(&rm->spr_sledgebrothers, (iBossType == Boss::Hammer ? 256 : (iBossType == Boss::Bomb ? 256 : App::screenWidth/2)), iBossType));
+    g_sim.objectcontainer[0].add(new MO_SledgeBrother(&rm->spr_sledgebrothers, (iBossType == Boss::Hammer ? 256 : (iBossType == Boss::Bomb ? 256 : App::screenWidth/2)), iBossType));
 }
 
 
 void CGM_Boss_MiniGame::think()
 {
-    if (!gameover && players.size() == 0) {
+    if (!gameover && g_sim.players.size() == 0) {
         gameover = true;
 
         if (game_values.music) {
@@ -57,23 +58,23 @@ void CGM_Boss_MiniGame::think()
         if (iBossType == Boss::Hammer) {
             //Randomly spawn koopas
             if (--enemytimer <= 0) {
-                objectcontainer[0].add(new MO_Koopa(&rm->spr_koopa, RANDOM_BOOL(), false, false, true));
-                enemytimer = (short)RANDOM_INT(120) + 120;  //Spawn koopas slowly
+                g_sim.objectcontainer[0].add(new MO_Koopa(&rm->spr_koopa, RANDOM_BOOL(), false, false, true));
+                enemytimer = static_cast<short>(RANDOM_INT(120)) + 120;  //Spawn koopas slowly
             }
         } else if (iBossType == Boss::Bomb) {
 
         } else if (iBossType == Boss::Fire) {
             //Only create podobos if the difficulty is moderate or greater
             if (--enemytimer <= 0 && game_values.gamemodesettings.boss.difficulty >= 2) {
-                objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {(short)RANDOM_INT(App::screenWidth * 0.95f), App::screenHeight}, -(float(RANDOM_INT(9)) / 2.0f) - 9.0f, -1, -1, -1, false));
-                enemytimer = (short)(RANDOM_INT(80) + 60);
+                g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {static_cast<short>(RANDOM_INT(App::screenWidth * 0.95f)), App::screenHeight}, -(float(RANDOM_INT(9)) / 2.0f) - 9.0f, -1, -1, -1, false));
+                enemytimer = static_cast<short>(RANDOM_INT(80) + 60);
             }
 
             if (--poweruptimer <= 0) {
-                poweruptimer = (short)(RANDOM_INT(80) + 60);
+                poweruptimer = static_cast<short>(RANDOM_INT(80) + 60);
 
-                if (objectcontainer[1].countTypes(object_frenzycard) < players.size()) {
-                    objectcontainer[1].add(new MO_FrenzyCard(&rm->spr_frenzycards, 0));
+                if (g_sim.objectcontainer[1].countTypes(object_frenzycard) < g_sim.players.size()) {
+                    g_sim.objectcontainer[1].add(new MO_FrenzyCard(&rm->spr_frenzycards, 0));
                 }
             }
         }
@@ -108,8 +109,8 @@ PlayerKillType CGM_Boss_MiniGame::playerkilledplayer(CPlayer &inflictor, CPlayer
 
         if (!playedwarningsound) {
             short countscore = 0;
-            for (short k = 0; k < score_cnt; k++)
-                countscore += score[k]->score;
+            for (short k = 0; k < g_sim.score_cnt; k++)
+                countscore += g_sim.score[k].score;
 
             if (countscore <= 2)
                 playwarningsound();
@@ -133,8 +134,8 @@ PlayerKillType CGM_Boss_MiniGame::playerkilledself(CPlayer &player, KillStyle st
 
         if (!playedwarningsound) {
             short countscore = 0;
-            for (short k = 0; k < score_cnt; k++)
-                countscore += score[k]->score;
+            for (short k = 0; k < g_sim.score_cnt; k++)
+                countscore += g_sim.score[k].score;
 
             if (countscore <= 2)
                 playwarningsound();
@@ -162,11 +163,11 @@ bool CGM_Boss_MiniGame::SetWinner(CPlayer * player)
 
     RemovePlayersButTeam(winningteam);
 
-    for (short iScore = 0; iScore < score_cnt; iScore++) {
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
         if (winningteam == iScore)
             continue;
 
-        score[iScore]->SetScore(0);
+        g_sim.score[iScore].SetScore(0);
     }
 
     SetupScoreBoard(false);

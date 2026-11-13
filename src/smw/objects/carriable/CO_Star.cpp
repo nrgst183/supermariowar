@@ -43,7 +43,7 @@ bool CO_Star::collide(CPlayer* player)
     if (game_values.gamemode->gamemode != game_mode_star)
         return false;
 
-    CGM_Star* starmode = (CGM_Star*)game_values.gamemode;
+    CGM_Star* starmode = static_cast<CGM_Star*>(game_values.gamemode);
 
     timer = 0;
     if (owner == nullptr && player->isready()) {
@@ -112,7 +112,7 @@ void CO_Star::placeStar()
     if (game_values.gamemode->gamemode != game_mode_star)
         return;
 
-    CGM_Star* starmode = (CGM_Star*)game_values.gamemode;
+    CGM_Star* starmode = static_cast<CGM_Star*>(game_values.gamemode);
 
     timer = 0;
 

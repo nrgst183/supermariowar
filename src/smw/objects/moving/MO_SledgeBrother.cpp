@@ -8,6 +8,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "gamemodes/MiniBoss.h"
 #include "objects/carriable/CO_Bomb.h"
 #include "objects/carriable/CO_ThrowBox.h"
@@ -159,7 +160,7 @@ void MO_SledgeBrother::update()
                 short numThwomps = RANDOM_INT(5) + 6;
 
                 for (short iThwomp = 0; iThwomp < numThwomps; iThwomp++) {
-                    objectcontainer[2].add(new OMO_Thwomp(&rm->spr_thwomp, (short)(RANDOM_INT(591)), 2.0f + (float)(RANDOM_INT(20)) / 10.0f));
+                    g_sim.objectcontainer[2].add(new OMO_Thwomp(&rm->spr_thwomp, static_cast<short>(RANDOM_INT(591)), 2.0f + static_cast<float>(RANDOM_INT(20)) / 10.0f));
                 }
 
             } else if (iType == 2) {
@@ -169,7 +170,7 @@ void MO_SledgeBrother::update()
                 short numPodobos = RANDOM_INT(5) + 8;
 
                 for (short iPodobo = 0; iPodobo < numPodobos; iPodobo++) {
-                    objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {(short)(RANDOM_INT(608)), App::screenHeight}, -(float(RANDOM_INT(9)) / 2.0f) - 9.0f, -1, -1, -1, false));
+                    g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {static_cast<short>(RANDOM_INT(608)), App::screenHeight}, -(float(RANDOM_INT(9)) / 2.0f) - 9.0f, -1, -1, -1, false));
                 }
             }
         }
@@ -327,16 +328,16 @@ void MO_SledgeBrother::throwprojectile()
     arm_offset_x = 96;
 
     if (iType == 0) {
-        float fHammerVelX = ((float)(RANDOM_INT(9) + 2)) / 2.0f - (face_right ? 0.0f : 6.0f);
-        objectcontainer[2].add(new MO_SledgeHammer(&rm->spr_sledgehammer, {static_cast<short>((face_right ? ix + 32 : ix) - collisionOffsetX), iy}, 8, {fHammerVelX, -HAMMERTHROW}, 5, -1, -1, -1, false));
+        float fHammerVelX = (static_cast<float>(RANDOM_INT(9) + 2)) / 2.0f - (face_right ? 0.0f : 6.0f);
+        g_sim.objectcontainer[2].add(new MO_SledgeHammer(&rm->spr_sledgehammer, {static_cast<short>((face_right ? ix + 32 : ix) - collisionOffsetX), iy}, 8, {fHammerVelX, -HAMMERTHROW}, 5, -1, -1, -1, false));
     } else if (iType == 1) {
-        float fBombVelX = ((float)(RANDOM_INT(5) + 12)) / 2.0f - (face_right ? 0.0f : 14.0f);
-        float fBombVelY = -(float)(RANDOM_INT(13)) / 2.0f - 6.0f;
-        objectcontainer[2].add(new CO_Bomb(&rm->spr_bomb, {static_cast<short>(face_right ? ix + iw - 32 : ix - 20), iy}, {fBombVelX, fBombVelY}, 4, -1, -1, -1, RANDOM_INT(60) + 120));
+        float fBombVelX = (static_cast<float>(RANDOM_INT(5) + 12)) / 2.0f - (face_right ? 0.0f : 14.0f);
+        float fBombVelY = -static_cast<float>(RANDOM_INT(13)) / 2.0f - 6.0f;
+        g_sim.objectcontainer[2].add(new CO_Bomb(&rm->spr_bomb, {static_cast<short>(face_right ? ix + iw - 32 : ix - 20), iy}, {fBombVelX, fBombVelY}, 4, -1, -1, -1, RANDOM_INT(60) + 120));
     } else if (iType == 2) {
-        float fFireVelX = ((float)(RANDOM_INT(9) + 6)) / 2.0f - (face_right ? 0.0f : 10.0f);
-        float fFireVelY = (float)(RANDOM_INT(17)) / 2.0f - 4.0f;
-        objectcontainer[2].add(new MO_SuperFireball(&rm->spr_superfireball, {static_cast<short>(face_right ? ix + iw - 32 : ix - 16), iy}, 4, {fFireVelX, fFireVelY}, 4, -1, -1, -1));
+        float fFireVelX = (static_cast<float>(RANDOM_INT(9) + 6)) / 2.0f - (face_right ? 0.0f : 10.0f);
+        float fFireVelY = static_cast<float>(RANDOM_INT(17)) / 2.0f - 4.0f;
+        g_sim.objectcontainer[2].add(new MO_SuperFireball(&rm->spr_superfireball, {static_cast<short>(face_right ? ix + iw - 32 : ix - 16), iy}, 4, {fFireVelX, fFireVelY}, 4, -1, -1, -1));
     }
 
     need_action[1] = 0;
@@ -354,7 +355,7 @@ void MO_SledgeBrother::taunt()
 
     // If this is a bomb brother, push bombs away when taunting
     if (iType == 1) {
-        pushBombs(objectcontainer[2], ix + 32, iy + 32);
+        pushBombs(g_sim.objectcontainer[2], ix + 32, iy + 32);
     }
 }
 
@@ -380,7 +381,7 @@ void MO_SledgeBrother::wait(short min, short max)
 {
     SetLastAction(2);
 
-    wait_timer = RandomNumberGenerator::generator().getInteger(min, max);
+    wait_timer = RandomNumberGenerator::gameplay().getInteger(min, max);
     iActionState = 1;
 
     need_action[3] = 0;
@@ -396,7 +397,7 @@ bool MO_SledgeBrother::collide(CPlayer* player)
         Die();
 
         if (game_values.gamemode->gamemode == game_mode_boss_minigame) {
-            ((CGM_Boss_MiniGame*)game_values.gamemode)->SetWinner(player);
+            (static_cast<CGM_Boss_MiniGame*>(game_values.gamemode))->SetWinner(player);
         }
     } else {
         return hit(player);
@@ -440,7 +441,7 @@ void MO_SledgeBrother::collide(IO_MovingObject* object)
             return;
 
         // If it is a throw box but is sitting, dont' collide
-        if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity())
+        if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity())
             return;
 
         if (fDamageWeapon) {
@@ -478,7 +479,7 @@ void MO_SledgeBrother::Damage(short playerID)
             Die();
 
             if (game_values.gamemode->gamemode == game_mode_boss_minigame) {
-                ((CGM_Boss_MiniGame*)game_values.gamemode)->SetWinner(killer);
+                (static_cast<CGM_Boss_MiniGame*>(game_values.gamemode))->SetWinner(killer);
             }
         } else {
             hit_timer = 60;

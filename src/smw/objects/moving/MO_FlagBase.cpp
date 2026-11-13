@@ -7,6 +7,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/carriable/CO_Flag.h"
 
 #include <cmath>
@@ -29,9 +30,9 @@ MO_FlagBase::MO_FlagBase(gfxSprite* nspr, short iTeamID, short iColorID)
     teamID = iTeamID;
     iGraphicOffsetX = iColorID * 48;
 
-    angle = (float)(RANDOM_INT(1000) * 0.00628f);
-    anglechange = (float)(RANDOM_INT(100) * 0.0002f);
-    anglechangetimer = (short)(RANDOM_INT(50) + 100);
+    angle = static_cast<float>(RANDOM_INT(1000) * 0.00628f);
+    anglechange = static_cast<float>(RANDOM_INT(100) * 0.0002f);
+    anglechangetimer = static_cast<short>(RANDOM_INT(50) + 100);
 
     velx = sin(angle);
     vely = cos(angle);
@@ -40,7 +41,7 @@ MO_FlagBase::MO_FlagBase(gfxSprite* nspr, short iTeamID, short iColorID)
 
     placeFlagBase(true);
 
-    speed = (float)game_values.gamemodesettings.flag.speed / 4.0f;
+    speed = static_cast<float>(game_values.gamemodesettings.flag.speed) / 4.0f;
 
     timer = 0;
 
@@ -50,7 +51,7 @@ MO_FlagBase::MO_FlagBase(gfxSprite* nspr, short iTeamID, short iColorID)
 bool MO_FlagBase::collide(CPlayer* player)
 {
     if (teamID == player->teamID && player->carriedItem && player->carriedItem->getMovingObjectType() == movingobject_flag) {
-        CO_Flag* flag = (CO_Flag*)player->carriedItem;
+        CO_Flag* flag = static_cast<CO_Flag*>(player->carriedItem);
         scoreFlag(flag, player);
         timer = 0;
     }
@@ -68,8 +69,8 @@ void MO_FlagBase::update()
 {
     if (game_values.gamemodesettings.flag.speed > 0) {
         if (--anglechangetimer <= 0) {
-            anglechange = (float)((RANDOM_INT(101) - 50) * 0.0002f);
-            anglechangetimer = (short)(RANDOM_INT(50) + 100);
+            anglechange = static_cast<float>((RANDOM_INT(101) - 50) * 0.0002f);
+            anglechangetimer = static_cast<short>(RANDOM_INT(50) + 100);
         }
 
         angle += anglechange;
@@ -83,13 +84,13 @@ void MO_FlagBase::update()
         if (ix < 0) {
             velx = -velx;
             ix = 0;
-            fx = (float)ix;
+            fx = static_cast<float>(ix);
 
             angle = atan2(velx, vely);
         } else if (ix + collisionWidth >= App::screenWidth) {
             velx = -velx;
             ix = App::screenWidth - 1 - collisionWidth;
-            fx = (float)ix;
+            fx = static_cast<float>(ix);
 
             angle = atan2(velx, vely);
         }
@@ -97,13 +98,13 @@ void MO_FlagBase::update()
         if (iy < 0) {
             vely = -vely;
             iy = 0;
-            fy = (float)iy;
+            fy = static_cast<float>(iy);
 
             angle = atan2(velx, vely);
         } else if (iy + collisionHeight >= App::screenHeight) {
             vely = -vely;
             iy = App::screenHeight - 1 - collisionHeight;
-            fy = (float)iy;
+            fy = static_cast<float>(iy);
 
             angle = atan2(velx, vely);
         }
@@ -123,7 +124,7 @@ void MO_FlagBase::placeFlagBase(bool fInit)
         y = g_map->flagbaselocations[teamID].y;
     } else {
         short iAttempts = 32;
-        while ((!g_map->findspawnpoint(5, &x, &y, collisionWidth, collisionHeight, false) || objectcontainer[1].getClosestMovingObject(x, y, movingobject_flagbase) < 200.0f)
+        while ((!g_map->findspawnpoint(5, &x, &y, collisionWidth, collisionHeight, false) || g_sim.objectcontainer[1].getClosestMovingObject(x, y, movingobject_flagbase) < 200.0f)
             && iAttempts-- > 0)
             ;
     }
@@ -135,7 +136,7 @@ void MO_FlagBase::placeFlagBase(bool fInit)
 void MO_FlagBase::collide(IO_MovingObject* object)
 {
     if (object->getMovingObjectType() == movingobject_flag) {
-        CO_Flag* flag = (CO_Flag*)object;
+        CO_Flag* flag = static_cast<CO_Flag*>(object);
         CPlayer* player = flag->owner_throw;
 
         if (player) {

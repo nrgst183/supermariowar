@@ -37,8 +37,8 @@ CObject::CObject(gfxSprite* nspr1, Vec2s pos)
     setYi(pos.y);
 
     if (spr) {
-        iw = (short)spr->getWidth();
-        ih = (short)spr->getHeight();
+        iw = static_cast<short>(spr->getWidth());
+        ih = static_cast<short>(spr->getHeight());
     }
 
     collisionWidth = iw;

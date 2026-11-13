@@ -241,16 +241,16 @@ void MovingPlatform::collide(CPlayer * player)
         //printf(">>>>Checking Right Side fRelativeX: %.5f  fRelativeY1: %.5f  fRelativeY2: %.5f\n", fRelativeX, fRelativeY1, fRelativeY2);
 
         if (fRelativeX >= 0.0f && fRelativeX < iWidth) {
-            short tx = (short)fRelativeX / TILESIZE;
+            short tx = static_cast<short>(fRelativeX) / TILESIZE;
 
             int t1 = tile_flag_nonsolid;
             int t2 = tile_flag_nonsolid;
 
             if (fRelativeY1 >= 0.0f && fRelativeY1 < iHeight)
-                t1 = tileToFlags(tileTypeAt(tx, (short)fRelativeY1 / TILESIZE));
+                t1 = tileToFlags(tileTypeAt(tx, static_cast<short>(fRelativeY1) / TILESIZE));
 
             if (fRelativeY2 >= 0.0f && fRelativeY2 < iHeight)
-                t2 = tileToFlags(tileTypeAt(tx, (short)fRelativeY2 / TILESIZE));
+                t2 = tileToFlags(tileTypeAt(tx, static_cast<short>(fRelativeY2) / TILESIZE));
 
             if ((t1 & tile_flag_solid) || (t2 & tile_flag_solid)) {
                 bool fDeathTileToLeft = ((t1 & tile_flag_death_on_left) && (t2 & tile_flag_death_on_left)) ||
@@ -269,7 +269,7 @@ void MovingPlatform::collide(CPlayer * player)
                     if (PlayerKillType::NonKill != player->KillPlayerMapHazard(fSuperDeathTileToLeft, KillStyle::Environment, false, iPlayerId))
                         return;
                 } else {
-                    player->setXf((float)((tx << 5) - PW) - 0.2f + fx - iHalfWidth);
+                    player->setXf(static_cast<float>((tx << TILESIZE_SHIFT) - PW) - 0.2f + fx - iHalfWidth);
                     player->flipsidesifneeded();
 
                     //test to see if we put the object on top of a background tile
@@ -304,16 +304,16 @@ void MovingPlatform::collide(CPlayer * player)
         //printf(">>>>Checking Left Side fRelativeX: %.5f  fRelativeY1: %.5f  fRelativeY2: %.5f\n", fRelativeX, fRelativeY1, fRelativeY2);
 
         if (fRelativeX >= 0.0f && fRelativeX < iWidth) {
-            short tx = (short)fRelativeX / TILESIZE;
+            short tx = static_cast<short>(fRelativeX) / TILESIZE;
 
             int t1 = tile_flag_nonsolid;
             int t2 = tile_flag_nonsolid;
 
             if (fRelativeY1 >= 0 && fRelativeY1 < iHeight)
-                t1 = tileToFlags(tileTypeAt(tx, (short)fRelativeY1 / TILESIZE));
+                t1 = tileToFlags(tileTypeAt(tx, static_cast<short>(fRelativeY1) / TILESIZE));
 
             if (fRelativeY2 >= 0 && fRelativeY2 < iHeight)
-                t2 = tileToFlags(tileTypeAt(tx, (short)fRelativeY2 / TILESIZE));
+                t2 = tileToFlags(tileTypeAt(tx, static_cast<short>(fRelativeY2) / TILESIZE));
 
             if ((t1 & tile_flag_solid) || (t2 & tile_flag_solid)) {
                 bool fDeathTileToRight = ((t1 & tile_flag_death_on_right) && (t2 & tile_flag_death_on_right)) ||
@@ -332,7 +332,7 @@ void MovingPlatform::collide(CPlayer * player)
                     if (PlayerKillType::NonKill != player->KillPlayerMapHazard(fSuperDeathTileToRight, KillStyle::Environment, false, iPlayerId))
                         return;
                 } else {
-                    player->setXf((float)((tx << 5) + TILESIZE) + 0.2f + fx - iHalfWidth);
+                    player->setXf(static_cast<float>((tx << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fx - iHalfWidth);
                     player->flipsidesifneeded();
 
                     //test to see if we put the object on top of a background tile
@@ -387,16 +387,16 @@ void MovingPlatform::collide(CPlayer * player)
         //printf(">>>>Checking Bottom Side fRelativeY: %.5f  fRelativeX1: %.5f  fRelativeX2: %.5f\n", fRelativeY, fRelativeX1, fRelativeX2);
 
         if (fRelativeY >= 0.0f && fRelativeY < iHeight) {
-            short ty = (short)fRelativeY / TILESIZE;
+            short ty = static_cast<short>(fRelativeY) / TILESIZE;
 
             int t1 = tile_flag_nonsolid;
             int t2 = tile_flag_nonsolid;
 
             if (fRelativeX1 >= 0.0f && fRelativeX1 < iWidth)
-                t1 = tileToFlags(tileTypeAt((short)fRelativeX1 / TILESIZE, ty));
+                t1 = tileToFlags(tileTypeAt(static_cast<short>(fRelativeX1) / TILESIZE, ty));
 
             if (fRelativeX2 >= 0.0f && fRelativeX2 < iWidth)
-                t2 = tileToFlags(tileTypeAt((short)fRelativeX2 / TILESIZE, ty));
+                t2 = tileToFlags(tileTypeAt(static_cast<short>(fRelativeX2) / TILESIZE, ty));
 
             bool fSolidTileOverPlayer = (t1 & tile_flag_solid) || (t2 & tile_flag_solid);
 
@@ -415,7 +415,7 @@ void MovingPlatform::collide(CPlayer * player)
                     //printf("Platform Bottom Killed Player\n");
                     return;
                 } else {
-                    player->fPrecalculatedY = (ty << 5) + TILESIZE + 0.2f + fy - iHalfHeight;
+                    player->fPrecalculatedY = (ty << TILESIZE_SHIFT) + TILESIZE + 0.2f + fy - iHalfHeight;
                     player->fOldY = player->fPrecalculatedY - fVelY - GRAVITATION;
 
                     if (player->vely < 0.0f && fVelY > 0.0f)
@@ -442,23 +442,23 @@ void MovingPlatform::collide(CPlayer * player)
         //printf(">>>>Checking Top Side fRelativeY: %.5f  fRelativeX1: %.5f  fRelativeX2: %.5f\n", fRelativeY, fRelativeX1, fRelativeX2);
 
         if (fRelativeY >= 0.0f && fRelativeY < iHeight) {
-            short ty = (short)fRelativeY / TILESIZE;
+            short ty = static_cast<short>(fRelativeY) / TILESIZE;
 
             int t1 = tile_flag_nonsolid;
             int t2 = tile_flag_nonsolid;
 
             if (fRelativeX1 >= 0.0f && fRelativeX1 < iWidth)
-                t1 = tileToFlags(tileTypeAt((short)fRelativeX1 / TILESIZE, ty));
+                t1 = tileToFlags(tileTypeAt(static_cast<short>(fRelativeX1) / TILESIZE, ty));
 
             if (fRelativeX2 >= 0.0f && fRelativeX2 < iWidth)
-                t2 = tileToFlags(tileTypeAt((short)fRelativeX2 / TILESIZE, ty));
+                t2 = tileToFlags(tileTypeAt(static_cast<short>(fRelativeX2) / TILESIZE, ty));
 
             bool fSolidTileUnderPlayer = (t1 & tile_flag_solid) || (t2 & tile_flag_solid);
 
-            if ((t1 & tile_flag_solid_on_top || t2 & tile_flag_solid_on_top) && player->fOldY + PH <= (ty << 5) + fOldY - iHalfHeight) {
+            if ((t1 & tile_flag_solid_on_top || t2 & tile_flag_solid_on_top) && player->fOldY + PH <= (ty << TILESIZE_SHIFT) + fOldY - iHalfHeight) {
                 //Deal with player down jumping through solid on top tiles
                 if (player->fallthrough && !fSolidTileUnderPlayer) {
-                    player->fPrecalculatedY = (ty << 5) - PH + (fVelY > 0.0f ? fVelY : 0.0f) + 0.2f + fy - iHalfHeight;
+                    player->fPrecalculatedY = (ty << TILESIZE_SHIFT) - PH + (fVelY > 0.0f ? fVelY : 0.0f) + 0.2f + fy - iHalfHeight;
                     player->inair = true;
                     player->platform = nullptr;
                     //printf("Fell Through Solid On Top Platform\n");
@@ -472,7 +472,7 @@ void MovingPlatform::collide(CPlayer * player)
                         player->iVerticalPlatformCollision = 2;
                         player->iPlatformCollisionPlayerId = iPlayerId;
 
-                        player->fPrecalculatedY = (ty << 5) - PH - 0.2f + fy - iHalfHeight;
+                        player->fPrecalculatedY = (ty << TILESIZE_SHIFT) - PH - 0.2f + fy - iHalfHeight;
                         player->vely = GRAVITATION;
                         player->inair = false;
                         player->killsinrowinair = 0;
@@ -509,7 +509,7 @@ void MovingPlatform::collide(CPlayer * player)
                     player->iVerticalPlatformCollision = 2;
                     player->iPlatformCollisionPlayerId = iPlayerId;
 
-                    player->fPrecalculatedY = (ty << 5) - PH - 0.2f + fy - iHalfHeight;
+                    player->fPrecalculatedY = (ty << TILESIZE_SHIFT) - PH - 0.2f + fy - iHalfHeight;
                     player->fOldY = player->fPrecalculatedY - fVelY;
 
                     player->vely = GRAVITATION;
@@ -548,17 +548,17 @@ void MovingPlatform::check_map_collision_right(CPlayer * player)
 
     short iTestBackgroundX;
     if (player->fx + PW >= App::screenWidth)
-        iTestBackgroundX = ((short)player->fx + PW - App::screenWidth) / TILESIZE;
+        iTestBackgroundX = (static_cast<short>(player->fx) + PW - App::screenWidth) / TILESIZE;
     else
-        iTestBackgroundX = ((short)player->fx + PW) / TILESIZE;
+        iTestBackgroundX = (static_cast<short>(player->fx) + PW) / TILESIZE;
 
-    short iTestBackgroundY = ((short)player->fy + PH) / TILESIZE;
+    short iTestBackgroundY = (static_cast<short>(player->fy) + PH) / TILESIZE;
 
     IO_Block * topblock = g_map->block(iTestBackgroundX, iTestBackgroundY);
 
     if ((topblock && !topblock->isTransparent() && !topblock->isHidden()) ||
             (g_map->map(iTestBackgroundX, iTestBackgroundY) & tile_flag_solid)) {
-        player->setXf((float)((iTestBackgroundX << 5) - PW) - 0.2f);
+        player->setXf(static_cast<float>((iTestBackgroundX << TILESIZE_SHIFT) - PW) - 0.2f);
         player->flipsidesifneeded();
         return;
     }
@@ -566,13 +566,13 @@ void MovingPlatform::check_map_collision_right(CPlayer * player)
     if (player->fy < 0.0f)
         return;
 
-    short iTestBackgroundY2 = (short)player->fy / TILESIZE;
+    short iTestBackgroundY2 = static_cast<short>(player->fy) / TILESIZE;
 
     IO_Block * bottomblock = g_map->block(iTestBackgroundX, iTestBackgroundY2);
 
     if ((bottomblock && !bottomblock->isTransparent() && !bottomblock->isHidden()) ||
             (g_map->map(iTestBackgroundX, iTestBackgroundY2) & tile_flag_solid)) {
-        player->setXf((float)((iTestBackgroundX << 5) - PW) - 0.2f);
+        player->setXf(static_cast<float>((iTestBackgroundX << TILESIZE_SHIFT) - PW) - 0.2f);
         player->flipsidesifneeded();
         return;
     }
@@ -583,14 +583,14 @@ void MovingPlatform::check_map_collision_left(CPlayer * player)
     if (player->fy + PH < 0.0f)
         return;
 
-    short iTestBackgroundX = (short)player->fx / TILESIZE;
-    short iTestBackgroundY = ((short)player->fy + PH) / TILESIZE;
+    short iTestBackgroundX = static_cast<short>(player->fx) / TILESIZE;
+    short iTestBackgroundY = (static_cast<short>(player->fy) + PH) / TILESIZE;
 
     IO_Block * topblock = g_map->block(iTestBackgroundX, iTestBackgroundY);
 
     if ((topblock && !topblock->isTransparent() && !topblock->isHidden()) ||
             (g_map->map(iTestBackgroundX, iTestBackgroundY) & tile_flag_solid)) {
-        player->setXf((float)((iTestBackgroundX << 5) + TILESIZE) + 0.2f);
+        player->setXf(static_cast<float>((iTestBackgroundX << TILESIZE_SHIFT) + TILESIZE) + 0.2f);
         player->flipsidesifneeded();
         return;
     }
@@ -598,13 +598,13 @@ void MovingPlatform::check_map_collision_left(CPlayer * player)
     if (player->fy < 0.0f)
         return;
 
-    short iTestBackgroundY2 = (short)player->fy / TILESIZE;
+    short iTestBackgroundY2 = static_cast<short>(player->fy) / TILESIZE;
 
     IO_Block * bottomblock = g_map->block(iTestBackgroundX, iTestBackgroundY2);
 
     if ((bottomblock && !bottomblock->isTransparent() && !bottomblock->isHidden()) ||
             (g_map->map(iTestBackgroundX, iTestBackgroundY2) & tile_flag_solid)) {
-        player->setXf((float)((iTestBackgroundX << 5) + TILESIZE) + 0.2f);
+        player->setXf(static_cast<float>((iTestBackgroundX << TILESIZE_SHIFT) + TILESIZE) + 0.2f);
         player->flipsidesifneeded();
         return;
     }
@@ -640,19 +640,19 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     short txRight = -1;
 
     if (fRelativeXLeft >= 0.0f && fRelativeXLeft < iWidth)
-        txLeft = (short)fRelativeXLeft / TILESIZE;
+        txLeft = static_cast<short>(fRelativeXLeft) / TILESIZE;
 
     if (fRelativeXRight >= 0.0f && fRelativeXRight < iWidth)
-        txRight = (short)fRelativeXRight / TILESIZE;
+        txRight = static_cast<short>(fRelativeXRight) / TILESIZE;
 
     short tyTop = -1;
     short tyBottom = -1;
 
     if (fRelativeYTop >= 0.0f && fRelativeYTop < iHeight)
-        tyTop = (short)fRelativeYTop / TILESIZE;
+        tyTop = static_cast<short>(fRelativeYTop) / TILESIZE;
 
     if (fRelativeYBottom >= 0.0f && fRelativeYBottom < iHeight)
-        tyBottom = (short)fRelativeYBottom / TILESIZE;
+        tyBottom = static_cast<short>(fRelativeYBottom) / TILESIZE;
 
     if (txLeft >= 0) {
         int t1 = tile_flag_nonsolid;
@@ -700,11 +700,11 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
         //[X][ ]
         //[ ][ ]
     case 1: {
-        if (object->ix + (object->collisionWidth >> 1) > (txLeft << 5) + TILESIZE) {
-            object->setXf((float)((txLeft << 5) + TILESIZE) + 0.2f + fx - iHalfWidth);
+        if (object->ix + (object->collisionWidth >> 1) > (txLeft << TILESIZE_SHIFT) + TILESIZE) {
+            object->setXf(static_cast<float>((txLeft << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fx - iHalfWidth);
             object->flipsidesifneeded();
         } else {
-            object->setYf((float)((tyTop << 5) + TILESIZE) + 0.2f + fy - iHalfHeight);
+            object->setYf(static_cast<float>((tyTop << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fy - iHalfHeight);
         }
 
         break;
@@ -713,11 +713,11 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[ ][X]
     //[ ][ ]
     case 2: {
-        if (object->ix + (object->collisionWidth >> 1) < (txRight << 5)) {
-            object->setXf((float)((txRight << 5) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
+        if (object->ix + (object->collisionWidth >> 1) < (txRight << TILESIZE_SHIFT)) {
+            object->setXf(static_cast<float>((txRight << TILESIZE_SHIFT) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
             object->flipsidesifneeded();
         } else {
-            object->setYf((float)((tyTop << 5) + TILESIZE) + 0.2f + fy - iHalfHeight);
+            object->setYf(static_cast<float>((tyTop << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fy - iHalfHeight);
         }
 
         break;
@@ -726,18 +726,18 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[X][X]
     //[ ][ ]
     case 3: {
-        object->setYf((float)((tyTop << 5) + TILESIZE) + 0.2f + fy - iHalfHeight);
+        object->setYf(static_cast<float>((tyTop << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fy - iHalfHeight);
         break;
     }
 
     //[ ][ ]
     //[X][ ]
     case 4: {
-        if (object->ix + (object->collisionWidth >> 1) > (txLeft << 5) + TILESIZE) {
-            object->setXf((float)((txLeft << 5) + TILESIZE) + 0.2f + fx - iHalfWidth);
+        if (object->ix + (object->collisionWidth >> 1) > (txLeft << TILESIZE_SHIFT) + TILESIZE) {
+            object->setXf(static_cast<float>((txLeft << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fx - iHalfWidth);
             object->flipsidesifneeded();
         } else {
-            object->setYf((float)((tyBottom << 5) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
+            object->setYf(static_cast<float>((tyBottom << TILESIZE_SHIFT) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
         }
 
         break;
@@ -746,7 +746,7 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[X][ ]
     //[X][ ]
     case 5: {
-        object->setXf((float)((txLeft << 5) + TILESIZE) + 0.2f + fx - iHalfWidth);
+        object->setXf(static_cast<float>((txLeft << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fx - iHalfWidth);
         object->flipsidesifneeded();
         break;
     }
@@ -754,13 +754,13 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[ ][X]
     //[X][ ]
     case 6: {
-        if (object->ix + (object->collisionWidth >> 1) > (txLeft << 5) + TILESIZE) {
-            object->setYf((float)((tyTop << 5) + TILESIZE) + 0.2f + fy - iHalfHeight);
-            object->setXf((float)((txLeft << 5) + TILESIZE) + 0.2f + fx - iHalfWidth);
+        if (object->ix + (object->collisionWidth >> 1) > (txLeft << TILESIZE_SHIFT) + TILESIZE) {
+            object->setYf(static_cast<float>((tyTop << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fy - iHalfHeight);
+            object->setXf(static_cast<float>((txLeft << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fx - iHalfWidth);
             object->flipsidesifneeded();
         } else {
-            object->setYf((float)((tyBottom << 5) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
-            object->setXf((float)((txRight << 5) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
+            object->setYf(static_cast<float>((tyBottom << TILESIZE_SHIFT) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
+            object->setXf(static_cast<float>((txRight << TILESIZE_SHIFT) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
             object->flipsidesifneeded();
         }
 
@@ -770,8 +770,8 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[X][X]
     //[X][ ]
     case 7: {
-        object->setYf((float)((tyTop << 5) + TILESIZE) + 0.2f + fy - iHalfHeight);
-        object->setXf((float)((txLeft << 5) + TILESIZE) + 0.2f + fx - iHalfWidth);
+        object->setYf(static_cast<float>((tyTop << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fy - iHalfHeight);
+        object->setXf(static_cast<float>((txLeft << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fx - iHalfWidth);
         object->flipsidesifneeded();
         break;
     }
@@ -779,11 +779,11 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[ ][ ]
     //[ ][X]
     case 8: {
-        if (object->ix + (object->collisionWidth >> 1) < (txRight << 5)) {
-            object->setXf((float)((txRight << 5) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
+        if (object->ix + (object->collisionWidth >> 1) < (txRight << TILESIZE_SHIFT)) {
+            object->setXf(static_cast<float>((txRight << TILESIZE_SHIFT) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
             object->flipsidesifneeded();
         } else {
-            object->setYf((float)((tyBottom << 5) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
+            object->setYf(static_cast<float>((tyBottom << TILESIZE_SHIFT) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
         }
 
         break;
@@ -792,13 +792,13 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[X][ ]
     //[ ][X]
     case 9: {
-        if (object->ix + (object->collisionWidth >> 1) > (txLeft << 5) + TILESIZE) {
-            object->setYf((float)((tyBottom << 5) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
-            object->setXf((float)((txLeft << 5) + TILESIZE) + 0.2f + fx - iHalfWidth);
+        if (object->ix + (object->collisionWidth >> 1) > (txLeft << TILESIZE_SHIFT) + TILESIZE) {
+            object->setYf(static_cast<float>((tyBottom << TILESIZE_SHIFT) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
+            object->setXf(static_cast<float>((txLeft << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fx - iHalfWidth);
             object->flipsidesifneeded();
         } else {
-            object->setYf((float)((tyTop << 5) + TILESIZE) + 0.2f + fy - iHalfHeight);
-            object->setXf((float)((txRight << 5) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
+            object->setYf(static_cast<float>((tyTop << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fy - iHalfHeight);
+            object->setXf(static_cast<float>((txRight << TILESIZE_SHIFT) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
             object->flipsidesifneeded();
         }
 
@@ -808,7 +808,7 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[ ][X]
     //[ ][X]
     case 10: {
-        object->setXf((float)((txRight << 5) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
+        object->setXf(static_cast<float>((txRight << TILESIZE_SHIFT) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
         object->flipsidesifneeded();
         break;
     }
@@ -816,8 +816,8 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[X][X]
     //[ ][X]
     case 11: {
-        object->setYf((float)((tyTop << 5) + TILESIZE) + 0.2f + fy - iHalfHeight);
-        object->setXf((float)((txRight << 5) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
+        object->setYf(static_cast<float>((tyTop << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fy - iHalfHeight);
+        object->setXf(static_cast<float>((txRight << TILESIZE_SHIFT) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
         object->flipsidesifneeded();
         break;
     }
@@ -825,15 +825,15 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[ ][ ]
     //[X][X]
     case 12: {
-        object->setYf((float)((tyBottom << 5) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
+        object->setYf(static_cast<float>((tyBottom << TILESIZE_SHIFT) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
         break;
     }
 
     //[X][ ]
     //[X][X]
     case 13: {
-        object->setYf((float)((tyBottom << 5) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
-        object->setXf((float)((txLeft << 5) + TILESIZE) + 0.2f + fx - iHalfWidth);
+        object->setYf(static_cast<float>((tyBottom << TILESIZE_SHIFT) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
+        object->setXf(static_cast<float>((txLeft << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fx - iHalfWidth);
         object->flipsidesifneeded();
         break;
     }
@@ -841,8 +841,8 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[ ][X]
     //[X][X]
     case 14: {
-        object->setYf((float)((tyBottom << 5) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
-        object->setXf((float)((txRight << 5) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
+        object->setYf(static_cast<float>((tyBottom << TILESIZE_SHIFT) - object->collisionHeight) - 0.2f + fy - iHalfHeight);
+        object->setXf(static_cast<float>((txRight << TILESIZE_SHIFT) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
         object->flipsidesifneeded();
         break;
     }
@@ -851,7 +851,7 @@ bool MovingPlatform::collision_detection_check_sides(IO_MovingObject * object)
     //[X][X]
     //[X][X]
     case 15: {
-        object->setYf((float)((tyBottom << 5) + TILESIZE) + 0.2f + fy - iHalfHeight);
+        object->setYf(static_cast<float>((tyBottom << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fy - iHalfHeight);
         break;
     }
 
@@ -895,7 +895,7 @@ void MovingPlatform::GetTileTypesFromPlayer(CPlayer * player, int * lefttile, in
     if (fRelativeY < 0.0f || fRelativeY >= iHeight)
         return;
 
-    short ty = (short)fRelativeY / TILESIZE;
+    short ty = static_cast<short>(fRelativeY) / TILESIZE;
 
     float fRelativeX1 = player->fx - fx + iHalfWidth;
 
@@ -906,10 +906,10 @@ void MovingPlatform::GetTileTypesFromPlayer(CPlayer * player, int * lefttile, in
         fRelativeX2 = player->fx + PW - fx + iHalfWidth;
 
     if (fRelativeX1 >= 0.0f && fRelativeX1 < iWidth)
-        *lefttile = tileToFlags(tileTypeAt((short)fRelativeX1 / TILESIZE, ty));
+        *lefttile = tileToFlags(tileTypeAt(static_cast<short>(fRelativeX1) / TILESIZE, ty));
 
     if (fRelativeX2 >= 0.0f && fRelativeX2 < iWidth)
-        *righttile = tileToFlags(tileTypeAt((short)fRelativeX2 / TILESIZE, ty));
+        *righttile = tileToFlags(tileTypeAt(static_cast<short>(fRelativeX2) / TILESIZE, ty));
 }
 
 int MovingPlatform::GetTileTypeFromCoord(short x, short y)
@@ -929,7 +929,7 @@ int MovingPlatform::GetTileTypeFromCoord(short x, short y)
     if (fRelativeX < 0.0f || fRelativeX >= iWidth)
         return tile_flag_nonsolid;
 
-    return tileToFlags(tileTypeAt((short)fRelativeX / TILESIZE, (short)fRelativeY / TILESIZE));
+    return tileToFlags(tileTypeAt(static_cast<short>(fRelativeX) / TILESIZE, static_cast<short>(fRelativeY) / TILESIZE));
 }
 
 void MovingPlatform::collide(IO_MovingObject * object)
@@ -980,34 +980,34 @@ void MovingPlatform::collide(IO_MovingObject * object)
             fRelativeX = object->fx + object->collisionWidth - fx + iHalfWidth;
 
         if (fRelativeX >= 0.0f && fRelativeX < iWidth) {
-            short tx = (short)fRelativeX / TILESIZE;
+            short tx = static_cast<short>(fRelativeX) / TILESIZE;
 
             int t1 = tile_flag_nonsolid;
             int t2 = tile_flag_nonsolid;
 
             if (fRelativeY1 >= 0.0f && fRelativeY1 < iHeight)
-                t1 = tileToFlags(tileTypeAt(tx, (short)fRelativeY1 / TILESIZE));
+                t1 = tileToFlags(tileTypeAt(tx, static_cast<short>(fRelativeY1) / TILESIZE));
 
             if (fRelativeY2 >= 0.0f && fRelativeY2 < iHeight)
-                t2 = tileToFlags(tileTypeAt(tx, (short)fRelativeY2 / TILESIZE));
+                t2 = tileToFlags(tileTypeAt(tx, static_cast<short>(fRelativeY2) / TILESIZE));
 
             if ((t1 & tile_flag_solid) || (t2 & tile_flag_solid)) {
                 if (object->iHorizontalPlatformCollision == 3) {
                     object->KillObjectMapHazard();
                     return;
                 } else {
-                    object->setXf((float)((tx << 5) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
+                    object->setXf(static_cast<float>((tx << TILESIZE_SHIFT) - object->collisionWidth) - 0.2f + fx - iHalfWidth);
                     object->flipsidesifneeded();
 
                     //test to see if we put the object on top of a background tile
-                    short iTestBackgroundY = (short)object->fy / TILESIZE;
-                    short iTestBackgroundY2 = ((short)object->fy + object->collisionHeight) / TILESIZE;
+                    short iTestBackgroundY = static_cast<short>(object->fy) / TILESIZE;
+                    short iTestBackgroundY2 = (static_cast<short>(object->fy) + object->collisionHeight) / TILESIZE;
 
                     short iTestBackgroundX;
                     if (object->fx + object->collisionWidth >= App::screenWidth)
-                        iTestBackgroundX = ((short)object->fx + object->collisionWidth - App::screenWidth) / TILESIZE;
+                        iTestBackgroundX = (static_cast<short>(object->fx) + object->collisionWidth - App::screenWidth) / TILESIZE;
                     else
-                        iTestBackgroundX = ((short)object->fx + object->collisionWidth) / TILESIZE;
+                        iTestBackgroundX = (static_cast<short>(object->fx) + object->collisionWidth) / TILESIZE;
 
                     IO_Block * topblock = g_map->block(iTestBackgroundX, iTestBackgroundY);
                     IO_Block * bottomblock = g_map->block(iTestBackgroundX, iTestBackgroundY2);
@@ -1016,7 +1016,7 @@ void MovingPlatform::collide(IO_MovingObject * object)
                             (bottomblock && !bottomblock->isTransparent() && !bottomblock->isHidden()) ||
                             (g_map->map(iTestBackgroundX, iTestBackgroundY) & tile_flag_solid) ||
                             (g_map->map(iTestBackgroundX, iTestBackgroundY2) & tile_flag_solid)) {
-                        object->setXf((float)((iTestBackgroundX << 5) - object->collisionWidth) - 0.2f);
+                        object->setXf(static_cast<float>((iTestBackgroundX << TILESIZE_SHIFT) - object->collisionWidth) - 0.2f);
                         object->flipsidesifneeded();
                     }
 
@@ -1046,29 +1046,29 @@ void MovingPlatform::collide(IO_MovingObject * object)
             fRelativeX = object->fx - fx + iHalfWidth;
 
         if (fRelativeX >= 0.0f && fRelativeX < iWidth) {
-            short tx = (short)fRelativeX / TILESIZE;
+            short tx = static_cast<short>(fRelativeX) / TILESIZE;
 
             int t1 = tile_flag_nonsolid;
             int t2 = tile_flag_nonsolid;
 
             if (fRelativeY1 >= 0 && fRelativeY1 < iHeight)
-                t1 = tileToFlags(tileTypeAt(tx, (short)fRelativeY1 / TILESIZE));
+                t1 = tileToFlags(tileTypeAt(tx, static_cast<short>(fRelativeY1) / TILESIZE));
 
             if (fRelativeY2 >= 0 && fRelativeY2 < iHeight)
-                t2 = tileToFlags(tileTypeAt(tx, (short)fRelativeY2 / TILESIZE));
+                t2 = tileToFlags(tileTypeAt(tx, static_cast<short>(fRelativeY2) / TILESIZE));
 
             if ((t1 & tile_flag_solid) || (t2 & tile_flag_solid)) {
                 if (object->iHorizontalPlatformCollision == 1) {
                     object->KillObjectMapHazard();
                     return;
                 } else {
-                    object->setXf((float)((tx << 5) + TILESIZE) + 0.2f + fx - iHalfWidth);
+                    object->setXf(static_cast<float>((tx << TILESIZE_SHIFT) + TILESIZE) + 0.2f + fx - iHalfWidth);
                     object->flipsidesifneeded();
 
                     //test to see if we put the object on top of a background tile
-                    short iTestBackgroundY = (short)object->fy / TILESIZE;
-                    short iTestBackgroundY2 = ((short)object->fy + object->collisionHeight) / TILESIZE;
-                    short iTestBackgroundX = (short)object->fx / TILESIZE;
+                    short iTestBackgroundY = static_cast<short>(object->fy) / TILESIZE;
+                    short iTestBackgroundY2 = (static_cast<short>(object->fy) + object->collisionHeight) / TILESIZE;
+                    short iTestBackgroundX = static_cast<short>(object->fx) / TILESIZE;
 
                     IO_Block * topblock = g_map->block(iTestBackgroundX, iTestBackgroundY);
                     IO_Block * bottomblock = g_map->block(iTestBackgroundX, iTestBackgroundY2);
@@ -1077,7 +1077,7 @@ void MovingPlatform::collide(IO_MovingObject * object)
                             (bottomblock && !bottomblock->isTransparent() && !bottomblock->isHidden()) ||
                             (g_map->map(iTestBackgroundX, iTestBackgroundY) & tile_flag_solid) ||
                             (g_map->map(iTestBackgroundX, iTestBackgroundY2) & tile_flag_solid)) {
-                        object->setXf((float)((iTestBackgroundX << 5) + TILESIZE) + 0.2f);
+                        object->setXf(static_cast<float>((iTestBackgroundX << TILESIZE_SHIFT) + TILESIZE) + 0.2f);
                         object->flipsidesifneeded();
                     }
 
@@ -1127,23 +1127,23 @@ void MovingPlatform::collide(IO_MovingObject * object)
             fRelativeY = object->fy - fy + iHalfHeight;
 
         if (fRelativeY >= 0.0f && fRelativeY < iHeight) {
-            short ty = (short)fRelativeY / TILESIZE;
+            short ty = static_cast<short>(fRelativeY) / TILESIZE;
 
             int t1 = tile_flag_nonsolid;
             int t2 = tile_flag_nonsolid;
 
             if (fRelativeX1 >= 0.0f && fRelativeX1 < iWidth)
-                t1 = tileToFlags(tileTypeAt((short)fRelativeX1 / TILESIZE, ty));
+                t1 = tileToFlags(tileTypeAt(static_cast<short>(fRelativeX1) / TILESIZE, ty));
 
             if (fRelativeX2 >= 0.0f && fRelativeX2 < iWidth)
-                t2 = tileToFlags(tileTypeAt((short)fRelativeX2 / TILESIZE, ty));
+                t2 = tileToFlags(tileTypeAt(static_cast<short>(fRelativeX2) / TILESIZE, ty));
 
             if ((t1 & tile_flag_solid) || (t2 & tile_flag_solid)) {
                 if (object->iVerticalPlatformCollision == 2) {
                     object->KillObjectMapHazard();
                     return;
                 } else {
-                    object->fPrecalculatedY = (ty << 5) + TILESIZE + 0.2f + fy - iHalfHeight;
+                    object->fPrecalculatedY = (ty << TILESIZE_SHIFT) + TILESIZE + 0.2f + fy - iHalfHeight;
                     object->fOldY = object->fPrecalculatedY - fVelY - GRAVITATION;
 
                     if (object->vely < 0.0f && fVelY > 0.0f)
@@ -1162,18 +1162,18 @@ void MovingPlatform::collide(IO_MovingObject * object)
         float fRelativeY = object->fPrecalculatedY + object->collisionHeight - fy + iHalfHeight;;
 
         if (fRelativeY >= 0.0f && fRelativeY < iHeight) {
-            short ty = (short)fRelativeY / TILESIZE;
+            short ty = static_cast<short>(fRelativeY) / TILESIZE;
 
             int t1 = tile_flag_nonsolid;
             int t2 = tile_flag_nonsolid;
 
             if (fRelativeX1 >= 0.0f && fRelativeX1 < iWidth)
-                t1 = tileToFlags(tileTypeAt((short)fRelativeX1 / TILESIZE, ty));
+                t1 = tileToFlags(tileTypeAt(static_cast<short>(fRelativeX1) / TILESIZE, ty));
 
             if (fRelativeX2 >= 0.0f && fRelativeX2 < iWidth)
-                t2 = tileToFlags(tileTypeAt((short)fRelativeX2 / TILESIZE, ty));
+                t2 = tileToFlags(tileTypeAt(static_cast<short>(fRelativeX2) / TILESIZE, ty));
 
-            if (((t1 & tile_flag_solid_on_top) || (t2 & tile_flag_solid_on_top)) && object->fOldY + object->collisionHeight <= (ty << 5) + fOldY - iHalfHeight) {
+            if (((t1 & tile_flag_solid_on_top) || (t2 & tile_flag_solid_on_top)) && object->fOldY + object->collisionHeight <= (ty << TILESIZE_SHIFT) + fOldY - iHalfHeight) {
                 if (object->iVerticalPlatformCollision == 0) {
                     object->KillObjectMapHazard();
                     return;
@@ -1183,7 +1183,7 @@ void MovingPlatform::collide(IO_MovingObject * object)
 
                     object->iVerticalPlatformCollision = 2;
 
-                    object->fPrecalculatedY = (ty << 5) - object->collisionHeight - 0.2f + fy - iHalfHeight;
+                    object->fPrecalculatedY = (ty << TILESIZE_SHIFT) - object->collisionHeight - 0.2f + fy - iHalfHeight;
                     object->fOldY = object->fPrecalculatedY - fVelY;
                     object->vely = object->BottomBounce();
                     object->inair = false;
@@ -1208,7 +1208,7 @@ void MovingPlatform::collide(IO_MovingObject * object)
 
                     object->iVerticalPlatformCollision = 2;
 
-                    object->fPrecalculatedY = (ty << 5) - object->collisionHeight - 0.2f + fy - iHalfHeight;
+                    object->fPrecalculatedY = (ty << TILESIZE_SHIFT) - object->collisionHeight - 0.2f + fy - iHalfHeight;
                     object->fOldY = object->fPrecalculatedY - fVelY;
                     object->vely = object->BottomBounce();
                     object->inair = false;
@@ -1256,18 +1256,18 @@ short MovingPlatform::coldec_object(IO_MovingObject * object)
 
 bool MovingPlatform::IsInNoSpawnZone(short iX, short iY, short w, short h)
 {
-    short iTop = (short)pPath->currentPos1().y - iHalfHeight;
+    short iTop = static_cast<short>(pPath->currentPos1().y) - iHalfHeight;
 
     if (iY + h < iTop)
         return false;
 
-    short iBottom = (short)pPath->currentPos1().y + iHalfHeight;
+    short iBottom = static_cast<short>(pPath->currentPos1().y) + iHalfHeight;
 
     if (iY >= iBottom)
         return false;
 
-    short iLeft = (short)pPath->currentPos1().x - iHalfWidth;
-    short iRight = (short)pPath->currentPos1().x + iHalfWidth;
+    short iLeft = static_cast<short>(pPath->currentPos1().x) - iHalfWidth;
+    short iRight = static_cast<short>(pPath->currentPos1().x) + iHalfWidth;
 
     //Deal with screen side overlap
     if (iX + w < iLeft)

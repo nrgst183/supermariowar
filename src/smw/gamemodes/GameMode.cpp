@@ -8,13 +8,14 @@
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 #include "WorldTourStop.h"
 #include "objects/powerup/PU_TreasureChestBonus.h"
 
 
 void RemovePlayersButTeam(short teamid)
 {
-    for (CPlayer* player : players) {
+    for (CPlayer* player : g_sim.players) {
         if (player->getTeamID() != teamid) {
             player->state = PlayerState::Dead;
         }
@@ -26,13 +27,13 @@ void RemovePlayersButHighestScoring()
     short iMaxScore = -1;
 
     //Figure out what the maximum score is
-    for (short iScore = 0; iScore < score_cnt; iScore++) {
-        if (score[iScore]->score > iMaxScore)
-            iMaxScore = score[iScore]->score;
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
+        if (g_sim.score[iScore].score > iMaxScore)
+            iMaxScore = g_sim.score[iScore].score;
     }
 
     //Remove all players that don't have that max score
-    for (CPlayer* player : players) {
+    for (CPlayer* player : g_sim.players) {
         if (player->Score().score < iMaxScore) {
             player->state = PlayerState::Dead;
         }
@@ -47,39 +48,39 @@ void SetupScoreBoard(bool fOrderMatters)
 
     short oldmax = -1;
     short max = -1;
-    for (i = 0; i < score_cnt; i++) {
+    for (i = 0; i < g_sim.score_cnt; i++) {
         oldmax = max;
         max = -1;
 
-        for (j = 0; j < score_cnt; j++) {
+        for (j = 0; j < g_sim.score_cnt; j++) {
             if (!doneWithScore[j]) {
                 //The boxes minigame doesn't use "score" it uses "subscore[0]" to determine the winner
                 if (game_values.gamemode->gamemode == game_mode_boxes_minigame) {
-                    if (max == -1 || score[j]->subscore[0] > score[max]->subscore[0] ||
-                            (score[j]->subscore[0] == score[max]->subscore[0] && score[j]->score > score[max]->score)) { //or it is tied but they died later in the game
+                    if (max == -1 || g_sim.score[j].subscore[0] > g_sim.score[max].subscore[0] ||
+                            (g_sim.score[j].subscore[0] == g_sim.score[max].subscore[0] && g_sim.score[j].score > g_sim.score[max].score)) { //or it is tied but they died later in the game
                         max = j;
                     }
                 } else {
                     //If this player's score is bigger
-                    if (max == -1 || score[j]->score > score[max]->score ||
-                            (score[j]->score == score[max]->score && score[j]->order > score[max]->order)) { //or it is tied but they died later in the game
+                    if (max == -1 || g_sim.score[j].score > g_sim.score[max].score ||
+                            (g_sim.score[j].score == g_sim.score[max].score && g_sim.score[j].order > g_sim.score[max].order)) { //or it is tied but they died later in the game
                         max = j;
                     }
                 }
             }
         }
 
-        score[max]->displayorder = i;
-        score[max]->place = i;
+        g_sim.score[max].displayorder = i;
+        g_sim.score[max].place = i;
 
         if (!fOrderMatters && i > 0) {
             if (game_values.gamemode->gamemode == game_mode_boxes_minigame) {
-                if (score[oldmax]->subscore[0] == score[max]->subscore[0] &&
-                        score[oldmax]->score == score[max]->score)
-                    score[max]->place = score[oldmax]->place;
+                if (g_sim.score[oldmax].subscore[0] == g_sim.score[max].subscore[0] &&
+                        g_sim.score[oldmax].score == g_sim.score[max].score)
+                    g_sim.score[max].place = g_sim.score[oldmax].place;
             } else {
-                if (score[oldmax]->score == score[max]->score)
-                    score[max]->place = score[oldmax]->place;
+                if (g_sim.score[oldmax].score == g_sim.score[max].score)
+                    g_sim.score[max].place = g_sim.score[oldmax].place;
             }
         }
 
@@ -94,7 +95,7 @@ void SetupScoreBoard(bool fOrderMatters)
         for (short iBonus = 0; iBonus < iNumBonuses; iBonus++) {
             if (tourStop->wsbBonuses[iBonus].iWinnerPlace == 0) {
                 short iBonusType = tourStop->wsbBonuses[iBonus].iBonus;
-                objectcontainer[0].add(new PU_TreasureChestBonus(&rm->spr_bonuschest, 1, 0, 30, 30, 1, 1, iBonusType));
+                g_sim.objectcontainer[0].add(new PU_TreasureChestBonus(&rm->spr_bonuschest, 1, 0, 30, 30, 1, 1, iBonusType));
                 game_values.flags.noexittimer = 0;
                 game_values.flags.noexit = false;
             }
@@ -110,9 +111,9 @@ void ShowScoreBoard()
     if (game_values.gamemode->gamemode == game_mode_health || game_values.gamemode->gamemode == game_mode_collection || game_values.gamemode->gamemode == game_mode_boxes_minigame)
         iScoreboardElementHeight = 63;
 
-    for (short i = 0; i < score_cnt; i++) {
-        score[i]->destx = 309 - 34 * game_values.teamcounts[i];
-        score[i]->desty = score[i]->displayorder * iScoreboardElementHeight + 140;
+    for (short i = 0; i < g_sim.score_cnt; i++) {
+        g_sim.score[i].destx = 309 - 34 * game_values.teamcounts[i];
+        g_sim.score[i].desty = g_sim.score[i].displayorder * iScoreboardElementHeight + 140;
     }
 
     if (game_values.music) {
@@ -128,12 +129,12 @@ void ShowScoreBoard()
 bool RemoveTeam(short teamid)
 {
     //If we have already removed this team then return
-    if (score[teamid]->order > -1)
-        return game_values.flags.teamdeadcounter == score_cnt - 1;
+    if (g_sim.score[teamid].order > -1)
+        return game_values.flags.teamdeadcounter == g_sim.score_cnt - 1;
 
     //kill all players on the dead team
     short iAnnouncementColor = -1;
-    for (CPlayer* player : players) {
+    for (CPlayer* player : g_sim.players) {
         if (player->getTeamID() == teamid) {
             if (iAnnouncementColor == -1)
                 iAnnouncementColor = player->getColorID();
@@ -142,15 +143,15 @@ bool RemoveTeam(short teamid)
         }
     }
 
-    score[teamid]->order = game_values.flags.teamdeadcounter++;
+    g_sim.score[teamid].order = game_values.flags.teamdeadcounter++;
 
     //Announce that a team was removed
-    if (game_values.deadteamnotice && game_values.flags.teamdeadcounter < score_cnt - 1) {
+    if (game_values.deadteamnotice && game_values.flags.teamdeadcounter < g_sim.score_cnt - 1) {
         eyecandy[2].emplace<EC_Announcement>(&rm->game_font_large, &rm->spr_announcementicons, "Team Removed!", iAnnouncementColor, 90, 200);
         rm->sfx_announcer[iAnnouncementColor + 16].play();
     }
 
-    return game_values.flags.teamdeadcounter == score_cnt - 1;
+    return game_values.flags.teamdeadcounter == g_sim.score_cnt - 1;
 }
 
 
@@ -174,17 +175,17 @@ void CGameMode::init()  //called once when the game is started
     gameover = false;
     playedwarningsound = false;
 
-    for (short iScore = 0; iScore < score_cnt; iScore++) {
-        score[iScore]->SetScore(0);
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
+        g_sim.score[iScore].SetScore(0);
     }
 };
 
 void CGameMode::think()
 {
     if (netplay.active) {
-        for (size_t k = 0; k < players.size(); k++) {
+        for (size_t k = 0; k < g_sim.players.size(); k++) {
             if (netplay.player_disconnected[k])
-                players[k]->spawnText("Disconnected!");
+                g_sim.players[k]->spawnText("Disconnected!");
         }
     }
 
@@ -195,7 +196,7 @@ void CGameMode::think()
 void CGameMode::displayplayertext()
 {
     if (winningteam > -1) {
-        for (CPlayer* player : players) {
+        for (CPlayer* player : g_sim.players) {
             if (player->getTeamID() == winningteam)
                 player->spawnText("Winner!");
         }
@@ -267,8 +268,8 @@ CPlayer * CGameMode::GetHighestScorePlayer(bool fGetHighest)
     tiedplayers[0] = 0;
 
     //Find the first non-dead player and use them for the first player to compare to
-    for (j = 0; j < players.size(); j++) {
-        if (!players[j]->isdead()) {
+    for (j = 0; j < g_sim.players.size(); j++) {
+        if (!g_sim.players[j]->isdead()) {
             count = 1;
             tiedplayers[0] = j;
             break;
@@ -276,20 +277,20 @@ CPlayer * CGameMode::GetHighestScorePlayer(bool fGetHighest)
     }
 
     //Loop through all players, comparing scores to find the highest/lowest
-    for (i = j + 1; i < players.size(); i++) {
-        if (!players[i]->isdead()) {
-            if ((!fGetHighest && players[i]->Score().score < players[tiedplayers[0]]->Score().score) ||
-                    (fGetHighest && players[i]->Score().score > players[tiedplayers[0]]->Score().score)) {
+    for (i = j + 1; i < g_sim.players.size(); i++) {
+        if (!g_sim.players[i]->isdead()) {
+            if ((!fGetHighest && g_sim.players[i]->Score().score < g_sim.players[tiedplayers[0]]->Score().score) ||
+                    (fGetHighest && g_sim.players[i]->Score().score > g_sim.players[tiedplayers[0]]->Score().score)) {
                 count = 1;
                 tiedplayers[0] = i;
-            } else if (players[i]->Score().score == players[tiedplayers[0]]->Score().score) {
+            } else if (g_sim.players[i]->Score().score == g_sim.players[tiedplayers[0]]->Score().score) {
                 tiedplayers[count] = i;
                 count++;
             }
         }
     }
 
-    return players[tiedplayers[RANDOM_INT(count)]];
+    return g_sim.players[tiedplayers[RANDOM_INT(count)]];
 }
 
 //Returns number of players in list
@@ -297,7 +298,7 @@ short CGameMode::GetScoreRankedPlayerList(CPlayer * outPlayers[4], bool fGetHigh
 {
     short iNumPlayersInList = 0;
 
-    for (CPlayer* player : players) {
+    for (CPlayer* player : g_sim.players) {
         if (player->isdead())
             continue;
 

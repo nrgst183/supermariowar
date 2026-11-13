@@ -5,6 +5,7 @@
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 
 
 //mariowar (x lives - counting down)
@@ -20,9 +21,9 @@ void CGM_Health::init()
 {
     CGM_Classic::init();
 
-    for (short iScore = 0; iScore < score_cnt; iScore++) {
-        score[iScore]->subscore[0] = game_values.gamemodesettings.health.startlife;
-        score[iScore]->subscore[1] = score[iScore]->subscore[0];
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
+        g_sim.score[iScore].subscore[0] = game_values.gamemodesettings.health.startlife;
+        g_sim.score[iScore].subscore[1] = g_sim.score[iScore].subscore[0];
     }
 }
 

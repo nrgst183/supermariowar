@@ -9,7 +9,7 @@
 // class fireball
 //------------------------------------------------------------------------------
 MO_Fireball::MO_Fireball(gfxSprite* nspr, Vec2s pos, short iNumSpr, bool moveToRight, short aniSpeed, short iGlobalID, short teamID, short iColorID)
-    : IO_MovingObject(nspr, pos, iNumSpr, aniSpeed, (short)nspr->getWidth() >> 2, (short)nspr->getHeight() >> 3, 0, 0)
+    : IO_MovingObject(nspr, pos, iNumSpr, aniSpeed, static_cast<short>(nspr->getWidth()) >> 2, static_cast<short>(nspr->getHeight()) >> 3, 0, 0)
 {
     if (moveToRight)
         velx = 5.0f;

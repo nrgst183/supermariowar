@@ -44,17 +44,17 @@ void FPSLimiter::beforeFlip()
     if (game_values.showfps)
 #endif
     {
-        float potentialFps = 1000.0f / (float)(game_values.framelimiter == 0 ? 1 : game_values.framelimiter);
-        rm->menu_font_large.draw(0, 480 - rm->menu_font_large.getHeight(), std::format("Actual:{:.1f}/{:.1f}, Flip:{:.1f}, Potential:{:.1f}", realfps, potentialFps, flipfps, 1000.0f / (float)ticks));
+        float potentialFps = 1000.0f / static_cast<float>(game_values.framelimiter == 0 ? 1 : game_values.framelimiter);
+        rm->menu_font_large.draw(0, 480 - rm->menu_font_large.getHeight(), std::format("Actual:{:.1f}/{:.1f}, Flip:{:.1f}, Potential:{:.1f}", realfps, potentialFps, flipfps, 1000.0f / static_cast<float>(ticks)));
     }
 }
 
 void FPSLimiter::afterFlip()
 {
-    flipfps = 1000.0f / (float)ticks;
+    flipfps = 1000.0f / static_cast<float>(ticks);
 
     //Sleep for time just under what we need
-    short delay = (short)(game_values.framelimiter - SDL_GetTicks() + framestart - 2);
+    short delay = static_cast<short>(game_values.framelimiter - SDL_GetTicks() + framestart - 2);
 
     if (delay > 0) {
         if (delay > game_values.framelimiter)
@@ -64,13 +64,13 @@ void FPSLimiter::afterFlip()
     }
 
     //Fine tune wait here
-    while (SDL_GetTicks() - framestart < (unsigned short)game_values.framelimiter)
+    while (SDL_GetTicks() - framestart < static_cast<unsigned short>(game_values.framelimiter))
         SDL_Delay(0);   //keep framerate constant at 1000/game_values.framelimiter fps
 
     //Debug code to slow framerate down to 1 fps to see exact movement
 #ifdef _DEBUG
     if (game_values.frameadvance) {
-        delay = (short)(1000 - SDL_GetTicks() + framestart);
+        delay = static_cast<short>(1000 - SDL_GetTicks() + framestart);
 
         if (delay > 0) {
             if (delay > 1000)
@@ -88,7 +88,7 @@ void FPSLimiter::afterFlip()
     if (ticks == 0)
         ticks = game_values.framelimiter;
 
-    realfps = 1000.0f / (float)ticks;
+    realfps = 1000.0f / static_cast<float>(ticks);
 
 }
 #endif

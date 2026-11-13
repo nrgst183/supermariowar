@@ -6,6 +6,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 
 
 namespace {
@@ -103,8 +104,8 @@ void OMO_KingOfTheHillZone::update()
 
         if (scoretimer >= game_values.pointspeed) {
             scoretimer = 0;
-            players[iPlayerID]->Score().AdjustScore(multiplier);
-            game_values.gamemode->CheckWinner(players[iPlayerID]);
+            g_sim.players[iPlayerID]->Score().AdjustScore(multiplier);
+            game_values.gamemode->CheckWinner(g_sim.players[iPlayerID]);
 
             if (game_values.gamemodesettings.kingofthehill.maxmultiplier > 1 && ++multipliertimer >= 5) {
                 multipliertimer = 0;
@@ -147,8 +148,8 @@ void OMO_KingOfTheHillZone::placeArea()
     short y;
 
     for (short iLoop = 0; iLoop < 64; iLoop++) {
-        x = (short)RANDOM_INT(MAPWIDTH - size + 1);
-        y = (short)RANDOM_INT(MAPHEIGHT - size);
+        x = static_cast<short>(RANDOM_INT(MAPWIDTH - size + 1));
+        y = static_cast<short>(RANDOM_INT(MAPHEIGHT - size));
 
         // First move the zone down so it is sitting on atleast 1 solid tile
         short iFindY = y + size;

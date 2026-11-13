@@ -13,15 +13,15 @@
 #include <string>
 #include <vector>
 
-#define WORLD_BACKGROUND_SPRITE_SET_SIZE    60
-#define WORLD_PATH_SPRITE_SET_SIZE          20
+inline constexpr int WORLD_BACKGROUND_SPRITE_SET_SIZE = 60;
+inline constexpr int WORLD_PATH_SPRITE_SET_SIZE = 20;
 
-#define WORLD_FOREGROUND_STAGE_OFFSET           200
-#define WORLD_WINNING_TEAM_SPRITE_OFFSET        600
-#define WORLD_BRIDGE_SPRITE_OFFSET              604
-#define WORLD_START_SPRITE_OFFSET               608
-#define WORLD_FOREGROUND_SPRITE_OFFSET          700
-#define WORLD_FOREGROUND_SPRITE_ANIMATED_OFFSET 900
+inline constexpr int WORLD_FOREGROUND_STAGE_OFFSET = 200;
+inline constexpr int WORLD_WINNING_TEAM_SPRITE_OFFSET = 600;
+inline constexpr int WORLD_BRIDGE_SPRITE_OFFSET = 604;
+inline constexpr int WORLD_START_SPRITE_OFFSET = 608;
+inline constexpr int WORLD_FOREGROUND_SPRITE_OFFSET = 700;
+inline constexpr int WORLD_FOREGROUND_SPRITE_ANIMATED_OFFSET = 900;
 
 enum class WorldMusicCategory : unsigned char;
 

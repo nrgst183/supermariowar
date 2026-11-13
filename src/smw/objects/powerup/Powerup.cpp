@@ -16,7 +16,7 @@ MO_Powerup::MO_Powerup(gfxSprite* nspr, Vec2s pos, short iNumSpr, short aniSpeed
 void MO_Powerup::draw()
 {
     if (state == 0)
-        spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {drawframe, 0, iw, (short)(ih - fy + desty)});
+        spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {drawframe, 0, iw, static_cast<short>(ih - fy + desty)});
     else
         spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {drawframe, 0, iw, ih});
 }

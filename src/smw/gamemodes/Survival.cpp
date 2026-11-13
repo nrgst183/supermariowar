@@ -5,6 +5,7 @@
 #include "ObjectContainer.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_Podobo.h"
 #include "objects/overmap/WO_BowserFire.h"
 #include "objects/overmap/WO_Thwomp.h"
@@ -25,7 +26,7 @@ void CGM_Survival::init()
     CGM_Classic::init();
 
     rate = 3 * game_values.gamemodesettings.survival.density;
-    timer = (short)(RANDOM_INT(21) - 10 + rate);
+    timer = static_cast<short>(RANDOM_INT(21) - 10 + rate);
     ratetimer = 0;
 
     iEnemyWeightCount = 0;
@@ -59,21 +60,21 @@ void CGM_Survival::think()
 
             //TODO: Replace all these magic constants with proportional values
             if (0 == iSelectedEnemy) {
-                objectcontainer[2].add(new OMO_Thwomp(&rm->spr_thwomp, (short)RANDOM_INT(App::screenWidth * 0.92f), (float)game_values.gamemodesettings.survival.speed / 2.0f + (float)(RANDOM_INT(20))/10.0f));
-                timer = (short)(RANDOM_INT(21) - 10 + rate);
+                g_sim.objectcontainer[2].add(new OMO_Thwomp(&rm->spr_thwomp, static_cast<short>(RANDOM_INT(App::screenWidth * 0.92f)), static_cast<float>(game_values.gamemodesettings.survival.speed) / 2.0f + static_cast<float>(RANDOM_INT(20))/10.0f));
+                timer = static_cast<short>(RANDOM_INT(21) - 10 + rate);
             } else if (1 == iSelectedEnemy) {
-                objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {(short)RANDOM_INT(App::screenWidth * 0.95f ), App::screenHeight}, -(float(RANDOM_INT(9)) / 2.0f) - 8.0f, -1, -1, -1, false));
-                timer = (short)(RANDOM_INT(21) - 10 + rate - 20);
+                g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {static_cast<short>(RANDOM_INT(App::screenWidth * 0.95f )), App::screenHeight}, -(float(RANDOM_INT(9)) / 2.0f) - 8.0f, -1, -1, -1, false));
+                timer = static_cast<short>(RANDOM_INT(21) - 10 + rate - 20);
             } else {
-                float dSpeed = ((float)(RANDOM_INT(21) + 20)) / 10.0f;
+                float dSpeed = (static_cast<float>(RANDOM_INT(21) + 20)) / 10.0f;
                 float dVel = RANDOM_BOOL() ? dSpeed : -dSpeed;
 
                 short x = -54;
                 if (dVel < 0)
                     x = 694;
 
-                objectcontainer[2].add(new OMO_BowserFire(&rm->spr_bowserfire, {x, (short)RANDOM_INT( App::screenHeight * 0.93f )}, {dVel, 0.0f}, -1, -1, -1));
-                timer = (short)(RANDOM_INT(21) - 10 + rate);
+                g_sim.objectcontainer[2].add(new OMO_BowserFire(&rm->spr_bowserfire, {x, static_cast<short>(RANDOM_INT( App::screenHeight * 0.93f ))}, {dVel, 0.0f}, -1, -1, -1));
+                timer = static_cast<short>(RANDOM_INT(21) - 10 + rate);
             }
         }
     }

@@ -13,6 +13,8 @@
 #include "WorldTourStop.h"
 
 #include <cmath>
+#include <format>
+#include <string>
 
 
 MI_World::MI_World()
@@ -106,11 +108,11 @@ void MI_World::SetControllingTeam(short iWinningTeam)
 
 void MI_World::DisplayTeamControlAnnouncement()
 {
-    char szMessage[128];
+    std::string szMessage;
     if (game_values.teamcounts[iControllingTeam] <= 1)
-        snprintf(szMessage, sizeof(szMessage), "Player %d Is In Control", game_values.teamids[iControllingTeam][0] + 1);
+        szMessage = std::format("Player {} Is In Control", game_values.teamids[iControllingTeam][0] + 1);
     else
-        snprintf(szMessage, sizeof(szMessage), "Team %d Is In Control", iControllingTeam + 1);
+        szMessage = std::format("Team {} Is In Control", iControllingTeam + 1);
 
     m_parentMenu->AddEyeCandy<EC_Announcement>(&rm->menu_font_large, &rm->spr_announcementicons, szMessage, game_values.colorids[iControllingPlayerId], 120, 100);
 }
@@ -419,9 +421,9 @@ void MI_World::Draw()
            //Draw the teleport/warp stars effect
     if (iState == -2 || iState >= 4) {
         for (short iStar = 0; iStar < 10; iStar++) {
-            float dAngle = dTeleportStarAngle + (TWO_PI / 10.0f) * (float)iStar;
-            short iStarX = (short)(dTeleportStarRadius * cos(dAngle));
-            short iStarY = (short)(dTeleportStarRadius * sin(dAngle));
+            float dAngle = dTeleportStarAngle + (TWO_PI / 10.0f) * static_cast<float>(iStar);
+            short iStarX = static_cast<short>(dTeleportStarRadius * cos(dAngle));
+            short iStarY = static_cast<short>(dTeleportStarRadius * sin(dAngle));
 
             rm->spr_teleportstar.draw(iStarX + iPlayerDrawPos.x + iMapOffsetX, iStarY + iPlayerDrawPos.y + iMapOffsetY, {iTeleportStarAnimationFrame, 0, 32, 32});
         }
@@ -474,7 +476,7 @@ void MI_World::Draw()
     }
 
     if (iState == 4 || iState == 5) {
-        rm->menu_shade.setalpha((Uint8)iScreenfade);
+        rm->menu_shade.setalpha(static_cast<Uint8>(iScreenfade));
         rm->menu_shade.draw(0, 0);
     }
 }
@@ -709,7 +711,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
                     }
                 }
             }
-        } else if (iStateTransition[iTeamId] == 3) { //not transitioning to or from the item popup menu
+        } else if (iTeamId >= 0 && iStateTransition[iTeamId] == 3) { //not transitioning to or from the item popup menu
             if (playerKeys->menu_up.fPressed) {
                 if (iItemPage[iTeamId] > 0) {
                     iItemPage[iTeamId]--;
@@ -758,7 +760,8 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
             }
         }
 
-        if (iState == -1 && (iStateTransition[iTeamId] == 0 || iStateTransition[iTeamId] == 3)) {
+        //Players without a team (iTeamId == -1) can still cancel, but have no item popup
+        if (iState == -1 && (iTeamId < 0 || iStateTransition[iTeamId] == 0 || iStateTransition[iTeamId] == 3)) {
             if (playerKeys->menu_cancel.fPressed) {
                 if (DEVICE_KEYBOARD_ID != playerInput->inputControls[iPlayer]->iDevice || iPlayer == 0) {
                     fModifying = false;
@@ -766,7 +769,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
                 }
             }
 
-            if ((game_values.playercontrol[iPlayer] == 1 || fNoInterestingMoves) && (iPopupFlag[iTeamId] || playerKeys->menu_random.fPressed ||
+            if (iTeamId >= 0 && (game_values.playercontrol[iPlayer] == 1 || fNoInterestingMoves) && (iPopupFlag[iTeamId] || playerKeys->menu_random.fPressed ||
                     (iPlayer != 0 && playerInput->inputControls[iPlayer]->iDevice == DEVICE_KEYBOARD_ID && playerKeys->menu_cancel.fPressed))) {
                 iPopupFlag[iTeamId] = true;
 

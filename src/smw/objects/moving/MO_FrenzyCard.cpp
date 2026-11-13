@@ -8,6 +8,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "gamemodes/Frenzy.h"
 #include "objects/carriable/CO_Shell.h"
 
@@ -43,25 +44,25 @@ bool MO_FrenzyCard::collide(CPlayer* player)
         switch (type) {
         case 14: {
             CO_Shell* shell = new CO_Shell(ShellType::Green, Vec2s::zero(), true, true, true, false);
-            if (objectcontainer[1].add(shell))
+            if (g_sim.objectcontainer[1].add(shell))
                 shell->UsedAsStoredPowerup(player);
             break;
         }
         case 15: {
             CO_Shell* shell = new CO_Shell(ShellType::Red, Vec2s::zero(), false, true, true, false);
-            if (objectcontainer[1].add(shell))
+            if (g_sim.objectcontainer[1].add(shell))
                 shell->UsedAsStoredPowerup(player);
             break;
         }
         case 16: {
             CO_Shell* shell = new CO_Shell(ShellType::Spiny, Vec2s::zero(), false, false, true, true);
-            if (objectcontainer[1].add(shell))
+            if (g_sim.objectcontainer[1].add(shell))
                 shell->UsedAsStoredPowerup(player);
             break;
         }
         case 17: {
             CO_Shell* shell = new CO_Shell(ShellType::Buzzy, Vec2s::zero(), false, true, false, false);
-            if (objectcontainer[1].add(shell))
+            if (g_sim.objectcontainer[1].add(shell))
                 shell->UsedAsStoredPowerup(player);
             break;
         }
@@ -101,7 +102,7 @@ void MO_FrenzyCard::placeCard()
 
     short x = 0, y = 0;
     short iAttempts = 32;
-    while ((!g_map->findspawnpoint(5, &x, &y, collisionWidth, collisionHeight, false) || objectcontainer[1].getClosestObject(x, y, object_frenzycard) <= 150.0f)
+    while ((!g_map->findspawnpoint(5, &x, &y, collisionWidth, collisionHeight, false) || g_sim.objectcontainer[1].getClosestObject(x, y, object_frenzycard) <= 150.0f)
         && iAttempts-- > 0)
         ;
 

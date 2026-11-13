@@ -5,6 +5,7 @@
 #include "player.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 #include "objects/overmap/WO_RaceGoal.h"
 
 
@@ -55,7 +56,7 @@ void CGM_Race::init()
         game_values.gamemodesettings.race.penalty = penalty = 0;
 
     for (short iRaceGoal = 0; iRaceGoal < quantity; iRaceGoal++)
-        objectcontainer[2].add(new OMO_RaceGoal(&rm->spr_racegoal, iRaceGoal));
+        g_sim.objectcontainer[2].add(new OMO_RaceGoal(&rm->spr_racegoal, iRaceGoal));
 
     for (short iPlayer = 0; iPlayer < 4; iPlayer++)
         nextGoal[iPlayer] = 0;
@@ -103,17 +104,17 @@ void CGM_Race::setNextGoal(short teamID)
 {
     if (++nextGoal[teamID] >= quantity) {
         nextGoal[teamID] = 0;
-        removePlayerRaceGoals(objectcontainer[2], teamID, -1);
+        removePlayerRaceGoals(g_sim.objectcontainer[2], teamID, -1);
 
         if (!gameover) {
-            score[teamID]->AdjustScore(1);
+            g_sim.score[teamID].AdjustScore(1);
 
             //Don't end the game if the goal is infinite
             if (goal == -1)
                 return;
 
-            if (score[teamID]->score >= goal) {
-                score[teamID]->SetScore(goal);
+            if (g_sim.score[teamID].score >= goal) {
+                g_sim.score[teamID].SetScore(goal);
                 winningteam = teamID;
                 gameover = true;
 
@@ -121,7 +122,7 @@ void CGM_Race::setNextGoal(short teamID)
                 SetupScoreBoard(false);
                 ShowScoreBoard();
 
-            } else if (score[teamID]->score >= goal - 1 && !playedwarningsound) {
+            } else if (g_sim.score[teamID].score >= goal - 1 && !playedwarningsound) {
                 playwarningsound();
             }
         }
@@ -131,7 +132,7 @@ void CGM_Race::setNextGoal(short teamID)
 //Player loses control of his areas
 void CGM_Race::PenalizeRaceGoals(CPlayer &player)
 {
-    removePlayerRaceGoals(objectcontainer[2], player.getTeamID(), nextGoal[player.getTeamID()] - 1);
+    removePlayerRaceGoals(g_sim.objectcontainer[2], player.getTeamID(), nextGoal[player.getTeamID()] - 1);
 
     if (2 == penalty)
         nextGoal[player.getTeamID()] = 0;

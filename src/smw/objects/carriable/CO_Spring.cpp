@@ -108,8 +108,8 @@ void CO_Spring::place()
     short iAttempts = 10;
     while (!g_map->findspawnpoint(5, &ix, &iy, collisionWidth, collisionHeight, false) && iAttempts-- > 0)
         ;
-    fx = (float)ix;
-    fy = (float)iy;
+    fx = static_cast<float>(ix);
+    fy = static_cast<float>(iy);
 
     Drop();
 }

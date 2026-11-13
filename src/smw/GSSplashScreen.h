@@ -6,6 +6,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <memory>
+
 class SplashScreenState : public GameState
 {
     public:
@@ -18,7 +20,7 @@ class SplashScreenState : public GameState
         void onLeaveState() override;
 
         SDL_Event loop_event;
-        gfxSprite* menu_credits = nullptr;
+        std::unique_ptr<gfxSprite> menu_credits;
         int alpha;
         int state;
         int timer;

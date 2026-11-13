@@ -17,36 +17,23 @@ MI_BonusWheel::MI_BonusWheel(short x, short y)
     : UI_Control(x, y)
 {
     for (short iImage = 0; iImage < NUMBONUSITEMSONWHEEL; iImage++) {
-        dSelectionSector[iImage] = (float)iImage * TWO_PI / (float)(NUMBONUSITEMSONWHEEL);
+        dSelectionSector[iImage] = static_cast<float>(iImage) * TWO_PI / static_cast<float>(NUMBONUSITEMSONWHEEL);
 
-        short iPowerupX = x + 160 + (short)(110.0f * cos(dSelectionSector[iImage]));
-        short iPowerupY = y + 208 + (short)(110.0f * sin(dSelectionSector[iImage]));
+        short iPowerupX = x + 160 + static_cast<short>(110.0f * cos(dSelectionSector[iImage]));
+        short iPowerupY = y + 208 + static_cast<short>(110.0f * sin(dSelectionSector[iImage]));
 
-        miBonusImages[iImage] = new MI_Image(&rm->spr_storedpoweruplarge, iPowerupX, iPowerupY, 0, 0, 32, 32, 1, 1, 0);
+        miBonusImages[iImage] = std::make_unique<MI_Image>(&rm->spr_storedpoweruplarge, iPowerupX, iPowerupY, 0, 0, 32, 32, 1, 1, 0);
     }
 
     //Fix the last sector to allow correct detection of sector for tick sound
     dSelectionSector[NUMBONUSITEMSONWHEEL] = TWO_PI;
 
-    miContinueButton = new MI_Button(&rm->menu_plain_field, m_pos.x + 76, m_pos.y + 390, "Continue", 200, TextAlign::CENTER);
+    miContinueButton = std::make_unique<MI_Button>(&rm->menu_plain_field, m_pos.x + 76, m_pos.y + 390, "Continue", 200, TextAlign::CENTER);
     miContinueButton->setVisible(false);
     miContinueButton->SetCode(MENU_CODE_BONUS_DONE);
 }
 
-MI_BonusWheel::~MI_BonusWheel()
-{
-    delete miContinueButton;
-
-    for (int iImage = 0; iImage < NUMBONUSITEMSONWHEEL; iImage++)
-        delete miBonusImages[iImage];
-
-    if (miPlayerImages) {
-        for (int iPlayer = 0; iPlayer < iNumPlayers; iPlayer++)
-            delete miPlayerImages[iPlayer];
-
-        delete [] miPlayerImages;
-    }
-}
+MI_BonusWheel::~MI_BonusWheel() = default;
 
 MenuCodeEnum MI_BonusWheel::Modify(bool fModify)
 {
@@ -86,8 +73,8 @@ void MI_BonusWheel::Update()
         if (--iDisplayPowerupTimer <= 0) {
             iDisplayPowerupTimer = 20;
 
-            short iPoofX = m_pos.x + 152 + (short)(110.0f * cos(dSelectionSector[iDisplayPowerupIndex]));
-            short iPoofY = m_pos.y + 200 + (short)(110.0f * sin(dSelectionSector[iDisplayPowerupIndex]));
+            short iPoofX = m_pos.x + 152 + static_cast<short>(110.0f * cos(dSelectionSector[iDisplayPowerupIndex]));
+            short iPoofY = m_pos.y + 200 + static_cast<short>(110.0f * sin(dSelectionSector[iDisplayPowerupIndex]));
 
             m_parentMenu->AddEyeCandy<EC_SingleAnimation>(&rm->spr_poof, iPoofX, iPoofY, 4, 5);
 
@@ -120,7 +107,7 @@ void MI_BonusWheel::Update()
 
         if (iSelectionSpeedTimer > 0) {
             if (--iSelectionSpeedTimer <= 0) {
-                dSelectionSpeedGoal = (float)(RANDOM_INT(100) + 200) * 0.0005f;
+                dSelectionSpeedGoal = static_cast<float>(RANDOM_INT(100) + 200) * 0.0005f;
                 iSelectionSpeedTimer = 0;
             }
         }
@@ -189,8 +176,8 @@ void MI_BonusWheel::Draw()
 
     rm->spr_tournament_powerup_splash.draw(m_pos.x, m_pos.y);
 
-    short iSelectorX = m_pos.x + 144 + (short)(110.0f * cos(dSelectionAngle));
-    short iSelectorY = m_pos.y + 190 + (short)(110.0f * sin(dSelectionAngle));
+    short iSelectorX = m_pos.x + 144 + static_cast<short>(110.0f * cos(dSelectionAngle));
+    short iSelectorY = m_pos.y + 190 + static_cast<short>(110.0f * sin(dSelectionAngle));
 
     if (iState > 0)
         rm->spr_powerupselector.draw(iSelectorX, iSelectorY, {iSelectorAnimation * 64, 0, 64, 64});
@@ -248,20 +235,13 @@ void MI_BonusWheel::Reset(bool fTournament)
     }
 
            //Setup player images on wheel
-    if (miPlayerImages) {
-        for (short iPlayer = 0; iPlayer < iNumPlayers; iPlayer++)
-            delete miPlayerImages[iPlayer];
-
-        delete [] miPlayerImages;
-    }
+    miPlayerImages.clear();
 
     iNumPlayers = game_values.teamcounts[iWinningTeam];
 
-    miPlayerImages = new MI_Image * [iNumPlayers];
-
     short iPlayerX = m_pos.x + 160 - ((iNumPlayers - 1) * 17);
     for (short iPlayer = 0; iPlayer < iNumPlayers; iPlayer++) {
-        miPlayerImages[iPlayer] = new MI_Image(&rm->spr_player[game_values.teamids[iWinningTeam][iPlayer]][PGFX_JUMPING_R], iPlayerX, m_pos.y + 210, 0, 0, 32, 32, 1, 1, 0);
+        miPlayerImages.push_back(std::make_unique<MI_Image>(&rm->spr_player[game_values.teamids[iWinningTeam][iPlayer]][PGFX_JUMPING_R], iPlayerX, m_pos.y + 210, 0, 0, 32, 32, 1, 1, 0));
         iPlayerX += 34;
     }
 
@@ -276,9 +256,9 @@ void MI_BonusWheel::Reset(bool fTournament)
     iSelectorAnimationCounter = 0;
 
            //Figure out the initial position and speed of the selector
-    dSelectionSpeed = (float)(RANDOM_INT(100) + 200) * 0.0005f;
-    dSelectionAngle = (float)RANDOM_INT(NUMBONUSITEMSONWHEEL) * TWO_PI / (float)(NUMBONUSITEMSONWHEEL);
-    dSelectionSpeedGoal = (float)(RANDOM_INT(100) + 200) * 0.0005f;
+    dSelectionSpeed = static_cast<float>(RANDOM_INT(100) + 200) * 0.0005f;
+    dSelectionAngle = static_cast<float>(RANDOM_INT(NUMBONUSITEMSONWHEEL)) * TWO_PI / static_cast<float>(NUMBONUSITEMSONWHEEL);
+    dSelectionSpeedGoal = static_cast<float>(RANDOM_INT(100) + 200) * 0.0005f;
     iSelectionSpeedTimer = 0;
 
     for (short iSector = 0; iSector < NUMBONUSITEMSONWHEEL; iSector++) {

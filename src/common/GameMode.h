@@ -1,7 +1,7 @@
 #ifndef GAMEMODE_H
 #define GAMEMODE_H
 
-#define GAMEMODE_NUM_OPTIONS 21
+constexpr int GAMEMODE_NUM_OPTIONS = 21;
 
 #include "GameModeType.h"
 #include "PlayerKillStyles.h"

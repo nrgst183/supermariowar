@@ -3,7 +3,7 @@
 
 //------------- global definitions -------------
 
-#define FILEBUFSIZE 1024
+constexpr int FILEBUFSIZE = 1024;
 
 //----------------------------------------------------------------
 // DON'T CHANGE THE ORDER xxx_R xxx_L xxx_R xxx_L !!!
@@ -16,148 +16,149 @@
 
 // see CPlayer::draw() on how this is used
 
-#define PGFX_STANDING_R 0
-#define PGFX_STANDING_L 1
-#define PGFX_RUNNING_R  2
-#define PGFX_RUNNING_L  3
-#define PGFX_JUMPING_R  4
-#define PGFX_JUMPING_L  5
-#define PGFX_STOPPING_R 6
-#define PGFX_STOPPING_L 7
-#define PGFX_DEADFLYING 8
-#define PGFX_DEAD       9
+constexpr int PGFX_STANDING_R = 0;
+constexpr int PGFX_STANDING_L = 1;
+constexpr int PGFX_RUNNING_R = 2;
+constexpr int PGFX_RUNNING_L = 3;
+constexpr int PGFX_JUMPING_R = 4;
+constexpr int PGFX_JUMPING_L = 5;
+constexpr int PGFX_STOPPING_R = 6;
+constexpr int PGFX_STOPPING_L = 7;
+constexpr int PGFX_DEADFLYING = 8;
+constexpr int PGFX_DEAD = 9;
 //--------------------------
-#define PGFX_LAST       10
+constexpr int PGFX_LAST = 10;
 
-#define PANNOUNCER_SOUND_LAST   20
+constexpr int PANNOUNCER_SOUND_LAST = 20;
 
-#define PH              25      //Player height
-#define PW              22      //Player width
-#define HALFPH          12
-#define HALFPW          11
-#define PHOFFSET        4
-#define PWOFFSET        5
+constexpr int PH = 25;                                  //Player height
+constexpr int PW = 22;                                  //Player width
+constexpr int HALFPH = 12;
+constexpr int HALFPW = 11;
+constexpr int PHOFFSET = 4;
+constexpr int PWOFFSET = 5;
 
-#define VELMOVING           4.0f        //velocity (speed) for moving left, right
-#define VELSLOWMOVING       2.2f        //velocity when slow down powerup is in effect
-#define VELMOVING_CHICKEN   2.9f        //speed of the chicken in the gamemode capturethechicken
-#define VELMOVINGADD        0.5f
-#define VELMOVINGADDICE     VELMOVINGADD / 4
-#define VELTURBOMOVING      5.5f
-#define VELJUMP             9.0f    //velocity for jumping
-#define VELSLOWJUMP         7.0f    //velocity for jumping when slow down powerup is in effect
-#define VELTURBOJUMP        10.2f   //velocity for turbo jumping
-#define VELSUPERJUMP        13.0f  //super jump (jumping off of orange note blocks)
-#define VELPUSHBACK         5.0f
-#define VELMAXBREAKBLOCK    3.0f
-#define VELNOTEBLOCKBOUNCE  3.0f
-#define VELNOTEBLOCKREPEL   5.0f
-#define VELBLOCKBOUNCE      3.0f
-#define VELBLOCKREPEL       3.0f
-#define VELPOWERUPBOUNCE    8.1f
-#define FIREBALLBOUNCE      5.0f
-#define HAMMERTHROW         8.5f
-#define VELMOVINGFRICTION   0.2f
-#define VELICEFRICTION      0.06f
-#define VELAIRFRICTION      0.06f
-#define VELSTOPJUMP         5.0f
-#define BOUNCESTRENGTH      0.5f
-#define TAGGEDBOOST         1.0f
-#define VELSUPERSTOMP       10.0f
-#define VELTAILSHAKE        1.0f
-#define VELKURIBOBOUNCE     3.0f
-#define VELENEMYBOUNCE      7.0f
+constexpr float VELMOVING = 4.0f;                       //velocity (speed) for moving left, right
+constexpr float VELSLOWMOVING = 2.2f;                   //velocity when slow down powerup is in effect
+constexpr float VELMOVING_CHICKEN = 2.9f;               //speed of the chicken in the gamemode capturethechicken
+constexpr float VELMOVINGADD = 0.5f;
+constexpr float VELMOVINGADDICE = VELMOVINGADD / 4;
+constexpr float VELTURBOMOVING = 5.5f;
+constexpr float VELJUMP = 9.0f;                         //velocity for jumping
+constexpr float VELSLOWJUMP = 7.0f;                     //velocity for jumping when slow down powerup is in effect
+constexpr float VELTURBOJUMP = 10.2f;                   //velocity for turbo jumping
+constexpr float VELSUPERJUMP = 13.0f;                   //super jump (jumping off of orange note blocks)
+constexpr float VELPUSHBACK = 5.0f;
+constexpr float VELMAXBREAKBLOCK = 3.0f;
+constexpr float VELNOTEBLOCKBOUNCE = 3.0f;
+constexpr float VELNOTEBLOCKREPEL = 5.0f;
+constexpr float VELBLOCKBOUNCE = 3.0f;
+constexpr float VELBLOCKREPEL = 3.0f;
+constexpr float VELPOWERUPBOUNCE = 8.1f;
+constexpr float FIREBALLBOUNCE = 5.0f;
+constexpr float HAMMERTHROW = 8.5f;
+constexpr float VELMOVINGFRICTION = 0.2f;
+constexpr float VELICEFRICTION = 0.06f;
+constexpr float VELAIRFRICTION = 0.06f;
+constexpr float VELSTOPJUMP = 5.0f;
+constexpr float BOUNCESTRENGTH = 0.5f;
+constexpr float TAGGEDBOOST = 1.0f;
+constexpr float VELSUPERSTOMP = 10.0f;
+constexpr float VELTAILSHAKE = 1.0f;
+constexpr float VELKURIBOBOUNCE = 3.0f;
+constexpr float VELENEMYBOUNCE = 7.0f;
 
-#define GRAVITATION 0.40f
+constexpr float GRAVITATION = 0.40f;
 
-#define MAXVELY     20.0f
-#define MAXSIDEVELY 10.0f
+constexpr float MAXVELY = 20.0f;
+constexpr float MAXSIDEVELY = 10.0f;
 
-#define CRUNCHVELOCITY  2
-#define CRUNCHAMOUNT    16
-#define CRUNCHMAX       32
+constexpr int CRUNCHVELOCITY = 2;
+constexpr int CRUNCHAMOUNT = 16;
+constexpr int CRUNCHMAX = 32;
 
 
-#define MAPWIDTH        20          //width of the map
-#define MAPHEIGHT       15          //height of the map
-#define MAPLAYERS       4           //number of layers the map has
-#define TILESIZE        32          //size of the tiles, should be dynamically read
-#define PREVIEWTILESIZE 16          //size of the preview tiles
-#define THUMBTILESIZE   8           //size of the thumbnail tiles
+constexpr int MAPWIDTH = 20;                            //width of the map
+constexpr int MAPHEIGHT = 15;                           //height of the map
+constexpr int MAPLAYERS = 4;                            //number of layers the map has
+constexpr int TILESIZE = 32;                            //size of the tiles, should be dynamically read
+constexpr int TILESIZE_SHIFT = 5;                       //log2(TILESIZE): converts tile coordinates to pixels
+constexpr int PREVIEWTILESIZE = 16;                     //size of the preview tiles
+constexpr int THUMBTILESIZE = 8;                        //size of the thumbnail tiles
 
-#define MAXWARPS            32
-#define MAXMAPITEMS         32
-#define MAXMAPHAZARDS       30
-#define NUMMAPHAZARDPARAMS  5
+constexpr int MAXWARPS = 32;
+constexpr int MAXMAPITEMS = 32;
+constexpr int MAXMAPHAZARDS = 30;
+constexpr int NUMMAPHAZARDPARAMS = 5;
 
-#define NUMSPAWNAREATYPES   6
-#define MAXSPAWNAREAS       128
-#define MAXDRAWAREAS        128
+constexpr int NUMSPAWNAREATYPES = 6;
+constexpr int MAXSPAWNAREAS = 128;
+constexpr int MAXDRAWAREAS = 128;
 
-#define MAX_BONUS_CHESTS            5
-#define MAX_WORLD_BONUSES_AWARDED   3
+constexpr int MAX_BONUS_CHESTS = 5;
+constexpr int MAX_WORLD_BONUSES_AWARDED = 3;
 
-#define TILESETSIZE     960         //30*32 Tiles by 32 pixel in a 1024*1024 bmp
-#define TILESETHEIGHT   30
-#define TILESETWIDTH    32
+constexpr int TILESETSIZE = 960;                        //30*32 Tiles by 32 pixel in a 1024*1024 bmp
+constexpr int TILESETHEIGHT = 30;
+constexpr int TILESETWIDTH = 32;
 
-#define TILESETANIMATED     -1
-#define TILESETNONE         -2
-#define TILESETUNKNOWN      -3
+constexpr int TILESETANIMATED = -1;
+constexpr int TILESETNONE = -2;
+constexpr int TILESETUNKNOWN = -3;
 
-#define TILEANIMATIONSIZE   38      //number of tile animations
+constexpr int TILEANIMATIONSIZE = 38;                   //number of tile animations
 
-#define MAXMUSICCATEGORY        11
-#define MAXWORLDMUSICCATEGORY   9
-#define WORLDMUSICBONUS         MAXWORLDMUSICCATEGORY
-#define WORLDMUSICSLEEP         MAXWORLDMUSICCATEGORY + 1
-#define WORLDMUSICWORLDS        MAXWORLDMUSICCATEGORY + 2
-#define MAXCATEGORYTRACKS       64
+constexpr int MAXMUSICCATEGORY = 11;
+constexpr int MAXWORLDMUSICCATEGORY = 9;
+constexpr int WORLDMUSICBONUS = MAXWORLDMUSICCATEGORY;
+constexpr int WORLDMUSICSLEEP = MAXWORLDMUSICCATEGORY + 1;
+constexpr int WORLDMUSICWORLDS = MAXWORLDMUSICCATEGORY + 2;
+constexpr int MAXCATEGORYTRACKS = 64;
 
-#define MAXEYECANDY 192
-#define CORPSESTAY  200
+constexpr int MAXEYECANDY = 192;
+constexpr int CORPSESTAY = 200;
 
-#define WAITTIME        16      //delay between frames (default:16)
-#define MAXAWARDS       10
-#define MINAWARDSNEEDED 3
+constexpr int WAITTIME = 16;                            //delay between frames (default:16)
+constexpr int MAXAWARDS = 10;
+constexpr int MINAWARDSNEEDED = 3;
 
-#define MAXTOURNAMENTGAMES  10
-#define MAXWORLDITEMS       32
+constexpr int MAXTOURNAMENTGAMES = 10;
+constexpr int MAXWORLDITEMS = 32;
 
-#define MAXRACEGOALS        8
+constexpr int MAXRACEGOALS = 8;
 
-#define TWO_PI              6.2831853f
-#define PI                  3.1415292f
-#define THREE_HALF_PI       4.7123890f
-#define THREE_QUARTER_PI    2.3561945f
-#define HALF_PI             1.5707963f
-#define QUARTER_PI          0.7853982f
+constexpr float TWO_PI = 6.2831853f;
+constexpr float PI = 3.1415292f;
+constexpr float THREE_HALF_PI = 4.7123890f;
+constexpr float THREE_QUARTER_PI = 2.3561945f;
+constexpr float HALF_PI = 1.5707963f;
+constexpr float QUARTER_PI = 0.7853982f;
 
-#define NUM_POWERUPS            26
-#define NUM_WORLD_POWERUPS      15
-#define NUM_WORLD_SCORE_BONUSES 20
-#define NUM_WORLD_ITEMS         NUM_POWERUPS + NUM_WORLD_POWERUPS + NUM_WORLD_SCORE_BONUSES
-#define NUM_BLOCK_SETTINGS      NUM_POWERUPS
-#define NUM_POWERUP_PRESETS     17
+constexpr int NUM_POWERUPS = 26;
+constexpr int NUM_WORLD_POWERUPS = 15;
+constexpr int NUM_WORLD_SCORE_BONUSES = 20;
+constexpr int NUM_WORLD_ITEMS = NUM_POWERUPS + NUM_WORLD_POWERUPS + NUM_WORLD_SCORE_BONUSES;
+constexpr int NUM_BLOCK_SETTINGS = NUM_POWERUPS;
+constexpr int NUM_POWERUP_PRESETS = 17;
 
-#define HEALTH_POWERUP      -1
-#define TIME_POWERUP        -2
-#define JAIL_KEY_POWERUP    -3
-#define COIN_POWERUP        -4
-#define MINIGAME_COIN       -5
-#define SECRET1_POWERUP     -6
-#define SECRET2_POWERUP     -7
-#define SECRET3_POWERUP     -8
-#define SECRET4_POWERUP     -9
-#define NO_POWERUP          -10
+constexpr int HEALTH_POWERUP = -1;
+constexpr int TIME_POWERUP = -2;
+constexpr int JAIL_KEY_POWERUP = -3;
+constexpr int COIN_POWERUP = -4;
+constexpr int MINIGAME_COIN = -5;
+constexpr int SECRET1_POWERUP = -6;
+constexpr int SECRET2_POWERUP = -7;
+constexpr int SECRET3_POWERUP = -8;
+constexpr int SECRET4_POWERUP = -9;
+constexpr int NO_POWERUP = -10;
 
-#define NUM_AUTO_FILTERS 12
+constexpr int NUM_AUTO_FILTERS = 12;
 
-#define NUMSTOMPENEMIES     9
-#define NUMSURVIVALENEMIES  3
-#define NUMFRENZYCARDS      19
+constexpr int NUMSTOMPENEMIES = 9;
+constexpr int NUMSURVIVALENEMIES = 3;
+constexpr int NUMFRENZYCARDS = 19;
 
-#define MAX_PLAYERS 4
+constexpr int MAX_PLAYERS = 4;
 
 
 #endif // GLOBALCONSTANTS_H

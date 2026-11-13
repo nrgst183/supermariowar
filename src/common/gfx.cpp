@@ -413,6 +413,6 @@ void gfx_setjoystickteamcolor(SDL_Joystick* joystick, short team, float brightne
     }
     brightness = max(0.f, min(1.f, brightness));
     if (std::optional<RGB> color = gfx_palette.replacementFor(RGB {0x80, 0x00, 0x00}, team, PlayerPalette::normal)) {
-        SDL_SetJoystickLED(joystick, (Uint8)(brightness * color->r), (Uint8)(brightness * color->g), (Uint8)(brightness * color->b));
+        SDL_SetJoystickLED(joystick, static_cast<Uint8>(brightness * color->r), static_cast<Uint8>(brightness * color->g), static_cast<Uint8>(brightness * color->b));
     }
 }

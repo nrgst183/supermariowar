@@ -22,7 +22,7 @@ void MI_PowerupSlider::Draw()
     m_spr->draw(m_pos.x + 38, m_pos.y, {0, (fSelected ? 32 : 0) + m_adjustmentY, m_halfWidth, 32});
     m_spr->draw(m_pos.x + 38 + m_halfWidth, m_pos.y, {550 - m_width + m_halfWidth, (fSelected ? 32 : 0) + m_adjustmentY, m_width - m_halfWidth - 38, 32});
 
-    short iSpacing = (m_width - 100) / ((short)m_items.size() - 1);
+    short iSpacing = (m_width - 100) / (static_cast<short>(m_items.size()) - 1);
     short iSpot = 0;
 
     for (unsigned int index = 0; index < m_items.size(); index++) {

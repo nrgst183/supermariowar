@@ -174,7 +174,7 @@ void PlayerTanookiSuit::drawStatue(CPlayer& player)
             player.leftX() - PWOFFSET,
             player.topY() - 31,
             {player.getColorID() << 5, 0, 32, 58},
-            static_cast<ClipEdge>((short)player.state % 4), player.GetWarpPlane());
+            static_cast<ClipEdge>(static_cast<short>(player.state) % 4), player.GetWarpPlane());
     else
         rm->spr_statue.draw(
             player.leftX() - PWOFFSET,

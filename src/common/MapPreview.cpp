@@ -1,0 +1,348 @@
+#include "map.h"
+
+#include "IO_Block.h"
+#include "GameValues.h"
+#include "GlobalConstants.h"
+#include "Game.h"
+#include "FileIO.h"
+#include "FileList.h"
+#include "movingplatform.h"
+#include "path.h"
+#include "RandomNumberGenerator.h"
+#include "ResourceManager.h"
+#include "TilesetManager.h"
+#include "Version.h"
+#include "map/MapReader.h"
+
+#include <SDL3_image/SDL_image.h>
+
+#include <cmath>
+#include <iostream>
+using std::cout;
+using std::endl;
+
+#if defined(__APPLE__)
+#include <sys/stat.h>
+#endif
+
+#ifndef __EMSCRIPTEN__
+    inline void smallDelay() { SDL_Delay(10); }
+#else
+    inline void smallDelay() {}
+#endif
+
+
+gfxSprite CMap::createThumbnailSurface(bool fUseClassicPack)
+{
+    gfxSprite sThumbnail = gfxSprite::blank(160, 120);
+
+    std::string localSzBackgroundFile;
+    std::string path;
+
+    if (fUseClassicPack) {
+        localSzBackgroundFile = "gfx/packs/Classic/backgrounds/" + g_map->szBackgroundFile;
+        path = convertPath(localSzBackgroundFile);
+
+        //if the background file doesn't exist, use the classic background
+        if (!FileExists(path))
+            path = convertPath("gfx/packs/Classic/backgrounds/Land_Classic.png");
+    } else {
+        localSzBackgroundFile = "gfx/packs/backgrounds/" + g_map->szBackgroundFile;
+        path = convertPath(localSzBackgroundFile, gamegraphicspacklist->currentPath());
+
+        //if the background file doesn't exist, use the classic background
+        if (!FileExists(path))
+            path = convertPath("gfx/packs/backgrounds/Land_Classic.png", gamegraphicspacklist->currentPath());
+    }
+    {
+        gfxSprite sBackground = ImageLoader(path).withoutColorKey().create();
+        SDL_Rect srcRectBackground = {0, 0, App::screenWidth, App::screenHeight};
+        SDL_Rect dstRectBackground = {0, 0, 160, 120};
+        sBackground.drawStretch(srcRectBackground, sThumbnail.getSurface(), dstRectBackground);
+    }
+
+    preDrawPreviewBackground(sThumbnail, true);
+    preDrawPreviewBlocks(sThumbnail, true);
+    preDrawPreviewMapItems(sThumbnail, true);
+    drawThumbnailHazards(sThumbnail);
+    drawThumbnailPlatforms(sThumbnail);
+    preDrawPreviewForeground(sThumbnail, true);
+    preDrawPreviewWarps(sThumbnail, true);
+
+    return sThumbnail;
+}
+
+//Save thumbnail image
+void CMap::saveThumbnail(const std::string &sFile, bool fUseClassicPack)
+{
+    gfxSprite sThumbnail = createThumbnailSurface(fUseClassicPack);
+
+    //Save the screenshot with the same name as the map file
+    IMG_SavePNG(sThumbnail.getSurface(), sFile.c_str());
+}
+
+void CMap::drawThumbnailHazards(gfxSprite& targetSurface)
+{
+    for (const MapHazard& hazard : maphazards) {
+        DrawMapHazard(hazard, 2, false, targetSurface.getSurface());
+    }
+}
+
+void CMap::drawThumbnailPlatforms(gfxSprite& targetSurface)
+{
+    for (MovingPlatform* platform : platforms) {
+        MovingPlatformPath * basepath = platform->pPath;
+
+        if (auto* path = dynamic_cast<StraightPath*>(basepath)) {
+            DrawPlatform(path->typeId(), platform->iTileData, path->startPos().x * 2.f, path->startPos().y * 2.f, path->endPos().x * 2.f, path->endPos().y * 2.f, 0.0f, 0.0f, 0.0f, 2, platform->iTileWidth, platform->iTileHeight, true, true, targetSurface.getSurface());
+        } else if (auto* path = dynamic_cast<StraightPathContinuous*>(basepath)) {
+            DrawPlatform(path->typeId(), platform->iTileData, path->startPos().x * 2.f, path->startPos().y * 2.f, 0, 0, path->angle(), 0.0f, 0.0f, 2, platform->iTileWidth, platform->iTileHeight, true, true, targetSurface.getSurface());
+        } else if (auto* path = dynamic_cast<EllipsePath*>(basepath)) {
+            DrawPlatform(path->typeId(), platform->iTileData, path->centerPos().x * 2.f, path->centerPos().y * 2.f, 0, 0, path->startAngle(), path->radius().x * 2, path->radius().y * 2, 2, platform->iTileWidth, platform->iTileHeight, true, true, targetSurface.getSurface());
+        }
+    }
+}
+
+void CMap::preDrawPreviewWarps(gfxSprite& targetSurface, bool fThumbnail)
+{
+    short iTileSize = 16;
+    short iScreenshotSize = 0;
+
+    if (fThumbnail) {
+        iTileSize = 8;
+        iScreenshotSize = 1;
+    }
+
+    for (int j = 0; j < MAPHEIGHT; j++) {
+        for (int i = 0; i < MAPWIDTH; i++) {
+            Warp * wWarp = &g_map->warpdata[i][j];
+
+            if (wWarp->connection != -1) {
+                SDL_Rect rSrc = {wWarp->connection * iTileSize, wWarp->direction * iTileSize, iTileSize, iTileSize};
+                SDL_Rect rDst = {i * iTileSize, j * iTileSize, iTileSize, iTileSize};
+
+                rm->spr_thumbnail_warps[iScreenshotSize].draw(rSrc, targetSurface.getSurface(), rDst);
+            }
+        }
+    }
+}
+
+void CMap::preDrawPreviewMapItems(gfxSprite& targetSurface, bool fThumbnail)
+{
+    short iTileSize = 16;
+    short iScreenshotSize = 0;
+
+    if (fThumbnail) {
+        iTileSize = 8;
+        iScreenshotSize = 1;
+    }
+
+    for (const MapItem& item : mapitems) {
+        SDL_Rect rSrc = {item.itype * iTileSize, 0, iTileSize, iTileSize};
+        SDL_Rect rDst = {item.ix * iTileSize, item.iy * iTileSize, iTileSize, iTileSize};
+
+        rm->spr_thumbnail_mapitems[iScreenshotSize].draw(rSrc, targetSurface.getSurface(), rDst);
+    }
+}
+
+void CMap::preDrawPreviewBackground(gfxSprite& targetSurface, bool fThumbnail)
+{
+    drawPreview(targetSurface, 0, fThumbnail);
+    smallDelay(); //Sleeps to help the music from skipping
+
+    drawPreview(targetSurface, 1, fThumbnail);
+    smallDelay();
+
+    if (!game_values.toplayer) {
+        drawPreview(targetSurface, 2, fThumbnail);
+        smallDelay();
+
+        drawPreview(targetSurface, 3, fThumbnail);
+        smallDelay();
+    }
+
+    //drawPreviewBlocks(targetSurface, fThumbnail);
+}
+
+void CMap::preDrawPreviewBackground(const gfxSprite& background, gfxSprite& targetSurface, bool fThumbnail)
+{
+    SDL_Rect srcrect;
+    srcrect.x = 0;
+    srcrect.y = 0;
+	srcrect.w = App::screenWidth;
+    srcrect.h = App::screenHeight;
+
+    SDL_Rect dstrect;
+    dstrect.x = 0;
+    dstrect.y = 0;
+
+    if (fThumbnail) {
+        dstrect.w = 160;
+        dstrect.h = 120;
+    } else {
+		dstrect.w = App::screenWidth/2;
+        dstrect.h = App::screenHeight/2;
+    }
+
+    background.drawStretch(srcrect, targetSurface.getSurface(), dstrect);
+
+    smallDelay();
+    preDrawPreviewBackground(targetSurface, fThumbnail);
+}
+
+void CMap::preDrawPreviewBlocks(gfxSprite& targetSurface, bool fThumbnail)
+{
+    if (!fThumbnail) {
+        SDL_FillSurfaceRect(targetSurface.getSurface(), nullptr, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
+        SDL_SetSurfaceColorKey(targetSurface.getSurface(), true, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
+        smallDelay();
+    }
+
+    drawPreviewBlocks(targetSurface, fThumbnail);
+}
+
+
+void CMap::preDrawPreviewForeground(gfxSprite& targetSurface, bool fThumbnail)
+{
+    if (!fThumbnail) {
+        SDL_FillSurfaceRect(targetSurface.getSurface(), nullptr, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
+        SDL_SetSurfaceColorKey(targetSurface.getSurface(), true, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
+        smallDelay();
+    }
+
+    if (!game_values.toplayer)
+        return;
+
+    drawPreview(targetSurface, 2, fThumbnail);
+    smallDelay();
+    drawPreview(targetSurface, 3, fThumbnail);
+}
+
+void CMap::drawPreview(gfxSprite& targetSurface, int layer, bool fThumbnail)
+{
+    int i, j;
+
+    //draw left to right full vertical
+    DrawSize iTilesetSize = DrawSize::Preview;
+    if (fThumbnail)
+        iTilesetSize = DrawSize::Thumbnail;
+
+    for (i = 0; i < MAPWIDTH; i++) {
+        for (j = 0; j < MAPHEIGHT; j++) {
+            TilesetTile * tile = &mapdata[i][j][layer];
+            if (tile->iID == TILESETNONE)
+                continue;
+
+            //Handle drawing preview for animated tiles
+            if (tile->iID >= 0) {
+                g_tilesetmanager->Draw(targetSurface.getSurface(), tile->iID, iTilesetSize, tile->iCol, tile->iRow, i, j);
+            } else if (tile->iID == TILESETANIMATED) {
+                const SDL_Rect& srcRect = CTilesetManager::rect(iTilesetSize, tile->iCol * 4, tile->iRow);
+                const SDL_Rect& dstRect = CTilesetManager::rect(iTilesetSize, i, j);
+                rm->spr_tileanimation[static_cast<size_t>(iTilesetSize)].draw(srcRect, targetSurface.getSurface(), dstRect);
+            } else if (tile->iID == TILESETUNKNOWN) {
+                const SDL_Rect& srcRect = CTilesetManager::rect(iTilesetSize, 0, 0);
+                const SDL_Rect& dstRect = CTilesetManager::rect(iTilesetSize, i, j);
+                rm->spr_unknowntile[static_cast<size_t>(iTilesetSize)].draw(srcRect, targetSurface.getSurface(), dstRect);
+            }
+        }
+    }
+}
+
+void CMap::drawPreviewBlocks(gfxSprite& targetSurface, bool fThumbnail)
+{
+    int i, j, ts;
+
+    short iBlockSize = PREVIEWTILESIZE;
+
+    if (fThumbnail)
+        iBlockSize = THUMBTILESIZE;
+
+    SDL_Rect rectDst;
+    rectDst.w = iBlockSize;
+    rectDst.h = iBlockSize;
+
+    SDL_Rect rectSrc;
+    rectSrc.w = iBlockSize;
+    rectSrc.h = iBlockSize;
+
+    rectDst.x = 0;
+    for (i = 0; i < MAPWIDTH; i++) {
+        rectDst.y = -iBlockSize;	//this is okay, see
+
+        for (j = 0; j < MAPHEIGHT; j++) {
+            rectDst.y += iBlockSize;	// here
+
+            ts = objectdata[i][j].iType;
+            if (ts == -1)
+                continue;
+
+            //Don't draw hidden blocks
+            if (objectdata[i][j].fHidden)
+                continue;
+
+            rectSrc.x = static_cast<Sint16>(ts * iBlockSize);
+            rectSrc.y = 0;
+
+            //Draw the turned off switch blocks too
+            if (ts >= 7 && ts <= 10) {
+                if (iSwitches[(ts - 7) % 4] == 0)
+                    rectSrc.y = iBlockSize;
+            } else if (ts >= 11 && ts <= 14) {
+                if (objectdata[i][j].iSettings[0] == 0)
+                    rectSrc.y = iBlockSize;
+            } else if (ts >= 15 && ts <= 19) {
+                rectSrc.x = iBlockSize * (ts - 15);
+                rectSrc.y = iBlockSize;
+            } else if (ts >= 20 && ts <= 29) {
+                rectSrc.x = iBlockSize * (ts - 20);
+                rectSrc.y = iBlockSize << 1;
+            }
+
+            if (fThumbnail)
+                rm->spr_blocks[2].draw(rectSrc, targetSurface.getSurface(), rectDst);
+            else
+                rm->spr_blocks[1].draw(rectSrc, targetSurface.getSurface(), rectDst);
+        }
+
+        rectDst.x += iBlockSize;
+    }
+}
+
+void CMap::predrawbackground(gfxSprite &background, gfxSprite &mapspr)
+{
+    SDL_Rect r;
+    r.x = 0;
+    r.y = 0;
+	r.w = App::screenWidth;
+	r.h = App::screenHeight;
+
+    background.draw(mapspr.getSurface(), r);
+
+    draw(mapspr, 0);
+    draw(mapspr, 1);
+
+    if (!game_values.toplayer) {
+        draw(mapspr, 2);
+        draw(mapspr, 3);
+    }
+
+    //Add animated tile objects for each animated tile in a platform (to be used later for drawing)
+    addPlatformAnimatedTiles();
+
+}
+
+void CMap::predrawforeground(gfxSprite &foregroundspr)
+{
+    if (SDL_MUSTLOCK(foregroundspr.getSurface()))
+        SDL_LockSurface(foregroundspr.getSurface());
+
+    SDL_FillSurfaceRect(foregroundspr.getSurface(), nullptr, SDL_MapSurfaceRGB(foregroundspr.getSurface(), 255, 0, 255));
+    SDL_SetSurfaceColorKey(foregroundspr.getSurface(), true, SDL_MapSurfaceRGB(foregroundspr.getSurface(), 255, 0, 255));
+
+    if (SDL_MUSTLOCK(foregroundspr.getSurface()))
+        SDL_UnlockSurface(foregroundspr.getSurface());
+
+    draw(foregroundspr, 2);
+    draw(foregroundspr, 3);
+}

@@ -2,16 +2,34 @@ add_executable(smw WIN32
 	main.cpp
 
 	ai.cpp
+	AIObjects.cpp
 	ai.h
 	FPSLimiter.cpp
 	FPSLimiter.h
 	GSGameplay.cpp
 	GSGameplay.h
+	GSGameplayInternal.h
+	GameplayCollisions.cpp
+	GameplayDebug.cpp
+	GameplayDraw.cpp
+	GameplayEffects.cpp
+	GameplayMapObjects.cpp
+	GameplayNetwork.cpp
+	GameplayPause.cpp
+	GameplayScoreboard.cpp
+	GameplaySetup.cpp
 	GSMenu.cpp
 	GSMenu.h
+	MenuAutoTest.cpp
+	MenuScript.cpp
+	MenuStartGame.cpp
 	GSSplashScreen.cpp
 	GSSplashScreen.h
 	net.cpp
+	NetClientGame.cpp
+	NetClientRoom.cpp
+	NetGameHost.cpp
+	NetInternal.h
 	net.h
 	network/FileCompressor.cpp
 	network/FileCompressor.h
@@ -24,7 +42,13 @@ add_executable(smw WIN32
 	objecthazard.cpp
 	objecthazard.h
 	player.cpp
+	PlayerDraw.cpp
+	PlayerKills.cpp
+	PlayerMapCollision.cpp
+	PlayerMovement.cpp
+	PlayerPowerups.cpp
 	player.h
+	SimulationState.h
 	world.cpp
 	world.h
 

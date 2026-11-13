@@ -31,19 +31,19 @@ class MovingPlatform
 
     void setXf(float xf) {
         fx = xf;
-        ix = (short)fx;
+        ix = static_cast<short>(fx);
     }
     void setXi(short xi) {
         ix = xi;
-        fx = (float)ix;
+        fx = static_cast<float>(ix);
     }
     void setYf(float yf) {
         fy = yf;
-        iy = (short)fy;
+        iy = static_cast<short>(fy);
     }
     void setYi(short yi) {
         iy = yi;
-        fy = (float)iy;
+        fy = static_cast<float>(iy);
     }
 
 		bool IsInNoSpawnZone(short x, short y, short w, short h);

@@ -2,84 +2,58 @@
 
 #include <cassert>
 #include <climits>
-#include <cstdlib>
 #include <ctime>
 
-//
-// ABSTRACT RNG CLASS
-//
+namespace {
+// Salt for the cosmetic generator's time seed, so it does not mirror the
+// gameplay generator when both are seeded in the same second.
+constexpr uint32_t COSMETIC_SEED_SALT = 0x9E3779B9u;
 
-void RandomNumberGeneratorType::reseed(unsigned seed)
+RandomNumberGenerator*& boundGameplayRng()
 {
-    srand(seed);
+    static RandomNumberGenerator* rng = nullptr;
+    return rng;
+}
+} // namespace
+
+//
+// SEEDING
+//
+
+RandomNumberGenerator::RandomNumberGenerator()
+{
+    seedFromTime();
 }
 
-// generate uniformly distributed random number
-// rMax is not part of the set
-int RandomNumberGeneratorType::getInteger(int rMax)
+RandomNumberGenerator::RandomNumberGenerator(uint32_t seedValue)
 {
-    return getInteger(0, rMax);
+    seed(seedValue);
 }
 
-bool RandomNumberGeneratorType::getBoolean()
+void RandomNumberGenerator::seed(uint32_t seedValue)
 {
-    return getBoolean(2);
+    m_state.index = 0;
+    m_state.words[0] = seedValue;
+    for (size_t i = 1; i < m_state.words.size(); i++)
+        // see Linear congruential generator
+        m_state.words[i] = ((m_state.words[i-1] * 1103515245) + 12345) & 0x7fffffff;
 }
 
-// will return true only if 1/scaleMax is verified
-bool RandomNumberGeneratorType::getBoolean(int scaleMax)
+void RandomNumberGenerator::seedFromTime(uint32_t salt)
 {
-    // maybe we shall match center of range, like (scaleMax/2 - 1) ?
-    return 0 == getInteger(scaleMax);
-}
-
-// make a decision using 'scaleMax' steps and 'positiveThreshold' as threshold
-// returns true only when random value is above the threshold
-bool RandomNumberGeneratorType::getBoolean(int scaleMax, int positiveThreshold)
-{
-    assert(positiveThreshold < scaleMax && positiveThreshold >= 0);
-    return getInteger(scaleMax) > positiveThreshold;
+    seed(static_cast<uint32_t>(time(nullptr)) ^ salt);
 }
 
 //
-// GLOBAL ACCESS
+// GENERATION
 //
 
-RandomNumberGenerator::RandomNumberGenerator() {
-    rng = new Well512RandomNumberGenerator();
-}
-
-RandomNumberGenerator::~RandomNumberGenerator() {
-    delete rng;
-}
-
-RandomNumberGeneratorType& RandomNumberGenerator::generator() {
-    static RandomNumberGenerator grng;
-    return *(grng.rng);
-}
-
-//
-// SYSTEM RNG
-//
-
-// default random number generator, using system
-int SystemRandomNumberGenerator::getInteger(int rMin, int rMax)
+uint32_t RandomNumberGenerator::getNext()
 {
-    assert(rMax > rMin);
-    int rVal = ((double) rand() / (((float)RAND_MAX)+1)) * (rMax-rMin) + rMin;
-    assert(rVal < rMax && rVal >= rMin);
-    return rVal;
-}
+    auto& state = m_state.words;
+    uint32_t& index = m_state.index;
 
-//
-// WELL512 RNG
-//
-
-// we initialize the state with (supposedly) true random numbers coming from the system
-// this constitutes a good enough seed
-unsigned Well512RandomNumberGenerator::getNext()
-{
-    unsigned a, b, c, d;
+    uint32_t a, b, c, d;
     a = state[index];
     c = state[(index+13)&15];
     b = a^c^(a<<16)^(c<<15);
@@ -93,42 +67,65 @@ unsigned Well512RandomNumberGenerator::getNext()
     return state[index];
 }
 
-void Well512RandomNumberGenerator::initialize()
-{
-    index = 0;
-    srand(time(0));
-    for (int i =0; i < 16; i++) {
-        state[i] = rand();
-    }
-}
-
-void Well512RandomNumberGenerator::initialize(unsigned seed)
-{
-    assert(sizeof(unsigned) == 4);
-
-    index = 0;
-    state[0] = seed;
-    for (int i = 1; i < 16; i++)
-        // see Linear congruential generator
-        state[i] = ((state[i-1] * 1103515245) + 12345) & 0x7fffffff;
-}
-
-// we initialize the state with (supposedly) true random numbers coming from the system
-// this constitutes a good enough seed
-Well512RandomNumberGenerator::Well512RandomNumberGenerator()
-{
-    initialize();
-}
-
-void Well512RandomNumberGenerator::reseed(unsigned seed)
-{
-    initialize(seed);
-}
-
-int Well512RandomNumberGenerator::getInteger(int rMin, int rMax)
+int RandomNumberGenerator::getInteger(int rMin, int rMax)
 {
     assert(rMax > rMin);
-    int rVal = ((double) getNext() / (((float)UINT_MAX)+1)) * (rMax-rMin) + rMin;
+    int rVal = (static_cast<double>(getNext()) / ((static_cast<float>(UINT_MAX))+1)) * (rMax-rMin) + rMin;
     assert(rVal < rMax && rVal >= rMin);
     return rVal;
+}
+
+// generate uniformly distributed random number
+// rMax is not part of the set
+int RandomNumberGenerator::getInteger(int rMax)
+{
+    return getInteger(0, rMax);
+}
+
+bool RandomNumberGenerator::getBoolean()
+{
+    return getBoolean(2);
+}
+
+// will return true only if 1/scaleMax is verified
+bool RandomNumberGenerator::getBoolean(int scaleMax)
+{
+    // maybe we shall match center of range, like (scaleMax/2 - 1) ?
+    return 0 == getInteger(scaleMax);
+}
+
+// make a decision using 'scaleMax' steps and 'positiveThreshold' as threshold
+// returns true only when random value is above the threshold
+bool RandomNumberGenerator::getBoolean(int scaleMax, int positiveThreshold)
+{
+    assert(positiveThreshold < scaleMax && positiveThreshold >= 0);
+    return getInteger(scaleMax) > positiveThreshold;
+}
+
+//
+// GLOBAL ACCESS
+//
+
+RandomNumberGenerator& RandomNumberGenerator::gameplay()
+{
+    if (RandomNumberGenerator* rng = boundGameplayRng())
+        return *rng;
+
+    static RandomNumberGenerator fallback;
+    return fallback;
+}
+
+RandomNumberGenerator& RandomNumberGenerator::cosmetic()
+{
+    static RandomNumberGenerator rng = [] {
+        RandomNumberGenerator r(0);
+        r.seedFromTime(COSMETIC_SEED_SALT);
+        return r;
+    }();
+    return rng;
+}
+
+void RandomNumberGenerator::bindGameplay(RandomNumberGenerator* rng)
+{
+    boundGameplayRng() = rng;
 }

@@ -18,7 +18,7 @@ MO_CheepCheep::MO_CheepCheep(gfxSprite* nspr)
     : IO_MovingObject(nspr, {0, App::screenHeight}, 2, 8, 30, 28, 1, 3)
 {
     ih = 32;
-    setXi((short)(RANDOM_INT(608)));
+    setXi(static_cast<short>(RANDOM_INT(608)));
 
     velx = 0.0f;
     while (velx == 0.0f)
@@ -30,7 +30,7 @@ MO_CheepCheep::MO_CheepCheep(gfxSprite* nspr)
     movingObjectType = movingobject_cheepcheep;
     state = 1;
 
-    iColorOffsetY = (short)(RANDOM_INT(3)) * 64;
+    iColorOffsetY = static_cast<short>(RANDOM_INT(3)) * 64;
 
     if (velx > 0.0f)
         iColorOffsetY += 32;
@@ -130,7 +130,7 @@ void MO_CheepCheep::collide(IO_MovingObject* object)
             if (type == movingobject_shell && object->GetState() == 2)
                 return;
 
-            if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity())
+            if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity())
                 return;
 
             if (game_values.gamemode->gamemode == game_mode_stomp && !game_values.gamemode->gameover) {
@@ -142,7 +142,7 @@ void MO_CheepCheep::collide(IO_MovingObject* object)
                     killer->Score().AdjustScore(1);
 
                     if (type == movingobject_shell)
-                        ((CO_Shell*)object)->AddMovingKill(killer);
+                        (static_cast<CO_Shell*>(object))->AddMovingKill(killer);
                 }
             }
 

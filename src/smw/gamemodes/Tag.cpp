@@ -5,6 +5,7 @@
 #include "player.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 
 
 //tag mode (leper mode suggestion from ziotok)
@@ -26,11 +27,11 @@ void CGM_Tag::init()
     CGameMode::init();
     fReverseScoring = goal == -1;
 
-    for (short iScore = 0; iScore < score_cnt; iScore++) {
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
         if (fReverseScoring)
-            score[iScore]->SetScore(0);
+            g_sim.score[iScore].SetScore(0);
         else
-            score[iScore]->SetScore(goal);
+            g_sim.score[iScore].SetScore(goal);
     }
 
     setTagged(nullptr);
@@ -50,11 +51,9 @@ void CGM_Tag::think()
             m_tagged = GetHighestScorePlayer(!fReverseScoring);
         }
 
-        static short counter = 0;
-
         if (m_tagged->isready()) {
-            if (++counter >= game_values.pointspeed) {
-                counter = 0;
+            if (++pointCounter >= game_values.pointspeed) {
+                pointCounter = 0;
 
                 if (fReverseScoring)
                     m_tagged->Score().AdjustScore(1);
@@ -68,12 +67,12 @@ void CGM_Tag::think()
 
         short countscore = 0;
         bool playwarning = false;
-        for (short j = 0; j < score_cnt; j++) {
-            for (short k = 0; k < score_cnt; k++) {
+        for (short j = 0; j < g_sim.score_cnt; j++) {
+            for (short k = 0; k < g_sim.score_cnt; k++) {
                 if (j == k)
                     continue;
 
-                countscore += score[k]->score;
+                countscore += g_sim.score[k].score;
             }
 
             if (countscore <= goal * 0.2) {
@@ -114,11 +113,11 @@ PlayerKillType CGM_Tag::playerkilledplayer(CPlayer &inflictor, CPlayer &other, K
         }
 
         short countscore = 0;
-        for (short k = 0; k < score_cnt; k++) {
-            if (&inflictor.Score() == score[k])
+        for (short k = 0; k < g_sim.score_cnt; k++) {
+            if (&inflictor.Score() == &g_sim.score[k])
                 continue;
 
-            countscore += score[k]->score;
+            countscore += g_sim.score[k].score;
         }
 
         if (countscore <= goal * 0.2 && !playedwarningsound) {
@@ -150,12 +149,12 @@ PlayerKillType CGM_Tag::playerkilledself(CPlayer &player, KillStyle style)
 
         short countscore = 0;
         bool playwarning = false;
-        for (short j = 0; j < score_cnt; j++) {
-            for (short k = 0; k < score_cnt; k++) {
+        for (short j = 0; j < g_sim.score_cnt; j++) {
+            for (short k = 0; k < g_sim.score_cnt; k++) {
                 if (j == k)
                     continue;
 
-                countscore += score[k]->score;
+                countscore += g_sim.score[k].score;
             }
 
             if (countscore <= goal * 0.2) {

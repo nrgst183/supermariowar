@@ -74,15 +74,15 @@ void MO_Podobo::collide(IO_MovingObject* object)
 
     if (type == movingobject_shell || type == movingobject_throwblock || type == movingobject_bulletbill) {
         // Same team bullet bills don't kill each other
-        if (type == movingobject_bulletbill && ((MO_BulletBill*)object)->iTeamID == iTeamID)
+        if (type == movingobject_bulletbill && (static_cast<MO_BulletBill*>(object))->iTeamID == iTeamID)
             return;
 
         if (type == movingobject_shell)
-            ((CO_Shell*)object)->Die();
+            (static_cast<CO_Shell*>(object))->Die();
         else if (type == movingobject_throwblock)
-            ((CO_ThrowBlock*)object)->Die();
+            (static_cast<CO_ThrowBlock*>(object))->Die();
         else if (type == movingobject_bulletbill)
-            ((MO_BulletBill*)object)->Die();
+            (static_cast<MO_BulletBill*>(object))->Die();
 
         ifSoundOnPlay(rm->sfx_kicksound);
     }

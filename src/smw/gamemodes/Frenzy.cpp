@@ -5,6 +5,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_FrenzyCard.h"
 
 
@@ -46,9 +47,9 @@ void CGM_Frenzy::think()
             if (0 == iPowerupQuantity)
                 iPowerupQuantity = 1;
             if (5 < iPowerupQuantity)
-                iPowerupQuantity = players.size() + iPowerupQuantity - 7;
+                iPowerupQuantity = g_sim.players.size() + iPowerupQuantity - 7;
 
-            if (static_cast<short>(objectcontainer[1].countTypes(object_frenzycard)) < iPowerupQuantity) {
+            if (static_cast<short>(g_sim.objectcontainer[1].countTypes(object_frenzycard)) < iPowerupQuantity) {
                 if (iItemWeightCount == 0) {
                     //If all weights are zero, then choose the random powerup
                     iSelectedPowerup = NUMFRENZYCARDS - 1;
@@ -62,7 +63,7 @@ void CGM_Frenzy::think()
                         iWeightCount += game_values.gamemodesettings.frenzy.powerupweight[++iSelectedPowerup];
                 }
 
-                objectcontainer[1].add(new MO_FrenzyCard(&rm->spr_frenzycards, iSelectedPowerup));
+                g_sim.objectcontainer[1].add(new MO_FrenzyCard(&rm->spr_frenzycards, iSelectedPowerup));
             }
         }
     }

@@ -37,6 +37,10 @@ add_library(CommonFiles STATIC
     linfunc.cpp
     linfunc.h
     map.cpp
+    MapDraw.cpp
+    MapDrawHazards.cpp
+    MapPreview.cpp
+    MapSave.cpp
     map.h
     map/MapReader.cpp
     map/MapReader.h

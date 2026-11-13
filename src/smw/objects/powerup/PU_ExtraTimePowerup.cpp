@@ -19,7 +19,7 @@ bool PU_ExtraTimePowerup::collide(CPlayer* player)
 {
     if (state > 0) {
         if (game_values.gamemode->gamemode == game_mode_timelimit || game_values.gamemode->gamemode == game_mode_star) {
-            CGM_TimeLimit* timelimitmode = (CGM_TimeLimit*)game_values.gamemode;
+            CGM_TimeLimit* timelimitmode = static_cast<CGM_TimeLimit*>(game_values.gamemode);
             timelimitmode->addtime(timelimitmode->goal / 5);
         }
 

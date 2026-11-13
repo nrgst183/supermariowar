@@ -65,7 +65,7 @@ void B_DonutBlock::triggerBehavior(short iPlayerId)
 
     TileType type = TileType::Solid;
 
-    MovingPlatformPath * path = new FallingPath(Vec2f((float)ix + 16.0f, (float)iy + 15.8f));
+    MovingPlatformPath * path = new FallingPath(Vec2f(static_cast<float>(ix) + 16.0f, static_cast<float>(iy) + 15.8f));
     MovingPlatform * platform = new MovingPlatform({ tile }, { type }, 1, 1, 2, path, false);
     platform->SetPlayerId(iPlayerId);
     platform->paintSpriteAt(*spr, 0, 0);

@@ -19,16 +19,13 @@ MI_NetRoomTeamSelect::MI_NetRoomTeamSelect(short x, short y, short player_id, st
     , iFastScrollTimer(0)
     , onChangeAccepted(on_change_accepted)
 {
-    miHoverImage = new MI_Image(&rm->menu_player_select, x - 6, y - 6, 32 + 18, 128 + 18, 44, 44, 1, 1, 1);
+    miHoverImage = std::make_unique<MI_Image>(&rm->menu_player_select, x - 6, y - 6, 32 + 18, 128 + 18, 44, 44, 1, 1, 1);
     miHoverImage->setVisible(false);
-    miModifyImage = new MI_Image(&rm->menu_player_select, x - 24, y - 24, 32, 128, 78, 78, 4, 1, 8);
+    miModifyImage = std::make_unique<MI_Image>(&rm->menu_player_select, x - 24, y - 24, 32, 128, 78, 78, 4, 1, 8);
     miModifyImage->setVisible(false);
 }
 
-MI_NetRoomTeamSelect::~MI_NetRoomTeamSelect() {
-    delete miHoverImage;
-    delete miModifyImage;
-}
+MI_NetRoomTeamSelect::~MI_NetRoomTeamSelect() = default;
 
 void MI_NetRoomTeamSelect::Update() {
     if (++iAnimationTimer > 7) {
@@ -93,7 +90,7 @@ MenuCodeEnum MI_NetRoomTeamSelect::SendInput(CPlayerInput * playerInput) {
                     game_values.skinids[owner_player] = RANDOM_INT(skinlist->count());
                 } else {
                     if (--game_values.skinids[owner_player] < 0)
-                        game_values.skinids[owner_player] = (short)skinlist->count() - 1;
+                        game_values.skinids[owner_player] = static_cast<short>(skinlist->count()) - 1;
                 }
             } while (!rm->LoadMenuSkin(owner_player, game_values.skinids[owner_player], game_values.colorids[owner_player], false));
         } else if (playerKeys->menu_up.fDown) {
@@ -105,7 +102,7 @@ MenuCodeEnum MI_NetRoomTeamSelect::SendInput(CPlayerInput * playerInput) {
                 if (++iFastScrollTimer > 5) {
                     do {
                         if (--game_values.skinids[owner_player] < 0)
-                            game_values.skinids[owner_player] = (short)skinlist->count() - 1;
+                            game_values.skinids[owner_player] = static_cast<short>(skinlist->count()) - 1;
                     } while (!rm->LoadMenuSkin(owner_player, game_values.skinids[owner_player], game_values.colorids[owner_player], false));
 
                     iFastScrollTimer = 0;

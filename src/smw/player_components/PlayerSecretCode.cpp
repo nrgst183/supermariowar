@@ -1,9 +1,11 @@
 #include "PlayerSecretCode.h"
+#include "PlayerKeyMask.h"
 
 #include "objectgame.h"
 #include "player.h"
 
-static const uint8_t SECRET_CODE[18] = {4, 8, 4, 8, 1, 1, 4, 8, 4, 8, 1, 1, 4, 8, 4, 8, 1, 1};
+using namespace PlayerKeyMask;
+static const uint8_t SECRET_CODE[18] = {Left, Right, Left, Right, Jump, Jump, Left, Right, Left, Right, Jump, Jump, Left, Right, Left, Right, Jump, Jump};
 static const unsigned short SECRET_CODE_TIME_MAX = 186;
 
 PlayerSecretCode::PlayerSecretCode() {

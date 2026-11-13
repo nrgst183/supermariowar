@@ -15,9 +15,9 @@ PU_ExtraGuyPowerup::PU_ExtraGuyPowerup(gfxSprite* nspr, Vec2s pos, short iNumSpr
     , iType(type)
 {
     if (moveToRight)
-        velx = 1.0f + (float)type;
+        velx = 1.0f + static_cast<float>(type);
     else
-        velx = -1.0f - (float)type;
+        velx = -1.0f - static_cast<float>(type);
 }
 
 bool PU_ExtraGuyPowerup::collide(CPlayer* player)

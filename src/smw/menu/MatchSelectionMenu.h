@@ -18,6 +18,7 @@ public:
     void WorldMapChanged();
     void ActivateMinigameField();
     Minigame GetMinigame() const;
+    void SetMinigame(Minigame minigame);
     MatchType GetSelectedMatchType() const;
 
 private:

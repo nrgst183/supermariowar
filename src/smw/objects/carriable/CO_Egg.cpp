@@ -5,6 +5,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_Explosion.h"
 
 
@@ -89,7 +90,7 @@ void CO_Egg::update()
         if (--explosiondrawtimer <= 0) {
             explosiondrawtimer = 62;
             if (--explosiondrawframe < 0) {
-                objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(ix + (iw >> 1) - 96), static_cast<short>(iy + (ih >> 1) - 64)}, 2, 4, -1, -1, KillStyle::Bomb));
+                g_sim.objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(ix + (iw >> 1) - 96), static_cast<short>(iy + (ih >> 1) - 64)}, 2, 4, -1, -1, KillStyle::Bomb));
                 placeEgg();
 
                 ifSoundOnPlay(rm->sfx_bobombsound);
@@ -135,7 +136,7 @@ void CO_Egg::placeEgg()
 
     short x = 0, y = 0;
     short iAttempts = 32;
-    while ((!g_map->findspawnpoint(5, &x, &y, collisionWidth, collisionHeight, false) || objectcontainer[1].getClosestMovingObject(x, y, movingobject_yoshi) < 250.0f)
+    while ((!g_map->findspawnpoint(5, &x, &y, collisionWidth, collisionHeight, false) || g_sim.objectcontainer[1].getClosestMovingObject(x, y, movingobject_yoshi) < 250.0f)
         && iAttempts-- > 0)
         ;
 

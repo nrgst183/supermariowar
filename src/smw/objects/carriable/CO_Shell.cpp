@@ -244,7 +244,7 @@ void CO_Shell::collide(IO_MovingObject* object)
     MovingObjectType type = object->getMovingObjectType();
 
     if (type == movingobject_shell) {
-        CO_Shell* shell = (CO_Shell*)object;
+        CO_Shell* shell = static_cast<CO_Shell*>(object);
 
         // Green shells should die on collision, other shells should not,
         // except if they also hit a non dead on collision shell
@@ -265,12 +265,12 @@ void CO_Shell::collide(IO_MovingObject* object)
                 shell->Die();
         }
     } else if (type == movingobject_throwblock) {
-        CO_ThrowBlock* block = (CO_ThrowBlock*)object;
+        CO_ThrowBlock* block = static_cast<CO_ThrowBlock*>(object);
 
         Die();
         block->Die();
     } else if (type == movingobject_throwbox) {
-        CO_ThrowBox* box = (CO_ThrowBox*)object;
+        CO_ThrowBox* box = static_cast<CO_ThrowBox*>(object);
 
         Die();
         box->Die();
@@ -369,7 +369,7 @@ void CO_Shell::update()
 void CO_Shell::draw()
 {
     if (state == 0) {
-        spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {0, iColorOffsetY, iw, (short)(ih - fy + iDestY)});
+        spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {0, iColorOffsetY, iw, static_cast<short>(ih - fy + iDestY)});
     } else if (owner) {
         if (owner->iswarping())
             spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {0, iColorOffsetY + iFlippedOffset, iw, ih}, static_cast<ClipEdge>(owner->GetWarpState()), owner->GetWarpPlane());

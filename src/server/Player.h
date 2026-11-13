@@ -1,6 +1,7 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
+#include <memory>
 #include <string>
 
 #include "Blob.h"
@@ -14,7 +15,7 @@ struct PlayerSkin: public Blob {
 
 struct Player {
     std::string     name;
-    NetPeer*        network_client;
+    std::unique_ptr<NetPeer> network_client;  // owned
 
     uint32_t        currentRoomID;
     bool            isPlaying;
@@ -29,6 +30,13 @@ struct Player {
     Player();
     ~Player();
 
+    // Owns its network connection, so a Player cannot be copied
+    Player(const Player&) = delete;
+    Player& operator=(const Player&) = delete;
+    Player(Player&&) = default;
+    Player& operator=(Player&&) = default;
+
+    // Takes ownership of `client`
     void setClient(NetPeer* client);
     void setName(const std::string& name);
     void setSkin(const void*, size_t);

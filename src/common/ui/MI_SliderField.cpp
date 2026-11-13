@@ -43,7 +43,7 @@ void MI_SliderField::Draw()
         rm->menu_font_large.drawChopRight(m_pos.x + m_indent2 + 16, m_pos.y + 5, m_width - m_indent2 - 24, currentItem().name.c_str());
     }
 
-    short iSpacing = (m_indent2 - m_indent - 20) / ((short)m_items.size() - 1);
+    short iSpacing = (m_indent2 - m_indent - 20) / (static_cast<short>(m_items.size()) - 1);
     short iSpot = 0;
 
     for (unsigned int index = 0; index < m_items.size(); index++) {

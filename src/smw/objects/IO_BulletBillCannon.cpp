@@ -4,6 +4,7 @@
 #include "ObjectContainer.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_BulletBill.h"
 
 
@@ -27,7 +28,7 @@ void IO_BulletBillCannon::update()
         SetNewTimer();
 
         const Vec2s pos(ix + (m_vel < 0.0f ? 32 : -32), iy);
-        objectcontainer[1].add(new MO_BulletBill(&rm->spr_hazard_bulletbill[m_preview ? 1 : 0], &rm->spr_hazard_bulletbilldead, pos, m_vel, 0, true));
+        g_sim.objectcontainer[1].add(new MO_BulletBill(&rm->spr_hazard_bulletbill[m_preview ? 1 : 0], &rm->spr_hazard_bulletbilldead, pos, m_vel, 0, true));
         ifSoundOnPlay(rm->sfx_bulletbillsound);
     }
 }

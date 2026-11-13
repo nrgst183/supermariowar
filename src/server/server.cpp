@@ -84,7 +84,7 @@ void SMWServer::readConfig(const std::string& config_path)
                 }
                 if (keyword.compare("maxplayers") == 0)
                 {
-                    uint16_t num = (uint16_t) strtol(value.c_str(), nullptr, 10);
+                    uint16_t num = static_cast<uint16_t>(strtol(value.c_str(), nullptr, 10));
                     if (num) {
                         maxPlayerCount = num;
                         serverInfo.maxPlayerCount = num;
@@ -305,11 +305,11 @@ void SMWServer::sendVisibleRoomEntries(NetPeer& client)
             {
                 roomInfo.roomID = room->roomID;
 
-                strncpy(roomInfo.name, room->name, NET_MAX_ROOM_NAME_LENGTH);
+                strncpy(roomInfo.name, room->name.c_str(), NET_MAX_ROOM_NAME_LENGTH);
                 roomInfo.name[NET_MAX_ROOM_NAME_LENGTH - 1] = '\0';
 
                 roomInfo.passwordRequired = false;
-                if (room->password[0] != '\0')
+                if (!room->password.empty())
                     roomInfo.passwordRequired = true;
 
                 roomInfo.currentPlayerCount = 0;
@@ -365,7 +365,7 @@ void SMWServer::playerCreatesRoom(uint64_t playerID, const void* data, size_t da
     player->sendData(&package, sizeof(package));
 
     log("New room by %s : {id: %d; name: %s; pw: %s}",
-        player->toString().c_str(), room.roomID, room.name, room.password);
+        player->toString().c_str(), room.roomID, room.name.c_str(), room.password.c_str());
 
     roomCreateID++; // increase global ID
 }

@@ -5,6 +5,7 @@
 #include "player.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 #include "objects/overmap/WO_Area.h"
 
 
@@ -34,11 +35,11 @@ PlayerKillType CGM_Jail::playerkilledplayer(CPlayer &inflictor, CPlayer &other, 
                 short jailedteams[4];
 
                 short i;
-                for (i = 0; i < score_cnt; i++)
+                for (i = 0; i < g_sim.score_cnt; i++)
                     jailedteams[i] = game_values.teamcounts[i];
 
                 //Figure out which teams have been jailed
-                for (CPlayer* player : players) {
+                for (CPlayer* player : g_sim.players) {
                     if (player->Jail().isActive()) {
                         jailedteams[player->getTeamID()]--;
                     }
@@ -46,7 +47,7 @@ PlayerKillType CGM_Jail::playerkilledplayer(CPlayer &inflictor, CPlayer &other, 
 
                 //Determine if a single team is the only one not completely jailed
                 short iTeamPoint = -1;
-                for (i = 0; i < score_cnt; i++) {
+                for (i = 0; i < g_sim.score_cnt; i++) {
                     if (jailedteams[i] == 0)
                         continue;
 
@@ -62,7 +63,7 @@ PlayerKillType CGM_Jail::playerkilledplayer(CPlayer &inflictor, CPlayer &other, 
                 if (iTeamPoint >= 0) {
                     short numjailedplayers = 0;
 
-                    for (CPlayer* player : players) {
+                    for (CPlayer* player : g_sim.players) {
                         //If they weren't just the one killed and they were jailed, give them a transform cloud
                         if (player != &other && player->Jail().isActive()) {
                             eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_poof, player->centerX() - 24, player->centerY() - 24, 4, 5);
@@ -77,7 +78,7 @@ PlayerKillType CGM_Jail::playerkilledplayer(CPlayer &inflictor, CPlayer &other, 
 
                     //Give extra bonus score for being on the non-jailed team
                     if (numjailedplayers > 1)
-                        score[iTeamPoint]->AdjustScore(1);
+                        g_sim.score[iTeamPoint].AdjustScore(1);
                 }
             }
             //Apply rules for "Owned" jail
@@ -85,7 +86,7 @@ PlayerKillType CGM_Jail::playerkilledplayer(CPlayer &inflictor, CPlayer &other, 
                 short jailedteams[4] = {-1, -1, -1, -1};
 
                 //Figure out which teams have been jailed
-                for (CPlayer* player : players) {
+                for (CPlayer* player : g_sim.players) {
                     short * piMarker = &jailedteams[player->getTeamID()];
 
                     if (*piMarker == -2)
@@ -101,9 +102,9 @@ PlayerKillType CGM_Jail::playerkilledplayer(CPlayer &inflictor, CPlayer &other, 
 
                 //Determine if a single team is the only one not completely jailed
                 short iTeamPoint = -1;
-                for (short i = 0; i < score_cnt; i++) {
+                for (short i = 0; i < g_sim.score_cnt; i++) {
                     short iJailOwner = -1;
-                    for (short j = 0; j < score_cnt; j++) {
+                    for (short j = 0; j < g_sim.score_cnt; j++) {
                         if (i == j)
                             continue;
 
@@ -131,17 +132,17 @@ PlayerKillType CGM_Jail::playerkilledplayer(CPlayer &inflictor, CPlayer &other, 
                 if (iTeamPoint >= 0) {
                     short numjailedplayers = 0;
 
-                    for (CPlayer* player : players) {
+                    for (CPlayer* player : g_sim.players) {
                         if (player->Jail().isActive() && player->getTeamID() != iTeamPoint)
                             numjailedplayers++;
                     }
 
                     //Give extra bonus score for being on the non-jailed team
                     if (numjailedplayers > 1) {
-                        score[iTeamPoint]->AdjustScore(1);
+                        g_sim.score[iTeamPoint].AdjustScore(1);
 
                         //Release other teams if a bonus was awarded for locking them up
-                        for (CPlayer* player : players) {
+                        for (CPlayer* player : g_sim.players) {
                             //Don't release players that were not jailed by this team
                             if (player->Jail().owner_teamID != iTeamPoint)
                                 continue;

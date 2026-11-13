@@ -1,7 +1,21 @@
 add_executable(smw-leveledit WIN32
 	../common/movingplatform.cpp
 	../smw/FPSLimiter.cpp
-	leveleditor.cpp
+	EditorAnimation.cpp
+	EditorBackgrounds.cpp
+	EditorBlocks.cpp
+	EditorDialogs.cpp
+	EditorDraw.cpp
+	EditorFile.cpp
+	EditorGlobals.cpp
+	EditorMapEdit.cpp
+	EditorMapHazards.cpp
+	EditorModeItems.cpp
+	EditorPlatforms.cpp
+	EditorTiles.cpp
+	EditorWarpEyecandy.cpp
+	LevelEditorState.h
+	main.cpp
 )
 if (WIN32)
 	# Add EXE icon on Windows

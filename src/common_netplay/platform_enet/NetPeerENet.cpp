@@ -3,9 +3,9 @@
 #include <cassert>
 #include <sstream>
 
-#define CONNECTION_TIMEOUT_MS 5000
-#define UNRELIABLE_CHANNEL 0
-#define RELIABLE_CHANNEL 1
+constexpr int CONNECTION_TIMEOUT_MS = 5000;
+constexpr int UNRELIABLE_CHANNEL = 0;
+constexpr int RELIABLE_CHANNEL = 1;
 
 
 NetPeerENet::NetPeerENet(ENetPeer* peer)
@@ -86,11 +86,11 @@ uint16_t NetPeerENet::addressPort()
 
 std::string NetPeerENet::addressAsString()
 {
-    uint8_t* addr = (uint8_t*)&foreign_peer->address.host;
+    uint8_t* addr = reinterpret_cast<uint8_t*>(&foreign_peer->address.host);
 
     std::ostringstream ss;
-    ss << (unsigned short)addr[0] <<"."<< (unsigned short)addr[1] <<"."<<
-          (unsigned short)addr[2] <<"."<< (unsigned short)addr[3] <<":"<< foreign_peer->address.port;
+    ss << static_cast<unsigned short>(addr[0]) <<"."<< static_cast<unsigned short>(addr[1]) <<"."<<
+          static_cast<unsigned short>(addr[2]) <<"."<< static_cast<unsigned short>(addr[3]) <<":"<< foreign_peer->address.port;
 
     return ss.str();
 }

@@ -5,6 +5,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_Explosion.h"
 
 
@@ -110,6 +111,6 @@ void CO_Bomb::Die()
         player->decreaseProjectilesCount();
 
     dead = true;
-    objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(ix + (iw >> 2) - 96), static_cast<short>(iy + (ih >> 2) - 64)}, 2, 4, iPlayerID, iTeamID, KillStyle::Bomb));
+    g_sim.objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(ix + (iw >> 2) - 96), static_cast<short>(iy + (ih >> 2) - 64)}, 2, 4, iPlayerID, iTeamID, KillStyle::Bomb));
     ifSoundOnPlay(rm->sfx_bobombsound);
 }

@@ -29,7 +29,7 @@ void PlayerWings::draw(CPlayer &player)
         rm->spr_wings.draw(
             player.ix + (fPlayerFacingRight ? - 19 : 15), player.iy - 10,
             {iWingsFrame, fPlayerFacingRight ? 0 : 32, 26, 32},
-            static_cast<ClipEdge>((short)player.state % 4), player.GetWarpPlane());
+            static_cast<ClipEdge>(static_cast<short>(player.state) % 4), player.GetWarpPlane());
     else
         rm->spr_wings.draw(
             player.ix + (fPlayerFacingRight ? - 19 : 15), player.iy - 10,

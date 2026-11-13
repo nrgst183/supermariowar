@@ -44,7 +44,7 @@ bool PU_SecretPowerup::collide(CPlayer* player)
         game_values.windaffectsplayers = true;
 
         for (short i = 0; i < 15; i++)
-            eyecandy[2].emplace<EC_Snow>(&rm->spr_snow, (float)(RANDOM_INT(App::screenWidth)), (float)RANDOM_INT(App::screenHeight), RANDOM_INT(4) + 1);
+            eyecandy[2].emplace<EC_Snow>(&rm->spr_snow, static_cast<float>(COSMETIC_RANDOM_INT(App::screenWidth)), static_cast<float>(COSMETIC_RANDOM_INT(App::screenHeight)), COSMETIC_RANDOM_INT(4) + 1);
     } else if (itemtype == 1) {
         game_values.spinscreen = true;
     } else if (itemtype == 2) {
@@ -65,6 +65,6 @@ void PU_SecretPowerup::place()
     while (!g_map->findspawnpoint(5, &ix, &iy, collisionWidth, collisionHeight, false) && iAttempts-- > 0)
         ;
 
-    fx = (float)ix;
-    fy = (float)iy;
+    fx = static_cast<float>(ix);
+    fy = static_cast<float>(iy);
 }

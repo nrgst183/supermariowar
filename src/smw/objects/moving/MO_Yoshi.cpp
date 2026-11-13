@@ -30,7 +30,7 @@ MO_Yoshi::MO_Yoshi(gfxSprite* nspr, short iColor)
 bool MO_Yoshi::collide(CPlayer* player)
 {
     if (player->carriedItem && player->carriedItem->getMovingObjectType() == movingobject_egg) {
-        CO_Egg* egg = (CO_Egg*)player->carriedItem;
+        CO_Egg* egg = static_cast<CO_Egg*>(player->carriedItem);
 
         if (egg->color == color) {
             if (!game_values.gamemode->gameover) {
@@ -62,8 +62,8 @@ void MO_Yoshi::placeYoshi()
     timer = 0;
 
     for (short tries = 0; tries < 64; tries++) {
-        ix = (short)RANDOM_INT(App::screenWidth - iw);
-        iy = (short)RANDOM_INT(App::screenHeight - ih - TILESIZE);  // don't spawn too low
+        ix = static_cast<short>(RANDOM_INT(App::screenWidth - iw));
+        iy = static_cast<short>(RANDOM_INT(App::screenHeight - ih - TILESIZE));  // don't spawn too low
 
         short ixl = ix / TILESIZE;
         short ixr = (ix + iw) / TILESIZE;
@@ -111,7 +111,7 @@ void MO_Yoshi::placeYoshi()
 void MO_Yoshi::collide(IO_MovingObject* object)
 {
     if (object->getMovingObjectType() == movingobject_egg) {
-        CO_Egg* egg = (CO_Egg*)object;
+        CO_Egg* egg = static_cast<CO_Egg*>(object);
 
         if (egg->color == color && egg->owner_throw) {
             CPlayer* player = egg->owner_throw;

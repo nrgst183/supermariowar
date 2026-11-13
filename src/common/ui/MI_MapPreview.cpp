@@ -8,6 +8,7 @@
 #include "ObjectContainer.h"
 #include "objecthazard.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/IO_FlameCannon.h"
 #include "objects/moving/MO_BulletBill.h"
 #include "objects/moving/MO_PirhanaPlant.h"
@@ -40,16 +41,16 @@ MI_MapPreview::MI_MapPreview(gfxSprite * nspr, short x, short y, short width, sh
     rectDst.w = App::screenWidth/2;
     rectDst.h = App::screenHeight/2;
 
-    memset(szMapName, 0, sizeof(szMapName));
+    szMapName.clear();
 }
 
 void MI_MapPreview::Update()
 {
     //Update hazards
-    noncolcontainer.update();
+    g_sim.noncolcontainer.update();
 
-    objectcontainer[1].update();
-    objectcontainer[1].cleanDeadObjects();
+    g_sim.objectcontainer[1].update();
+    g_sim.objectcontainer[1].cleanDeadObjects();
 
     g_map->updatePlatforms();
 }
@@ -78,7 +79,7 @@ void MI_MapPreview::Draw()
     g_map->drawPlatforms(rectDst.x, rectDst.y, 1);
 
     //Draw map hazards
-    for (const std::unique_ptr<CObject>& obj : objectcontainer[1].list()) {
+    for (const std::unique_ptr<CObject>& obj : g_sim.objectcontainer[1].list()) {
         if (auto* hazard = dynamic_cast<OMO_OrbitHazard*>(obj.get())) {
             hazard->draw(rectDst.x, rectDst.y);
         } else if (auto* hazard = dynamic_cast<OMO_StraightPathHazard*>(obj.get())) {
@@ -103,8 +104,7 @@ void MI_MapPreview::Draw()
 
 void MI_MapPreview::LoadCurrentMap()
 {
-    strncpy(szMapName, maplist->currentShortmapname().c_str(), 255);
-    szMapName[255] = 0;
+    szMapName = maplist->currentShortmapname();
 
     LoadMap(maplist->currentFilename());
 }
@@ -145,8 +145,7 @@ bool MI_MapPreview::SetMap(const char * paramSzMapName, bool fWorld)
 
 void MI_MapPreview::SetSpecialMap(const char * mapName, const char * szMapPath)
 {
-    strncpy(szMapName, mapName, 255);
-    szMapName[255] = 0;
+    szMapName = mapName;
 
     LoadMap(szMapPath);
 }

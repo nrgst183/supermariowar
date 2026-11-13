@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-#define NUM_FRAMES_IN_TILE_ANIMATION        4
-#define NUM_FRAMES_BETWEEN_TILE_ANIMATION   8
+constexpr int NUM_FRAMES_IN_TILE_ANIMATION = 4;
+constexpr int NUM_FRAMES_BETWEEN_TILE_ANIMATION = 8;
 
 enum class PlatformPathType: unsigned char;
 

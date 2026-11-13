@@ -28,4 +28,7 @@ public:
 
 private:
     CO_PhantoKey * key;
+
+    // Frames since the last time-based point (was a function-local static in think())
+    short pointCounter = 0;
 };

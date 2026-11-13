@@ -103,7 +103,7 @@ void MI_MapFilterScroll::Draw()
     rm->menu_font_large.drawCentered(m_pos.x + (iWidth >> 1), m_pos.y + 5, "Map Filters");
 
            //Draw each filter field
-    for (short iLine = 0; iLine < iNumLines && (unsigned short)iLine < items.size(); iLine++) {
+    for (short iLine = 0; iLine < iNumLines && static_cast<unsigned short>(iLine) < items.size(); iLine++) {
         if (iOffset + iLine >= NUM_AUTO_FILTERS) {
             short iHalfLineWidth = (iWidth - 64) >> 1;
             short iLineWidth = iWidth - 64;

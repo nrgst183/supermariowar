@@ -131,12 +131,12 @@ void CO_ThrowBlock::collide(IO_MovingObject* object)
     MovingObjectType type = object->getMovingObjectType();
 
     if (type == movingobject_throwblock) {
-        CO_ThrowBlock* block = (CO_ThrowBlock*)object;
+        CO_ThrowBlock* block = static_cast<CO_ThrowBlock*>(object);
 
         Die();
         block->Die();
     } else if (type == movingobject_throwbox) {
-        CO_ThrowBox* box = (CO_ThrowBox*)object;
+        CO_ThrowBox* box = static_cast<CO_ThrowBox*>(object);
 
         Die();
         box->Die();

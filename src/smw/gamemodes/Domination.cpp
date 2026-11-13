@@ -5,6 +5,7 @@
 #include "player.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 #include "objects/overmap/WO_Area.h"
 
 
@@ -52,18 +53,18 @@ void CGM_Domination::init()
         game_values.gamemodesettings.domination.quantity = iNumAreas = 1;
 
     if (iNumAreas > 18)
-        iNumAreas = 2 * players.size() + iNumAreas - 22;
+        iNumAreas = 2 * g_sim.players.size() + iNumAreas - 22;
     else if (iNumAreas > 10)
-        iNumAreas = players.size() + iNumAreas - 12;
+        iNumAreas = g_sim.players.size() + iNumAreas - 12;
 
     for (short k = 0; k < iNumAreas; k++)
-        objectcontainer[0].add(new OMO_Area(&rm->spr_areas, iNumAreas));
+        g_sim.objectcontainer[0].add(new OMO_Area(&rm->spr_areas, iNumAreas));
 }
 
 PlayerKillType CGM_Domination::playerkilledplayer(CPlayer &player, CPlayer &other, KillStyle style)
 {
     //Update areas the dead player owned
-    adjustPlayerAreas(objectcontainer[0], &player, &other);
+    adjustPlayerAreas(g_sim.objectcontainer[0], &player, &other);
 
     return PlayerKillType::Normal;
 }
@@ -73,7 +74,7 @@ PlayerKillType CGM_Domination::playerkilledself(CPlayer &player, KillStyle style
     CGameMode::playerkilledself(player, style);
 
     //Update areas the dead player owned
-    adjustPlayerAreas(objectcontainer[0], nullptr, &player);
+    adjustPlayerAreas(g_sim.objectcontainer[0], nullptr, &player);
 
     return PlayerKillType::Normal;
 }

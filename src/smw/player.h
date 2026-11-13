@@ -12,6 +12,7 @@
 #include "player_components/PlayerAwardEffects.h"
 #include "player_components/PlayerBurnupTimer.h"
 #include "player_components/PlayerCape.h"
+#include "player_components/PlayerKeyMask.h"
 #include "player_components/PlayerCardCollection.h"
 #include "player_components/PlayerCollisions.h"
 #include "player_components/PlayerInvincibility.h"
@@ -28,10 +29,16 @@
 #include "player_components/PlayerWarpStatus.h"
 #include "player_components/PlayerWings.h"
 
+#include <cstddef>
+#include <iterator>
+#include <memory>
 #include <optional>
 #include <vector>
 
 using SpriteStrip = std::array<gfxSprite, PGFX_LAST>;
+
+// Every PGFX_[action]_L sprite state has this bit set, every PGFX_[action]_R has it cleared
+inline constexpr int PGFX_FACING_LEFT_BIT = 0x1;
 
 namespace NetPkgs {
     struct MapCollision;
@@ -207,19 +214,19 @@ private:
 
         void setXf(float xf) {
             fx = xf;
-            ix = (short)fx;
+            ix = static_cast<short>(fx);
         }
         void setXi(short xi) {
             ix = xi;
-            fx = (float)ix;
+            fx = static_cast<float>(ix);
         }
         void setYf(float yf) {
             fy = yf;
-            iy = (short)fy;
+            iy = static_cast<short>(fy);
         }
         void setYi(short yi) {
             iy = yi;
-            fy = (float)iy;
+            fy = static_cast<float>(iy);
         }
 
         void trySuperJumping(short movement_direction);
@@ -540,8 +547,65 @@ private:
 		friend class PlayerInvincibility;
 };
 
-// Defined in smw/main.cpp and separately in the editors
-extern std::vector<CPlayer*> players;
+// Owning list of the players of the current match. Access is non-owning:
+// indexing and iteration yield plain CPlayer pointers.
+class PlayerList {
+public:
+    class const_iterator {
+    public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = CPlayer*;
+        using difference_type = std::ptrdiff_t;
+        using pointer = CPlayer* const*;
+        using reference = CPlayer*;
+
+        const_iterator() = default;
+        explicit const_iterator(std::vector<std::unique_ptr<CPlayer>>::const_iterator it) : m_it(it) {}
+
+        CPlayer* operator*() const { return m_it->get(); }
+        const_iterator& operator++() { ++m_it; return *this; }
+        const_iterator operator++(int) { const_iterator prev = *this; ++m_it; return prev; }
+        bool operator==(const const_iterator&) const = default;
+
+    private:
+        std::vector<std::unique_ptr<CPlayer>>::const_iterator m_it;
+    };
+
+    PlayerList() = default;
+    PlayerList(const PlayerList&) = delete;
+    PlayerList& operator=(const PlayerList&) = delete;
+    ~PlayerList() { clear(); }
+
+    CPlayer* operator[](size_t index) const { return m_players[index].get(); }
+    size_t size() const { return m_players.size(); }
+    bool empty() const { return m_players.empty(); }
+    const_iterator begin() const { return const_iterator(m_players.cbegin()); }
+    const_iterator end() const { return const_iterator(m_players.cend()); }
+
+    void reserve(size_t count) { m_players.reserve(count); }
+
+    CPlayer* add(std::unique_ptr<CPlayer> player) {
+        m_players.push_back(std::move(player));
+        return m_players.back().get();
+    }
+
+    // Destroys the player first, then closes the gap. The players after it
+    // move one slot down; their localID is not updated here.
+    void erase(size_t index) {
+        m_players[index].reset();
+        m_players.erase(m_players.begin() + static_cast<std::ptrdiff_t>(index));
+    }
+
+    // Destroys all players, in order.
+    void clear() {
+        for (std::unique_ptr<CPlayer>& player : m_players)
+            player.reset();
+        m_players.clear();
+    }
+
+private:
+    std::vector<std::unique_ptr<CPlayer>> m_players;
+};
 
 // Defined in smw/main.cpp
 extern short g_iSwirlSpawnLocations[4][2][25];

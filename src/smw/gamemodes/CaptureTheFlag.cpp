@@ -3,6 +3,7 @@
 #include "GameValues.h"
 #include "ObjectContainer.h"
 #include "player.h"
+#include "SimulationState.h"
 #include "objects/carriable/CO_Flag.h"
 #include "objects/moving/MO_FlagBase.h"
 #include "ResourceManager.h"
@@ -25,25 +26,21 @@ void CGM_CaptureTheFlag::init()
 
     bool fTeamUsed[4] = {false, false, false, false};
 
-    for (CPlayer* player : players) {
+    for (CPlayer* player : g_sim.players) {
         short iTeamID = player->getTeamID();
         if (!fTeamUsed[iTeamID]) {
             fTeamUsed[iTeamID] = true;
 
             short iColorID = player->getColorID();
-            MO_FlagBase * base = new MO_FlagBase(&rm->spr_flagbases, iTeamID, iColorID);
-            objectcontainer[0].add(base);
+            MO_FlagBase * base = g_sim.objectcontainer[0].add(new MO_FlagBase(&rm->spr_flagbases, iTeamID, iColorID));
 
-            if (!game_values.gamemodesettings.flag.centerflag) {
-                CO_Flag * flag = new CO_Flag(&rm->spr_flags, base, iTeamID, iColorID);
-                objectcontainer[1].add(flag);
-            }
+            if (!game_values.gamemodesettings.flag.centerflag)
+                g_sim.objectcontainer[1].add(new CO_Flag(&rm->spr_flags, base, iTeamID, iColorID));
         }
     }
 
     if (game_values.gamemodesettings.flag.centerflag) {
-        CO_Flag * centerflag = new CO_Flag(&rm->spr_flags, nullptr, -1, -1);
-        objectcontainer[1].add(centerflag);
+        g_sim.objectcontainer[1].add(new CO_Flag(&rm->spr_flags, nullptr, -1, -1));
     }
 }
 
@@ -57,7 +54,7 @@ PlayerKillType CGM_CaptureTheFlag::playerkilledself(CPlayer &player, KillStyle s
     CGameMode::playerkilledself(player, style);
 
     if (player.carriedItem && player.carriedItem->getMovingObjectType() == movingobject_flag) {
-        ((CO_Flag*)player.carriedItem)->placeFlag();
+        (static_cast<CO_Flag*>(player.carriedItem))->placeFlag();
         ifSoundOnPlay(rm->sfx_transform);
     }
 

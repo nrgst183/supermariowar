@@ -40,7 +40,7 @@ bool PlayerCollisions::checktop(CPlayer& player)
     if ((leftTile & tile_flag_solid) || (rightTile & tile_flag_solid) ||
             (leftBlock && !leftBlock->isTransparent() && !leftBlock->isHidden()) ||
             (rightBlock && !rightBlock->isTransparent() && !rightBlock->isHidden())) {
-        player.setYf((float)((tile_y << 5) + TILESIZE) + 0.2f);
+        player.setYf(static_cast<float>((tile_y << 5) + TILESIZE) + 0.2f);
         return true;
     }
 
@@ -52,12 +52,12 @@ bool PlayerCollisions::checkleft(CPlayer& player)
     if (player.fy < 0.0f)
         return false;
 
-    short tile_y = (short)player.fy / TILESIZE;
+    short tile_y = static_cast<short>(player.fy) / TILESIZE;
 
     if (tile_y < 0 || tile_y >= MAPHEIGHT)
         return false;
 
-    short tile_y2 = ((short)player.fy + PH) / TILESIZE;
+    short tile_y2 = (static_cast<short>(player.fy) + PH) / TILESIZE;
 
     if (tile_y2 < 0 || tile_y2 >= MAPHEIGHT)
         return false;
@@ -75,7 +75,7 @@ bool PlayerCollisions::checkleft(CPlayer& player)
     if ((topTile & tile_flag_solid) || (bottomTile & tile_flag_solid) ||
             (topBlock && !topBlock->isTransparent() && !topBlock->isHidden()) ||
             (bottomBlock && !bottomBlock->isTransparent() && !bottomBlock->isHidden())) {
-        player.setXf((float)((tile_x << 5) + TILESIZE) + 0.2f);
+        player.setXf(static_cast<float>((tile_x << 5) + TILESIZE) + 0.2f);
         player.flipsidesifneeded();
         return true;
     }
@@ -88,12 +88,12 @@ bool PlayerCollisions::checkright(CPlayer& player)
     if (player.fy < 0.0f)
         return false;
 
-    short tile_y = (short)player.fy / TILESIZE;
+    short tile_y = static_cast<short>(player.fy) / TILESIZE;
 
     if (tile_y < 0 || tile_y >= MAPHEIGHT)
         return false;
 
-    short tile_y2 = ((short)player.fy + PH) / TILESIZE;
+    short tile_y2 = (static_cast<short>(player.fy) + PH) / TILESIZE;
 
     if (tile_y2 < 0 || tile_y2 >= MAPHEIGHT)
         return false;
@@ -116,7 +116,7 @@ bool PlayerCollisions::checkright(CPlayer& player)
     if ((topTile & tile_flag_solid) || (bottomTile & tile_flag_solid) ||
             (topBlock && !topBlock->isTransparent() && !topBlock->isHidden()) ||
             (bottomBlock && !bottomBlock->isTransparent() && !bottomBlock->isHidden())) {
-        player.setXf((float)((tile_x << 5) - PW) - 0.2f);
+        player.setXf(static_cast<float>((tile_x << 5) - PW) - 0.2f);
         player.flipsidesifneeded();
         return true;
     }
@@ -194,10 +194,10 @@ void PlayerCollisions::checksides(CPlayer& player)
         //[ ][ ]
     case 1: {
         if (player.leftX() + (PW >> 1) > (tile_x_left << 5) + TILESIZE) {
-            player.setXf((float)((tile_x_left << 5) + TILESIZE) + 0.2f);
+            player.setXf(static_cast<float>((tile_x_left << 5) + TILESIZE) + 0.2f);
             player.flipsidesifneeded();
         } else {
-            player.setYf((float)((tile_y << 5) + TILESIZE) + 0.2f);
+            player.setYf(static_cast<float>((tile_y << 5) + TILESIZE) + 0.2f);
         }
 
         break;
@@ -207,10 +207,10 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[ ][ ]
     case 2: {
         if (player.leftX() + (PW >> 1) < (tile_x_right << 5)) {
-            player.setXf((float)((tile_x_right << 5) - PW) - 0.2f);
+            player.setXf(static_cast<float>((tile_x_right << 5) - PW) - 0.2f);
             player.flipsidesifneeded();
         } else {
-            player.setYf((float)((tile_y << 5) + TILESIZE) + 0.2f);
+            player.setYf(static_cast<float>((tile_y << 5) + TILESIZE) + 0.2f);
         }
 
         break;
@@ -219,7 +219,7 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[X][X]
     //[ ][ ]
     case 3: {
-        player.setYf((float)((tile_y << 5) + TILESIZE) + 0.2f);
+        player.setYf(static_cast<float>((tile_y << 5) + TILESIZE) + 0.2f);
         break;
     }
 
@@ -227,10 +227,10 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[X][ ]
     case 4: {
         if (player.leftX() + (PW >> 1) > (tile_x_left << 5) + TILESIZE) {
-            player.setXf((float)((tile_x_left << 5) + TILESIZE) + 0.2f);
+            player.setXf(static_cast<float>((tile_x_left << 5) + TILESIZE) + 0.2f);
             player.flipsidesifneeded();
         } else {
-            player.setYf((float)((tile_y2 << 5) - PH) - 0.2f);
+            player.setYf(static_cast<float>((tile_y2 << 5) - PH) - 0.2f);
         }
 
         break;
@@ -239,7 +239,7 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[X][ ]
     //[X][ ]
     case 5: {
-        player.setXf((float)((tile_x_left << 5) + TILESIZE) + 0.2f);
+        player.setXf(static_cast<float>((tile_x_left << 5) + TILESIZE) + 0.2f);
         player.flipsidesifneeded();
         break;
     }
@@ -248,12 +248,12 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[X][ ]
     case 6: {
         if (player.leftX() + (PW >> 1) > (tile_x_left << 5) + TILESIZE) {
-            player.setYf((float)((tile_y << 5) + TILESIZE) + 0.2f);
-            player.setXf((float)((tile_x_left << 5) + TILESIZE) + 0.2f);
+            player.setYf(static_cast<float>((tile_y << 5) + TILESIZE) + 0.2f);
+            player.setXf(static_cast<float>((tile_x_left << 5) + TILESIZE) + 0.2f);
             player.flipsidesifneeded();
         } else {
-            player.setYf((float)((tile_y2 << 5) - PH) - 0.2f);
-            player.setXf((float)((tile_x_right << 5) - PW) - 0.2f);
+            player.setYf(static_cast<float>((tile_y2 << 5) - PH) - 0.2f);
+            player.setXf(static_cast<float>((tile_x_right << 5) - PW) - 0.2f);
             player.flipsidesifneeded();
         }
 
@@ -263,8 +263,8 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[X][X]
     //[X][ ]
     case 7: {
-        player.setYf((float)((tile_y << 5) + TILESIZE) + 0.2f);
-        player.setXf((float)((tile_x_left << 5) + TILESIZE) + 0.2f);
+        player.setYf(static_cast<float>((tile_y << 5) + TILESIZE) + 0.2f);
+        player.setXf(static_cast<float>((tile_x_left << 5) + TILESIZE) + 0.2f);
         player.flipsidesifneeded();
         break;
     }
@@ -273,10 +273,10 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[ ][X]
     case 8: {
         if (player.leftX() + (PW >> 1) < (tile_x_right << 5)) {
-            player.setXf((float)((tile_x_right << 5) - PW) - 0.2f);
+            player.setXf(static_cast<float>((tile_x_right << 5) - PW) - 0.2f);
             player.flipsidesifneeded();
         } else {
-            player.setYf((float)((tile_y2 << 5) - PH) - 0.2f);
+            player.setYf(static_cast<float>((tile_y2 << 5) - PH) - 0.2f);
         }
 
         break;
@@ -286,12 +286,12 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[ ][X]
     case 9: {
         if (player.leftX() + (PW >> 1) > (tile_x_left << 5) + TILESIZE) {
-            player.setYf((float)((tile_y2 << 5) - PH) - 0.2f);
-            player.setXf((float)((tile_x_left << 5) + TILESIZE) + 0.2f);
+            player.setYf(static_cast<float>((tile_y2 << 5) - PH) - 0.2f);
+            player.setXf(static_cast<float>((tile_x_left << 5) + TILESIZE) + 0.2f);
             player.flipsidesifneeded();
         } else {
-            player.setYf((float)((tile_y << 5) + TILESIZE) + 0.2f);
-            player.setXf((float)((tile_x_right << 5) - PW) - 0.2f);
+            player.setYf(static_cast<float>((tile_y << 5) + TILESIZE) + 0.2f);
+            player.setXf(static_cast<float>((tile_x_right << 5) - PW) - 0.2f);
             player.flipsidesifneeded();
         }
 
@@ -301,7 +301,7 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[ ][X]
     //[ ][X]
     case 10: {
-        player.setXf((float)((tile_x_right << 5) - PW) - 0.2f);
+        player.setXf(static_cast<float>((tile_x_right << 5) - PW) - 0.2f);
         player.flipsidesifneeded();
         break;
     }
@@ -309,8 +309,8 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[X][X]
     //[ ][X]
     case 11: {
-        player.setYf((float)((tile_y << 5) + TILESIZE) + 0.2f);
-        player.setXf((float)((tile_x_right << 5) - PW) - 0.2f);
+        player.setYf(static_cast<float>((tile_y << 5) + TILESIZE) + 0.2f);
+        player.setXf(static_cast<float>((tile_x_right << 5) - PW) - 0.2f);
         player.flipsidesifneeded();
         break;
     }
@@ -318,15 +318,15 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[ ][ ]
     //[X][X]
     case 12: {
-        player.setYf((float)((tile_y2 << 5) - PH) - 0.2f);
+        player.setYf(static_cast<float>((tile_y2 << 5) - PH) - 0.2f);
         break;
     }
 
     //[X][ ]
     //[X][X]
     case 13: {
-        player.setYf((float)((tile_y2 << 5) - PH) - 0.2f);
-        player.setXf((float)((tile_x_left << 5) + TILESIZE) + 0.2f);
+        player.setYf(static_cast<float>((tile_y2 << 5) - PH) - 0.2f);
+        player.setXf(static_cast<float>((tile_x_left << 5) + TILESIZE) + 0.2f);
         player.flipsidesifneeded();
         break;
     }
@@ -334,8 +334,8 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[ ][X]
     //[X][X]
     case 14: {
-        player.setYf((float)((tile_y2 << 5) - PH) - 0.2f);
-        player.setXf((float)((tile_x_right << 5) - PW) - 0.2f);
+        player.setYf(static_cast<float>((tile_y2 << 5) - PH) - 0.2f);
+        player.setXf(static_cast<float>((tile_x_right << 5) - PW) - 0.2f);
         player.flipsidesifneeded();
         break;
     }
@@ -344,7 +344,7 @@ void PlayerCollisions::checksides(CPlayer& player)
     //[X][X]
     //[X][X]
     case 15: {
-        player.setYf((float)((tile_y2 << 5) + TILESIZE) + 0.2f);
+        player.setYf(static_cast<float>((tile_y2 << 5) + TILESIZE) + 0.2f);
         break;
     }
 

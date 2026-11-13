@@ -2,7 +2,11 @@
 
 #include "uicontrol.h"
 
-#define NUMBONUSITEMSONWHEEL 10
+#include <array>
+#include <memory>
+#include <vector>
+
+constexpr int NUMBONUSITEMSONWHEEL = 10;
 
 class MI_Button;
 class MI_Image;
@@ -25,10 +29,10 @@ private:
     short iDisplayPowerupIndex = 0;
     short iDisplayPowerupTimer = 0;
 
-    MI_Image* miBonusImages[NUMBONUSITEMSONWHEEL];
-    MI_Image** miPlayerImages = nullptr;
+    std::array<std::unique_ptr<MI_Image>, NUMBONUSITEMSONWHEEL> miBonusImages;
+    std::vector<std::unique_ptr<MI_Image>> miPlayerImages;
 
-    MI_Button* miContinueButton = nullptr;
+    std::unique_ptr<MI_Button> miContinueButton;
 
     short iChosenPowerups[NUMBONUSITEMSONWHEEL];
 

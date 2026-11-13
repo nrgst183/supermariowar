@@ -1,4 +1,6 @@
 #include "PlayerKuriboShoe.h"
+#include "PlayerKeyMask.h"
+#include "SimulationState.h"
 
 #include "../player.h"
 
@@ -9,7 +11,7 @@
 #include "objects/carriable/CO_KuriboShoe.h"
 
 
-static const uint8_t kuriboShoe_exitCode[4] = {4, 8, 4, 8};
+static const uint8_t kuriboShoe_exitCode[4] = {PlayerKeyMask::Left, PlayerKeyMask::Right, PlayerKeyMask::Left, PlayerKeyMask::Right};
 
 void PlayerKuriboShoe::reset()
 {
@@ -64,7 +66,7 @@ void PlayerKuriboShoe::update_gettingOutOfTheShoe(CPlayer& player, uint8_t keyma
         if (exitIndex == 4 && exitTimer < 32) {
             CO_KuriboShoe * shoe = new CO_KuriboShoe(&rm->spr_kuriboshoe, {static_cast<short>(player.ix - PWOFFSET), static_cast<short>(player.iy - PHOFFSET - 2)}, type == STICKY);
             shoe->collision_detection_checksides();
-            objectcontainer[1].add(shoe);
+            g_sim.objectcontainer[1].add(shoe);
             eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, player.centerX() - 16, player.centerY() - 16, 3, 8);
 
             exitIndex = 0;
@@ -105,7 +107,7 @@ void PlayerKuriboShoe::draw(CPlayer& player)
             rm->spr_kuriboshoe.draw(
                 player.leftX() - PWOFFSET, player.topY() - PHOFFSET,
                 {animationFrame + (type == STICKY ? 64 : 0), (player.sprite_state & 0x1) == 0 ? 0 : 32, 32, 32},
-                static_cast<ClipEdge>((short)player.state % 4), player.GetWarpPlane());
+                static_cast<ClipEdge>(static_cast<short>(player.state) % 4), player.GetWarpPlane());
         else
             rm->spr_kuriboshoe.draw(
                 player.leftX() - PWOFFSET, player.topY() - PHOFFSET,

@@ -25,7 +25,7 @@ MI_FrenzyModeOptions::MI_FrenzyModeOptions(short x, short y, short width, short 
     iTopStop = ((iNumLines - 1) >> 1) + 3;  // Plus 3 for the 3 fields at the top
     iBottomStop = ((NUMFRENZYCARDS + 1) >> 1) - iNumLines + iTopStop;
 
-    mMenu = new UI_Menu();
+    mMenu = std::make_unique<UI_Menu>();
 
     miQuantityField = new MI_SelectField<short>(&rm->spr_selectfield, 120, 40, "Limit", 400, 180);
     miQuantityField->add("Single Powerup", 0);
@@ -143,10 +143,7 @@ MI_FrenzyModeOptions::MI_FrenzyModeOptions(short x, short y, short width, short 
     mMenu->SetCancelCode(MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS);
 }
 
-MI_FrenzyModeOptions::~MI_FrenzyModeOptions()
-{
-    delete mMenu;
-}
+MI_FrenzyModeOptions::~MI_FrenzyModeOptions() = default;
 
 void MI_FrenzyModeOptions::SetupPowerupFields()
 {

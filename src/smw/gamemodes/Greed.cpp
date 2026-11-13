@@ -6,6 +6,7 @@
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_Coin.h"
 
 #include <cmath>
@@ -62,8 +63,8 @@ void CGM_Greed::init()
 
     short iGoal = goal == -1 ? 0 : goal;
 
-    for (short iScore = 0; iScore < score_cnt; iScore++) {
-        score[iScore]->SetScore(iGoal);
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
+        g_sim.score[iScore].SetScore(iGoal);
     }
 }
 
@@ -109,23 +110,23 @@ PlayerKillType CGM_Greed::ReleaseCoins(CPlayer &player, KillStyle style)
     const Vec2s pos(player.centerX() - 16, player.centerY() - 16);
 
     for (short k = 0; k < iDamage; k++) {
-        float speed = 7.0f + ((float)RANDOM_INT(9)) / 2.0f;
-        float angle = -((float)RANDOM_INT(314)) / 100.0f;
+        float speed = 7.0f + (static_cast<float>(RANDOM_INT(9))) / 2.0f;
+        float angle = -(static_cast<float>(RANDOM_INT(314))) / 100.0f;
         Vec2f vel(speed * cos(angle), speed * sin(angle));
 
-        objectcontainer[1].add(new MO_Coin(&rm->spr_coin, vel, pos, player.getColorID(), player.getTeamID(), 1, 30, false));
+        g_sim.objectcontainer[1].add(new MO_Coin(&rm->spr_coin, vel, pos, player.getColorID(), player.getTeamID(), 1, 30, false));
     }
 
     //Play warning sound if game is almost over
     if (goal != -1 && !playedwarningsound) {
         bool playwarning = false;
-        for (short j = 0; j < score_cnt; j++) {
+        for (short j = 0; j < g_sim.score_cnt; j++) {
             short countscore = 0;
-            for (short k = 0; k < score_cnt; k++) {
+            for (short k = 0; k < g_sim.score_cnt; k++) {
                 if (j == k)
                     continue;
 
-                countscore += score[k]->score;
+                countscore += g_sim.score[k].score;
             }
 
             if (countscore <= 10) {

@@ -5,6 +5,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/overmap/WO_PipeBonus.h"
 #include "objects/overmap/WO_PipeCoin.h"
 #include "Score.h"
@@ -30,6 +31,7 @@ void CGM_Pipe_MiniGame::init()
     iBonusTimer = 0;
     iBonusType = 0;
     iBonusTeam = 0;
+    fSlowdown = false;
 }
 
 
@@ -41,7 +43,7 @@ void CGM_Pipe_MiniGame::think()
     }
 
     if (--iNextItemTimer <= 0) {
-        const Vec2f vel((float)(RANDOM_INT(21) - 10) / 2.0f, -((float)RANDOM_INT(11) / 2.0f + 7.0f));
+        const Vec2f vel(static_cast<float>(RANDOM_INT(21) - 10) / 2.0f, -(static_cast<float>(RANDOM_INT(11)) / 2.0f + 7.0f));
         const Vec2s pos(304, 256);
 
         if (iBonusType == 0 || iBonusType == 2 || iBonusType == 4) {
@@ -52,28 +54,28 @@ void CGM_Pipe_MiniGame::think()
 
             short iRandPowerup = RANDOM_INT(50);
             if (iBonusType == 0 && iRandPowerup < 5) { //bonuses
-                objectcontainer[1].add(new OMO_PipeBonus(&rm->spr_pipegamebonus, vel, pos, iRandPowerup, 620, 15));
+                g_sim.objectcontainer[1].add(new OMO_PipeBonus(&rm->spr_pipegamebonus, vel, pos, iRandPowerup, 620, 15));
             } else if (iRandPowerup < 10) { //fireballs
-                objectcontainer[1].add(new OMO_PipeBonus(&rm->spr_pipegamebonus, vel, pos, 5, 0, 15));
+                g_sim.objectcontainer[1].add(new OMO_PipeBonus(&rm->spr_pipegamebonus, vel, pos, 5, 0, 15));
             } else { //coins
                 short iRandCoin = RANDOM_INT(20);
-                objectcontainer[1].add(new OMO_PipeCoin(&rm->spr_coin, vel, pos, -1, iRandCoin < 16 ? 2 : (iRandCoin < 19 ? 0 : 1), 15));
+                g_sim.objectcontainer[1].add(new OMO_PipeCoin(&rm->spr_coin, vel, pos, -1, iRandCoin < 16 ? 2 : (iRandCoin < 19 ? 0 : 1), 15));
             }
         } else if (iBonusType == 1) {
             iNextItemTimer = RANDOM_INT(10) + 10;
 
-            short iRandTeam = RANDOM_INT(score_cnt + 2);
+            short iRandTeam = RANDOM_INT(g_sim.score_cnt + 2);
 
             //Give an advantage to the team that got the item
-            if (iRandTeam >= score_cnt)
+            if (iRandTeam >= g_sim.score_cnt)
                 iRandTeam = iBonusTeam;
 
             short iRandPlayer = game_values.teamids[iRandTeam][RANDOM_INT(game_values.teamcounts[iRandTeam])];
 
-            objectcontainer[1].add(new OMO_PipeCoin(&rm->spr_coin, vel, pos, iRandTeam, game_values.colorids[iRandPlayer], 15));
+            g_sim.objectcontainer[1].add(new OMO_PipeCoin(&rm->spr_coin, vel, pos, iRandTeam, game_values.colorids[iRandPlayer], 15));
         } else if (iBonusType == 3) {
             iNextItemTimer = RANDOM_INT(5) + 10;
-            objectcontainer[1].add(new OMO_PipeCoin(&rm->spr_coin, vel, pos, -1, 0, 15));
+            g_sim.objectcontainer[1].add(new OMO_PipeCoin(&rm->spr_coin, vel, pos, -1, 0, 15));
         }
     }
 

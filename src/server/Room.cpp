@@ -34,8 +34,9 @@ Room::Room(uint32_t roomID, const char* name, const char* password, Player* host
     , gamemodeID(0) // Classic
     , gamemodeGoal(10) // 10 lives
 {
-    strncpy_sec(this->name, name, NET_MAX_ROOM_NAME_LENGTH);
-    strncpy_sec(this->password, password, NET_MAX_ROOM_PASSWORD_LENGTH);
+    // keep the same truncation as the fixed-size network buffers (incl. terminator)
+    this->name.assign(name, strnlen(name, NET_MAX_ROOM_NAME_LENGTH - 1));
+    this->password.assign(password, strnlen(password, NET_MAX_ROOM_PASSWORD_LENGTH - 1));
 
     players[0] = host;
     host->skinPackage.setPlayerID(0);
@@ -120,7 +121,7 @@ void Room::sendRoomUpdate()
     NetPkgs::CurrentRoom package;
         package.roomID = roomID;
         package.hostPlayerNumber = hostPlayerNumber;
-        strncpy_sec(package.name, name, NET_MAX_ROOM_NAME_LENGTH);
+        strncpy_sec(package.name, name.c_str(), NET_MAX_ROOM_NAME_LENGTH);
 
     for (uint8_t p = 0; p < 4; p++) {
         if (players[p])
@@ -274,7 +275,7 @@ void Room::sendStartSignal()
     printf("sendStartSignal\n");
 
 
-    NetPeer* gh_netclient = gamehost->network_client;
+    NetPeer* gh_netclient = gamehost->network_client.get();
     NetPkgs::GameHostInfo pkg_to_players(gh_netclient->addressHost());
 
     printf("  pkg->players: [%u:%u]\n", pkg_to_players.host, NET_GAMEHOST_PORT);
@@ -289,7 +290,7 @@ void Room::sendStartSignal()
             if (players[p])
             {
                 //printf("  %d\n", p);
-                NetPeer* client = players[p]->network_client;
+                NetPeer* client = players[p]->network_client.get();
                 assert(client != gh_netclient);
 
                 pkg_to_gh.setPlayer(playerIndex, client->addressHost(), client->addressPort());

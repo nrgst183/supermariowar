@@ -88,7 +88,7 @@ MenuCodeEnum MI_MapField::SendInput(CPlayerInput * playerInput)
 
                 //maplist->startswith((char)playerInput->iPressedKey);
 
-                sSearchString += (char)iPressedKey;
+                sSearchString += static_cast<char>(iPressedKey);
                 iSearchStringTimer = 10;
 
                 if (!maplist->startswith(sSearchString.c_str())) {
@@ -248,7 +248,7 @@ void MI_MapField::SetDimensions(short width, short indent)
 
     if (fShowtags) {
         //iSlideListOut = (iWidth - 352) >> 1;
-        iSlideListOut = ((int)(iWidth - App::screenWidth * 0.55)) >> 1;
+        iSlideListOut = (static_cast<int>(iWidth - App::screenWidth * 0.55)) >> 1;
         iSlideListOutGoal = iSlideListOut;
     }
 }

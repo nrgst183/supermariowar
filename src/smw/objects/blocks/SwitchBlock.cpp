@@ -8,9 +8,9 @@
 B_SwitchBlock::B_SwitchBlock(gfxSprite *nspr, Vec2s pos, SwitchColor color, short iState) :
     IO_Block(nspr, pos)
 {
-    iw = (short)spr->getWidth() >> 2;
+    iw = static_cast<short>(spr->getWidth()) >> 2;
     collisionWidth = iw;
-    ih = (short)spr->getHeight() >> 2;
+    ih = static_cast<short>(spr->getHeight()) >> 2;
     collisionHeight = ih;
 
     state = 1 - iState;
@@ -48,14 +48,14 @@ bool B_SwitchBlock::hittop(CPlayer * player, bool useBehavior)
 bool B_SwitchBlock::hitbottom(CPlayer * player, bool)
 {
     player->vely = CapFallingVelocity(-player->vely * BOUNCESTRENGTH);
-    player->setYf((float)(iposy + ih) + 0.2f);
+    player->setYf(static_cast<float>(iposy + ih) + 0.2f);
     vely = -VELBLOCKBOUNCE;
     return false;
 }
 
 bool B_SwitchBlock::hitright(CPlayer * player, bool)
 {
-    player->setXf((float)(iposx + iw) + 0.2f);
+    player->setXf(static_cast<float>(iposx + iw) + 0.2f);
     player->fOldX = player->fx;
 
     if (player->velx < 0.0f)
@@ -69,7 +69,7 @@ bool B_SwitchBlock::hitright(CPlayer * player, bool)
 
 bool B_SwitchBlock::hitleft(CPlayer * player, bool)
 {
-    player->setXf((float)(iposx - PW) - 0.2f);
+    player->setXf(static_cast<float>(iposx - PW) - 0.2f);
     player->fOldX = player->fx;
 
     if (player->velx > 0.0f)
@@ -84,7 +84,7 @@ bool B_SwitchBlock::hitleft(CPlayer * player, bool)
 bool B_SwitchBlock::hittop(IO_MovingObject * object)
 {
     if (state == 0) {
-        object->setYf((float)(iposy - object->collisionHeight) - 0.2f);
+        object->setYf(static_cast<float>(iposy - object->collisionHeight) - 0.2f);
         object->fOldY = object->fy;
         object->vely = object->BottomBounce();
     }
@@ -95,7 +95,7 @@ bool B_SwitchBlock::hittop(IO_MovingObject * object)
 bool B_SwitchBlock::hitbottom(IO_MovingObject * object)
 {
     if (state == 0) {
-        object->setYf((float)(iposy + ih) + 0.2f);
+        object->setYf(static_cast<float>(iposy + ih) + 0.2f);
         object->vely = -object->vely;
     }
 
@@ -105,7 +105,7 @@ bool B_SwitchBlock::hitbottom(IO_MovingObject * object)
 bool B_SwitchBlock::hitright(IO_MovingObject * object)
 {
     if (state == 0) {
-        object->setXf((float)(iposx + iw) + 0.2f);
+        object->setXf(static_cast<float>(iposx + iw) + 0.2f);
 
         if (object->velx < 0.0f)
             object->velx = -object->velx;
@@ -117,7 +117,7 @@ bool B_SwitchBlock::hitright(IO_MovingObject * object)
 bool B_SwitchBlock::hitleft(IO_MovingObject * object)
 {
     if (state == 0) {
-        object->setXf((float)(iposx - object->collisionWidth) - 0.2f);
+        object->setXf(static_cast<float>(iposx - object->collisionWidth) - 0.2f);
 
         if (object->velx > 0.0f)
             object->velx = -object->velx;

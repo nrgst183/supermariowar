@@ -4,6 +4,8 @@
 #include "uimenu.h"
 #include "uicontrol.h"
 
+#include <memory>
+
 class MI_Image;
 
 class MI_TeamSelect : public UI_Control
@@ -26,7 +28,7 @@ class MI_TeamSelect : public UI_Control
 
 		void FindNewTeam(short iPlayerID, short iDirection);
 
-		MI_Image * miImage;
+		std::unique_ptr<MI_Image> miImage;
 		gfxSprite * spr;
 
 		short iTeamIDs[4][3];

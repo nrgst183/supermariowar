@@ -86,8 +86,8 @@ void BinaryFile::write_i16(int16_t value)
 #if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
     int16_t tmp = value;
 
-    ((char*)&value)[0] = ((char*)&tmp)[1];
-    ((char*)&value)[1] = ((char*)&tmp)[0];
+    reinterpret_cast<char*>(&value)[0] = reinterpret_cast<char*>(&tmp)[1];
+    reinterpret_cast<char*>(&value)[1] = reinterpret_cast<char*>(&tmp)[0];
 #endif
 
     fwrite_or_exception(&value, sizeof(int16_t), 1);
@@ -98,10 +98,10 @@ void BinaryFile::write_i32(int32_t value)
 #if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
     int32_t tmp = value;
 
-    ((char*)&value)[0] = ((char*)&tmp)[3];
-    ((char*)&value)[1] = ((char*)&tmp)[2];
-    ((char*)&value)[2] = ((char*)&tmp)[1];
-    ((char*)&value)[3] = ((char*)&tmp)[0];
+    reinterpret_cast<char*>(&value)[0] = reinterpret_cast<char*>(&tmp)[3];
+    reinterpret_cast<char*>(&value)[1] = reinterpret_cast<char*>(&tmp)[2];
+    reinterpret_cast<char*>(&value)[2] = reinterpret_cast<char*>(&tmp)[1];
+    reinterpret_cast<char*>(&value)[3] = reinterpret_cast<char*>(&tmp)[0];
 #endif
 
     fwrite_or_exception(&value, sizeof(int32_t), 1);
@@ -117,10 +117,10 @@ void BinaryFile::write_u32(uint32_t value)
 #if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
     uint32_t tmp = value;
 
-    ((char*)&value)[0] = ((char*)&tmp)[3];
-    ((char*)&value)[1] = ((char*)&tmp)[2];
-    ((char*)&value)[2] = ((char*)&tmp)[1];
-    ((char*)&value)[3] = ((char*)&tmp)[0];
+    reinterpret_cast<char*>(&value)[0] = reinterpret_cast<char*>(&tmp)[3];
+    reinterpret_cast<char*>(&value)[1] = reinterpret_cast<char*>(&tmp)[2];
+    reinterpret_cast<char*>(&value)[2] = reinterpret_cast<char*>(&tmp)[1];
+    reinterpret_cast<char*>(&value)[3] = reinterpret_cast<char*>(&tmp)[0];
 #endif
 
     fwrite_or_exception(&value, sizeof(uint32_t), 1);
@@ -131,10 +131,10 @@ void BinaryFile::write_float(float value)
 #if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
     float tmp = value;
 
-    ((char*)&value)[0] = ((char*)&tmp)[3];
-    ((char*)&value)[1] = ((char*)&tmp)[2];
-    ((char*)&value)[2] = ((char*)&tmp)[1];
-    ((char*)&value)[3] = ((char*)&tmp)[0];
+    reinterpret_cast<char*>(&value)[0] = reinterpret_cast<char*>(&tmp)[3];
+    reinterpret_cast<char*>(&value)[1] = reinterpret_cast<char*>(&tmp)[2];
+    reinterpret_cast<char*>(&value)[2] = reinterpret_cast<char*>(&tmp)[1];
+    reinterpret_cast<char*>(&value)[3] = reinterpret_cast<char*>(&tmp)[0];
 #endif
 
     fwrite_or_exception(&value, sizeof(float), 1);
@@ -189,8 +189,8 @@ int16_t BinaryFile::read_i16()
 #if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
     int16_t tmp = in;
 
-    ((char*)&in)[0] = ((char*)&tmp)[1];
-    ((char*)&in)[1] = ((char*)&tmp)[0];
+    reinterpret_cast<char*>(&in)[0] = reinterpret_cast<char*>(&tmp)[1];
+    reinterpret_cast<char*>(&in)[1] = reinterpret_cast<char*>(&tmp)[0];
 #endif
 
     return in;
@@ -207,8 +207,8 @@ void BinaryFile::read_i16_array(int16_t* target, size_t size)
 
         int16_t tmp = target[i];
 
-        ((char*)&target[i])[0] = ((char*)&tmp)[1];
-        ((char*)&target[i])[1] = ((char*)&tmp)[0];
+        reinterpret_cast<char*>(&target[i])[0] = reinterpret_cast<char*>(&tmp)[1];
+        reinterpret_cast<char*>(&target[i])[1] = reinterpret_cast<char*>(&tmp)[0];
     }
 #else
     fread_or_exception(target, sizeof(int16_t), size);
@@ -223,10 +223,10 @@ int32_t BinaryFile::read_i32()
 #if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
     int32_t tmp = in;
 
-    ((char*)&in)[0] = ((char*)&tmp)[3];
-    ((char*)&in)[1] = ((char*)&tmp)[2];
-    ((char*)&in)[2] = ((char*)&tmp)[1];
-    ((char*)&in)[3] = ((char*)&tmp)[0];
+    reinterpret_cast<char*>(&in)[0] = reinterpret_cast<char*>(&tmp)[3];
+    reinterpret_cast<char*>(&in)[1] = reinterpret_cast<char*>(&tmp)[2];
+    reinterpret_cast<char*>(&in)[2] = reinterpret_cast<char*>(&tmp)[1];
+    reinterpret_cast<char*>(&in)[3] = reinterpret_cast<char*>(&tmp)[0];
 #endif
 
     return in;
@@ -243,10 +243,10 @@ void BinaryFile::read_i32_array(int32_t* target, size_t size)
 
         int32_t tmp = target[i];
 
-        ((char*)&target[i])[0] = ((char*)&tmp)[3];
-        ((char*)&target[i])[1] = ((char*)&tmp)[2];
-        ((char*)&target[i])[2] = ((char*)&tmp)[1];
-        ((char*)&target[i])[3] = ((char*)&tmp)[0];
+        reinterpret_cast<char*>(&target[i])[0] = reinterpret_cast<char*>(&tmp)[3];
+        reinterpret_cast<char*>(&target[i])[1] = reinterpret_cast<char*>(&tmp)[2];
+        reinterpret_cast<char*>(&target[i])[2] = reinterpret_cast<char*>(&tmp)[1];
+        reinterpret_cast<char*>(&target[i])[3] = reinterpret_cast<char*>(&tmp)[0];
     }
 #else
     fread_or_exception(target, sizeof(int32_t), size);
@@ -261,10 +261,10 @@ uint32_t BinaryFile::read_u32()
 #if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
     uint32_t tmp = in;
 
-    ((char*)&in)[0] = ((char*)&tmp)[3];
-    ((char*)&in)[1] = ((char*)&tmp)[2];
-    ((char*)&in)[2] = ((char*)&tmp)[1];
-    ((char*)&in)[3] = ((char*)&tmp)[0];
+    reinterpret_cast<char*>(&in)[0] = reinterpret_cast<char*>(&tmp)[3];
+    reinterpret_cast<char*>(&in)[1] = reinterpret_cast<char*>(&tmp)[2];
+    reinterpret_cast<char*>(&in)[2] = reinterpret_cast<char*>(&tmp)[1];
+    reinterpret_cast<char*>(&in)[3] = reinterpret_cast<char*>(&tmp)[0];
 #endif
 
     return in;
@@ -278,10 +278,10 @@ float BinaryFile::read_float()
 #if (SDL_BYTEORDER == SDL_BIG_ENDIAN)
     float tmp = in;
 
-    ((char*)&in)[0] = ((char*)&tmp)[3];
-    ((char*)&in)[1] = ((char*)&tmp)[2];
-    ((char*)&in)[2] = ((char*)&tmp)[1];
-    ((char*)&in)[3] = ((char*)&tmp)[0];
+    reinterpret_cast<char*>(&in)[0] = reinterpret_cast<char*>(&tmp)[3];
+    reinterpret_cast<char*>(&in)[1] = reinterpret_cast<char*>(&tmp)[2];
+    reinterpret_cast<char*>(&in)[2] = reinterpret_cast<char*>(&tmp)[1];
+    reinterpret_cast<char*>(&in)[3] = reinterpret_cast<char*>(&tmp)[0];
 #endif
 
     return in;

@@ -5,6 +5,7 @@
 #include "GameValues.h"
 #include "ObjectContainer.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_SpinAttack.h"
 
 
@@ -38,7 +39,7 @@ void PlayerTail::spin(CPlayer& player)
 
     player.spin.spin(player);
 
-    objectcontainer[1].add(new MO_SpinAttack(player.getGlobalID(), player.getTeamID(), KillStyle::Leaf, player.isFacingRight(), 13));
+    g_sim.objectcontainer[1].add(new MO_SpinAttack(player.getGlobalID(), player.getTeamID(), KillStyle::Leaf, player.isFacingRight(), 13));
 }
 
 //If player is shaking tail, slow decent
@@ -112,7 +113,7 @@ void PlayerTail::draw(CPlayer& player) {
             rm->spr_tail.draw(player.leftX() + (fPlayerFacingRight ? - 18 : 18),
                 player.topY() + 6,
                 {iTailFrame, (fPlayerFacingRight ? 0 : 26) + iOffsetY, 22, 26},
-                static_cast<ClipEdge>((short)player.state % 4), player.GetWarpPlane());
+                static_cast<ClipEdge>(static_cast<short>(player.state) % 4), player.GetWarpPlane());
         else
             rm->spr_tail.draw(player.leftX() + (fPlayerFacingRight ? - 18 : 18),
                 player.topY() + 6,

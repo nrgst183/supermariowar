@@ -138,6 +138,11 @@ Minigame UI_MatchSelectionMenu::GetMinigame() const
     return miMinigameField->currentValue();
 }
 
+void UI_MatchSelectionMenu::SetMinigame(Minigame minigame)
+{
+    miMinigameField->setCurrentValue(minigame);
+}
+
 MatchType UI_MatchSelectionMenu::GetSelectedMatchType() const
 {
     return miMatchSelectionField->currentValue();

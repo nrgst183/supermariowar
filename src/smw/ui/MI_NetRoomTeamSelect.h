@@ -5,6 +5,7 @@
 #include "uicontrol.h"
 
 #include <functional>
+#include <memory>
 
 class MI_Image;
 
@@ -29,8 +30,8 @@ private:
     short iFastScroll;
     short iFastScrollTimer;
 
-    MI_Image* miModifyImage;
-    MI_Image* miHoverImage;
+    std::unique_ptr<MI_Image> miModifyImage;
+    std::unique_ptr<MI_Image> miHoverImage;
 
     std::function<void()> onChangeAccepted;
 };

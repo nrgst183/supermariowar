@@ -6,16 +6,9 @@
 #include <limits>
 #include <cmath>
 
-constexpr int MAXOBJECTS = 300;
-
 //------------------------------------------------------------------------------
 // class object_container
 //------------------------------------------------------------------------------
-CObjectContainer::CObjectContainer()
-{
-    m_list.reserve(MAXOBJECTS);
-}
-
 void CObjectContainer::clean()
 {
     m_list.clear();
@@ -28,27 +21,30 @@ void CObjectContainer::cleanDeadObjects()
     m_list.erase(erase_from, m_list.end());
 }
 
-bool CObjectContainer::add(CObject* ptr)
+bool CObjectContainer::addObject(std::unique_ptr<CObject> obj)
 {
-    if (m_list.size() + 1 >= m_list.capacity()) {
-        //printf("eyecandy list full!\n");
-        delete ptr;	// otherwise memory leak!
-        return false;
-    }
-    m_list.emplace_back(ptr);
+    // The list never grows past its reserved capacity, so adding an object
+    // while update() or draw() is iterating never reallocates.
+    if (isFull())
+        return false;  // `obj` is destroyed here
+
+    m_list.push_back(std::move(obj));
     return true;
 }
 
+// Objects may add new objects while being updated or drawn. Those are
+// appended to the list and are first processed on the next call, so the
+// number of objects to visit is fixed before the loop starts.
 void CObjectContainer::update() const
 {
-    for (const std::unique_ptr<CObject>& obj : m_list)
-        obj->update();
+    for (size_t i = 0, count = m_list.size(); i < count; i++)
+        m_list[i]->update();
 }
 
 void CObjectContainer::draw() const
 {
-    for (const std::unique_ptr<CObject>& obj : m_list)
-        obj->draw();
+    for (size_t i = 0, count = m_list.size(); i < count; i++)
+        m_list[i]->draw();
 }
 
 float CObjectContainer::getClosestObject(short ix, short iy, ObjectType objectType) const

@@ -6,6 +6,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 
 
 //------------------------------------------------------------------------------
@@ -15,7 +16,7 @@ OMO_Area::OMO_Area(gfxSprite* nspr, short iNumAreas)
     : IO_OverMapObject(nspr, {1280, 960}, 5, 0)
     , numareas(iNumAreas)
 {
-    iw = (short)spr->getWidth() / 5;
+    iw = static_cast<short>(spr->getWidth()) / 5;
     collisionWidth = iw;
 
     objectType = object_area;
@@ -52,8 +53,8 @@ void OMO_Area::update()
     if (iPlayerID != -1 && !game_values.gamemode->gameover) {
         if (++scoretimer >= (game_values.pointspeed << 1)) {
             scoretimer = 0;
-            players[iPlayerID]->Score().AdjustScore(1);
-            game_values.gamemode->CheckWinner(players[iPlayerID]);
+            g_sim.players[iPlayerID]->Score().AdjustScore(1);
+            game_values.gamemode->CheckWinner(g_sim.players[iPlayerID]);
         }
     }
 
@@ -72,7 +73,7 @@ void OMO_Area::placeArea()
 {
     short x = 0, y = 0;
     short iAttempts = 32;
-    while ((!g_map->findspawnpoint(5, &x, &y, collisionWidth, collisionHeight, false) || objectcontainer[0].getClosestObject(x, y, object_area) <= (200.0f - ((numareas - 3) * 25.0f)))
+    while ((!g_map->findspawnpoint(5, &x, &y, collisionWidth, collisionHeight, false) || g_sim.objectcontainer[0].getClosestObject(x, y, object_area) <= (200.0f - ((numareas - 3) * 25.0f)))
         && iAttempts-- > 0)
         ;
 

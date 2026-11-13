@@ -4,6 +4,7 @@
 #include "player.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 
 
 //Owned:
@@ -21,31 +22,29 @@ void CGM_Owned::think()
     if (gameover) {
         displayplayertext();
     } else {
-        static short counter = 0;
+        if (++pointCounter >= game_values.pointspeed) {
+            pointCounter = 0;
 
-        if (++counter >= game_values.pointspeed) {
-            counter = 0;
-
-            for (size_t i = 0; i < players.size(); i++) {
-                for (size_t k = 0; k < players.size(); k++) {
+            for (size_t i = 0; i < g_sim.players.size(); i++) {
+                for (size_t k = 0; k < g_sim.players.size(); k++) {
                     if (i == k)
                         continue;
 
-                    if (players[k]->ownerPlayerID == players[i]->getGlobalID())
-                        players[i]->Score().AdjustScore(1);
+                    if (g_sim.players[k]->ownerPlayerID == g_sim.players[i]->getGlobalID())
+                        g_sim.players[i]->Score().AdjustScore(1);
                 }
 
                 if (goal > -1) {
-                    if (players[i]->Score().score >= goal) {
-                        players[i]->Score().SetScore(goal);
+                    if (g_sim.players[i]->Score().score >= goal) {
+                        g_sim.players[i]->Score().SetScore(goal);
 
-                        winningteam = players[i]->getTeamID();
+                        winningteam = g_sim.players[i]->getTeamID();
                         gameover = true;
 
                         RemovePlayersButTeam(winningteam);
                         SetupScoreBoard(false);
                         ShowScoreBoard();
-                    } else if (players[i]->Score().score >= goal * 0.8 && !playedwarningsound) {
+                    } else if (g_sim.players[i]->Score().score >= goal * 0.8 && !playedwarningsound) {
                         playwarningsound();
                     }
                 }
@@ -62,7 +61,7 @@ PlayerKillType CGM_Owned::playerkilledplayer(CPlayer &inflictor, CPlayer &other,
             inflictor.Score().AdjustScore(5);
 
         //Release all players owned by the killed player
-        for (CPlayer* player : players) {
+        for (CPlayer* player : g_sim.players) {
             if (player->ownerPlayerID == other.getGlobalID()) {
                 player->ownerPlayerID = -1;
             }
@@ -84,7 +83,7 @@ PlayerKillType CGM_Owned::playerkilledself(CPlayer &player, KillStyle style)
 {
     CGameMode::playerkilledself(player, style);
 
-    for (CPlayer* other : players) {
+    for (CPlayer* other : g_sim.players) {
         if (other->ownerPlayerID == player.getGlobalID()) {
             other->ownerPlayerID = -1;
         }

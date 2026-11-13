@@ -14,6 +14,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <ranges>
+#include <format>
+#include <string>
 
 
 namespace {
@@ -332,8 +334,7 @@ MI_InputControlContainer::MI_InputControlContainer(gfxSprite * spr_button, short
     iDevice = game_values.playerInput.inputControls[iPlayerID]->iDevice;
     iSelectedInputType = 0;
 
-    char szTitle[128];
-    snprintf(szTitle, sizeof(szTitle), "Player %d Controls", iPlayerID + 1);
+    const std::string szTitle = std::format("Player {} Controls", iPlayerID + 1);
     miText = new MI_HeaderText(szTitle, 320, 5);
 
     miImage[0] = new MI_Image(spr_button, 0, 0, 0, 0, 320, 32, 1, 1, 0);
@@ -374,7 +375,7 @@ MI_InputControlContainer::MI_InputControlContainer(gfxSprite * spr_button, short
     miBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miBackButton->SetCode(MENU_CODE_BACK_TO_CONTROLS_MENU);
 
-    mInputMenu = new UI_Menu();
+    mInputMenu = std::make_unique<UI_Menu>();
     mInputMenu->SetCancelCode(MENU_CODE_BACK_TO_CONTROLS_MENU);
     mInputMenu->AddNonControl(miImage[0]);
     mInputMenu->AddNonControl(miImage[1]);
@@ -406,11 +407,8 @@ MI_InputControlContainer::MI_InputControlContainer(gfxSprite * spr_button, short
     SetVisibleInputFields();
 }
 
-MI_InputControlContainer::~MI_InputControlContainer()
-{
-    //takes care of deleting all added controls
-    delete mInputMenu;
-}
+//mInputMenu takes care of deleting all added controls
+MI_InputControlContainer::~MI_InputControlContainer() = default;
 
 
 void MI_InputControlContainer::Update()
@@ -524,8 +522,7 @@ void MI_InputControlContainer::SetPlayer(short playerID)
 
     SetVisibleInputFields();
 
-    char szNewTitle[128];
-    snprintf(szNewTitle, sizeof(szNewTitle), "Player %d Controls", iPlayerID + 1);
+    const std::string szNewTitle = std::format("Player {} Controls", iPlayerID + 1);
     miText->SetText(szNewTitle);
     mInputMenu->ResetMenu();
 }

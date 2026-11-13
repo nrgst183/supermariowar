@@ -6,6 +6,7 @@
 #include "ObjectContainer.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_CheepCheep.h"
 #include "objects/walkingenemy/WE_BuzzyBeetle.h"
 #include "objects/walkingenemy/WE_Goomba.h"
@@ -41,7 +42,7 @@ void CGM_Stomp::think()
     if (gameover) {
         displayplayertext();
     } else {
-        for (CPlayer* player : players) {
+        for (CPlayer* player : g_sim.players) {
             CheckWinner(player);
         }
     }
@@ -64,23 +65,23 @@ void CGM_Stomp::think()
             }
 
             if (0 == iSelectedEnemy)
-                objectcontainer[0].add(new MO_Goomba(&rm->spr_goomba, RANDOM_BOOL(), false));
+                g_sim.objectcontainer[0].add(new MO_Goomba(&rm->spr_goomba, RANDOM_BOOL(), false));
             else if (1 == iSelectedEnemy)
-                objectcontainer[0].add(new MO_Koopa(&rm->spr_koopa, RANDOM_BOOL(), false, false, true));
+                g_sim.objectcontainer[0].add(new MO_Koopa(&rm->spr_koopa, RANDOM_BOOL(), false, false, true));
             else if (2 == iSelectedEnemy)
-                objectcontainer[2].add(new MO_CheepCheep(&rm->spr_cheepcheep));
+                g_sim.objectcontainer[2].add(new MO_CheepCheep(&rm->spr_cheepcheep));
             else if (3 == iSelectedEnemy)
-                objectcontainer[0].add(new MO_Koopa(&rm->spr_redkoopa, RANDOM_BOOL(), true, false, false));
+                g_sim.objectcontainer[0].add(new MO_Koopa(&rm->spr_redkoopa, RANDOM_BOOL(), true, false, false));
             else if (4 == iSelectedEnemy)
-                objectcontainer[0].add(new MO_Spiny(&rm->spr_spiny, RANDOM_BOOL()));
+                g_sim.objectcontainer[0].add(new MO_Spiny(&rm->spr_spiny, RANDOM_BOOL()));
             else if (5 == iSelectedEnemy)
-                objectcontainer[0].add(new MO_BuzzyBeetle(&rm->spr_buzzybeetle, RANDOM_BOOL()));
+                g_sim.objectcontainer[0].add(new MO_BuzzyBeetle(&rm->spr_buzzybeetle, RANDOM_BOOL()));
             else if (6 == iSelectedEnemy)
-                objectcontainer[0].add(new MO_Goomba(&rm->spr_paragoomba, RANDOM_BOOL(), true));
+                g_sim.objectcontainer[0].add(new MO_Goomba(&rm->spr_paragoomba, RANDOM_BOOL(), true));
             else if (7 == iSelectedEnemy)
-                objectcontainer[0].add(new MO_Koopa(&rm->spr_parakoopa, RANDOM_BOOL(), false, true, true));
+                g_sim.objectcontainer[0].add(new MO_Koopa(&rm->spr_parakoopa, RANDOM_BOOL(), false, true, true));
             else
-                objectcontainer[0].add(new MO_Koopa(&rm->spr_redparakoopa, RANDOM_BOOL(), true, true, true));
+                g_sim.objectcontainer[0].add(new MO_Koopa(&rm->spr_redparakoopa, RANDOM_BOOL(), true, true, true));
         }
     }
 }
@@ -105,7 +106,7 @@ void CGM_Stomp::playerextraguy(CPlayer &player, short iType)
 
 void CGM_Stomp::ResetSpawnTimer()
 {
-    spawntimer = (short)(RANDOM_INT(game_values.gamemodesettings.stomp.rate)) + game_values.gamemodesettings.stomp.rate;
+    spawntimer = static_cast<short>(RANDOM_INT(game_values.gamemodesettings.stomp.rate)) + game_values.gamemodesettings.stomp.rate;
 }
 
 PlayerKillType CGM_Stomp::CheckWinner(CPlayer * player)

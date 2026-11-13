@@ -6,6 +6,8 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_PowerupSlider.h"
 
+#include <memory>
+
 class MI_Button;
 
 class MI_FrenzyModeOptions : public UI_Control
@@ -40,7 +42,7 @@ private:
     short iNumLines;
     short iWidth;
 
-    UI_Menu * mMenu;
+    std::unique_ptr<UI_Menu> mMenu;
 
     MI_SelectField<short> * miQuantityField;
     MI_SelectField<short> * miRateField;

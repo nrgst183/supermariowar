@@ -25,22 +25,17 @@ Player::Player()
     synchOK = false;
 
     name = "Anonymous";
-    network_client = nullptr;
 
     joinTime = time_now();
     lastActivityTime = joinTime;
 }
 
-Player::~Player()
-{
-    if (network_client)
-        delete network_client;
-}
+Player::~Player() = default;
 
 void Player::setClient(NetPeer* client)
 {
     assert(network_client == nullptr);
-    network_client = client;
+    network_client.reset(client);
 
     lastActivityTime = time_now();
 }

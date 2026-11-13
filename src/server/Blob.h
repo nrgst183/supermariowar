@@ -1,6 +1,7 @@
 #ifndef BLOB_H
 #define BLOB_H
 
+#include <memory>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -19,7 +20,7 @@ public:
     size_t get_size() const;
 
 protected:
-    uint8_t* data;
+    std::unique_ptr<uint8_t[]> data;
     size_t size;
 };
 

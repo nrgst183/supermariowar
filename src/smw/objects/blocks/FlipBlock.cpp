@@ -28,7 +28,7 @@
 B_FlipBlock::B_FlipBlock(gfxSprite *nspr, Vec2s pos, bool fHidden) :
     IO_Block(nspr, pos)
 {
-    iw = (short)spr->getWidth() >> 2;
+    iw = static_cast<short>(spr->getWidth()) >> 2;
     collisionWidth = iw;
 
     hidden = ishiddentype = fHidden;
@@ -36,7 +36,7 @@ B_FlipBlock::B_FlipBlock(gfxSprite *nspr, Vec2s pos, bool fHidden) :
     counter = 0;
     frame = 0;
     timer = 0;
-    animationWidth = (short)spr->getWidth();
+    animationWidth = static_cast<short>(spr->getWidth());
 }
 
 void B_FlipBlock::draw()
@@ -133,7 +133,7 @@ bool B_FlipBlock::hitbottom(CPlayer * player, bool useBehavior)
 {
     if (useBehavior && state == 0) {
         player->vely = CapFallingVelocity(-player->vely * BOUNCESTRENGTH);
-        player->setYf((float)(iposy + ih) + 0.2f);
+        player->setYf(static_cast<float>(iposy + ih) + 0.2f);
 
         iBumpPlayerID = player->globalID;
         iBumpTeamID = player->teamID;
@@ -181,7 +181,7 @@ bool B_FlipBlock::collide(IO_MovingObject * object, short direction)
 bool B_FlipBlock::hittop(IO_MovingObject * object)
 {
     if (state == 0) {
-        object->setYf((float)(iposy - object->collisionHeight) - 0.2f);
+        object->setYf(static_cast<float>(iposy - object->collisionHeight) - 0.2f);
         object->fOldY = object->fy;
         object->vely = object->BottomBounce();
     }
@@ -192,7 +192,7 @@ bool B_FlipBlock::hittop(IO_MovingObject * object)
 bool B_FlipBlock::hitbottom(IO_MovingObject * object)
 {
     if (state == 0) {
-        object->setYf((float)(iposy + ih) + 0.2f);
+        object->setYf(static_cast<float>(iposy + ih) + 0.2f);
         object->vely = -object->vely;
     }
 
@@ -202,7 +202,7 @@ bool B_FlipBlock::hitbottom(IO_MovingObject * object)
 bool B_FlipBlock::hitright(IO_MovingObject * object)
 {
     if (state == 0) {
-        object->setXf((float)(iposx + iw) + 0.2f);
+        object->setXf(static_cast<float>(iposx + iw) + 0.2f);
         object->fOldX = object->fx;
 
         if (object->velx < 0.0f)
@@ -215,7 +215,7 @@ bool B_FlipBlock::hitright(IO_MovingObject * object)
                     return false;
             }
 
-            if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity()) {
+            if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity()) {
                 return false;
             }
 
@@ -243,7 +243,7 @@ bool B_FlipBlock::hitright(IO_MovingObject * object)
 bool B_FlipBlock::hitleft(IO_MovingObject * object)
 {
     if (state == 0) {
-        object->setXf((float)(iposx - object->collisionWidth) - 0.2f);
+        object->setXf(static_cast<float>(iposx - object->collisionWidth) - 0.2f);
         object->fOldX = object->fx;
 
         if (object->velx > 0.0f)
@@ -256,7 +256,7 @@ bool B_FlipBlock::hitleft(IO_MovingObject * object)
                     return false;
             }
 
-            if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity()) {
+            if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity()) {
                 return false;
             }
 

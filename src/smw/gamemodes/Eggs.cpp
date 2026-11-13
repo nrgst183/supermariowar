@@ -4,6 +4,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/carriable/CO_Egg.h"
 #include "objects/moving/MO_Yoshi.h"
 
@@ -33,7 +34,7 @@ void CGM_Eggs::init()
                 break;
 
             fEgg[iEggs] = true;
-            objectcontainer[1].add(new CO_Egg(&rm->spr_egg, iEggs));
+            g_sim.objectcontainer[1].add(new CO_Egg(&rm->spr_egg, iEggs));
         }
     }
 
@@ -45,13 +46,13 @@ void CGM_Eggs::init()
             if (fEgg[iYoshis])
                 fAtLeastOneMatch = true;
 
-            objectcontainer[1].add(new MO_Yoshi(&rm->spr_yoshi, iYoshis));
+            g_sim.objectcontainer[1].add(new MO_Yoshi(&rm->spr_yoshi, iYoshis));
         }
     }
 
     if (!fAtLeastOneMatch) {
-        objectcontainer[1].add(new CO_Egg(&rm->spr_egg, 1));
-        objectcontainer[1].add(new MO_Yoshi(&rm->spr_yoshi, 1));
+        g_sim.objectcontainer[1].add(new CO_Egg(&rm->spr_egg, 1));
+        g_sim.objectcontainer[1].add(new MO_Yoshi(&rm->spr_yoshi, 1));
     }
 }
 
@@ -65,7 +66,7 @@ PlayerKillType CGM_Eggs::playerkilledself(CPlayer &player, KillStyle style)
     CGameMode::playerkilledself(player, style);
 
     if (player.carriedItem && player.carriedItem->getMovingObjectType() == movingobject_egg) {
-        ((CO_Egg*)player.carriedItem)->placeEgg();
+        (static_cast<CO_Egg*>(player.carriedItem))->placeEgg();
     }
 
     return PlayerKillType::Normal;

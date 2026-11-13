@@ -73,20 +73,20 @@ void MO_AttackZone::collide(IO_MovingObject* object)
 
     if (type == movingobject_shell || type == movingobject_throwblock || type == movingobject_throwbox) {
         if (type == movingobject_shell) {
-            CO_Shell* shell = (CO_Shell*)object;
+            CO_Shell* shell = static_cast<CO_Shell*>(object);
             if (shell->frozen)
                 shell->ShatterDie();
             else
                 shell->Die();
         } else if (type == movingobject_throwblock) {
-            CO_ThrowBlock* block = (CO_ThrowBlock*)object;
+            CO_ThrowBlock* block = static_cast<CO_ThrowBlock*>(object);
 
             if (block->frozen)
                 block->ShatterDie();
             else if (!block->owner || block->owner->globalID != iPlayerID)
                 block->Die();
         } else if (type == movingobject_throwbox) {
-            CO_ThrowBox* box = (CO_ThrowBox*)object;
+            CO_ThrowBox* box = static_cast<CO_ThrowBox*>(object);
 
             if (box->frozen)
                 box->ShatterDie();

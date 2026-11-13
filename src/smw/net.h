@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -148,7 +149,7 @@ class NetGameHost : public NetworkEventHandler
 
         // Currently collision detection may change player data,
         // so it has to be saved before
-        NetPkgs::MapCollision* preparedMapCollPkg;
+        std::unique_ptr<NetPkgs::MapCollision> preparedMapCollPkg;
 
         // P2.5. Pre-game
         void sendStartGameMessage();

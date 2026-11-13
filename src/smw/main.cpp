@@ -23,8 +23,10 @@
 #include "net.h"
 #include "path.h"
 #include "player.h"
+#include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "sfx.h"
+#include "SimulationState.h"
 #include "TilesetManager.h"
 #include "gamemodes/BonusHouse.h"
 #include "gamemodes/CaptureTheFlag.h"
@@ -57,9 +59,14 @@
 #include "GSSplashScreen.h"
 #include "joystick.h"
 
+#include <algorithm>
+#include <format>
+#include <memory>
+#include <string>
 #include <ctime>
 #include <cmath>
-#include <cstdlib> // srand()
+#include <cstdlib>
+#include <vector>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -88,22 +95,47 @@ short			y_shake = 0;
 
 
 //------ game relevant stuff ------
-std::vector<CPlayer*> players;
-
-CScore			*score[4];
-
-short			score_cnt;
+// (the simulation state, g_sim, is defined in GSGameplay.cpp)
 
 
 //Locations for swirl spawn effects
 short g_iSwirlSpawnLocations[4][2][25];
 
 
+// Non-owning views; the objects are owned by ownedGameModes below
 CGameMode			*gamemodes[GAMEMODE_LAST];
 CGM_Bonus			*bonushousemode = nullptr;
 CGM_Pipe_MiniGame	*pipegamemode = nullptr;
 CGM_Boss_MiniGame	*bossgamemode = nullptr;
 CGM_Boxes_MiniGame	*boxesgamemode = nullptr;
+
+namespace {
+// Owns every game mode object, in creation order.
+std::vector<std::unique_ptr<CGameMode>> ownedGameModes;
+
+template<typename T>
+T* createGameMode()
+{
+    auto mode = std::make_unique<T>();
+    T* view = mode.get();
+    ownedGameModes.push_back(std::move(mode));
+    return view;
+}
+
+void destroyGameModes()
+{
+    // Destroy in creation order
+    for (std::unique_ptr<CGameMode>& mode : ownedGameModes)
+        mode.reset();
+    ownedGameModes.clear();
+
+    std::fill(std::begin(gamemodes), std::end(gamemodes), nullptr);
+    bonushousemode = nullptr;
+    pipegamemode = nullptr;
+    bossgamemode = nullptr;
+    boxesgamemode = nullptr;
+}
+} // namespace
 
 short currentgamemode = 0;
 
@@ -180,7 +212,7 @@ void create_globals()
     gamegraphicspacklist->setCurrentIndex(0);
     soundpacklist->setCurrentIndex(0);
 
-    players.reserve(4);
+    g_sim.players.reserve(4);
 
     try {
         UpdateMusicWithOverrides(*musiclist, *worldmusiclist);
@@ -192,37 +224,37 @@ void create_globals()
 void create_gamemodes()
 {
     //set game modes
-    gamemodes[0] = new CGM_Classic();
-    gamemodes[1] = new CGM_Frag();
-    gamemodes[2] = new CGM_TimeLimit();
-    gamemodes[3] = new CGM_Jail();
-    gamemodes[4] = new CGM_Coins();
-    gamemodes[5] = new CGM_Stomp();
-    gamemodes[6] = new CGM_Eggs();
-    gamemodes[7] = new CGM_CaptureTheFlag();
-    gamemodes[8] = new CGM_Chicken();
-    gamemodes[9] = new CGM_Tag();
-    gamemodes[10] = new CGM_Star();
-    gamemodes[11] = new CGM_Domination();
-    gamemodes[12] = new CGM_KingOfTheHill();
-    gamemodes[13] = new CGM_Race();
-    gamemodes[14] = new CGM_Owned();
-    gamemodes[15] = new CGM_Frenzy();
-    gamemodes[16] = new CGM_Survival();
-    gamemodes[17] = new CGM_Greed();
-    gamemodes[18] = new CGM_Health();
-    gamemodes[19] = new CGM_Collection();
-    gamemodes[20] = new CGM_Chase();
-    gamemodes[21] = new CGM_ShyGuyTag();
+    gamemodes[0] = createGameMode<CGM_Classic>();
+    gamemodes[1] = createGameMode<CGM_Frag>();
+    gamemodes[2] = createGameMode<CGM_TimeLimit>();
+    gamemodes[3] = createGameMode<CGM_Jail>();
+    gamemodes[4] = createGameMode<CGM_Coins>();
+    gamemodes[5] = createGameMode<CGM_Stomp>();
+    gamemodes[6] = createGameMode<CGM_Eggs>();
+    gamemodes[7] = createGameMode<CGM_CaptureTheFlag>();
+    gamemodes[8] = createGameMode<CGM_Chicken>();
+    gamemodes[9] = createGameMode<CGM_Tag>();
+    gamemodes[10] = createGameMode<CGM_Star>();
+    gamemodes[11] = createGameMode<CGM_Domination>();
+    gamemodes[12] = createGameMode<CGM_KingOfTheHill>();
+    gamemodes[13] = createGameMode<CGM_Race>();
+    gamemodes[14] = createGameMode<CGM_Owned>();
+    gamemodes[15] = createGameMode<CGM_Frenzy>();
+    gamemodes[16] = createGameMode<CGM_Survival>();
+    gamemodes[17] = createGameMode<CGM_Greed>();
+    gamemodes[18] = createGameMode<CGM_Health>();
+    gamemodes[19] = createGameMode<CGM_Collection>();
+    gamemodes[20] = createGameMode<CGM_Chase>();
+    gamemodes[21] = createGameMode<CGM_ShyGuyTag>();
 
     currentgamemode = 0;
     game_values.gamemode = gamemodes[currentgamemode];
 
     //Special modes
-    bonushousemode = new CGM_Bonus();
-    pipegamemode = new CGM_Pipe_MiniGame();
-    bossgamemode = new CGM_Boss_MiniGame();
-    boxesgamemode = new CGM_Boxes_MiniGame();
+    bonushousemode = createGameMode<CGM_Bonus>();
+    pipegamemode = createGameMode<CGM_Pipe_MiniGame>();
+    bossgamemode = createGameMode<CGM_Boss_MiniGame>();
+    boxesgamemode = createGameMode<CGM_Boxes_MiniGame>();
 }
 
 void init_spawnlocations()
@@ -232,20 +264,20 @@ void init_spawnlocations()
     float spawnangle = 0.0f;
 
     for (short i = 0; i < 25; i++) {
-        g_iSwirlSpawnLocations[0][0][i] = (short)(spawnradius * cos(spawnangle));
-        g_iSwirlSpawnLocations[0][1][i] = (short)(spawnradius * sin(spawnangle));
+        g_iSwirlSpawnLocations[0][0][i] = static_cast<short>(spawnradius * cos(spawnangle));
+        g_iSwirlSpawnLocations[0][1][i] = static_cast<short>(spawnradius * sin(spawnangle));
 
         float angle = spawnangle + HALF_PI;
-        g_iSwirlSpawnLocations[1][0][i] = (short)(spawnradius * cos(angle));
-        g_iSwirlSpawnLocations[1][1][i] = (short)(spawnradius * sin(angle));
+        g_iSwirlSpawnLocations[1][0][i] = static_cast<short>(spawnradius * cos(angle));
+        g_iSwirlSpawnLocations[1][1][i] = static_cast<short>(spawnradius * sin(angle));
 
         angle = spawnangle + PI;
-        g_iSwirlSpawnLocations[2][0][i] = (short)(spawnradius * cos(angle));
-        g_iSwirlSpawnLocations[2][1][i] = (short)(spawnradius * sin(angle));
+        g_iSwirlSpawnLocations[2][0][i] = static_cast<short>(spawnradius * cos(angle));
+        g_iSwirlSpawnLocations[2][1][i] = static_cast<short>(spawnradius * sin(angle));
 
         angle = spawnangle + THREE_HALF_PI;
-        g_iSwirlSpawnLocations[3][0][i] = (short)(spawnradius * cos(angle));
-        g_iSwirlSpawnLocations[3][1][i] = (short)(spawnradius * sin(angle));
+        g_iSwirlSpawnLocations[3][0][i] = static_cast<short>(spawnradius * cos(angle));
+        g_iSwirlSpawnLocations[3][1][i] = static_cast<short>(spawnradius * sin(angle));
 
         spawnradius -= 4.0f;
         spawnangle += 0.1f;
@@ -306,6 +338,9 @@ void main_game()
     printf("-------------------------------------------------------------------------------\n");
     printf("\n---------------- startup ----------------\n");
 
+    // All gameplay randomness comes from the simulation state's generator
+    RandomNumberGenerator::bindGameplay(&g_sim.rng);
+
     App::registerSdlMetadata(TITLESTRING);
     ensureSettingsDir();
     create_globals();
@@ -332,21 +367,19 @@ void main_game()
 
     //currently this only sets the title, not the icon.
     //setting the icon isn't implemented in sdl ->  i'll ask on the mailing list
-    char title[128];
-    snprintf(title, sizeof(title), "%s %s %s", TITLESTRING, GIT_REVISION, GIT_DATE);
-    gfx_settitle(title);
+    gfx_settitle(std::format("{} {} {}", TITLESTRING, GIT_REVISION, GIT_DATE).c_str());
     SDL_HideCursor();
 
     printf("\n---------------- loading ----------------\n");
-
-    for (short iScore = 0; iScore < 4; iScore++)
-        score[iScore] = new CScore(iScore);
 
     game_values.init();
 
     create_gamemodes();
 
     game_values.ReadConfig();
+
+    if (cmd::g_autotest.enabled)
+        game_values.framelimiter = 0;   // run as fast as possible
 
     //Assign the powerup weights to the selected preset
     for (short iPowerup = 0; iPowerup < NUM_POWERUPS; iPowerup++) {
@@ -368,7 +401,13 @@ void main_game()
         gfx_loadpalette(convertPath("gfx/packs/palette.bmp", gamegraphicspacklist->currentPath()));
     }
 
-    srand((unsigned int)time(nullptr));
+    // Gameplay randomness is seeded from the clock (netplay reseeds it with a
+    // shared seed before each match); cosmetic randomness seeds itself.
+    RandomNumberGenerator::gameplay().seedFromTime();
+
+    if (cmd::g_autotest.enabled && cmd::g_autotest.seed != 0) {
+        RandomNumberGenerator::gameplay().seed(static_cast<uint32_t>(cmd::g_autotest.seed));
+    }
 
 
     //**********************************************************
@@ -382,18 +421,12 @@ void main_game()
 
     printf("\n---------------- shutdown ----------------\n");
 
-    for (short i = 0; i < GAMEMODE_LAST; i++)
-        delete gamemodes[i];
+    destroyGameModes();
 
     JoystickManager::instance().shutdown();
     sfx_close();
     gfx_close();
     net_close();
-
-    //Delete player skins
-    for (short k = 0; k < MAX_PLAYERS; k++) {
-        delete score[k];
-    }
 
 	// release all resources
 	delete rm;

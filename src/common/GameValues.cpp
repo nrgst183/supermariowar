@@ -1,5 +1,6 @@
 #include "GameValues.h"
 
+#include "CmdArgs.h"
 #include "TomlConfig.h"
 #include "FileIO.h"
 #include "FileList.h"
@@ -19,9 +20,6 @@
 #include <cstring>
 #include <filesystem>
 #include <vector>
-
-// TODO: Refactor externs
-
 
 //[Keyboard/Joystick][Game/Menu][NumPlayers][NumKeys]  left, right, jump, down, turbo, powerup, start, cancel
 SDL_Keycode controlkeys[2][2][4][NUM_KEYS] = { { { {SDLK_LEFT, SDLK_RIGHT, SDLK_UP, SDLK_DOWN, SDLK_RCTRL, SDLK_RSHIFT, SDLK_RETURN, SDLK_ESCAPE},
@@ -304,6 +302,10 @@ void CGameConfig::ReadConfig()
 
 void CGameConfig::WriteConfig() const
 {
+    // The --autotest harness changes settings; never persist them
+    if (cmd::g_autotest.enabled)
+        return;
+
     WriteTomlConfig();
     WriteInputConfig();
 
@@ -393,7 +395,7 @@ void CGameConfig::ReadBinaryConfig() {
         suicidetime = options.read_i16();
 
         poweruppreset = options.read_i16();
-        options.read_i16_array((int16_t *)allPowerupPresets.data(), NUM_POWERUP_PRESETS * NUM_POWERUPS);
+        options.read_i16_array(reinterpret_cast<int16_t *>(allPowerupPresets.data()), NUM_POWERUP_PRESETS * NUM_POWERUPS);
 
         fullscreen = options.read_bool();
 

@@ -4,6 +4,7 @@
 #include "player.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 
 
 //mariowar (x lives - counting down)
@@ -21,11 +22,11 @@ void CGM_Classic::init()
 
     fReverseScoring = goal == -1;
 
-    for (short iScore = 0; iScore < score_cnt; iScore++) {
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
         if (fReverseScoring)
-            score[iScore]->SetScore(0);
+            g_sim.score[iScore].SetScore(0);
         else
-            score[iScore]->SetScore(goal);
+            g_sim.score[iScore].SetScore(goal);
     }
 }
 
@@ -44,11 +45,11 @@ PlayerKillType CGM_Classic::playerkilledplayer(CPlayer &inflictor, CPlayer &othe
 
             if (!playedwarningsound) {
                 short countscore = 0;
-                for (short k = 0; k < score_cnt; k++) {
-                    if (&inflictor.Score() == score[k])
+                for (short k = 0; k < g_sim.score_cnt; k++) {
+                    if (&inflictor.Score() == &g_sim.score[k])
                         continue;
 
-                    countscore += score[k]->score;
+                    countscore += g_sim.score[k].score;
                 }
 
                 if (countscore <= 2) {
@@ -85,12 +86,12 @@ PlayerKillType CGM_Classic::playerkilledself(CPlayer &player, KillStyle style)
             if (!playedwarningsound) {
                 short countscore = 0;
                 bool playwarning = false;
-                for (short j = 0; j < score_cnt; j++) {
-                    for (short k = 0; k < score_cnt; k++) {
+                for (short j = 0; j < g_sim.score_cnt; j++) {
+                    for (short k = 0; k < g_sim.score_cnt; k++) {
                         if (j == k)
                             continue;
 
-                        countscore += score[k]->score;
+                        countscore += g_sim.score[k].score;
                     }
 
                     if (countscore <= 2) {

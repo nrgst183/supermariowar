@@ -42,11 +42,9 @@ void CGM_Chicken::think()
         else if (m_chicken->getVelX() < -VELMOVING_CHICKEN)
             m_chicken->velx = -VELMOVING_CHICKEN;
 
-        static short counter = 0;
-
         if (m_chicken->isready() && !m_chicken->IsTanookiStatue()) {
-            if (++counter >= game_values.pointspeed) {
-                counter = 0;
+            if (++pointCounter >= game_values.pointspeed) {
+                pointCounter = 0;
                 m_chicken->Score().AdjustScore(1);
                 CheckWinner(m_chicken);
             }

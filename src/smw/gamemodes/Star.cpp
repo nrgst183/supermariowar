@@ -7,6 +7,7 @@
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 #include "objects/carriable/CO_Star.h"
 
 
@@ -33,11 +34,11 @@ void CGM_Star::init()
     fReverseScoring = goal == -1;
 
     //Set initial scores
-    for (short iScore = 0; iScore < score_cnt; iScore++) {
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
         if (fReverseScoring)
-            score[iScore]->SetScore(0);
+            g_sim.score[iScore].SetScore(0);
         else
-            score[iScore]->SetScore(goal);
+            g_sim.score[iScore].SetScore(goal);
     }
 
     for (short iStar = 0; iStar < 3; iStar++) {
@@ -69,15 +70,14 @@ void CGM_Star::SetupMode()
         for (short iStar = 0; iStar < iNumPlayers - 1; iStar++) {
             starPlayer[iStar] = players[iStar];
 
-            starItem[iStar] = new CO_Star(&rm->spr_star, 1, iStar);
-            starItem[iStar]->setPlayerColor(starPlayer[iStar]->getColorID());
-            objectcontainer[1].add(starItem[iStar]);
+            starItem[iStar] = g_sim.objectcontainer[1].add(new CO_Star(&rm->spr_star, 1, iStar));
+            if (starItem[iStar])
+                starItem[iStar]->setPlayerColor(starPlayer[iStar]->getColorID());
         }
     } else { //otherwise, add just a single star
         starPlayer[0] = GetHighestScorePlayer(!fReverseScoring && iCurrentModeType == StarStyle::Ztar);
 
-        starItem[0] = new CO_Star(&rm->spr_star, iCurrentModeType == StarStyle::Ztar ? 0 : 1, 0);
-        objectcontainer[1].add(starItem[0]);
+        starItem[0] = g_sim.objectcontainer[1].add(new CO_Star(&rm->spr_star, iCurrentModeType == StarStyle::Ztar ? 0 : 1, 0));
     }
 }
 
@@ -90,7 +90,7 @@ void CGM_Star::think()
 
     //Make sure there is a star player(s)
     if (iCurrentModeType == StarStyle::Multi) {
-        for (size_t iStar1 = 0; iStar1 + 1 < players.size(); iStar1++) {
+        for (size_t iStar1 = 0; iStar1 + 1 < g_sim.players.size(); iStar1++) {
             //If we're missing a star player, then reassign them all
             if (!starPlayer[iStar1]) {
                 CPlayer * players[4];
@@ -124,7 +124,7 @@ void CGM_Star::think()
         ifSoundOnPlay(rm->sfx_thunder);
 
         if (iCurrentModeType == StarStyle::Ztar) {
-            if (score[starPlayer[0]->getTeamID()]->score > 1 || fReverseScoring)
+            if (g_sim.score[starPlayer[0]->getTeamID()].score > 1 || fReverseScoring)
                 starPlayer[0]->KillPlayerMapHazard(true, KillStyle::Environment, false);
 
             if (fReverseScoring) {
@@ -141,25 +141,25 @@ void CGM_Star::think()
             starPlayer[0] = GetHighestScorePlayer(!fReverseScoring);
             starItem[0]->placeStar();
         } else if (iCurrentModeType == StarStyle::Shine) {
-            for (CPlayer* player : players) {
+            for (CPlayer* player : g_sim.players) {
                 if (starPlayer[0]->getTeamID() == player->getTeamID())
                     continue;
 
                 //Let the cleanup function remove the player on the last kill
-                if (score[player->getTeamID()]->score > 1 || fReverseScoring)
+                if (g_sim.score[player->getTeamID()].score > 1 || fReverseScoring)
                     player->KillPlayerMapHazard(true, KillStyle::Environment, false);
             }
 
             if (fReverseScoring) {
                 starPlayer[0]->Score().AdjustScore(1);
             } else {
-                for (short iTeam = 0; iTeam < score_cnt; iTeam++) {
+                for (short iTeam = 0; iTeam < g_sim.score_cnt; iTeam++) {
                     if (starPlayer[0]->getTeamID() == iTeam)
                         continue;
 
-                    score[iTeam]->AdjustScore(-1);
+                    g_sim.score[iTeam].AdjustScore(-1);
 
-                    if (score[iTeam]->score <= 0) {
+                    if (g_sim.score[iTeam].score <= 0) {
                         fDisplayTimer = !RemoveTeam(iTeam);
                     }
                 }
@@ -168,10 +168,10 @@ void CGM_Star::think()
             starPlayer[0] = GetHighestScorePlayer(false);
             starItem[0]->placeStar();
         } else if (iCurrentModeType == StarStyle::Multi) {
-            for (size_t iPlayer = 0; iPlayer < players.size(); iPlayer++) {
+            for (size_t iPlayer = 0; iPlayer < g_sim.players.size(); iPlayer++) {
                 bool fFound = false;
-                for (size_t iStar = 0; iStar + 1 < players.size(); iStar++) {
-                    if (starPlayer[iStar] == players[iPlayer]) {
+                for (size_t iStar = 0; iStar + 1 < g_sim.players.size(); iStar++) {
+                    if (starPlayer[iStar] == g_sim.players[iPlayer]) {
                         fFound = true;
                         break;
                     }
@@ -180,17 +180,17 @@ void CGM_Star::think()
                 if (fFound)
                     continue;
 
-                if (score[players[iPlayer]->getTeamID()]->score > 1 || fReverseScoring)
-                    players[iPlayer]->KillPlayerMapHazard(true, KillStyle::Environment, false);
+                if (g_sim.score[g_sim.players[iPlayer]->getTeamID()].score > 1 || fReverseScoring)
+                    g_sim.players[iPlayer]->KillPlayerMapHazard(true, KillStyle::Environment, false);
 
                 bool fNeedRebalance = true;
                 if (fReverseScoring) {
-                    players[iPlayer]->Score().AdjustScore(1);
+                    g_sim.players[iPlayer]->Score().AdjustScore(1);
                 } else {
-                    players[iPlayer]->Score().AdjustScore(-1);
+                    g_sim.players[iPlayer]->Score().AdjustScore(-1);
 
-                    if (players[iPlayer]->Score().score <= 0) {
-                        fDisplayTimer = !RemoveTeam(players[iPlayer]->getTeamID());
+                    if (g_sim.players[iPlayer]->Score().score <= 0) {
+                        fDisplayTimer = !RemoveTeam(g_sim.players[iPlayer]->getTeamID());
 
                         //Don't setup the mode if this is a random game because it will be setup below
                         if (game_values.gamemodesettings.star.shine != StarStyle::Random) {
@@ -219,12 +219,12 @@ void CGM_Star::think()
         if (!fReverseScoring) {
             if (!playedwarningsound) {
                 short countscore = 0;
-                for (short j = 0; j < score_cnt; j++) {
-                    for (short k = 0; k < score_cnt; k++) {
+                for (short j = 0; j < g_sim.score_cnt; j++) {
+                    for (short k = 0; k < g_sim.score_cnt; k++) {
                         if (j == k)
                             continue;
 
-                        countscore += score[k]->score;
+                        countscore += g_sim.score[k].score;
                     }
 
                     if (countscore <= 1) {
@@ -276,7 +276,7 @@ void CGM_Star::playerextraguy(CPlayer &player, short iType)
 
 bool CGM_Star::isplayerstar(const CPlayer * player)
 {
-    for (size_t iPlayer = 0; iPlayer < players.size() - 1; iPlayer++) {
+    for (size_t iPlayer = 0; iPlayer < g_sim.players.size() - 1; iPlayer++) {
         if (starPlayer[iPlayer] == player)
             return true;
     }

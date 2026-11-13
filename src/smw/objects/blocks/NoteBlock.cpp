@@ -14,13 +14,13 @@
 B_NoteBlock::B_NoteBlock(gfxSprite *nspr, Vec2s pos, short iNumSpr, short aniSpeed, NoteBlockType type, bool fHidden) :
     IO_Block(nspr, pos)
 {
-    iw = (short)nspr->getWidth() >> 2;
+    iw = static_cast<short>(nspr->getWidth()) >> 2;
     ih = TILESIZE;
     iNumSprites = iNumSpr;
     animationSpeed = aniSpeed;
     animationTimer = 0;
     drawFrame = 0;
-    animationWidth = (short)spr->getWidth();
+    animationWidth = static_cast<short>(spr->getWidth());
 
     hidden = ishiddentype = fHidden;
 
@@ -115,7 +115,7 @@ bool B_NoteBlock::hittop(CPlayer * player, bool useBehavior)
 bool B_NoteBlock::hitbottom(CPlayer * player, bool useBehavior)
 {
     if (useBehavior) {
-        player->setYf((float)(iposy + ih) + 0.2f);
+        player->setYf(static_cast<float>(iposy + ih) + 0.2f);
         player->vely = VELNOTEBLOCKREPEL;
 
         if (state == 0) {
@@ -142,7 +142,7 @@ bool B_NoteBlock::hitbottom(CPlayer * player, bool useBehavior)
 bool B_NoteBlock::hitright(CPlayer * player, bool useBehavior)
 {
     if (useBehavior) {
-        player->setXf((float)(iposx + iw) + 0.2f);
+        player->setXf(static_cast<float>(iposx + iw) + 0.2f);
         player->fOldX = player->fx;
         player->velx = VELNOTEBLOCKREPEL;
         player->oldvelx = VELNOTEBLOCKREPEL;
@@ -161,7 +161,7 @@ bool B_NoteBlock::hitright(CPlayer * player, bool useBehavior)
 bool B_NoteBlock::hitleft(CPlayer * player, bool useBehavior)
 {
     if (useBehavior) {
-        player->setXf((float)(iposx - PW) - 0.2f);
+        player->setXf(static_cast<float>(iposx - PW) - 0.2f);
         player->fOldX = player->fx;
         player->velx = -VELNOTEBLOCKREPEL;
         player->oldvelx = -VELNOTEBLOCKREPEL;
@@ -187,7 +187,7 @@ bool B_NoteBlock::collide(IO_MovingObject * object, short direction)
 
 bool B_NoteBlock::hittop(IO_MovingObject * object)
 {
-    object->setYf((float)(iposy - object->collisionHeight) - 0.2f);
+    object->setYf(static_cast<float>(iposy - object->collisionHeight) - 0.2f);
     object->fOldY = object->fy;
 
     if (state == 3 && object->bounce == GRAVITATION) {

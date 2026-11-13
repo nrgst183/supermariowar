@@ -7,6 +7,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/carriable/CO_ThrowBox.h"
 #include "objects/overmap/WO_StraightPathHazard.h"
 
@@ -93,7 +94,7 @@ void MO_PirhanaPlant::update()
 {
     // Needed for collisions with player and kuribo's shoe to know
     // if the plant hit the player from the top or not
-    fOldY = (float)iy;
+    fOldY = static_cast<float>(iy);
 
     if (state == 0) {  // waiting to appear
         if (--iTimer <= 0) {
@@ -145,7 +146,7 @@ void MO_PirhanaPlant::update()
             short iPlantX = ix + 16;
             short iPlantY = iy + (iDirection == 0 ? 16 : ih - 16);
 
-            for (CPlayer* player : players) {
+            for (CPlayer* player : g_sim.players) {
                 if (player->state != PlayerState::Ready)
                     continue;
 
@@ -162,7 +163,7 @@ void MO_PirhanaPlant::update()
                 }
             }
 
-            float dAngle = (float)atan2((double)iDiffX, (double)iDiffY);
+            float dAngle = static_cast<float>(atan2(static_cast<double>(iDiffX), static_cast<double>(iDiffY)));
 
             if (dAngle >= 0.0f && dAngle < HALF_PI)
                 iFrame = 0;
@@ -184,7 +185,7 @@ void MO_PirhanaPlant::update()
 
     // Fire a fireball
     if (iType <= 1 && state == 2 && iTimer == 30) {
-        objectcontainer[1].add(new OMO_StraightPathHazard(&rm->spr_hazard_fireball[fPreview ? 1 : 0], {static_cast<short>(iDirection != 3 ? ix + 7 : ix + iw - 23), static_cast<short>(iDirection != 1 ? iy + 7 : iy + ih - 23)}, GetFireballAngle(), 3.0f, 4, 8, 18, 18, 0, 0, 0, iFrame <= 1 ? 18 : 0, 18, 18));
+        g_sim.objectcontainer[1].add(new OMO_StraightPathHazard(&rm->spr_hazard_fireball[fPreview ? 1 : 0], {static_cast<short>(iDirection != 3 ? ix + 7 : ix + iw - 23), static_cast<short>(iDirection != 1 ? iy + 7 : iy + ih - 23)}, GetFireballAngle(), 3.0f, 4, 8, 18, 18, 0, 0, 0, iFrame <= 1 ? 18 : 0, 18, 18));
     }
 }
 
@@ -274,7 +275,7 @@ void MO_PirhanaPlant::collide(IO_MovingObject* object)
             return;
 
         // Don't kill things with boxesx that aren't moving fast enough
-        if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity())
+        if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity())
             return;
 
         if (type == movingobject_shell || type == movingobject_throwblock) {

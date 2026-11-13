@@ -2,6 +2,7 @@
 #define GAMESTATE_MENU_H
 
 #include "GameState.h"
+#include "ui/MenuCode.h"
 
 #include <memory>
 #include <vector>
@@ -102,6 +103,7 @@ class MenuState : public GameState
 		bool ReadTourFile();
 		void StartGame();
 		void Exit();
+		MenuCodeEnum AutoTestMenuUpdate();
 		void ResetTournamentBackToMainMenu();
 
 		void SetControllingTeamForSettingsMenu(short iControlTeam, bool fDisplayMessage);

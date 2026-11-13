@@ -50,7 +50,7 @@ void MapReader1800::read_tileset(BinaryFile& mapfile)
 {
     //Load tileset information
 
-    short iNumTilesets = (short)mapfile.read_i32();
+    short iNumTilesets = static_cast<short>(mapfile.read_i32());
 
     std::vector<TilesetTranslation> translation(iNumTilesets > 0 ? iNumTilesets : 0);
 
@@ -71,6 +71,9 @@ void MapReader1800::read_tileset(BinaryFile& mapfile)
 
     for (short iTileset = 0; iTileset < iNumTilesets; iTileset++) {
         short iID = translation[iTileset].iID;
+        if (iID < 0) // corrupt map file: ignore invalid tileset IDs instead of writing out of bounds
+            continue;
+
         translationid[iID] = g_tilesetmanager->indexFromName(translation[iTileset].szName);
 
         if (translationid[iID] == TILESETUNKNOWN) {
@@ -122,7 +125,7 @@ void MapReader1800::read_switches(CMap& map, BinaryFile& mapfile)
 {
     // Read the on/off switch state of the four colors (turned on or off)
     for (short iSwitch = 0; iSwitch < 4; iSwitch++)
-        map.iSwitches[iSwitch] = (short)mapfile.read_i32();
+        map.iSwitches[iSwitch] = static_cast<short>(mapfile.read_i32());
 }
 
 void MapReader1800::read_items(CMap& map, BinaryFile& mapfile)
@@ -164,9 +167,9 @@ void MapReader1802::read_eyecandy(CMap& map, BinaryFile& mapfile)
 {
     //Read in eyecandy to use
     //For all layers if the map format supports it
-    map.eyecandy[0] = (short)mapfile.read_i32();
-    map.eyecandy[1] = (short)mapfile.read_i32();
-    map.eyecandy[2] = (short)mapfile.read_i32();
+    map.eyecandy[0] = static_cast<short>(mapfile.read_i32());
+    map.eyecandy[1] = static_cast<short>(mapfile.read_i32());
+    map.eyecandy[2] = static_cast<short>(mapfile.read_i32());
 }
 
 void MapReader1800::read_warp_locations(CMap& map, BinaryFile& mapfile)
@@ -176,8 +179,8 @@ void MapReader1800::read_warp_locations(CMap& map, BinaryFile& mapfile)
             map.mapdatatop[i][j] = (TileType)mapfile.read_i32();;
 
             map.warpdata[i][j].direction = (WarpEnterDirection)mapfile.read_i32();
-            map.warpdata[i][j].connection = (short)mapfile.read_i32();
-            map.warpdata[i][j].id = (short)mapfile.read_i32();
+            map.warpdata[i][j].connection = static_cast<short>(mapfile.read_i32());
+            map.warpdata[i][j].id = static_cast<short>(mapfile.read_i32());
 
             for (short sType = 0; sType < NUMSPAWNAREATYPES; sType++)
                 map.nospawn[sType][i][j] = mapfile.read_bool();
@@ -202,7 +205,7 @@ bool MapReader1800::read_spawn_areas(CMap& map, BinaryFile& mapfile)
 {
     for (unsigned short i = 0; i < NUMSPAWNAREATYPES; i++) {
         map.totalspawnsize[i] = 0;
-        map.numspawnareas[i] = (short)mapfile.read_i32();
+        map.numspawnareas[i] = static_cast<short>(mapfile.read_i32());
 
         if (map.numspawnareas[i] > MAXSPAWNAREAS) {
             std::cout << std::endl << " ERROR: Number of spawn areas (" << map.numspawnareas[i]
@@ -212,11 +215,11 @@ bool MapReader1800::read_spawn_areas(CMap& map, BinaryFile& mapfile)
         }
 
         for (int m = 0; m < map.numspawnareas[i]; m++) {
-            map.spawnareas[i][m].left = (short)mapfile.read_i32();
-            map.spawnareas[i][m].top = (short)mapfile.read_i32();
-            map.spawnareas[i][m].width = (short)mapfile.read_i32();
-            map.spawnareas[i][m].height = (short)mapfile.read_i32();
-            map.spawnareas[i][m].size = (short)mapfile.read_i32();
+            map.spawnareas[i][m].left = static_cast<short>(mapfile.read_i32());
+            map.spawnareas[i][m].top = static_cast<short>(mapfile.read_i32());
+            map.spawnareas[i][m].width = static_cast<short>(mapfile.read_i32());
+            map.spawnareas[i][m].height = static_cast<short>(mapfile.read_i32());
+            map.spawnareas[i][m].size = static_cast<short>(mapfile.read_i32());
 
             map.totalspawnsize[i] += map.spawnareas[i][m].size;
         }
@@ -253,16 +256,16 @@ void MapReader1800::read_extra_tiledata(CMap& map, BinaryFile& mapfile)
 void MapReader1800::read_gamemode_settings(CMap& map, BinaryFile& mapfile)
 {
     //read mode item locations like flags and race goals
-    map.iNumRaceGoals = (short)mapfile.read_i32();
+    map.iNumRaceGoals = static_cast<short>(mapfile.read_i32());
     for (unsigned short j = 0; j < map.iNumRaceGoals; j++) {
-        map.racegoallocations[j].x = (short)mapfile.read_i32();
-        map.racegoallocations[j].y = (short)mapfile.read_i32();
+        map.racegoallocations[j].x = static_cast<short>(mapfile.read_i32());
+        map.racegoallocations[j].y = static_cast<short>(mapfile.read_i32());
     }
 
-    map.iNumFlagBases = (short)mapfile.read_i32();
+    map.iNumFlagBases = static_cast<short>(mapfile.read_i32());
     for (unsigned short j = 0; j < map.iNumFlagBases; j++) {
-        map.flagbaselocations[j].x = (short)mapfile.read_i32();
-        map.flagbaselocations[j].y = (short)mapfile.read_i32();
+        map.flagbaselocations[j].x = static_cast<short>(mapfile.read_i32());
+        map.flagbaselocations[j].y = static_cast<short>(mapfile.read_i32());
     }
 }
 
@@ -271,18 +274,18 @@ void MapReader1800::read_platforms(CMap& map, BinaryFile& mapfile, bool fPreview
     map.clearPlatforms();
 
     //Load moving platforms
-    const size_t iNumPlatforms = (short)mapfile.read_i32();
+    const size_t iNumPlatforms = static_cast<short>(mapfile.read_i32());
     map.platforms.reserve(iNumPlatforms);
 
     for (size_t idx = 0; idx < iNumPlatforms; idx++) {
-        short iWidth = (short)mapfile.read_i32();
-        short iHeight = (short)mapfile.read_i32();
+        short iWidth = static_cast<short>(mapfile.read_i32());
+        short iHeight = static_cast<short>(mapfile.read_i32());
 
         auto [tiles, types] = read_platform_tiles(map, mapfile, iWidth, iHeight);
 
         short iDrawLayer = 2;
         if (patch_version >= 1)
-            iDrawLayer = (short)mapfile.read_i32();
+            iDrawLayer = static_cast<short>(mapfile.read_i32());
 
         //printf("Layer: %d\n", iDrawLayer);
 

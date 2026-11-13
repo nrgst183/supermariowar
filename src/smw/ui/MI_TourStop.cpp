@@ -13,6 +13,7 @@
 #include "ui/MI_MapField.h"
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
+#include <string>
 
 
 //Call with x = 70 and y == 80
@@ -146,14 +147,11 @@ void MI_TourStop::Refresh(short iTourStop)
         miModeField->add(gamemode->GetModeName(), tourstopicon);
 
         miGoalField->clear();
-        char szTemp[16];
-        snprintf(szTemp, sizeof(szTemp), "%d", tourstop->iGoal);
-        miGoalField->add(szTemp, 0, false);
+        miGoalField->add(std::to_string(tourstop->iGoal), 0, false);
         miGoalField->setTitle(gamemode->GetGoalName());
 
         miPointsField->clear();
-        snprintf(szTemp, sizeof(szTemp), "%d", tourstop->iPoints);
-        miPointsField->add(szTemp, 0, false);
+        miPointsField->add(std::to_string(tourstop->iPoints), 0, false);
 
         if (tourstop->iMode == game_mode_pipe_minigame) {
             bool fFound = miMapField->SetMap(tourstop->pszMapFile.c_str(), true);

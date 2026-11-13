@@ -5,6 +5,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/carriable/CO_PhantoKey.h"
 #include "objects/overmap/WO_Phanto.h"
 
@@ -25,12 +26,11 @@ void CGM_Chase::init()
     //Add phantos based on settings
     for (short iPhanto = 0; iPhanto < 3; iPhanto++) {
         for (short iNumPhantos = 0; iNumPhantos < game_values.gamemodesettings.chase.phantoquantity[iPhanto]; iNumPhantos++)
-            objectcontainer[1].add(new OMO_Phanto(&rm->spr_phanto, {static_cast<short>(RANDOM_INT(App::screenWidth)), static_cast<short>(RANDOM_BOOL() ? -32 - CRUNCHMAX : App::screenHeight)}, 0.0f, 0.0f, iPhanto));
+            g_sim.objectcontainer[1].add(new OMO_Phanto(&rm->spr_phanto, {static_cast<short>(RANDOM_INT(App::screenWidth)), static_cast<short>(RANDOM_BOOL() ? -32 - CRUNCHMAX : App::screenHeight)}, 0.0f, 0.0f, iPhanto));
     }
 
     //Add a key
-    key = new CO_PhantoKey(&rm->spr_phantokey);
-    objectcontainer[1].add(key);
+    key = g_sim.objectcontainer[1].add(new CO_PhantoKey(&rm->spr_phantokey));
 }
 
 void CGM_Chase::think()
@@ -42,11 +42,9 @@ void CGM_Chase::think()
 
     CPlayer * keyholder = key->owner;
     if (keyholder) {
-        static short counter = 0;
-
         if (keyholder->isready() && !keyholder->IsTanookiStatue()) {
-            if (++counter >= game_values.pointspeed) {
-                counter = 0;
+            if (++pointCounter >= game_values.pointspeed) {
+                pointCounter = 0;
                 keyholder->Score().AdjustScore(1);
                 CheckWinner(keyholder);
             }

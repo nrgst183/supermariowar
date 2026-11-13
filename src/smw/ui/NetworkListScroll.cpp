@@ -148,7 +148,7 @@ void MI_NetworkListScroll::Draw()
     rm->menu_font_large.drawCentered(m_pos.x + (iWidth >> 1), m_pos.y + 5, sTitle.c_str());
 
     //Draw each filter field
-    for (short iLine = 0; iLine < iNumLines && (unsigned short)iLine < items.size(); iLine++) {
+    for (short iLine = 0; iLine < iNumLines && static_cast<unsigned short>(iLine) < items.size(); iLine++) {
         short iHalfLineWidth = (iWidth - 32) >> 1;
         short iLineWidth = iWidth - 32;
         spr->draw(m_pos.x + 16, m_pos.y + 32 + iLine * 32, {0, (iSelectedLine == iLine ? 32 : 0), iHalfLineWidth, 32});

@@ -5,6 +5,7 @@
 #include "movingplatform.h"
 #include "ObjectBase.h"
 #include "player.h"
+#include "SimulationState.h"
 
 #include <cmath>
 
@@ -80,7 +81,7 @@ StraightPath::StraightPath(float speed, Vec2f startPos, Vec2f endPos, bool previ
         length = ::sqrt(height * height + width * width);
     }
 
-    m_steps = (short)(length / m_speed) + 1;
+    m_steps = static_cast<short>(length / m_speed) + 1;
 
     for (short type = 0; type < 2; type++)
         SetVelocity(type);
@@ -149,7 +150,7 @@ StraightPathContinuous::StraightPathContinuous(float speed, Vec2f startPos, floa
         length = ::sqrt(height * height + width * width);
     }
 
-    m_steps = (short)(length / m_speed) + 1;
+    m_steps = static_cast<short>(length / m_speed) + 1;
 
     for (short type = 0; type < 2; type++)
         SetVelocity(type);
@@ -172,16 +173,16 @@ bool StraightPathContinuous::Move(short type)
 {
     m_currentPos[type] += m_velocity[type];
 
-    float dx = m_currentPos[type].x - (float)m_platform->iHalfWidth;
+    float dx = m_currentPos[type].x - static_cast<float>(m_platform->iHalfWidth);
     if (dx < 0.f)
         m_currentPos[type].x += m_edge.x;
     else if (dx >= m_edge.x)
         m_currentPos[type].x -= m_edge.x;
 
-    if (m_currentPos[type].y + (float)m_platform->iHalfHeight < 0.f)
-        m_currentPos[type].y += m_edge.y + (float)m_platform->iHeight;
-    else if (m_currentPos[type].y - (float)m_platform->iHalfHeight >= m_edge.y)
-        m_currentPos[type].y -= m_edge.y + (float)m_platform->iHeight;
+    if (m_currentPos[type].y + static_cast<float>(m_platform->iHalfHeight) < 0.f)
+        m_currentPos[type].y += m_edge.y + static_cast<float>(m_platform->iHeight);
+    else if (m_currentPos[type].y - static_cast<float>(m_platform->iHalfHeight) >= m_edge.y)
+        m_currentPos[type].y -= m_edge.y + static_cast<float>(m_platform->iHeight);
 
     return false;
 }
@@ -276,7 +277,7 @@ bool FallingPath::Move(short type)
 
     if (m_platform->fy - m_platform->iHalfHeight >= App::screenHeight) {
         // If a player is standing on this platform, clear him off
-        for (CPlayer* player : players) {
+        for (CPlayer* player : g_sim.players) {
             if (player->platform == m_platform) {
                 player->platform = nullptr;
                 player->vely = m_velocity[type].y;

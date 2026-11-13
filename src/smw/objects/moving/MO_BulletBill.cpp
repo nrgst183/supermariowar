@@ -8,6 +8,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/carriable/CO_ThrowBox.h"
 #include "objects/moving/MO_Explosion.h"
 
@@ -168,7 +169,7 @@ void MO_BulletBill::collide(IO_MovingObject* object)
     MovingObjectType type = object->getMovingObjectType();
 
     if (type == movingobject_bulletbill) {
-        MO_BulletBill* bulletbill = (MO_BulletBill*)object;
+        MO_BulletBill* bulletbill = static_cast<MO_BulletBill*>(object);
 
         // Same team bullet bills don't kill each other
         if (bulletbill->iTeamID == iTeamID)
@@ -186,7 +187,7 @@ void MO_BulletBill::collide(IO_MovingObject* object)
         short iCenterX = ((ix + iOffsetX - bulletbill->ix) >> 1) + (bulletbill->ix + (bulletbill->iw >> 1));
         short iCenterY = ((iy - bulletbill->iy) >> 1) + (bulletbill->iy + (bulletbill->ih >> 1));
 
-        objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(iCenterX - 96), static_cast<short>(iCenterY - 64)}, 2, 4, -1, -1, KillStyle::BulletBill));
+        g_sim.objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(iCenterX - 96), static_cast<short>(iCenterY - 64)}, 2, 4, -1, -1, KillStyle::BulletBill));
         ifSoundOnPlay(rm->sfx_bobombsound);
     } else if (type == movingobject_shell || type == movingobject_throwblock || type == movingobject_throwbox || type == movingobject_attackzone || type == movingobject_explosion) {
         // Don't kill things with shells that are sitting still
@@ -194,7 +195,7 @@ void MO_BulletBill::collide(IO_MovingObject* object)
             return;
 
         // Don't kill things with boxesx that aren't moving fast enough
-        if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity())
+        if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity())
             return;
 
         if (type != movingobject_explosion) {

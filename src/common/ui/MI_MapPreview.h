@@ -27,7 +27,7 @@ public:
     bool SetMap(const char * szMapName, bool fWorld);
     void SetSpecialMap(const char * szMapName, const char * szMapPath);
 
-    const char * GetMapName() { return szMapName; }
+    const char * GetMapName() { return szMapName.c_str(); }
     std::string GetMapFilePath() const;
 
     virtual void SetDimensions(short iWidth, short iIndent);
@@ -42,7 +42,7 @@ protected:
     SDL_Rect rectDst;
 
     short iWidth, iIndent;
-    char szMapName[256];
+    std::string szMapName;
 
     short iSlideListOut;
 };

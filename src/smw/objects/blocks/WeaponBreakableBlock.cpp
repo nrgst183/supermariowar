@@ -200,19 +200,19 @@ bool B_WeaponBreakableBlock::objecthitside(IO_MovingObject * object)
 {
     MovingObjectType type = object->getMovingObjectType();
 
-    if (iType == WeaponDamageType::Shell && ((type == movingobject_shell && object->state == 1) || type == movingobject_throwblock || (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity()))) {
+    if (iType == WeaponDamageType::Shell && ((type == movingobject_shell && object->state == 1) || type == movingobject_throwblock || (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity()))) {
         short iPlayerID = -1;
         short iTeamID = -1;
         if (type == movingobject_shell) {
-            CO_Shell * shell = (CO_Shell*)object;
+            CO_Shell * shell = static_cast<CO_Shell*>(object);
             iPlayerID = shell->iPlayerID;
             iTeamID = shell->iTeamID;
         } else if (type == movingobject_throwblock) {
-            CO_ThrowBlock * throwblock = (CO_ThrowBlock*)object;
+            CO_ThrowBlock * throwblock = static_cast<CO_ThrowBlock*>(object);
             iPlayerID = throwblock->iPlayerID;
             iTeamID = throwblock->iTeamID;
         } else if (type == movingobject_throwbox) {
-            CO_ThrowBox * throwbox = (CO_ThrowBox*)object;
+            CO_ThrowBox * throwbox = static_cast<CO_ThrowBox*>(object);
             iPlayerID = throwbox->iPlayerID;
             iTeamID = throwbox->iTeamID;
         }
@@ -220,12 +220,12 @@ bool B_WeaponBreakableBlock::objecthitside(IO_MovingObject * object)
         triggerBehavior(iPlayerID, iTeamID);
         return false;
     } else if (iType == WeaponDamageType::Fireball && type == movingobject_fireball) {
-        MO_Fireball * fireball = (MO_Fireball*)object;
+        MO_Fireball * fireball = static_cast<MO_Fireball*>(object);
         triggerBehavior(fireball->iPlayerID, fireball->iTeamID);
         removeifprojectile(object, false, true);
         return false;
     } else if (type == movingobject_attackzone) {
-        MO_AttackZone * zone = (MO_AttackZone*)object;
+        MO_AttackZone * zone = static_cast<MO_AttackZone*>(object);
 
         if ((zone->iStyle == KillStyle::Leaf && iType == WeaponDamageType::Leaf) || (zone->iStyle == KillStyle::Feather && iType == WeaponDamageType::Feather)) {
             triggerBehavior(zone->iPlayerID, zone->iTeamID);

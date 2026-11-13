@@ -1,4 +1,5 @@
 #include "PlayerCardCollection.h"
+#include "PlayerKeyMask.h"
 
 #include "GameValues.h"
 #include "player.h"
@@ -20,9 +21,9 @@ void PlayerCardCollection::update(CPlayer& player, const uint8_t keymask)
             }
         }
 
-        if (keymask & 16) {
+        if (keymask & PlayerKeyMask::Turbo) {
             index++;
-        } else if (keymask & ~16) {
+        } else if (keymask & ~PlayerKeyMask::Turbo) {
             index = 0;
             timer = 0;
         }
@@ -31,7 +32,7 @@ void PlayerCardCollection::update(CPlayer& player, const uint8_t keymask)
             timer = 0;
             index = 0;
 
-            ((CGM_Collection*)game_values.gamemode)->ReleaseCard(player);
+            (static_cast<CGM_Collection*>(game_values.gamemode))->ReleaseCard(player);
         }
     }
 }

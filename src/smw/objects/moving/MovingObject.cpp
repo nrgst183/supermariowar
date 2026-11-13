@@ -29,7 +29,7 @@ IO_MovingObject::IO_MovingObject(gfxSprite* nspr, Vec2s pos, short iNumSpr, shor
     if (iAnimationWidth > -1)
         iw = iAnimationWidth;
     else if (spr)
-        iw = (short)spr->getWidth() / iNumSprites;
+        iw = static_cast<short>(spr->getWidth()) / iNumSprites;
 
     if (iAnimationHeight > -1)
         ih = iAnimationHeight;
@@ -37,7 +37,7 @@ IO_MovingObject::IO_MovingObject(gfxSprite* nspr, Vec2s pos, short iNumSpr, shor
     animationtimer = 0;
 
     if (spr)
-        animationWidth = (short)spr->getWidth();
+        animationWidth = static_cast<short>(spr->getWidth());
 
     fOldX = fx;
     fOldY = fy - ih;
@@ -197,8 +197,8 @@ void IO_MovingObject::collision_detection_map()
     }
 
     // Could be optimized with bit shift >> 5
-    short ty = (short)fy / TILESIZE;
-    short ty2 = ((short)fy + collisionHeight) / TILESIZE;
+    short ty = static_cast<short>(fy) / TILESIZE;
+    short ty2 = (static_cast<short>(fy) + collisionHeight) / TILESIZE;
     short tx = -1;
 
 
@@ -209,10 +209,10 @@ void IO_MovingObject::collision_detection_map()
         if (velx + fPlatformVelX > 0.01f || iHorizontalPlatformCollision == 3) {
             // moving right
             if (fx + collisionWidth >= App::screenWidth) {
-                tx = (short)(fx + collisionWidth - App::screenWidth) / TILESIZE;
+                tx = static_cast<short>(fx + collisionWidth - App::screenWidth) / TILESIZE;
                 fOldX -= App::screenWidth;
             } else
-                tx = ((short)fx + collisionWidth) / TILESIZE;
+                tx = (static_cast<short>(fx) + collisionWidth) / TILESIZE;
 
             IO_Block* topblock = g_map->block(tx, ty);
             IO_Block* bottomblock = g_map->block(tx, ty2);
@@ -256,7 +256,7 @@ void IO_MovingObject::collision_detection_map()
                     return;
                 }
 
-                setXf((float)((tx << 5) - collisionWidth) - 0.2f);  // move to the edge of the tile (tile on the right -> mind the object width)
+                setXf(static_cast<float>((tx << 5) - collisionWidth) - 0.2f);  // move to the edge of the tile (tile on the right -> mind the object width)
                 fOldX = fx;
 
                 if (velx > 0.0f)
@@ -269,7 +269,7 @@ void IO_MovingObject::collision_detection_map()
             }
         } else if (velx + fPlatformVelX < -0.01f || iHorizontalPlatformCollision == 1) {
             // moving left
-            tx = (short)fx / TILESIZE;
+            tx = static_cast<short>(fx) / TILESIZE;
 
             // Just in case fx < 0 and wasn't caught by flipsidesifneeded()
             if (tx < 0)
@@ -315,7 +315,7 @@ void IO_MovingObject::collision_detection_map()
                     return;
                 }
 
-                setXf((float)((tx << 5) + TILESIZE) + 0.2f);  // move to the edge of the tile
+                setXf(static_cast<float>((tx << 5) + TILESIZE) + 0.2f);  // move to the edge of the tile
                 fOldX = fx;
 
                 if (velx < 0.0f)
@@ -347,7 +347,7 @@ void IO_MovingObject::collision_detection_map()
         fMovingUp = vely + fPlatformVelY - bounce;
 
     if (fMovingUp < -0.01f) {
-        ty = (short)(fPrecalculatedY) / TILESIZE;
+        ty = static_cast<short>(fPrecalculatedY) / TILESIZE;
 
         IO_Block* leftblock = g_map->block(txl, ty);
         IO_Block* rightblock = g_map->block(txr, ty);
@@ -372,7 +372,7 @@ void IO_MovingObject::collision_detection_map()
             if (iVerticalPlatformCollision == 2)
                 KillObjectMapHazard();
 
-            setYf((float)((ty << 5) + TILESIZE) + 0.2f);
+            setYf(static_cast<float>((ty << 5) + TILESIZE) + 0.2f);
             fOldY = fy - 1.0f;
 
             if (vely < 0.0f)
@@ -388,7 +388,7 @@ void IO_MovingObject::collision_detection_map()
         }
     } else {
         // moving down / on ground
-        ty = ((short)fPrecalculatedY + collisionHeight) / TILESIZE;
+        ty = (static_cast<short>(fPrecalculatedY) + collisionHeight) / TILESIZE;
 
         IO_Block* leftblock = g_map->block(txl, ty);
         IO_Block* rightblock = g_map->block(txr, ty);
@@ -428,7 +428,7 @@ void IO_MovingObject::collision_detection_map()
         if ((leftTile & tile_flag_solid_on_top) || (rightTile & tile_flag_solid_on_top)) {
             if ((fOldY + collisionHeight) / TILESIZE < ty) {
                 vely = BottomBounce();
-                setYf((float)((ty << 5) - collisionHeight) - 0.2f);
+                setYf(static_cast<float>((ty << 5) - collisionHeight) - 0.2f);
                 fOldY = fy - GRAVITATION;
 
                 if (!platform) {
@@ -449,7 +449,7 @@ void IO_MovingObject::collision_detection_map()
 
         if (((leftTile & tile_flag_solid) || (rightTile & tile_flag_solid)) && !fSuperDeathTileUnderObject) {
             vely = BottomBounce();
-            setYf((float)((ty << 5) - collisionHeight) - 0.2f);
+            setYf(static_cast<float>((ty << 5) - collisionHeight) - 0.2f);
             fOldY = fy;
 
             if (!platform) {
@@ -556,10 +556,10 @@ bool IO_MovingObject::collision_detection_checksides()
         //[ ][ ]
     case 1: {
         if (ix + (collisionWidth >> 1) > (nofliptxl << 5) + TILESIZE) {
-            setXf((float)((nofliptxl << 5) + TILESIZE) + 0.2f);
+            setXf(static_cast<float>((nofliptxl << 5) + TILESIZE) + 0.2f);
             flipsidesifneeded();
         } else {
-            setYf((float)((ty << 5) + TILESIZE) + 0.2f);
+            setYf(static_cast<float>((ty << 5) + TILESIZE) + 0.2f);
         }
 
         break;
@@ -569,10 +569,10 @@ bool IO_MovingObject::collision_detection_checksides()
     //[ ][ ]
     case 2: {
         if (ix + (collisionWidth >> 1) < (nofliptxr << 5)) {
-            setXf((float)((nofliptxr << 5) - collisionWidth) - 0.2f);
+            setXf(static_cast<float>((nofliptxr << 5) - collisionWidth) - 0.2f);
             flipsidesifneeded();
         } else {
-            setYf((float)((ty << 5) + TILESIZE) + 0.2f);
+            setYf(static_cast<float>((ty << 5) + TILESIZE) + 0.2f);
         }
 
         break;
@@ -581,7 +581,7 @@ bool IO_MovingObject::collision_detection_checksides()
     //[X][X]
     //[ ][ ]
     case 3: {
-        setYf((float)((ty << 5) + TILESIZE) + 0.2f);
+        setYf(static_cast<float>((ty << 5) + TILESIZE) + 0.2f);
         break;
     }
 
@@ -589,10 +589,10 @@ bool IO_MovingObject::collision_detection_checksides()
     //[X][ ]
     case 4: {
         if (ix + (collisionWidth >> 1) > (nofliptxl << 5) + TILESIZE) {
-            setXf((float)((nofliptxl << 5) + TILESIZE) + 0.2f);
+            setXf(static_cast<float>((nofliptxl << 5) + TILESIZE) + 0.2f);
             flipsidesifneeded();
         } else {
-            setYf((float)((ty2 << 5) - collisionHeight) - 0.2f);
+            setYf(static_cast<float>((ty2 << 5) - collisionHeight) - 0.2f);
         }
 
         break;
@@ -601,7 +601,7 @@ bool IO_MovingObject::collision_detection_checksides()
     //[X][ ]
     //[X][ ]
     case 5: {
-        setXf((float)((nofliptxl << 5) + TILESIZE) + 0.2f);
+        setXf(static_cast<float>((nofliptxl << 5) + TILESIZE) + 0.2f);
         flipsidesifneeded();
         break;
     }
@@ -610,12 +610,12 @@ bool IO_MovingObject::collision_detection_checksides()
     //[X][ ]
     case 6: {
         if (ix + (collisionWidth >> 1) > (nofliptxl << 5) + TILESIZE) {
-            setYf((float)((ty << 5) + TILESIZE) + 0.2f);
-            setXf((float)((nofliptxl << 5) + TILESIZE) + 0.2f);
+            setYf(static_cast<float>((ty << 5) + TILESIZE) + 0.2f);
+            setXf(static_cast<float>((nofliptxl << 5) + TILESIZE) + 0.2f);
             flipsidesifneeded();
         } else {
-            setYf((float)((ty2 << 5) - collisionHeight) - 0.2f);
-            setXf((float)((nofliptxr << 5) - collisionWidth) - 0.2f);
+            setYf(static_cast<float>((ty2 << 5) - collisionHeight) - 0.2f);
+            setXf(static_cast<float>((nofliptxr << 5) - collisionWidth) - 0.2f);
             flipsidesifneeded();
         }
 
@@ -625,8 +625,8 @@ bool IO_MovingObject::collision_detection_checksides()
     //[X][X]
     //[X][ ]
     case 7: {
-        setYf((float)((ty << 5) + TILESIZE) + 0.2f);
-        setXf((float)((nofliptxl << 5) + TILESIZE) + 0.2f);
+        setYf(static_cast<float>((ty << 5) + TILESIZE) + 0.2f);
+        setXf(static_cast<float>((nofliptxl << 5) + TILESIZE) + 0.2f);
         flipsidesifneeded();
         break;
     }
@@ -635,10 +635,10 @@ bool IO_MovingObject::collision_detection_checksides()
     //[ ][X]
     case 8: {
         if (ix + (collisionWidth >> 1) < (nofliptxr << 5)) {
-            setXf((float)((nofliptxr << 5) - collisionWidth) - 0.2f);
+            setXf(static_cast<float>((nofliptxr << 5) - collisionWidth) - 0.2f);
             flipsidesifneeded();
         } else {
-            setYf((float)((ty2 << 5) - collisionHeight) - 0.2f);
+            setYf(static_cast<float>((ty2 << 5) - collisionHeight) - 0.2f);
         }
 
         break;
@@ -648,12 +648,12 @@ bool IO_MovingObject::collision_detection_checksides()
     //[ ][X]
     case 9: {
         if (ix + (collisionWidth >> 1) > (nofliptxl << 5) + TILESIZE) {
-            setYf((float)((ty2 << 5) - collisionHeight) - 0.2f);
-            setXf((float)((nofliptxl << 5) + TILESIZE) + 0.2f);
+            setYf(static_cast<float>((ty2 << 5) - collisionHeight) - 0.2f);
+            setXf(static_cast<float>((nofliptxl << 5) + TILESIZE) + 0.2f);
             flipsidesifneeded();
         } else {
-            setYf((float)((ty << 5) + TILESIZE) + 0.2f);
-            setXf((float)((nofliptxr << 5) - collisionWidth) - 0.2f);
+            setYf(static_cast<float>((ty << 5) + TILESIZE) + 0.2f);
+            setXf(static_cast<float>((nofliptxr << 5) - collisionWidth) - 0.2f);
             flipsidesifneeded();
         }
 
@@ -663,7 +663,7 @@ bool IO_MovingObject::collision_detection_checksides()
     //[ ][X]
     //[ ][X]
     case 10: {
-        setXf((float)((nofliptxr << 5) - collisionWidth) - 0.2f);
+        setXf(static_cast<float>((nofliptxr << 5) - collisionWidth) - 0.2f);
         flipsidesifneeded();
         break;
     }
@@ -671,8 +671,8 @@ bool IO_MovingObject::collision_detection_checksides()
     //[X][X]
     //[ ][X]
     case 11: {
-        setYf((float)((ty << 5) + TILESIZE) + 0.2f);
-        setXf((float)((nofliptxr << 5) - collisionWidth) - 0.2f);
+        setYf(static_cast<float>((ty << 5) + TILESIZE) + 0.2f);
+        setXf(static_cast<float>((nofliptxr << 5) - collisionWidth) - 0.2f);
         flipsidesifneeded();
         break;
     }
@@ -680,15 +680,15 @@ bool IO_MovingObject::collision_detection_checksides()
     //[ ][ ]
     //[X][X]
     case 12: {
-        setYf((float)((ty2 << 5) - collisionHeight) - 0.2f);
+        setYf(static_cast<float>((ty2 << 5) - collisionHeight) - 0.2f);
         break;
     }
 
     //[X][ ]
     //[X][X]
     case 13: {
-        setYf((float)((ty2 << 5) - collisionHeight) - 0.2f);
-        setXf((float)((nofliptxl << 5) + TILESIZE) + 0.2f);
+        setYf(static_cast<float>((ty2 << 5) - collisionHeight) - 0.2f);
+        setXf(static_cast<float>((nofliptxl << 5) + TILESIZE) + 0.2f);
         flipsidesifneeded();
         break;
     }
@@ -696,8 +696,8 @@ bool IO_MovingObject::collision_detection_checksides()
     //[ ][X]
     //[X][X]
     case 14: {
-        setYf((float)((ty2 << 5) - collisionHeight) - 0.2f);
-        setXf((float)((nofliptxr << 5) - collisionWidth) - 0.2f);
+        setYf(static_cast<float>((ty2 << 5) - collisionHeight) - 0.2f);
+        setXf(static_cast<float>((nofliptxr << 5) - collisionWidth) - 0.2f);
         flipsidesifneeded();
         break;
     }
@@ -706,7 +706,7 @@ bool IO_MovingObject::collision_detection_checksides()
     //[X][X]
     //[X][X]
     case 15: {
-        setYf((float)((ty2 << 5) + TILESIZE) + 0.2f);
+        setYf(static_cast<float>((ty2 << 5) + TILESIZE) + 0.2f);
         break;
     }
 
@@ -745,7 +745,7 @@ void IO_MovingObject::KillObjectMapHazard(short playerID)
     if (!dead) {
         // If it is a throw box, trigger it's behavior and return
         if (movingObjectType == movingobject_throwbox) {
-            ((CO_ThrowBox*)this)->Die();
+            (static_cast<CO_ThrowBox*>(this))->Die();
             return;
         }
 
@@ -760,15 +760,15 @@ void IO_MovingObject::KillObjectMapHazard(short playerID)
             ifSoundOnPlay(rm->sfx_hit);
         } else if (movingObjectType == movingobject_egg) {
             dead = false;
-            ((CO_Egg*)this)->placeEgg();
+            (static_cast<CO_Egg*>(this))->placeEgg();
             ifSoundOnPlay(rm->sfx_transform);
         } else if (movingObjectType == movingobject_star) {
             dead = false;
-            ((CO_Star*)this)->placeStar();
+            (static_cast<CO_Star*>(this))->placeStar();
             ifSoundOnPlay(rm->sfx_transform);
         } else if (movingObjectType == movingobject_flag) {
             dead = false;
-            ((CO_Flag*)this)->placeFlag();
+            (static_cast<CO_Flag*>(this))->placeFlag();
             ifSoundOnPlay(rm->sfx_transform);
         } else if (movingObjectType == movingobject_bomb) {
             CPlayer* player = GetPlayerFromGlobalID(iPlayerID);
@@ -778,11 +778,11 @@ void IO_MovingObject::KillObjectMapHazard(short playerID)
             ifSoundOnPlay(rm->sfx_hit);
         } else if (movingObjectType == movingobject_phantokey) {
             dead = false;
-            ((CO_PhantoKey*)this)->placeKey();
+            (static_cast<CO_PhantoKey*>(this))->placeKey();
             ifSoundOnPlay(rm->sfx_transform);
         } else if (game_mode_boxes_minigame == game_values.gamemode->gamemode && movingObjectType == movingobject_coin) {
             dead = false;
-            ((MO_Coin*)this)->placeCoin();
+            (static_cast<MO_Coin*>(this))->placeCoin();
             ifSoundOnPlay(rm->sfx_transform);
         } else if (game_values.gamemode->gamemode == game_mode_stomp && (movingObjectType == movingobject_goomba || movingObjectType == movingobject_koopa || movingObjectType == movingobject_spiny || movingObjectType == movingobject_buzzybeetle || movingObjectType == movingobject_cheepcheep)) {
             if (!game_values.gamemode->gameover) {

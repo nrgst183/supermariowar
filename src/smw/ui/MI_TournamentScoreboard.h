@@ -3,6 +3,10 @@
 #include "GlobalConstants.h"
 #include "uicontrol.h"
 
+#include <array>
+#include <memory>
+#include <vector>
+
 class gfxSprite;
 class MI_Image;
 class MI_ScoreText;
@@ -29,14 +33,14 @@ private:
         return m_pos.y + iPlace * 69 + (4 - iNumTeams) * 35;
     }
     float GetIconSpacing() const {
-        return (float)(372 - iNumGames * 32) / (float)(iNumGames + 1);
+        return static_cast<float>(372 - iNumGames * 32) / static_cast<float>(iNumGames + 1);
     }
 
     bool fCreated = false;
 
-    MI_Image** miTeamImages;
-    MI_Image*** miIconImages;
-    MI_Image*** miPlayerImages;
+    std::vector<std::unique_ptr<MI_Image>> miTeamImages;
+    std::vector<std::vector<std::unique_ptr<MI_Image>>> miIconImages;
+    std::vector<std::vector<std::unique_ptr<MI_Image>>> miPlayerImages;
 
     short iNumTeams = 0;
     short iNumGames = 0;
@@ -57,14 +61,14 @@ private:
     short iTeamIDs[4][3];
     short iTeamCounts[4];
 
-    MI_ScoreText* tourScores[4];
-    MI_ScoreText* tourPoints[10];
-    MI_Image* miTourPointBar = nullptr;
-    MI_Image* tourBonus[10];
+    std::array<std::unique_ptr<MI_ScoreText>, 4> tourScores;
+    std::array<std::unique_ptr<MI_ScoreText>, 10> tourPoints;
+    std::unique_ptr<MI_Image> miTourPointBar;
+    std::array<std::unique_ptr<MI_Image>, 10> tourBonus;
 
-    MI_Image* worldBonus[4][MAX_WORLD_BONUSES_AWARDED];
-    MI_Image* worldScoreModifier = nullptr;
-    MI_Image* worldPlace[4];
-    MI_ScoreText* worldScore = nullptr;
-    MI_Image* worldPointsBackground[4];
+    std::array<std::array<std::unique_ptr<MI_Image>, MAX_WORLD_BONUSES_AWARDED>, 4> worldBonus;
+    std::unique_ptr<MI_Image> worldScoreModifier;
+    std::array<std::unique_ptr<MI_Image>, 4> worldPlace;
+    std::unique_ptr<MI_ScoreText> worldScore;
+    std::array<std::unique_ptr<MI_Image>, 4> worldPointsBackground;
 };

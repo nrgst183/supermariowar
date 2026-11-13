@@ -6,6 +6,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/carriable/CO_ThrowBlock.h"
 
 
@@ -18,7 +19,7 @@ B_ThrowBlock::B_ThrowBlock(gfxSprite *nspr, Vec2s pos, short iNumSpr, short aniS
     animationSpeed = aniSpeed;
     animationTimer = 0;
     drawFrame = 0;
-    animationWidth = (short)nspr->getWidth();
+    animationWidth = static_cast<short>(nspr->getWidth());
     iType = type;
 }
 
@@ -42,7 +43,7 @@ void B_ThrowBlock::update()
 bool B_ThrowBlock::hittop(CPlayer * player, bool useBehavior)
 {
     if (useBehavior) {
-        player->setYf((float)(iposy - PH) - 0.2f);
+        player->setYf(static_cast<float>(iposy - PH) - 0.2f);
         player->fOldY = player->fy;
         player->inair = false;
         player->fallthrough = false;
@@ -64,7 +65,7 @@ bool B_ThrowBlock::hittop(CPlayer * player, bool useBehavior)
 bool B_ThrowBlock::hitright(CPlayer * player, bool useBehavior)
 {
     if (useBehavior) {
-        player->setXf((float)(iposx + iw) + 0.2f);
+        player->setXf(static_cast<float>(iposx + iw) + 0.2f);
         player->fOldX = player->fx;
 
         if (player->velx < 0.0f)
@@ -87,7 +88,7 @@ bool B_ThrowBlock::hitright(CPlayer * player, bool useBehavior)
 bool B_ThrowBlock::hitleft(CPlayer * player, bool useBehavior)
 {
     if (useBehavior) {
-        player->setXf((float)(iposx - PW) - 0.2f);
+        player->setXf(static_cast<float>(iposx - PW) - 0.2f);
         player->fOldX = player->fx;
 
         if (player->velx > 0.0f)
@@ -109,17 +110,16 @@ bool B_ThrowBlock::hitleft(CPlayer * player, bool useBehavior)
 
 void B_ThrowBlock::GiveBlockToPlayer(CPlayer * player)
 {
-    CO_ThrowBlock * block = new CO_ThrowBlock(&rm->spr_blueblock, {ix, iy}, iType);
-    if (player->AcceptItem(block)) {
+    auto block = std::make_unique<CO_ThrowBlock>(&rm->spr_blueblock, Vec2s(ix, iy), iType);
+    // If the container is full, the block could not be stored after the player took it
+    if (!g_sim.objectcontainer[1].isFull() && player->AcceptItem(block.get())) {
         dead = true;
         g_map->blockdata[col][row] = nullptr;
         g_map->UpdateTileGap(col, row);
 
         block->owner = player;
         block->iPlayerID = player->globalID;
-        objectcontainer[1].add(block);
-    } else {
-        delete block;
+        g_sim.objectcontainer[1].add(std::move(block));
     }
 }
 

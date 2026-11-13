@@ -1,5 +1,6 @@
 #include "GSMenu.h"
 
+#include "CmdArgs.h"
 #include "FileList.h"
 #include "Game.h"
 #include "GameMode.h"
@@ -15,6 +16,7 @@
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 #include "gamemodes/BonusHouse.h"
 #include "gamemodes/MiniBoss.h"
 #include "gamemodes/MiniBoxes.h"
@@ -63,12 +65,12 @@
 #include "menu/network/NetRoomMenu.h"
 #include "menu/network/NetServersMenu.h"
 
+#include <format>
+#include <string>
 #include <cstdlib> // atoi()
+#include <random>
 #include <cassert>
 #include <sstream>
-
-
-
 
 // std::uniue_ptr requires that the special member function have access
 // to the complete types.
@@ -208,13 +210,13 @@ void MenuState::onEnterState()
                 short iNumInPlace = 0;
                 short iInPlace[4];
                 short iLowestPlace = 0;
-                for (short iScore = 0; iScore < score_cnt; iScore++) {
-                    if (score[iScore]->place == iLowestPlace) {
+                for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
+                    if (g_sim.score[iScore].place == iLowestPlace) {
                         iInPlace[iNumInPlace++] = iScore;
-                    } else if (score[iScore]->place > iLowestPlace) {
+                    } else if (g_sim.score[iScore].place > iLowestPlace) {
                         iNumInPlace = 1;
                         iInPlace[0] = iScore;
-                        iLowestPlace = score[iScore]->place;
+                        iLowestPlace = g_sim.score[iScore].place;
                     }
                 }
 
@@ -226,7 +228,7 @@ void MenuState::onEnterState()
                 short iNumInPlace = 0;
                 short iInPlace[4];
                 short iMostWins = 0;
-                for (short iTeam = 0; iTeam < score_cnt; iTeam++) {
+                for (short iTeam = 0; iTeam < g_sim.score_cnt; iTeam++) {
                     if (game_values.tournament_scores[iTeam].wins == iMostWins) {
                         iInPlace[iNumInPlace++] = iTeam;
                     } else if (game_values.tournament_scores[iTeam].wins > iMostWins) {
@@ -245,7 +247,7 @@ void MenuState::onEnterState()
                 short iInPlace[4] = {0,0,0,0};
                 short iLeastWins = 20; //Most possible wins are 10
 
-                for (short iTeam = 0; iTeam < score_cnt; iTeam++) {
+                for (short iTeam = 0; iTeam < g_sim.score_cnt; iTeam++) {
                     if (game_values.tournament_scores[iTeam].wins == iLeastWins) {
                         iInPlace[iNumInPlace++] = iTeam;
                     } else if (game_values.tournament_scores[iTeam].wins < iLeastWins) {
@@ -260,7 +262,7 @@ void MenuState::onEnterState()
             }
 
             case TournamentControlStyle::Random: { //Random
-                game_values.tournamentcontrolteam = RANDOM_INT( score_cnt);
+                game_values.tournamentcontrolteam = RANDOM_INT( g_sim.score_cnt);
                 break;
             }
 
@@ -269,14 +271,14 @@ void MenuState::onEnterState()
                 short iInPlace[4] = {0, 0, 0, 0};
                 short iWinner = 0;
 
-                for (short iTeam = 0; iTeam < score_cnt; iTeam++) {
-                    if (score[iTeam]->place == 0) {
+                for (short iTeam = 0; iTeam < g_sim.score_cnt; iTeam++) {
+                    if (g_sim.score[iTeam].place == 0) {
                         iWinner = iTeam;
                         break;
                     }
                 }
 
-                for (short iTeam = 0; iTeam < score_cnt; iTeam++) {
+                for (short iTeam = 0; iTeam < g_sim.score_cnt; iTeam++) {
                     if (iTeam == iWinner)
                         continue;
 
@@ -290,7 +292,7 @@ void MenuState::onEnterState()
             case TournamentControlStyle::RoundRobin: { //Round Robin
                 game_values.tournamentcontrolteam = game_values.tournamentnextcontrol;
 
-                if (++game_values.tournamentnextcontrol >= score_cnt)
+                if (++game_values.tournamentnextcontrol >= g_sim.score_cnt)
                     game_values.tournamentnextcontrol = 0;
 
                 break;
@@ -476,7 +478,11 @@ void MenuState::update()
 
     bool fGenerateMapThumbs = false;
     if (AppState::Menu == game_values.appstate) {
-        MenuCodeEnum code = mCurrentMenu->SendInput(&game_values.playerInput);
+        MenuCodeEnum code = MENU_CODE_NONE;
+        if (cmd::g_autotest.enabled)
+            code = AutoTestMenuUpdate();
+        if (MENU_CODE_NONE == code)
+            code = mCurrentMenu->SendInput(&game_values.playerInput);
 
         // Shortcut to game start
         if (netplay.active) {
@@ -567,7 +573,7 @@ void MenuState::update()
         else if (MENU_CODE_TO_GAME_SETUP_MENU == code) {
             printf("MENU_CODE_TO_GAME_SETUP_MENU\n");
             //Moves teams to the first arrays in the list and counts the number of teams
-            score_cnt = mTeamSelectMenu->GetTeamCount();
+            g_sim.score_cnt = mTeamSelectMenu->GetTeamCount();
             iDisplayError = DISPLAY_ERROR_NONE;
             iDisplayErrorTimer = 0;
             bool fErrorReadingTourFile = false;
@@ -632,13 +638,13 @@ void MenuState::update()
                         iDisplayErrorTimer = 120;
                         fErrorReadingTourFile = true;
                     } else {
-                        mTournamentScoreboardMenu->miTournamentScoreboard->CreateScoreboard(score_cnt, game_values.tourstops.size(), &rm->spr_tour_markers);
+                        mTournamentScoreboardMenu->miTournamentScoreboard->CreateScoreboard(g_sim.score_cnt, game_values.tourstops.size(), &rm->spr_tour_markers);
                     }
                 } else if (game_values.matchtype == MatchType::Tournament) {
                     printf("  Match type: Tournament\n");
                     //Set who is controlling the tournament menu
                     if (game_values.tournamentcontrolstyle == TournamentControlStyle::Random || game_values.tournamentcontrolstyle == TournamentControlStyle::RandomLoser) //Random
-                        game_values.tournamentcontrolteam = RANDOM_INT( score_cnt);
+                        game_values.tournamentcontrolteam = RANDOM_INT( g_sim.score_cnt);
                     else if (game_values.tournamentcontrolstyle == TournamentControlStyle::RoundRobin) //Round robin
                         game_values.tournamentcontrolteam = 0;
                     else //The first game of the tournament is controlled by all players
@@ -646,13 +652,13 @@ void MenuState::update()
 
                     game_values.tournamentnextcontrol = 1;  //if round robin is selected, choose the next team next
 
-                    mTournamentScoreboardMenu->miTournamentScoreboard->CreateScoreboard(score_cnt, game_values.tournamentgames, &rm->menu_mode_large);
+                    mTournamentScoreboardMenu->miTournamentScoreboard->CreateScoreboard(g_sim.score_cnt, game_values.tournamentgames, &rm->menu_mode_large);
                 } else if (game_values.matchtype == MatchType::World) {
                     printf("  Match type: World\n");
                     try {
                         g_worldmap = loadWorldMap(worldlist->at(game_values.worldindex).string(), TILESIZE);
 
-                        mTournamentScoreboardMenu->miTournamentScoreboard->CreateScoreboard(score_cnt, 0, &rm->spr_tour_markers);
+                        mTournamentScoreboardMenu->miTournamentScoreboard->CreateScoreboard(g_sim.score_cnt, 0, &rm->spr_tour_markers);
 
                         g_worldmap.SetInitialPowerups();
 
@@ -668,7 +674,7 @@ void MenuState::update()
                         }
 
                         mWorldMenu->miWorld->Init();
-                        mWorldMenu->miWorld->SetControllingTeam(RANDOM_INT( score_cnt));
+                        mWorldMenu->miWorld->SetControllingTeam(RANDOM_INT( g_sim.score_cnt));
                     }
                     catch (const std::runtime_error& err) {
                         iDisplayError = DISPLAY_ERROR_READ_WORLD_FILE;
@@ -1007,10 +1013,10 @@ void MenuState::update()
             mCurrentMenu = mMapFilterEditMenu.get();
             mCurrentMenu->ResetMenu();
         } else if (MENU_CODE_SAVE_ALL_MAP_THUMBNAILS == code) {
-            ((UI_OptionsMenu*) mCurrentMenu)->showThumbnailsPopup();
+            (static_cast<UI_OptionsMenu*>(mCurrentMenu))->showThumbnailsPopup();
             mCurrentMenu->ResetMenu();
         } else if (MENU_CODE_GENERATE_THUMBS_RESET_YES == code || MENU_CODE_GENERATE_THUMBS_RESET_NO == code) {
-            ((UI_OptionsMenu*) mCurrentMenu)->hideThumbnailsPopup();
+            (static_cast<UI_OptionsMenu*>(mCurrentMenu))->hideThumbnailsPopup();
 
             if (MENU_CODE_GENERATE_THUMBS_RESET_YES == code) {
                 fGenerateMapThumbs = true;
@@ -1144,7 +1150,7 @@ void MenuState::update()
 
                 mTeamSelectMenu->ResetTeamSelect();
                 mTeamSelectMenu->ResetMenu();
-                score_cnt = mTeamSelectMenu->GetTeamCount();
+                g_sim.score_cnt = mTeamSelectMenu->GetTeamCount();
 
                 game_values.tournamentcontrolteam = -1;
                 game_values.tournamentwinner = -1;
@@ -1208,7 +1214,7 @@ void MenuState::update()
     }
 
     if (game_values.screenfade > 0) {
-        rm->menu_shade.setalpha((Uint8)game_values.screenfade);
+        rm->menu_shade.setalpha(static_cast<Uint8>(game_values.screenfade));
         rm->menu_shade.draw(0, 0);
     }
 
@@ -1347,12 +1353,6 @@ void MenuState::update()
 		rm->menu_font_large.drawCentered(App::screenWidth/2, 245, "Please Wait...");
     }
 
-// TODO: FIX
-/*#if	!_DEBUG
-    if (game_values.showfps)
-#endif
-        rm->menu_font_large.drawf(0, App::screenHeight - rm->menu_font_large.getHeight(), "Actual:%.1f/%.1f, Flip:%.1f, Potential:%.1f", realfps, 1000.0f / (float)WAITTIME, flipfps, 1000.0f / (float)ticks);
-*/
 
 #ifdef _DEBUG
     if (g_fAutoTest)
@@ -1386,159 +1386,6 @@ void MenuState::update()
 
         rm->backgroundmusic[2].togglePause();
     }
-}
-
-bool MenuState::ReadTourFile()
-{
-    ResetTourStops();
-
-    FILE * fp = fopen(tourlist->at(game_values.tourindex).string().c_str(), "r");
-    const char* const ignorable_leads = " #\n\r\t";
-
-    char buffer[256];
-    bool fReadVersion = false;
-    Version version;
-    while (fgets(buffer, 256, fp) && game_values.tourstops.size() < 10) {
-        if (strchr(ignorable_leads, buffer[0]))
-            continue;
-
-        if (!fReadVersion) {
-            fReadVersion = true;
-
-            char * psz = strtok(buffer, ".\n");
-            if (psz)
-                version.major = atoi(psz);
-
-            psz = strtok(nullptr, ".\n");
-            if (psz)
-                version.minor = atoi(psz);
-
-            psz = strtok(nullptr, ".\n");
-            if (psz)
-                version.patch = atoi(psz);
-
-            psz = strtok(nullptr, ".\n");
-            if (psz)
-                version.build = atoi(psz);
-
-            continue;
-        }
-
-        TourStop* ts = new TourStop();
-        *ts = ParseTourStopLine(buffer, version, false);
-        game_values.tourstops.push_back(ts);
-    }
-
-    if (game_values.tourstops.size() != 0) {
-        mTourStopMenu->miTourStop->Refresh(game_values.tourstopcurrent);
-
-        //For old tours, turn on the bonus wheel at the end
-        if (version.major == 1 && version.minor == 7 && version.patch == 0 && version.build <= 1)
-            game_values.tourstops[game_values.tourstops.size() - 1]->iBonusType = 1;
-    }
-
-    fclose(fp);
-
-    return game_values.tourstops.size() != 0;
-}
-
-void MenuState::StartGame()
-{
-    printf("> StartGame\n");
-#ifdef _DEBUG
-    iScriptState = 2;
-    fScriptRunPreGameOptions = false;
-#endif
-
-    game_values.appstate = AppState::StartGame;
-    //backgroundonly = false;
-    //fastmap = false;
-
-    game_values.WriteConfig();
-
-    //Load skins for players
-    printf("Loading player skins...\n");
-    for (int k = 0; k < 4; k++) {
-        if (game_values.playercontrol[k] > 0) {
-            if (netplay.active) {
-                if (k == netplay.remotePlayerNumber) { // local player uses local skin
-                    printf("  player %d -> local\n", k);
-                    rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
-                }
-                else {
-                    std::ostringstream path;
-                    path << GetHomeDirectory() << "net_skin" << k << ".bmp";
-                    printf("  player %d -> %s\n", k, path.str().c_str());
-
-                    try {
-                        rm->spr_player[k] = rm->LoadFullSkin(path.str(), k);
-                    } catch (...) {
-                        printf("[warning] Could not load netplay skin of player %d, using default\n", k);
-                        rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
-                    }
-                }
-            }
-            else if (game_values.randomskin[k]) {
-                game_values.skinids[k] = RANDOM_INT( skinlist->count());
-                rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
-            }
-            else {
-                rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
-            }
-        }
-    }
-
-    //Load announcer sounds if changed
-    if (game_values.loadedannouncer != announcerlist->currentIndex()) {
-        game_values.loadedannouncer = announcerlist->currentIndex();
-
-        //Delete the old sounds
-        for (int k = 0; k < PANNOUNCER_SOUND_LAST; k++)
-            rm->sfx_announcer[k] = {};
-
-        FILE * announcerfile = fopen(announcerlist->currentPath().string().c_str(), "r");
-
-        char szBuffer[256];
-
-        int announcerIndex = 0;
-
-        while (fgets(szBuffer, 256, announcerfile) && announcerIndex < PANNOUNCER_SOUND_LAST) {
-            //Ignore comment lines
-            if (szBuffer[0] == '#' || szBuffer[0] == ' ' || szBuffer[0] == '\t' || szBuffer[0] == '\n' || szBuffer[0] == '\r')
-                continue;
-
-            //Clean off carriage returns
-            for (int k = 0; k < (int)strlen(szBuffer); k++) {
-                if (szBuffer[k] == '\r' || szBuffer[k] == '\n') {
-                    szBuffer[k] = '\0';
-                    break;
-                }
-            }
-
-            //If it is not "[none]", then add this announcer sound
-            if (strcmp(szBuffer, "[none]"))
-                rm->sfx_announcer[announcerIndex] = sfxSound(convertPath(szBuffer));
-
-            announcerIndex++;
-        }
-
-        fclose(announcerfile);
-    }
-
-    //Load soundtrack music if changed
-    if (game_values.loadedmusic != (short)musiclist->currentIndex()) {
-        game_values.loadedmusic = (short)musiclist->currentIndex();
-        rm->backgroundmusic[1] = sfxMusic(musiclist->music(0)); //Stage Clear
-        rm->backgroundmusic[3] = sfxMusic(musiclist->music(2)); //Tournament Menu
-        rm->backgroundmusic[4] = sfxMusic(musiclist->music(3)); //Tournament Over
-    }
-
-    rm->backgroundmusic[2].stop();
-    rm->sfx_announcer[11].play();
-
-    game_values.screenfade = 8;
-    game_values.screenfadespeed = 8;
-    printf("< StartGame\n");
 }
 
 void MenuState::SetControllingTeamForSettingsMenu(short iControlTeam, bool fDisplayMessage)
@@ -1577,13 +1424,13 @@ void MenuState::SetControllingTeamForSettingsMenu(short iControlTeam, bool fDisp
 void MenuState::DisplayControllingTeamMessage(short iControlTeam)
 {
     //Display the team that is in control of selecting the next game
-    char szMessage[128];
+    std::string szMessage;
     if (iControlTeam < 0)
-        snprintf(szMessage, sizeof(szMessage), "All Teams Are In Control");
+        szMessage = "All Teams Are In Control";
     else if (game_values.teamcounts[iControlTeam] <= 1)
-        snprintf(szMessage, sizeof(szMessage), "Player %d Is In Control", game_values.teamids[iControlTeam][0] + 1);
+        szMessage = std::format("Player {} Is In Control", game_values.teamids[iControlTeam][0] + 1);
     else
-        snprintf(szMessage, sizeof(szMessage), "Team %d Is In Control", iControlTeam + 1);
+        szMessage = std::format("Team {} Is In Control", iControlTeam + 1);
 
     mCurrentMenu->AddEyeCandy<EC_Announcement>(&rm->menu_font_large, &rm->spr_announcementicons, szMessage, iControlTeam < 0 ? 4 : game_values.colorids[game_values.teamids[iControlTeam][0]], 120, 100);
 }
@@ -1610,290 +1457,3 @@ void MenuState::ResetTournamentBackToMainMenu()
         }
     }
 }
-
-//Debugging code for writing and playing test scripts
-#ifdef _DEBUG
-
-void MenuState::LoadScript(const char * szScriptFile)
-{
-    operations.clear();
-
-    FILE * fp = fopen(szScriptFile, "r");
-
-    if (fp != nullptr) {
-        char buffer[256];
-        while (fgets(buffer, 256, fp) != nullptr) {
-            if (buffer[0] == '#' || buffer[0] == '\n' || buffer[0] == ' ' || buffer[0] == '\t')
-                continue;
-
-            ScriptOperation * op = new ScriptOperation();
-
-            //Get controller to use
-            op->iController = atoi(strtok(buffer, ",\n"));
-
-            //Get iterations on this operation
-            op->iIterations = atoi(strtok(nullptr, ",\n"));
-
-            //Get input operations to perform
-            for (short i = 0; i < 8; i++) {
-                op->fInput[i] = atoi(strtok(nullptr, ",\n")) != 0;
-            }
-
-            operations.push_back(op);
-        }
-
-        fclose(fp);
-    }
-
-    current = operations.begin();
-    iScriptState = 0;
-}
-
-void MenuState::ResetScript()
-{
-    std::vector<ScriptOperation*>::iterator itr = operations.begin();
-
-    while (itr != operations.end()) {
-        (*itr)->iTimesExecuted = 0;
-        itr++;
-    }
-
-    current = operations.begin();
-    iScriptState = 0;
-}
-
-void MenuState::GetNextScriptOperation()
-{
-    if (AppState::Menu != game_values.appstate)
-        return;
-
-    //static short slowdowntimer = 0;
-    //if (++slowdowntimer < 30)
-    //return;
-    //slowdowntimer = 0;
-
-    if (iScriptState == 1) {
-        if (mCurrentMenu == mGameSettingsMenu.get()) {
-            if (!fScriptRunPreGameOptions) {
-                fScriptRunPreGameOptions = true;
-                LoadScript("Scripts/GameModeOptionsOnly.txt");
-                iScriptState = 0;
-                return;
-            } else if (game_values.gamemode->gamemode == game_mode_frag ||
-                      game_values.gamemode->gamemode == game_mode_timelimit ||
-                      game_values.gamemode->gamemode == game_mode_coins ||
-                      game_values.gamemode->gamemode == game_mode_classic ||
-                      game_values.gamemode->gamemode == game_mode_eggs ||
-                      game_values.gamemode->gamemode == game_mode_owned) {
-                LoadScript("Scripts/NoModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_jail) {
-                LoadScript("Scripts/JailModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_stomp) {
-                LoadScript("Scripts/StompModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_ctf) {
-                LoadScript("Scripts/CaptureTheFlagModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_chicken) {
-                LoadScript("Scripts/ChickenModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_tag) {
-                LoadScript("Scripts/TagModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_star) {
-                LoadScript("Scripts/StarModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_domination) {
-                LoadScript("Scripts/DominationModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_koth) {
-                LoadScript("Scripts/KingOfTheHillModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_race) {
-                LoadScript("Scripts/RaceModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_frenzy) {
-                LoadScript("Scripts/FrenzyModeOptions.txt");
-            } else if (game_values.gamemode->gamemode == game_mode_survival) {
-                LoadScript("Scripts/SurvivalModeOptions.txt");
-            }
-
-            game_values.gamemode->setdebuggoal();
-        } else if (mCurrentMenu == mTourStopMenu.get()) {
-            static int tournext = RANDOM_INT(200);
-
-            if (--tournext < 0) {
-                game_values.playerInput.outputControls[0].menu_select.fPressed = true;
-                tournext = RANDOM_INT(200);
-                game_values.gamemode->setdebuggoal();
-            }
-            return;
-        }
-
-        return;
-    } else if (iScriptState == 2) {
-        if (mCurrentMenu == mTournamentScoreboardMenu.get()) {
-            static int scoreboardnext = RANDOM_INT(200);
-
-            if (--scoreboardnext < 0) {
-                game_values.playerInput.outputControls[0].menu_select.fPressed = true;
-                iScriptState = 3;
-                scoreboardnext = RANDOM_INT(200);
-            }
-
-            return;
-        } else if (mCurrentMenu == mGameSettingsMenu.get()) {
-            iScriptState = 0;
-            mCurrentMenu = mMainMenu.get();
-            mCurrentMenu->ResetMenu();
-            LoadScript("Scripts/StartMenuAutomation.txt");
-            fScriptRunPreGameOptions = true;
-            return;
-        } else if (mCurrentMenu == mBonusWheelMenu.get()) {
-            static int bonuswheelnext = RANDOM_INT(200) + 300;
-
-            if (--bonuswheelnext < 0) {
-                game_values.playerInput.outputControls[0].menu_select.fPressed = true;
-                //iScriptState = 3;
-                bonuswheelnext = RANDOM_INT(200) + 300;
-            }
-            return;
-        } else if (mCurrentMenu == mTourStopMenu.get()) {
-            static int tournext = RANDOM_INT(200);
-
-            if (--tournext < 0) {
-                game_values.playerInput.outputControls[0].menu_select.fPressed = true;
-                tournext = RANDOM_INT(200);
-                game_values.gamemode->setdebuggoal();
-            }
-            return;
-        }
-
-        return;
-    } else if (iScriptState == 3) {
-        if (mCurrentMenu == mBonusWheelMenu.get()) {
-            game_values.playerInput.outputControls[0].menu_select.fPressed = true;
-            return;
-        } else if (mCurrentMenu == mGameSettingsMenu.get()) {
-            iScriptState = 0;
-            LoadScript("Scripts/GameModeOptionsOnly.txt");
-            fScriptRunPreGameOptions = true;
-            return;
-        } else if (mCurrentMenu == mMainMenu.get()) {
-            iScriptState = 0;
-            LoadScript("Scripts/StartMenuAutomation.txt");
-            fScriptRunPreGameOptions = true;
-            return;
-        } else if (mCurrentMenu == mTourStopMenu.get()) {
-            static int tournext = RANDOM_INT(200);
-
-            if (--tournext < 0) {
-                game_values.playerInput.outputControls[0].menu_select.fPressed = true;
-                tournext = RANDOM_INT(200);
-                game_values.gamemode->setdebuggoal();
-            }
-            return;
-        }
-
-        return;
-    }
-
-    // here bad reference when pressing Ins!
-    ScriptOperation * op = *current;
-
-    while (op->iTimesExecuted >= op->iIterations) {
-        if (++current == operations.end()) {
-            iScriptState = 1;
-            return;
-        }
-
-        op = *current;
-    }
-
-    op->iTimesExecuted++;
-
-    short iController = op->iController;
-
-    if (iController == 5)
-        iController = RANDOM_INT(4);
-
-    short iKeys[8];
-    short iNumKeys = 0;
-
-    for (short i = 0; i < 8; i++) {
-        if (op->fInput[i])
-            iKeys[iNumKeys++] = i;
-    }
-
-    if (iController == MAX_PLAYERS) { //All controllers
-        game_values.playerInput.outputControls[0].keys[iKeys[RANDOM_INT(iNumKeys)]].fPressed = true;
-        game_values.playerInput.outputControls[1].keys[iKeys[RANDOM_INT(iNumKeys)]].fPressed = true;
-        game_values.playerInput.outputControls[2].keys[iKeys[RANDOM_INT(iNumKeys)]].fPressed = true;
-        game_values.playerInput.outputControls[3].keys[iKeys[RANDOM_INT(iNumKeys)]].fPressed = true;
-    } else {
-        game_values.playerInput.outputControls[iController].keys[iKeys[RANDOM_INT(iNumKeys)]].fPressed = true;
-    }
-}
-
-void MenuState::StartRecordScript()
-{
-    operations.clear();
-}
-
-void MenuState::SaveScript(const char * szScriptFile)
-{
-    FILE * fp = fopen(szScriptFile, "w");
-
-    if (fp) {
-        std::vector<ScriptOperation*>::iterator itr = operations.begin();
-
-        while (itr != operations.end()) {
-            ScriptOperation * op = *itr;
-
-            //Add line breaks
-            if (op->iController == -1) {
-                fprintf(fp, "\n");
-                itr++;
-                continue;
-            }
-
-            fprintf(fp, "%d,%d", op->iController, op->iIterations);
-
-            for (short i = 0; i < 8; i++) {
-                fprintf(fp, ",%d", op->fInput[i]);
-            }
-
-            fprintf(fp, "\n");
-
-            itr++;
-        }
-
-        fclose(fp);
-
-#if defined(__APPLE__)
-        chmod(szScriptFile, S_IRWXU | S_IRWXG | S_IROTH);
-#endif
-    }
-}
-
-void MenuState::AddEmtpyLineToScript()
-{
-    ScriptOperation * op = new ScriptOperation();
-    op->iController = -1;
-    operations.push_back(op);
-}
-
-void MenuState::SetNextScriptOperation()
-{
-    for (short i = 0; i < 8; i++) {
-        if (game_values.playerInput.outputControls[0].keys[i].fPressed) {
-            ScriptOperation * op = new ScriptOperation();
-
-            op->iController = 0;
-            op->iIterations = 1;
-
-            for (short iKey = 0; iKey < 8; iKey++) {
-                op->fInput[iKey] = false;
-            }
-
-            op->fInput[i] = true;
-
-            operations.push_back(op);
-        }
-    }
-}
-
-
-#endif

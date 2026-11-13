@@ -6,6 +6,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_Explosion.h"
 #include "objects/moving/MO_Hammer.h"
 
@@ -16,7 +17,7 @@
 // class sledge hammer
 //------------------------------------------------------------------------------
 MO_SledgeHammer::MO_SledgeHammer(gfxSprite* nspr, Vec2s pos, short iNumSpr, Vec2f vel, short aniSpeed, short iGlobalID, short iTeamID, short iColorID, bool superHammer)
-    : IO_MovingObject(nspr, pos, iNumSpr, aniSpeed, (short)nspr->getWidth() / iNumSpr, (short)nspr->getHeight() / 5, 0, 0)
+    : IO_MovingObject(nspr, pos, iNumSpr, aniSpeed, static_cast<short>(nspr->getWidth()) / iNumSpr, static_cast<short>(nspr->getHeight()) / 5, 0, 0)
 {
     ih = collisionHeight;
 
@@ -84,7 +85,7 @@ bool MO_SledgeHammer::collide(CPlayer* player)
 void MO_SledgeHammer::explode()
 {
     if (fSuper) {
-        objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(ix + (iw >> 2) - 96), static_cast<short>(iy + (ih >> 2) - 64)}, 2, 4, -1, -1, KillStyle::Hammer));
+        g_sim.objectcontainer[2].add(new MO_Explosion(&rm->spr_explosion, {static_cast<short>(ix + (iw >> 2) - 96), static_cast<short>(iy + (ih >> 2) - 64)}, 2, 4, -1, -1, KillStyle::Hammer));
         ifSoundOnPlay(rm->sfx_bobombsound);
     } else {
         short iCenterX = ix + (iw >> 1) - 14;
@@ -92,11 +93,11 @@ void MO_SledgeHammer::explode()
         short iColorID = colorOffset / 32 - 1;
 
         for (short iHammer = 0; iHammer < 3; iHammer++) {
-            float dAngle = (float)(RANDOM_INT(628)) / 100.0f;
-            float dVel = (float)(RANDOM_INT(5)) / 2.0f + 3.0f;
+            float dAngle = static_cast<float>(RANDOM_INT(628)) / 100.0f;
+            float dVel = static_cast<float>(RANDOM_INT(5)) / 2.0f + 3.0f;
             float dVelX = dVel * cos(dAngle);
             float dVelY = dVel * sin(dAngle);
-            objectcontainer[2].add(new MO_Hammer(&rm->spr_hammer, {iCenterX, iCenterY}, 6, {dVelX, dVelY}, 5, playerID, teamID, iColorID, true));
+            g_sim.objectcontainer[2].add(new MO_Hammer(&rm->spr_hammer, {iCenterX, iCenterY}, 6, {dVelX, dVelY}, 5, playerID, teamID, iColorID, true));
         }
 
         CPlayer* player = GetPlayerFromGlobalID(playerID);

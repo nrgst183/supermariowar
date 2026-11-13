@@ -19,9 +19,9 @@ OMO_Phanto::OMO_Phanto(gfxSprite* nspr, Vec2s pos, float dVelX, float dVelY, sho
     velx = dVelX;
     vely = dVelY;
 
-    dMaxSpeedY = (float)game_values.gamemodesettings.chase.phantospeed / 2.0f;
+    dMaxSpeedY = static_cast<float>(game_values.gamemodesettings.chase.phantospeed) / 2.0f;
     dMaxSpeedX = dMaxSpeedY + 1.0f;
-    dSpeedRatio = (float)game_values.gamemodesettings.chase.phantospeed / 6.0f;
+    dSpeedRatio = static_cast<float>(game_values.gamemodesettings.chase.phantospeed) / 6.0f;
 
     dReactionSpeed = 0.2f;
 }
@@ -38,12 +38,12 @@ void OMO_Phanto::update()
 
     if (++iSpeedTimer > 62) {
         iSpeedTimer = 0;
-        dReactionSpeed = (0.05f + (float)(RANDOM_INT(20)) / 100.0f) * dSpeedRatio;
+        dReactionSpeed = (0.05f + static_cast<float>(RANDOM_INT(20)) / 100.0f) * dSpeedRatio;
     }
 
     // Chase player or move off screen if there is no player holding the key
     if (game_values.gamemode->gamemode == game_mode_chase) {
-        CGM_Chase* chasemode = (CGM_Chase*)game_values.gamemode;
+        CGM_Chase* chasemode = static_cast<CGM_Chase*>(game_values.gamemode);
 
         CPlayer* player = chasemode->GetKeyHolder();
 
@@ -113,7 +113,7 @@ bool OMO_Phanto::collide(CPlayer* player)
             return true;
         } else {
             if (game_values.gamemode->gamemode == game_mode_chase) {
-                CGM_Chase* chasemode = (CGM_Chase*)game_values.gamemode;
+                CGM_Chase* chasemode = static_cast<CGM_Chase*>(game_values.gamemode);
                 CPlayer* keyholder = chasemode->GetKeyHolder();
 
                 if (keyholder == player) {

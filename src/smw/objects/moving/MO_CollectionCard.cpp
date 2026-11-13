@@ -7,6 +7,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 
 
 //------------------------------------------------------------------------------
@@ -124,7 +125,7 @@ void MO_CollectionCard::placeCard()
 
     short x = 0, y = 0;
     short iAttempts = 32;
-    while ((!g_map->findspawnpoint(5, &x, &y, collisionWidth, collisionHeight, false) || objectcontainer[1].getClosestMovingObject(x, y, movingobject_collectioncard) <= 150.0f)
+    while ((!g_map->findspawnpoint(5, &x, &y, collisionWidth, collisionHeight, false) || g_sim.objectcontainer[1].getClosestMovingObject(x, y, movingobject_collectioncard) <= 150.0f)
         && iAttempts-- > 0)
         ;
 

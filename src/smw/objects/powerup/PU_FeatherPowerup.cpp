@@ -18,7 +18,7 @@ PU_FeatherPowerup::PU_FeatherPowerup(gfxSprite* nspr, Vec2s pos, short iNumSpr, 
 {
     movingObjectType = movingobject_powerup;
 
-    iw = (short)nspr->getWidth() >> 1;
+    iw = static_cast<short>(nspr->getWidth()) >> 1;
     velx = 0.0f;
 
     fObjectCollidesWithMap = false;
@@ -27,7 +27,7 @@ PU_FeatherPowerup::PU_FeatherPowerup(gfxSprite* nspr, Vec2s pos, short iNumSpr, 
 void PU_FeatherPowerup::draw()
 {
     if (state == 0)
-        spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {0, 0, iw, (short)(ih - fy + desty)});
+        spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {0, 0, iw, static_cast<short>(ih - fy + desty)});
     else if (state == 1)
         spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {0, 0, iw, ih});
     else

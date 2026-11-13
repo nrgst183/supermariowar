@@ -36,7 +36,7 @@ void PU_CoinPowerup::update()
 void PU_CoinPowerup::draw()
 {
     if (state == 0) {
-        short iHeight = (short)(32 - fy + desty);
+        short iHeight = static_cast<short>(32 - fy + desty);
         spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {drawframe, iColorOffsetY, 32, iHeight});
         rm->spr_shinesparkle.draw(ix - collisionOffsetX, iy - collisionOffsetY, {sparkledrawframe, 0, 32, iHeight});
     } else {

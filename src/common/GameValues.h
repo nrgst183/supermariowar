@@ -1,7 +1,7 @@
 #ifndef GAMEVALUES_H
 #define GAMEVALUES_H
 
-#define TITLESTRING "Super Mario War"
+constexpr const char* TITLESTRING = "Super Mario War";
 
 #include "EyecandyStyles.h"
 #include "GameModeSettings.h"

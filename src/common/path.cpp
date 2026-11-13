@@ -92,7 +92,7 @@ void Initialize_Paths()
         return;
     }
 
-    SMW_Root_Data_Dir = getFileFromPath(std::string((char*)temp));
+    SMW_Root_Data_Dir = getFileFromPath(std::string(reinterpret_cast<char*>(temp)));
 
     CFRelease(dirURL);
 #else

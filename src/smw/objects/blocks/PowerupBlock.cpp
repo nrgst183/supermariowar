@@ -21,15 +21,15 @@
 B_PowerupBlock::B_PowerupBlock(gfxSprite* nspr1, Vec2s pos, short iNumSpr, short aniSpeed, bool fHidden, const short * piSettings)
     : IO_Block(nspr1, pos)
 {
-    iw = (short)spr->getWidth() >> 2;
-    ih = (short)spr->getHeight() >> 1;  //This sprite has two images (unused and used blocks)
+    iw = static_cast<short>(spr->getWidth()) >> 2;
+    ih = static_cast<short>(spr->getHeight()) >> 1;  //This sprite has two images (unused and used blocks)
     collisionWidth = iw;
     timer = 0;
     side = true;
     iNumSprites = iNumSpr;
     animationSpeed = aniSpeed;
     animationTimer = 0;
-    animationWidth = (short)spr->getWidth();
+    animationWidth = static_cast<short>(spr->getWidth());
     drawFrame = 0;
 
     hidden = ishiddentype = fHidden;
@@ -53,13 +53,13 @@ B_PowerupBlock::B_PowerupBlock(gfxSprite* nspr1, Vec2s pos, short iNumSpr, short
             dGameWeightCount += game_values.powerupweights[iPowerup];
 
         for (short iSetting = 0; iSetting < NUM_POWERUPS; iSetting++) {
-            float dWeight = ((float)piSettings[iSetting] / dMapWeightCount + (float)game_values.powerupweights[iSetting] / dGameWeightCount) * 100.0f;
+            float dWeight = (static_cast<float>(piSettings[iSetting]) / dMapWeightCount + static_cast<float>(game_values.powerupweights[iSetting]) / dGameWeightCount) * 100.0f;
 
             //Cap lowest value at 1
             if (dWeight < 1.0f && dWeight > 0.0f)
                 settings[iSetting] = 1;
             else
-                settings[iSetting] = (short)dWeight;
+                settings[iSetting] = static_cast<short>(dWeight);
         }
     }
 
@@ -177,7 +177,7 @@ bool B_PowerupBlock::hitbottom(CPlayer* player, bool useBehavior)
     if (useBehavior) {
         //Player bounces off
         player->vely = CapFallingVelocity(-player->vely * BOUNCESTRENGTH);
-        player->setYf((float)(iposy + ih) + 0.2f);
+        player->setYf(static_cast<float>(iposy + ih) + 0.2f);
 
         if (hidden) {
             hidden = false;
@@ -211,11 +211,11 @@ bool B_PowerupBlock::collide(IO_MovingObject* object, short direction)
 
 bool B_PowerupBlock::hittop(IO_MovingObject* object)
 {
-    object->setYf((float)(iposy - object->collisionHeight) - 0.2f);
+    object->setYf(static_cast<float>(iposy - object->collisionHeight) - 0.2f);
     object->fOldY = object->fy;
 
     MovingObjectType type = object->getMovingObjectType();
-    if (type == movingobject_throwbox && ((CO_ThrowBox*)object)->HasKillVelocity()) {
+    if (type == movingobject_throwbox && (static_cast<CO_ThrowBox*>(object))->HasKillVelocity()) {
         if (state == 0) {
             ifSoundOnPlay(rm->sfx_bump);
 
@@ -239,7 +239,7 @@ bool B_PowerupBlock::hittop(IO_MovingObject* object)
 bool B_PowerupBlock::hitright(IO_MovingObject* object)
 {
     //Object bounces off
-    object->setXf((float)(iposx + iw) + 0.2f);
+    object->setXf(static_cast<float>(iposx + iw) + 0.2f);
     object->fOldX = object->fx;
 
     if (object->velx < 0.0f)
@@ -253,7 +253,7 @@ bool B_PowerupBlock::hitright(IO_MovingObject* object)
         }
 
         //If the box isn't moving fast enough, then don't do anything
-        if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity())
+        if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity())
             return false;
 
         if (state == 0) {
@@ -274,7 +274,7 @@ bool B_PowerupBlock::hitright(IO_MovingObject* object)
 bool B_PowerupBlock::hitleft(IO_MovingObject* object)
 {
     //Object bounces off
-    object->setXf((float)(iposx - object->collisionWidth) - 0.2f);
+    object->setXf(static_cast<float>(iposx - object->collisionWidth) - 0.2f);
     object->fOldX = object->fx;
 
     if (object->velx > 0.0f)
@@ -288,7 +288,7 @@ bool B_PowerupBlock::hitleft(IO_MovingObject* object)
         }
 
         //If the box isn't moving fast enough, then don't do anything
-        if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity())
+        if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity())
             return false;
 
         if (state == 0) {

@@ -17,9 +17,9 @@
 B_OnOffSwitchBlock::B_OnOffSwitchBlock(gfxSprite *nspr, Vec2s pos, SwitchColor color, short iState) :
     IO_Block(nspr, pos)
 {
-    iw = (short)spr->getWidth() >> 2;
+    iw = static_cast<short>(spr->getWidth()) >> 2;
     collisionWidth = iw;
-    ih = (short)spr->getHeight() >> 2;
+    ih = static_cast<short>(spr->getHeight()) >> 2;
     collisionHeight = ih;
 
     m_color = color;
@@ -76,7 +76,7 @@ bool B_OnOffSwitchBlock::hitbottom(CPlayer * player, bool useBehavior)
     //Player bounces off
     if (useBehavior) {
         player->vely = CapFallingVelocity(-player->vely * BOUNCESTRENGTH);
-        player->setYf((float)(iposy + ih) + 0.2f);
+        player->setYf(static_cast<float>(iposy + ih) + 0.2f);
 
         if (state == 0 || state == 3) {
             iBumpPlayerID = player->globalID;
@@ -91,14 +91,14 @@ bool B_OnOffSwitchBlock::hitbottom(CPlayer * player, bool useBehavior)
 
 bool B_OnOffSwitchBlock::hittop(IO_MovingObject * object)
 {
-    object->setYf((float)(iposy - object->collisionHeight) - 0.2f);
+    object->setYf(static_cast<float>(iposy - object->collisionHeight) - 0.2f);
     object->fOldY = object->fy;
 
     MovingObjectType type = object->getMovingObjectType();
-    if (type == movingobject_throwbox && ((CO_ThrowBox*)object)->HasKillVelocity()) {
+    if (type == movingobject_throwbox && (static_cast<CO_ThrowBox*>(object))->HasKillVelocity()) {
         if (state == 0 || state == 3) {
             iBumpPlayerID = -1;
-            triggerBehavior(((IO_MovingObject*)object)->iPlayerID);
+            triggerBehavior((static_cast<IO_MovingObject*>(object))->iPlayerID);
         }
 
         object->vely = object->BottomBounce();
@@ -117,7 +117,7 @@ bool B_OnOffSwitchBlock::hittop(IO_MovingObject * object)
 bool B_OnOffSwitchBlock::hitright(IO_MovingObject * object)
 {
     //Object bounces off
-    object->setXf((float)(iposx + iw) + 0.2f);
+    object->setXf(static_cast<float>(iposx + iw) + 0.2f);
     object->fOldX = object->fx;
 
     if (object->velx < 0.0f)
@@ -130,13 +130,13 @@ bool B_OnOffSwitchBlock::hitright(IO_MovingObject * object)
                 return false;
         }
 
-        if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity()) {
+        if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity()) {
             return false;
         }
 
         if (state == 0 || state == 3) {
             iBumpPlayerID = -1;
-            triggerBehavior(((IO_MovingObject*)object)->iPlayerID);
+            triggerBehavior((static_cast<IO_MovingObject*>(object))->iPlayerID);
         } else {
             ifSoundOnPlay(rm->sfx_bump);
         }
@@ -150,7 +150,7 @@ bool B_OnOffSwitchBlock::hitright(IO_MovingObject * object)
 bool B_OnOffSwitchBlock::hitleft(IO_MovingObject * object)
 {
     //Object bounces off
-    object->setXf((float)(iposx - object->collisionWidth) - 0.2f);
+    object->setXf(static_cast<float>(iposx - object->collisionWidth) - 0.2f);
     object->fOldX = object->fx;
 
     if (object->velx > 0.0f)
@@ -163,13 +163,13 @@ bool B_OnOffSwitchBlock::hitleft(IO_MovingObject * object)
                 return false;
         }
 
-        if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity()) {
+        if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity()) {
             return false;
         }
 
         if (state == 0 || state == 3) {
             iBumpPlayerID = -1;
-            triggerBehavior(((IO_MovingObject*)object)->iPlayerID);
+            triggerBehavior((static_cast<IO_MovingObject*>(object))->iPlayerID);
         } else {
             ifSoundOnPlay(rm->sfx_bump);
         }
@@ -194,7 +194,7 @@ void B_OnOffSwitchBlock::triggerBehavior(short playerID)
         std::list<IO_Block*>::iterator iterateSwitches = g_map->switchBlocks[colorIdx].begin();
 
         while (iterateSwitches != g_map->switchBlocks[colorIdx].end()) {
-            ((B_OnOffSwitchBlock*)(*iterateSwitches))->FlipState();
+            (static_cast<B_OnOffSwitchBlock*>(*iterateSwitches))->FlipState();
             iterateSwitches++;
         }
 
@@ -202,7 +202,7 @@ void B_OnOffSwitchBlock::triggerBehavior(short playerID)
         iterateSwitches = g_map->switchBlocks[colorIdx + 4].begin();
 
         while (iterateSwitches != g_map->switchBlocks[colorIdx + 4].end()) {
-            ((B_SwitchBlock*)(*iterateSwitches))->FlipState(playerID);
+            (static_cast<B_SwitchBlock*>(*iterateSwitches))->FlipState(playerID);
             iterateSwitches++;
         }
     }

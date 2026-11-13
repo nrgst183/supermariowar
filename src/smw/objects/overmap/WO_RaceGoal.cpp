@@ -6,6 +6,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "gamemodes/Race.h"
 #include "Score.h"
 
@@ -23,8 +24,8 @@ OMO_RaceGoal::OMO_RaceGoal(gfxSprite* nspr, short id)
     : IO_OverMapObject(nspr, Vec2s::zero(), 2, 8)
     , goalID(id)
 {
-    iw = (short)spr->getWidth() >> 1;
-    ih = (short)spr->getHeight() >> 1;
+    iw = static_cast<short>(spr->getWidth()) >> 1;
+    ih = static_cast<short>(spr->getHeight()) >> 1;
     collisionWidth = 36;
     collisionHeight = 36;
     collisionOffsetX = 16;
@@ -36,16 +37,16 @@ OMO_RaceGoal::OMO_RaceGoal(gfxSprite* nspr, short id)
     for (short k = 0; k < 4; k++)
         tagged[k] = -1;
 
-    angle = (float)(RANDOM_INT(1000) * 0.00628f);
-    anglechange = (float)(RANDOM_INT(100) * 0.0002f);
-    anglechangetimer = (short)(RANDOM_INT(50) + 100);
+    angle = static_cast<float>(RANDOM_INT(1000) * 0.00628f);
+    anglechange = static_cast<float>(RANDOM_INT(100) * 0.0002f);
+    anglechangetimer = static_cast<short>(RANDOM_INT(50) + 100);
 
     velx = sin(angle);
     vely = cos(angle);
 
     placeRaceGoal();
 
-    speed = (float)game_values.gamemodesettings.race.speed / 4.0f;
+    speed = static_cast<float>(game_values.gamemodesettings.race.speed) / 4.0f;
     quantity = game_values.gamemodesettings.race.quantity;
     isfinishline = goalID == quantity - 1;
 }
@@ -53,7 +54,7 @@ OMO_RaceGoal::OMO_RaceGoal(gfxSprite* nspr, short id)
 bool OMO_RaceGoal::collide(CPlayer* player)
 {
     if (game_values.gamemode->getgamemode() == game_mode_race && player->tanookisuit.notStatue()) {
-        CGM_Race* gamemode = (CGM_Race*)game_values.gamemode;
+        CGM_Race* gamemode = static_cast<CGM_Race*>(game_values.gamemode);
 
         if (tagged[player->teamID] != player->colorID && gamemode->getNextGoal(player->teamID) >= goalID) {
             tagged[player->teamID] = player->colorID;
@@ -77,9 +78,9 @@ void OMO_RaceGoal::draw()
     } else {
         spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {drawframe, 0, iw, ih});
 
-        for (short k = 0; k < score_cnt; k++) {
+        for (short k = 0; k < g_sim.score_cnt; k++) {
             if (tagged[k] > -1)
-                rm->spr_bonus.draw(ix - collisionOffsetX + flagpositions[score_cnt - 2][k][0], iy - collisionOffsetY + flagpositions[score_cnt - 2][k][1], {0, tagged[k] * 16, 16, 16});
+                rm->spr_bonus.draw(ix - collisionOffsetX + flagpositions[g_sim.score_cnt - 2][k][0], iy - collisionOffsetY + flagpositions[g_sim.score_cnt - 2][k][1], {0, tagged[k] * 16, 16, 16});
         }
     }
 
@@ -89,8 +90,8 @@ void OMO_RaceGoal::draw()
 void OMO_RaceGoal::update()
 {
     if (--anglechangetimer <= 0) {
-        anglechange = (float)((RANDOM_INT(101) - 50) * 0.0002f);
-        anglechangetimer = (short)(RANDOM_INT(50) + 100);
+        anglechange = static_cast<float>((RANDOM_INT(101) - 50) * 0.0002f);
+        anglechangetimer = static_cast<short>(RANDOM_INT(50) + 100);
     }
 
     angle += anglechange;
@@ -100,19 +101,19 @@ void OMO_RaceGoal::update()
 
     IO_OverMapObject::update();
 
-    ix = (short)fx;
-    iy = (short)fy;
+    ix = static_cast<short>(fx);
+    iy = static_cast<short>(fy);
 
     if (ix < 0) {
         velx = -velx;
         ix = 0;
-        fx = (float)ix;
+        fx = static_cast<float>(ix);
 
         angle = atan2(velx, vely);
     } else if (ix + collisionWidth >= App::screenWidth) {
         velx = -velx;
         ix = App::screenWidth - 1 - collisionWidth;
-        fx = (float)ix;
+        fx = static_cast<float>(ix);
 
         angle = atan2(velx, vely);
     }
@@ -120,13 +121,13 @@ void OMO_RaceGoal::update()
     if (iy < 0) {
         vely = -vely;
         iy = 0;
-        fy = (float)iy;
+        fy = static_cast<float>(iy);
 
         angle = atan2(velx, vely);
     } else if (iy + collisionHeight >= App::screenHeight) {
         vely = -vely;
         iy = App::screenHeight - 1 - collisionHeight;
-        fy = (float)iy;
+        fy = static_cast<float>(iy);
 
         angle = atan2(velx, vely);
     }
@@ -145,9 +146,9 @@ void OMO_RaceGoal::placeRaceGoal()
             if (++tries > 32)
                 break;
 
-            x = (short)RANDOM_INT(App::screenWidth - collisionWidth);
-            y = (short)RANDOM_INT(App::screenHeight - collisionHeight);
-        } while (objectcontainer[2].getClosestObject(x, y, object_race_goal) <= 250.0f - (quantity * 25.0f));
+            x = static_cast<short>(RANDOM_INT(App::screenWidth - collisionWidth));
+            y = static_cast<short>(RANDOM_INT(App::screenHeight - collisionHeight));
+        } while (g_sim.objectcontainer[2].getClosestObject(x, y, object_race_goal) <= 250.0f - (quantity * 25.0f));
     }
 
     setXi(x);

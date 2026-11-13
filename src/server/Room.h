@@ -7,11 +7,12 @@
 #include "Player.h"
 
 #include <stdint.h>
+#include <string>
 
 struct Room {
     uint32_t        roomID;
-    char            name[NET_MAX_ROOM_NAME_LENGTH];
-    char            password[NET_MAX_ROOM_PASSWORD_LENGTH];
+    std::string     name;
+    std::string     password;
     bool            visible;
 
     Player*         players[4];

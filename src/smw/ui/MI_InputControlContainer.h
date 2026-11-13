@@ -1,6 +1,7 @@
 #include "input.h"
 #include "uicontrol.h"
 
+#include <memory>
 #include <string>
 
 class gfxSprite;
@@ -80,7 +81,7 @@ class MI_InputControlContainer : public UI_Control
 		SDL_JoystickID iDevice;
 		short iSelectedInputType;
 
-		UI_Menu * mInputMenu;
+		std::unique_ptr<UI_Menu> mInputMenu;
 
 		MI_Image * miImage[2];
 		MI_Text * miText;

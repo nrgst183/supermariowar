@@ -36,7 +36,7 @@ MO_WalkingEnemy::MO_WalkingEnemy(gfxSprite* nspr, short iNumSpr, short aniSpeed,
         bounce = GRAVITATION;
 
     spawnradius = 100.0f;
-    spawnangle = (float)(RANDOM_INT(1000) * 0.00628f);
+    spawnangle = static_cast<float>(RANDOM_INT(1000) * 0.00628f);
     inair = true;
 
     iSpawnIconOffset = 0;
@@ -63,8 +63,8 @@ void MO_WalkingEnemy::draw()
         float displayangle = spawnangle;
 
         for (short k = 0; k < numeyecandy; k++) {
-            short spawnX = ix + (collisionWidth >> 1) - 8 + (short)(spawnradius * cos(displayangle));
-            short spawnY = iy + (collisionHeight >> 1) - 8 + (short)(spawnradius * sin(displayangle));
+            short spawnX = ix + (collisionWidth >> 1) - 8 + static_cast<short>(spawnradius * cos(displayangle));
+            short spawnY = iy + (collisionHeight >> 1) - 8 + static_cast<short>(spawnradius * sin(displayangle));
 
             displayangle += addangle;
 
@@ -228,7 +228,7 @@ void MO_WalkingEnemy::collide(IO_MovingObject* object)
                 return;
 
             // Don't kill enemies with slow or non-moving boxes
-            if (type == movingobject_throwbox && !((CO_ThrowBox*)object)->HasKillVelocity())
+            if (type == movingobject_throwbox && !(static_cast<CO_ThrowBox*>(object))->HasKillVelocity())
                 return;
 
             if (game_values.gamemode->gamemode == game_mode_stomp && !game_values.gamemode->gameover) {
@@ -240,7 +240,7 @@ void MO_WalkingEnemy::collide(IO_MovingObject* object)
                     killer->Score().AdjustScore(1);
 
                     if (type == movingobject_shell)
-                        ((CO_Shell*)object)->AddMovingKill(killer);
+                        (static_cast<CO_Shell*>(object))->AddMovingKill(killer);
                 }
             }
 
@@ -281,8 +281,8 @@ void MO_WalkingEnemy::place()
     short iAttempts = 10;
     while (!g_map->findspawnpoint(5, &ix, &iy, collisionWidth, collisionHeight, false) && iAttempts-- > 0)
         ;
-    fx = (float)ix;
-    fy = (float)iy;
+    fx = static_cast<float>(ix);
+    fy = static_cast<float>(iy);
 }
 
 void MO_WalkingEnemy::ShatterDie()

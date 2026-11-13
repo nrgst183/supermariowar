@@ -45,7 +45,17 @@ add_executable(smw-worldedit WIN32
 	../smw/ui/MI_PowerupSlider.h
 	../smw/ui/MI_FrenzyModeOptions.cpp
 	../smw/ui/MI_FrenzyModeOptions.h
-	worldeditor.cpp
+	WorldEditorDraw.cpp
+	WorldEditorEdit.cpp
+	WorldEditorFile.cpp
+	WorldEditorGlobals.cpp
+	WorldEditorStage.cpp
+	WorldEditorStageMode.cpp
+	WorldEditorState.h
+	WorldEditorTerrain.cpp
+	WorldEditorTileModes.cpp
+	WorldEditorVehiclesWarps.cpp
+	main.cpp
 )
 if (WIN32)
 	# Add EXE icon on Windows

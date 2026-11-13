@@ -1,5 +1,6 @@
 #include "GSSplashScreen.h"
 
+#include "CmdArgs.h"
 #include "FileList.h"
 #include "gfx.h"
 #include "MapList.h"
@@ -33,7 +34,7 @@ SplashScreenState& SplashScreenState::instance() {
 
 void SplashScreenState::onLeaveState()
 {
-    delete menu_credits;
+    menu_credits.reset();
 }
 
 bool SplashScreenState::init()
@@ -43,7 +44,7 @@ bool SplashScreenState::init()
 //  gfx_loadimagenocolorkey(&rm->menu_dpi_logo, convertPath("gfx/packs/menu/splash_72dpi.png", menugraphicspacklist->current_name()));
 //  gfx_loadimagenocolorkey(&rm->menu_contest_winners, convertPath("gfx/packs/menu/splash_contest_winners.png", menugraphicspacklist->current_name()));
 
-    menu_credits = new gfxSprite();
+    menu_credits = std::make_unique<gfxSprite>();
     *menu_credits = ImageLoader(convertPath("gfx/packs/menu/splash_credits.png", menugraphicspacklist->currentPath())).create();
 
 
@@ -104,6 +105,10 @@ void SplashScreenState::update()
         game_values.playerInput.Update(loop_event, 1);
     }
 
+    // --autotest: skip "Press Any Key To Continue"
+    if (cmd::g_autotest.enabled && state == 8)
+        game_values.playerInput.outputControls[0].menu_select.fPressed = true;
+
     for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
         if (game_values.playerInput.outputControls[iPlayer].menu_select.fPressed ||
             game_values.playerInput.outputControls[iPlayer].menu_cancel.fPressed ||
@@ -131,19 +136,19 @@ void SplashScreenState::update()
     SDL_FillSurfaceRect(screen, nullptr, 0x0);
 
     if (state == 6 || state == 7 || state == 8) {
-        rm->menu_backdrop.setalpha((Uint8)alpha);
+        rm->menu_backdrop.setalpha(static_cast<Uint8>(alpha));
         rm->menu_backdrop.draw(0, 0);
 
-        rm->menu_smw.setalpha((Uint8)alpha);
-        rm->menu_smw.draw(App::screenWidth/2 - ((short)rm->menu_smw.getWidth() >> 1), 30);  //smw logo
+        rm->menu_smw.setalpha(static_cast<Uint8>(alpha));
+        rm->menu_smw.draw(App::screenWidth/2 - (static_cast<short>(rm->menu_smw.getWidth()) >> 1), 30);  //smw logo
 
-        rm->menu_version.setalpha((Uint8)alpha);
+        rm->menu_version.setalpha(static_cast<Uint8>(alpha));
         rm->menu_version.draw(628 - rm->menu_version.getWidth(), 10); //smw logo
 
-        rm->menu_font_large.setAlpha((Uint8)alpha);
+        rm->menu_font_large.setAlpha(static_cast<Uint8>(alpha));
         //rm->menu_font_large.drawRightJustified(App::screenWidth * 0.98f, 45, "WIP");
 
-        menu_credits->setalpha((Uint8)alpha);
+        menu_credits->setalpha(static_cast<Uint8>(alpha));
         menu_credits->draw(227, 200);
     }
 

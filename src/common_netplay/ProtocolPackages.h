@@ -147,7 +147,7 @@ struct NewRoom : MessageHeader {
         assert(strlen(name) > 2);
 
         strncpy(this->name, name, NET_MAX_ROOM_NAME_LENGTH);
-        this->name[NET_MAX_PLAYER_NAME_LENGTH - 1] = '\0';
+        this->name[NET_MAX_ROOM_NAME_LENGTH - 1] = '\0';
 
         strncpy(this->password, password, NET_MAX_ROOM_PASSWORD_LENGTH);
         this->password[NET_MAX_ROOM_PASSWORD_LENGTH - 1] = '\0';

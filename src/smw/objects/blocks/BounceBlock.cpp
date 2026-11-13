@@ -85,7 +85,7 @@ bool B_BounceBlock::hitbottom(CPlayer * player, bool useBehavior)
     //Player bounces off
     if (useBehavior) {
         player->vely = CapFallingVelocity(-player->vely * BOUNCESTRENGTH);
-        player->setYf((float)(iposy + ih) + 0.2f);
+        player->setYf(static_cast<float>(iposy + ih) + 0.2f);
 
         iBumpPlayerID = player->globalID;
         iBumpTeamID = player->teamID;
@@ -113,7 +113,7 @@ bool B_BounceBlock::collide(IO_MovingObject * object, short direction)
 
 bool B_BounceBlock::hittop(IO_MovingObject * object)
 {
-    object->setYf((float)(iposy - object->collisionHeight) - 0.2f);
+    object->setYf(static_cast<float>(iposy - object->collisionHeight) - 0.2f);
     object->fOldY = object->fy;
 
     if (state == 1 && object->bounce == GRAVITATION) {

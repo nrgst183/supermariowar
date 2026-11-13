@@ -10,9 +10,25 @@
 //object container
 class CObjectContainer {
 public:
-    CObjectContainer();
+    CObjectContainer() { m_list.reserve(MAXOBJECTS); }
 
-    bool add(CObject* cio);
+    // Takes ownership of `obj`. Returns the stored object (non-owning), or
+    // nullptr if the container is full, in which case `obj` has been destroyed.
+    // Never keep using the pointer you passed in: use the returned one.
+    template<typename T>
+    T* add(std::unique_ptr<T> obj) {
+        T* raw = obj.get();
+        return addObject(std::move(obj)) ? raw : nullptr;
+    }
+    // Same as above, for `add(new Foo(...))` call sites.
+    template<typename T>
+    T* add(T* obj) {
+        return add(std::unique_ptr<T>(obj));
+    }
+
+    // True if add() would reject a new object.
+    bool isFull() const { return m_list.size() + 1 >= m_list.capacity(); }
+
     void update() const;
     void draw() const;
 
@@ -27,9 +43,9 @@ public:
     const std::vector<std::unique_ptr<CObject>>& list() const { return m_list; }
 
 private:
+    static constexpr size_t MAXOBJECTS = 300;
+
+    bool addObject(std::unique_ptr<CObject> obj);
+
     std::vector<std::unique_ptr<CObject>> m_list;
 };
-
-// Defined in smw/GSGameplay.cpp and separately in the world editor
-extern CObjectContainer noncolcontainer;
-extern CObjectContainer objectcontainer[3];

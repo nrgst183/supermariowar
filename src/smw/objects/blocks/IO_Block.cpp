@@ -6,6 +6,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MovingObject.h"
 #include "objects/carriable/CO_Shell.h"
 #include "objects/carriable/CO_ThrowBlock.h"
@@ -76,7 +77,7 @@ bool IO_Block::collide(CPlayer * player, short direction, bool useBehavior)
 bool IO_Block::hittop(CPlayer * player, bool useBehavior)
 {
     if (useBehavior) {
-        player->setYf((float)(iposy - PH) - 0.2f);
+        player->setYf(static_cast<float>(iposy - PH) - 0.2f);
         player->inair = false;
         player->fallthrough = false;
         player->killsinrowinair = 0;
@@ -92,7 +93,7 @@ bool IO_Block::hitbottom(CPlayer * player, bool useBehavior)
     if (useBehavior) {
         //Player bounces off
         player->vely = CapFallingVelocity(-player->vely * BOUNCESTRENGTH);
-        player->setYf((float)(iposy + ih) + 0.2f);
+        player->setYf(static_cast<float>(iposy + ih) + 0.2f);
     }
 
     return false;
@@ -101,7 +102,7 @@ bool IO_Block::hitbottom(CPlayer * player, bool useBehavior)
 bool IO_Block::hitright(CPlayer * player, bool useBehavior)
 {
     if (useBehavior) {
-        player->setXf((float)(iposx + iw) + 0.2f);
+        player->setXf(static_cast<float>(iposx + iw) + 0.2f);
         player->fOldX = player->fx;
 
         if (player->velx < 0.0f)
@@ -117,7 +118,7 @@ bool IO_Block::hitright(CPlayer * player, bool useBehavior)
 bool IO_Block::hitleft(CPlayer * player, bool useBehavior)
 {
     if (useBehavior) {
-        player->setXf((float)(iposx - PW) - 0.2f);
+        player->setXf(static_cast<float>(iposx - PW) - 0.2f);
         player->fOldX = player->fx;
 
         if (player->velx > 0.0f)
@@ -144,7 +145,7 @@ bool IO_Block::collide(IO_MovingObject * object, short direction)
 
 bool IO_Block::hittop(IO_MovingObject * object)
 {
-    object->setYf((float)(iposy - object->collisionHeight) - 0.2f);
+    object->setYf(static_cast<float>(iposy - object->collisionHeight) - 0.2f);
     object->fOldY = object->fy;
     object->vely = object->BottomBounce();
     return true;
@@ -152,7 +153,7 @@ bool IO_Block::hittop(IO_MovingObject * object)
 
 bool IO_Block::hitbottom(IO_MovingObject * object)
 {
-    object->setYf((float)(iposy + ih) + 0.2f);
+    object->setYf(static_cast<float>(iposy + ih) + 0.2f);
     object->fOldY = object->fy;
     object->vely = -object->vely;
     return true;
@@ -160,7 +161,7 @@ bool IO_Block::hitbottom(IO_MovingObject * object)
 
 bool IO_Block::hitright(IO_MovingObject * object)
 {
-    object->setXf((float)(iposx + iw) + 0.2f);
+    object->setXf(static_cast<float>(iposx + iw) + 0.2f);
     object->fOldX = object->fx;
 
     if (object->velx < 0.0f)
@@ -171,7 +172,7 @@ bool IO_Block::hitright(IO_MovingObject * object)
 
 bool IO_Block::hitleft(IO_MovingObject * object)
 {
-    object->setXf((float)(iposx - object->collisionWidth) - 0.2f);
+    object->setXf(static_cast<float>(iposx - object->collisionWidth) - 0.2f);
     object->fOldX = object->fx;
 
     if (object->velx > 0.0f)
@@ -186,7 +187,7 @@ void IO_Block::BounceMovingObject(IO_MovingObject * object)
     if (type == movingobject_goomba || type == movingobject_koopa || type == movingobject_buzzybeetle || type == movingobject_spiny) {
         ifSoundOnPlay(rm->sfx_kicksound);
 
-        MO_WalkingEnemy * enemy = (MO_WalkingEnemy *)object;
+        MO_WalkingEnemy * enemy = static_cast<MO_WalkingEnemy*>(object);
         KillStyle style = enemy->getKillStyle();
 
         enemy->DieAndDropShell(true, true);
@@ -200,13 +201,13 @@ void IO_Block::BounceMovingObject(IO_MovingObject * object)
             }
         }
     } else if (type == movingobject_shell) {
-        CO_Shell * shell = (CO_Shell*)object;
+        CO_Shell * shell = static_cast<CO_Shell*>(object);
         shell->Flip();
     } else if (type == movingobject_throwblock) {
-        CO_ThrowBlock * block = (CO_ThrowBlock*)object;
+        CO_ThrowBlock * block = static_cast<CO_ThrowBlock*>(object);
         block->Die();
     } else if (type == movingobject_throwbox) {
-        CO_ThrowBox * box = (CO_ThrowBox*)object;
+        CO_ThrowBox * box = static_cast<CO_ThrowBox*>(object);
         box->Die();
     } else {
         object->vely = -VELNOTEBLOCKREPEL;
@@ -216,7 +217,7 @@ void IO_Block::BounceMovingObject(IO_MovingObject * object)
 void IO_Block::KillPlayersAndObjectsInsideBlock(short playerID)
 {
     //Loop through players
-    for (CPlayer* player : players) {
+    for (CPlayer* player : g_sim.players) {
         if (!player->isready())
             continue;
 
@@ -234,7 +235,7 @@ void IO_Block::KillPlayersAndObjectsInsideBlock(short playerID)
 
     //Loop through objects
     for (short iLayer = 0; iLayer < 3; iLayer++) {
-        for (const std::unique_ptr<CObject>& obj : objectcontainer[iLayer].list()) {
+        for (const std::unique_ptr<CObject>& obj : g_sim.objectcontainer[iLayer].list()) {
             auto* movingobject = dynamic_cast<IO_MovingObject*>(obj.get());
             if (!movingobject || !movingobject->CollidesWithMap())
                 continue;

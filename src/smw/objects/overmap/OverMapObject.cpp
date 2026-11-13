@@ -16,7 +16,7 @@ IO_OverMapObject::IO_OverMapObject(gfxSprite* nspr, Vec2s pos, short iNumSpr, sh
     if (iAnimationWidth > -1)
         iw = iAnimationWidth;
     else if (spr)
-        iw = (short)spr->getWidth() / iNumSprites;
+        iw = static_cast<short>(spr->getWidth()) / iNumSprites;
 
     if (iAnimationHeight > -1)
         ih = iAnimationHeight;
@@ -25,7 +25,7 @@ IO_OverMapObject::IO_OverMapObject(gfxSprite* nspr, Vec2s pos, short iNumSpr, sh
     animationtimer = 0;
 
     if (spr)
-        animationWidth = (short)spr->getWidth();
+        animationWidth = static_cast<short>(spr->getWidth());
 
     if (iCollisionWidth > -1) {
         collisionWidth = iCollisionWidth;

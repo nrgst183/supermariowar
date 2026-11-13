@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 
-#define COMPRESSION_SIZE_LIMIT 20000
+constexpr int COMPRESSION_SIZE_LIMIT = 20000;
 
 CompressedData::CompressedData(uint8_t* data, size_t size)
     : data(data)
@@ -70,7 +70,7 @@ CompressedData FileCompressor::compress(const std::string& input_path, const siz
 
         // Read uncompressed data to buffer
 
-        input_buffer = (uint8_t*) calloc(input_size, 1);
+        input_buffer = static_cast<uint8_t*>(calloc(input_size, 1));
         if (!input_buffer) {
             printf("[error] Not enough memory for reading file %s\n", input_path.c_str());
             throw std::exception();
@@ -95,13 +95,13 @@ CompressedData FileCompressor::compress(const std::string& input_path, const siz
         }
 
         // package headers + uncompressed size (2B) + compressed size (2B) + data
-        compressed_buffer = (uint8_t*) calloc(output_header_offset + 4 + compressed_size_ulong, 1);
+        compressed_buffer = static_cast<uint8_t*>(calloc(output_header_offset + 4 + compressed_size_ulong, 1));
         if (!compressed_buffer) {
             printf("[error] Not enough memory to compress %s\n", input_path.c_str());
             throw std::exception();
         }
 
-        int return_value = ::compress((uint8_t*)(compressed_buffer + output_header_offset + 4), &compressed_size_ulong, input_buffer, input_size);
+        int return_value = ::compress(compressed_buffer + output_header_offset + 4, &compressed_size_ulong, input_buffer, input_size);
         if (return_value != Z_OK) {
             printf("[error] Out of memory, could not compress %s\n", input_path.c_str());
             throw std::exception();
@@ -159,7 +159,7 @@ bool FileCompressor::decompress(const uint8_t* input_buffer, const std::string& 
 
         // Zlib requires ulong, but the size of that depends on the platform
         unsigned long output_size_ulong = stored_full_size;
-        output_buffer = (uint8_t*) malloc(stored_full_size);
+        output_buffer = static_cast<uint8_t*>(malloc(stored_full_size));
         if (!output_buffer) {
             printf("[error] Out of memory\n");
             throw std::exception();
@@ -167,7 +167,7 @@ bool FileCompressor::decompress(const uint8_t* input_buffer, const std::string& 
 
         // Decompress
 
-        int return_value = ::uncompress(output_buffer, &output_size_ulong, (const uint8_t*) input_buffer + 4, stored_compressed_size);
+        int return_value = ::uncompress(output_buffer, &output_size_ulong, input_buffer + 4, stored_compressed_size);
         if (return_value != Z_OK) {
             printf("[error] Out of memory, could not decompress\n");
             throw std::exception();

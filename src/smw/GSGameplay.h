@@ -46,13 +46,8 @@ class GameplayState : public GameState
         void update_countdown_timer();
         void update_world();
 
-        short iCountDownState = 0;
-        short iCountDownTimer = 0;
-        short iWindTimer = 0;
-        float dNextWind = 0.0f;
         short iScoreTextOffset[4] = {};
 
-        short respawnCount[4];
         short respawnanimationtimer[4];
         short respawnanimationframe[4];
 
@@ -75,6 +70,8 @@ extern short g_iWinningPlayer;
 extern short scorepowerupoffsets[3][3];
 extern bool g_fAutoTest;
 extern bool g_fRecordTest;
+// Number of matches ended by the opt-in --autotest harness
+extern int g_autoTestMatchesDone;
 
 // Defined in GSGameplay.cpp and separately in the world editor
 short LookupTeamID(short id);

@@ -26,10 +26,10 @@ EC_StillImage::EC_StillImage(gfxSprite* nspr, short dstx, short dsty, short srcx
     ih = h;
 
     if (iw == 0)
-        iw = (short)spr->getWidth();
+        iw = static_cast<short>(spr->getWidth());
 
     if (ih == 0)
-        ih = (short)spr->getHeight();
+        ih = static_cast<short>(spr->getHeight());
 }
 
 void EC_StillImage::draw() const
@@ -52,10 +52,10 @@ EC_Animated::EC_Animated(gfxSprite* nspr, short dstx, short dsty, short srcx, sh
     iAnimationH = h;
 
     if (iAnimationW == 0)
-        iAnimationW = (short)spr->getWidth();
+        iAnimationW = static_cast<short>(spr->getWidth());
 
     if (iAnimationH == 0)
-        iAnimationH = (short)spr->getHeight();
+        iAnimationH = static_cast<short>(spr->getHeight());
 
     iAnimationSpeed = speed;
     iAnimationFrames = frames * iAnimationW + iAnimationX;
@@ -123,7 +123,7 @@ void EC_OscillatingAnimation::animate()
 // class cloud
 //------------------------------------------------------------------------------
 EC_Cloud::EC_Cloud(gfxSprite* nspr, float nx, float ny, float nvelx, short srcx, short srcy, short w, short h)
-    : EC_StillImage(nspr, (short)nx, (short)ny, srcx, srcy, w, h)
+    : EC_StillImage(nspr, static_cast<short>(nx), static_cast<short>(ny), srcx, srcy, w, h)
 {
     dx = nx;
     dy = ny;
@@ -139,7 +139,7 @@ void EC_Cloud::update()
     else if (dx < 0.0f)
         dx += App::screenWidth;
 
-    ix = (short)dx;
+    ix = static_cast<short>(dx);
 }
 
 
@@ -147,7 +147,7 @@ void EC_Cloud::update()
 // class ghost
 //------------------------------------------------------------------------------
 EC_Ghost::EC_Ghost(gfxSprite* nspr, float nx, float ny, float nvelx, short ianimationspeed, short inumframes, short srcx, short srcy, short w, short h)
-    : EC_Animated(nspr, (short)nx, (short)ny, srcx, srcy, w, h, ianimationspeed, inumframes)
+    : EC_Animated(nspr, static_cast<short>(nx), static_cast<short>(ny), srcx, srcy, w, h, ianimationspeed, inumframes)
 {
     dx = nx;
     dy = ny;
@@ -165,15 +165,15 @@ void EC_Ghost::update()
     else if (dx < 0.0f)
         dx += App::screenWidth;
 
-    ix = (short)dx;
-    iy = (short)dy;
+    ix = static_cast<short>(dx);
+    iy = static_cast<short>(dy);
 }
 
 //------------------------------------------------------------------------------
 // class leaf
 //------------------------------------------------------------------------------
 EC_Leaf::EC_Leaf(gfxSprite* nspr, float nx, float ny)
-    : EC_OscillatingAnimation(nspr, (short)nx, (short)ny, 0, 0, 16, 16, 16, 4)
+    : EC_OscillatingAnimation(nspr, static_cast<short>(nx), static_cast<short>(ny), 0, 0, 16, 16, 16, 4)
 {
     dx = nx;
     dy = ny;
@@ -196,23 +196,23 @@ void EC_Leaf::update()
 
     if (vely > 0.0f && iy >= App::screenHeight) {
         dy = -16.0f;
-        dx = RANDOM_INT(App::screenWidth);
+        dx = COSMETIC_RANDOM_INT(App::screenWidth);
 
         NextLeaf();
     } else if (vely < 0.0f && iy < -16) {
         dy = App::screenHeight;
-        dx = RANDOM_INT(App::screenWidth);
+        dx = COSMETIC_RANDOM_INT(App::screenWidth);
 
         NextLeaf();
     }
 
-    ix = (short)dx;
-    iy = (short)dy;
+    ix = static_cast<short>(dx);
+    iy = static_cast<short>(dy);
 }
 
 void EC_Leaf::NextLeaf()
 {
-    short iRand = RANDOM_INT(20);
+    short iRand = COSMETIC_RANDOM_INT(20);
     if (iRand < 12)
         iAnimationY = 0;
     else if (iRand < 15)
@@ -222,25 +222,25 @@ void EC_Leaf::NextLeaf()
     else
         iAnimationY = 48;
 
-    velx = RANDOM_INT(9) / 4.0f;
-    vely = RANDOM_INT(9) / 4.0f + 1.0f;
+    velx = COSMETIC_RANDOM_INT(9) / 4.0f;
+    vely = COSMETIC_RANDOM_INT(9) / 4.0f + 1.0f;
 
-    fForward = RANDOM_BOOL();
-    iAnimationFrame = (RANDOM_INT(3) + (fForward ? 0 : 1)) * iAnimationW;
-    iAnimationTimer = RANDOM_INT(16);
+    fForward = COSMETIC_RANDOM_BOOL();
+    iAnimationFrame = (COSMETIC_RANDOM_INT(3) + (fForward ? 0 : 1)) * iAnimationW;
+    iAnimationTimer = COSMETIC_RANDOM_INT(16);
 }
 
 //------------------------------------------------------------------------------
 // class snow
 //------------------------------------------------------------------------------
 EC_Snow::EC_Snow(gfxSprite* nspr, float nx, float ny, short type)
-    : EC_StillImage(nspr, (short)nx, (short)ny, RANDOM_BOOL() << 4, type << 4, 16, 16)
+    : EC_StillImage(nspr, static_cast<short>(nx), static_cast<short>(ny), COSMETIC_RANDOM_BOOL() << 4, type << 4, 16, 16)
 {
     dx = nx;
     dy = ny;
 
-    velx = RANDOM_INT(9) / 4.0f;
-    vely = RANDOM_INT(9) / 4.0f + 1.0f;
+    velx = COSMETIC_RANDOM_INT(9) / 4.0f;
+    vely = COSMETIC_RANDOM_INT(9) / 4.0f + 1.0f;
 }
 
 void EC_Snow::update()
@@ -255,14 +255,14 @@ void EC_Snow::update()
 
     if (vely > 0.0f && iy >= App::screenHeight) {
         dy = -16.0f;
-        dx = RANDOM_INT(App::screenWidth);
+        dx = COSMETIC_RANDOM_INT(App::screenWidth);
     } else if (vely < 0.0f && iy < -16) {
         dy = App::screenHeight;
-        dx = RANDOM_INT(App::screenWidth);
+        dx = COSMETIC_RANDOM_INT(App::screenWidth);
     }
 
-    ix = (short)dx;
-    iy = (short)dy;
+    ix = static_cast<short>(dx);
+    iy = static_cast<short>(dy);
 }
 
 
@@ -270,7 +270,7 @@ void EC_Snow::update()
 // class rain
 //------------------------------------------------------------------------------
 EC_Rain::EC_Rain(gfxSprite* nspr, float nx, float ny)
-    : EC_StillImage(nspr, (short)nx, (short)ny, 0, 16, 10, 10)
+    : EC_StillImage(nspr, static_cast<short>(nx), static_cast<short>(ny), 0, 16, 10, 10)
 {
     NextRainDrop();
     dx = nx;
@@ -290,19 +290,19 @@ void EC_Rain::update()
     if (iy >= App::screenHeight)
         NextRainDrop();
 
-    ix = (short)dx;
-    iy = (short)dy;
+    ix = static_cast<short>(dx);
+    iy = static_cast<short>(dy);
 }
 
 void EC_Rain::NextRainDrop()
 {
-    velx = -5.0f + RANDOM_INT(5) / 4.0f;
-    vely = 4.0f + RANDOM_INT(5) / 4.0f;
+    velx = -5.0f + COSMETIC_RANDOM_INT(5) / 4.0f;
+    vely = 4.0f + COSMETIC_RANDOM_INT(5) / 4.0f;
 
     dy = -16.0f;
-    dx = RANDOM_INT(App::screenWidth);
+    dx = COSMETIC_RANDOM_INT(App::screenWidth);
 
-    iSrcX = RANDOM_INT(8) * 10;
+    iSrcX = COSMETIC_RANDOM_INT(8) * 10;
 }
 
 
@@ -310,7 +310,7 @@ void EC_Rain::NextRainDrop()
 // class bubble
 //------------------------------------------------------------------------------
 EC_Bubble::EC_Bubble(gfxSprite* nspr, float nx, float ny)
-    : EC_OscillatingAnimation(nspr, (short)nx, (short)ny, 0, 0, 16, 8, 4, 4)
+    : EC_OscillatingAnimation(nspr, static_cast<short>(nx), static_cast<short>(ny), 0, 0, 16, 8, 4, 4)
 {
     NextBubble();
     dx = nx;
@@ -334,26 +334,26 @@ void EC_Bubble::update()
     if (iy + iAnimationH < 0)
         NextBubble();
 
-    ix = (short)dx;
-    iy = (short)dy;
+    ix = static_cast<short>(dx);
+    iy = static_cast<short>(dy);
 }
 
 void EC_Bubble::NextBubble()
 {
-    velx = -1.0f + RANDOM_INT(9) / 4.0f;
-    vely = -4.0f + RANDOM_INT(9) / 4.0f;
+    velx = -1.0f + COSMETIC_RANDOM_INT(9) / 4.0f;
+    vely = -4.0f + COSMETIC_RANDOM_INT(9) / 4.0f;
 
     dy = App::screenHeight;
-    dx = RANDOM_INT(App::screenWidth);
+    dx = COSMETIC_RANDOM_INT(App::screenWidth);
 
-    iAnimationFrame = RANDOM_INT(4) << 4;
+    iAnimationFrame = COSMETIC_RANDOM_INT(4) << 4;
 }
 
 //------------------------------------------------------------------------------
 // class corpse
 //------------------------------------------------------------------------------
 EC_Corpse::EC_Corpse(gfxSprite* nspr, float nx, float ny, short iSrcOffsetX)
-    : EC_StillImage(nspr, (short)nx, (short)ny, iSrcOffsetX, 0, 32, 32)
+    : EC_StillImage(nspr, static_cast<short>(nx), static_cast<short>(ny), iSrcOffsetX, 0, 32, 32)
 {
     dx = nx;
     dy = ny;
@@ -386,7 +386,7 @@ EC_Corpse::EC_Corpse(gfxSprite* nspr, float nx, float ny, short iSrcOffsetX)
 void EC_Corpse::update()
 {
     if (vely != 0.0f) {
-        short nexty = (short)(dy + 32.0f + vely);
+        short nexty = static_cast<short>(dy + 32.0f + vely);
 
         if (nexty >= App::screenHeight) {
             dead = true;
@@ -401,9 +401,9 @@ void EC_Corpse::update()
                 // on ground on tile solid_on_top
                 if ((dy + 32.0f - vely) / TILESIZE < ty) {
                     // only if we were above the tile in the previous frame
-                    dy = (float)((ty << 5) - TILESIZE);
+                    dy = static_cast<float>((ty << TILESIZE_SHIFT) - TILESIZE);
                     vely = 0.0f;
-                    iy = (short)dy;
+                    iy = static_cast<short>(dy);
 
                     return;
                 }
@@ -414,9 +414,9 @@ void EC_Corpse::update()
 
             if ((g_map->map(tx, ty) & 0x13) > 0 || (g_map->map(tx2, ty) & 0x13) > 0 || (leftblock && !leftblock->isTransparent() && !leftblock->isHidden()) || (rightblock && !rightblock->isTransparent() && !rightblock->isHidden())) {
                 // on ground
-                dy = (float)((ty << 5) - TILESIZE);
+                dy = static_cast<float>((ty << TILESIZE_SHIFT) - TILESIZE);
                 vely = 0.0f;
-                iy = (short)dy;
+                iy = static_cast<short>(dy);
 
                 return;
             }
@@ -432,7 +432,7 @@ void EC_Corpse::update()
             dead = true;
     }
 
-    iy = (short)dy;
+    iy = static_cast<short>(dy);
 }
 
 //------------------------------------------------------------------------------
@@ -445,9 +445,9 @@ EC_GravText::EC_GravText(gfxFont* nfont, short nx, short ny, std::string ntext, 
     , vely(nvely)
     , text(std::move(ntext))
 {
-    x = (float)(nx - (font->getWidth(text) / 2));
-    y = (float)ny;
-    w = (short)font->getWidth(text);
+    x = static_cast<float>(nx - (font->getWidth(text) / 2));
+    y = static_cast<float>(ny);
+    w = static_cast<short>(font->getWidth(text));
 }
 
 
@@ -463,12 +463,12 @@ void EC_GravText::update()
 
 void EC_GravText::draw() const
 {
-    font->draw((short)x, (short)y, text);
+    font->draw(static_cast<short>(x), static_cast<short>(y), text);
 
     if (x < 0)
-        font->draw((short)x + App::screenWidth, (short)y, text);
+        font->draw(static_cast<short>(x) + App::screenWidth, static_cast<short>(y), text);
     else if (x + w > App::screenWidth - 1)
-        font->draw((short)x - App::screenWidth, (short)y, text);
+        font->draw(static_cast<short>(x) - App::screenWidth, static_cast<short>(y), text);
 }
 
 
@@ -534,8 +534,8 @@ void EC_Announcement::draw() const
 EC_FallingObject::EC_FallingObject(gfxSprite* nspr, short x, short y, float nvelx, float nvely, short animationframes, short animationspeed, short srcOffsetX, short srcOffsetY, short w, short h)
     : EC_Animated(nspr, x, y, srcOffsetX, srcOffsetY, w, h, animationspeed, animationframes)
 {
-    fx = (float)x;
-    fy = (float)y;
+    fx = static_cast<float>(x);
+    fy = static_cast<float>(y);
 
     velx = nvelx;
     vely = nvely;
@@ -548,8 +548,8 @@ void EC_FallingObject::update()
     fy += vely;
     fx += velx;
 
-    ix = (short)fx;
-    iy = (short)fy;
+    ix = static_cast<short>(fx);
+    iy = static_cast<short>(fy);
 
     if (fy >= App::screenHeight) {
         dead = true;
@@ -565,7 +565,7 @@ void EC_FallingObject::update()
 //------------------------------------------------------------------------------
 
 EC_SingleAnimation::EC_SingleAnimation(gfxSprite* nspr, short x, short y, short iframes, short irate)
-    : EC_Animated(nspr, x, y, 0, 0, (short)nspr->getWidth() / iframes, 0, irate, iframes)
+    : EC_Animated(nspr, x, y, 0, 0, static_cast<short>(nspr->getWidth()) / iframes, 0, irate, iframes)
 {}
 
 EC_SingleAnimation::EC_SingleAnimation(gfxSprite* nspr, short x, short y, short iframes, short irate, short offsetx, short offsety, short w, short h)
@@ -615,8 +615,8 @@ EC_ExplodingAward::EC_ExplodingAward(gfxSprite* nspr, short nx, short ny, float 
     : CEyecandy()
 {
     spr = nspr;
-    x = (float)nx;
-    y = (float)ny;
+    x = static_cast<float>(nx);
+    y = static_cast<float>(ny);
     vely = nvely;
     velx = nvelx;
     timer = 0;
@@ -636,14 +636,14 @@ void EC_ExplodingAward::update()
 
     if (++timer > ttl) {
         dead = true;
-        eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, (short)x + (w >> 1) - 16, (short)y + (h >> 1) - 16, 3, 8);
+        eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, static_cast<short>(x) + (w >> 1) - 16, static_cast<short>(y) + (h >> 1) - 16, 3, 8);
     }
 }
 
 
 void EC_ExplodingAward::draw() const
 {
-    spr->draw((short)x, (short)y, {id, 0, w, h});
+    spr->draw(static_cast<short>(x), static_cast<short>(y), {id, 0, w, h});
 }
 
 //------------------------------------------------------------------------------
@@ -682,8 +682,8 @@ void EC_SwirlingAward::update()
     radius += 3.0f;
 
     if (++timer > ttl) {
-        short awardx = x + (short)(radius * cos(angle)) + (w >> 1) - 16;
-        short awardy = y + (short)(radius * sin(angle)) + (h >> 1) - 16;
+        short awardx = x + static_cast<short>(radius * cos(angle)) + (w >> 1) - 16;
+        short awardy = y + static_cast<short>(radius * sin(angle)) + (h >> 1) - 16;
         eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, awardx, awardy, 3, 8);
 
         dead = true;
@@ -701,8 +701,8 @@ void EC_SwirlingAward::update()
 
 void EC_SwirlingAward::draw() const
 {
-    short awardx = x + (short)(radius * cos(angle));
-    short awardy = y + (short)(radius * sin(angle));
+    short awardx = x + static_cast<short>(radius * cos(angle));
+    short awardy = y + static_cast<short>(radius * sin(angle));
 
     spr->draw(awardx, awardy, {iAnimationFrame, iSrcY, w, h});
 }
@@ -716,8 +716,8 @@ EC_RocketAward::EC_RocketAward(gfxSprite* nspr, short nx, short ny, float nvelx,
     : CEyecandy()
 {
     spr = nspr;
-    x = (float)nx;
-    y = (float)ny;
+    x = static_cast<float>(nx);
+    y = static_cast<float>(ny);
     velx = nvelx;
     vely = nvely;
 
@@ -746,7 +746,7 @@ void EC_RocketAward::update()
     x += velx;
 
     if (++timer > ttl) {
-        eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, (short)x + (w >> 1) - 16, (short)y + (h >> 1) - 16, 3, 8);
+        eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, static_cast<short>(x) + (w >> 1) - 16, static_cast<short>(y) + (h >> 1) - 16, 3, 8);
         dead = true;
     }
 
@@ -762,7 +762,7 @@ void EC_RocketAward::update()
 
 void EC_RocketAward::draw() const
 {
-    spr->draw((short)x, (short)y, {iAnimationFrame, iSrcY, w, h});
+    spr->draw(static_cast<short>(x), static_cast<short>(y), {iAnimationFrame, iSrcY, w, h});
 }
 
 //------------------------------------------------------------------------------
@@ -773,8 +773,8 @@ EC_FloatingObject::EC_FloatingObject(gfxSprite* nspr, short nx, short ny, float 
     : CEyecandy()
 {
     spr = nspr;
-    x = (float)nx;
-    y = (float)ny;
+    x = static_cast<float>(nx);
+    y = static_cast<float>(ny);
     velx = nvelx;
     vely = nvely;
     srcx = nsrcx;
@@ -793,7 +793,7 @@ void EC_FloatingObject::update()
     x += velx;
 
     if (++timer > ttl) {
-        eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, (short)x + (w >> 1) - 16, (short)y + (h >> 1) - 16, 3, 8);
+        eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, static_cast<short>(x) + (w >> 1) - 16, static_cast<short>(y) + (h >> 1) - 16, 3, 8);
         dead = true;
     }
 }
@@ -801,7 +801,7 @@ void EC_FloatingObject::update()
 
 void EC_FloatingObject::draw() const
 {
-    spr->draw((short)x, (short)y, {srcx, srcy, w, h});
+    spr->draw(static_cast<short>(x), static_cast<short>(y), {srcx, srcy, w, h});
 }
 
 //------------------------------------------------------------------------------
@@ -839,8 +839,8 @@ EC_SoulsAward::EC_SoulsAward(gfxSprite* nspr, gfxSprite* nspr2, short nx, short 
     frame = 0;
     endmode = false;
 
-    w = (short)nspr2->getWidth() / 7;
-    h = (short)nspr2->getHeight();
+    w = static_cast<short>(nspr2->getWidth()) / 7;
+    h = static_cast<short>(nspr2->getHeight());
 }
 
 EC_SoulsAward::~EC_SoulsAward()
@@ -856,7 +856,7 @@ void EC_SoulsAward::update()
         float addangle = QUARTER_PI / 20.0f;
         float startangle = -HALF_PI;
 
-        float angle = (float)(RANDOM_INT(21) - 10) * addangle + startangle;
+        float angle = static_cast<float>(COSMETIC_RANDOM_INT(21) - 10) * addangle + startangle;
         float velx = speed * cos(angle);
         float vely = speed * sin(angle);
 

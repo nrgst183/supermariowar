@@ -97,7 +97,7 @@ void CO_ThrowBox::collide(IO_MovingObject* object)
     MovingObjectType type = object->getMovingObjectType();
 
     if (type == movingobject_throwbox) {
-        CO_ThrowBox* box = (CO_ThrowBox*)object;
+        CO_ThrowBox* box = static_cast<CO_ThrowBox*>(object);
         if (frozen || box->frozen || HasKillVelocity() || box->HasKillVelocity()) {
             Die();
             box->Die();

@@ -25,7 +25,7 @@ void MapReader1500::read_tiles(CMap& map, BinaryFile& mapfile)
     for (j = 0; j < MAPHEIGHT; j++) {
         for (i = 0; i < MAPWIDTH; i++) {
             //Read everything into layer 1
-            short iTileID = (short)mapfile.read_i32();
+            short iTileID = static_cast<short>(mapfile.read_i32());
 
             TilesetTile * tile = &map.mapdata[i][j][1];
             tile->iID = g_tilesetmanager->classicTilesetIndex();
@@ -44,7 +44,7 @@ void MapReader1500::read_tiles(CMap& map, BinaryFile& mapfile)
     // 3. load objects data
     for (j = 0; j < MAPHEIGHT; j++) {
         for (i = 0; i < MAPWIDTH; i++) {
-            map.objectdata[i][j].iType = (short)mapfile.read_i32();
+            map.objectdata[i][j].iType = static_cast<short>(mapfile.read_i32());
             if (map.objectdata[i][j].iType == 6)
                 map.objectdata[i][j].iType = -1;
 
@@ -61,7 +61,7 @@ void MapReader1500::read_tiles(CMap& map, BinaryFile& mapfile)
 void MapReader1500::read_background(CMap& map, BinaryFile& mapfile)
 {
     // Read old background IDs and convert that to a background filename
-    map.backgroundID = (short)mapfile.read_i32();
+    map.backgroundID = static_cast<short>(mapfile.read_i32());
     map.szBackgroundFile = g_szBackgroundConversion[map.backgroundID];
 }
 

@@ -6,6 +6,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "WorldTourStop.h"
 #include "objects/moving/MO_BonusHouseChest.h"
 
@@ -55,13 +56,13 @@ void CGM_Bonus::init()
         }
     }
 
-    float dSpacing = (384.0f - (float)(iNumBonuses * 64)) / (float)(iNumBonuses + 1);
+    float dSpacing = (384.0f - static_cast<float>(iNumBonuses * 64)) / static_cast<float>(iNumBonuses + 1);
 
     float dx = 128.0f + dSpacing;
 
-    //float dx = 288.0f - (dSpacing * (float)(iNumBonuses - 1) / 2.0f);
+    //float dx = 288.0f - (dSpacing * static_cast<float>(iNumBonuses - 1) / 2.0f);
     for (short iChest = 0; iChest < iNumBonuses; iChest++) {
-        objectcontainer[0].add(new MO_BonusHouseChest(&rm->spr_worldbonushouse, {(short)dx, 384}, tsTourStop->wsbBonuses[iChestOrder[iChest]].iBonus));
+        g_sim.objectcontainer[0].add(new MO_BonusHouseChest(&rm->spr_worldbonushouse, {static_cast<short>(dx), 384}, tsTourStop->wsbBonuses[iChestOrder[iChest]].iBonus));
         dx += dSpacing + 64.0f;
     }
 }
@@ -70,7 +71,7 @@ void CGM_Bonus::init()
 void CGM_Bonus::draw_background()
 {
     //Draw Toad
-    rm->spr_worldbonushouse.draw(544, 256, {players[0]->leftX() > 544 ? 224 : 192, 0, 32, 64});
+    rm->spr_worldbonushouse.draw(544, 256, {g_sim.players[0]->leftX() > 544 ? 224 : 192, 0, 32, 64});
 
     //Draw Bonus House Title
     rm->menu_plain_field.draw(0, 0, {0, 0, App::screenWidth/2, 32});

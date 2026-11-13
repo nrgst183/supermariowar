@@ -13,8 +13,6 @@
 
 namespace fs = std::filesystem;
 
-#define MAXCATEGORYTRACKS 64
-
 
 void UpdateMusicWithOverrides(MusicList& musiclist, WorldMusicList& worldmusiclist)
 {
@@ -174,7 +172,7 @@ void SimpleFileList::prev()
 void SimpleFileList::random()
 {
     if (!m_filelist.empty())
-        m_index = RANDOM_INT(m_filelist.size());
+        m_index = COSMETIC_RANDOM_INT(m_filelist.size());
 }
 
 void SimpleFileList::add(fs::path path)
@@ -299,7 +297,7 @@ void MusicList::prev() {
 }
 
 void MusicList::random() {
-    m_currentIndex = RANDOM_INT(m_entries.size());
+    m_currentIndex = COSMETIC_RANDOM_INT(m_entries.size());
 }
 
 void MusicList::updateEntriesWithOverrides(const std::vector<MapMusicOverride>& overrides)
@@ -477,7 +475,7 @@ const fs::path& MusicPack::randomMusic(MusicCategory musicCategory, const std::s
     //First check if there is specific map music
     const auto mapIter = m_map_overrides.find(mapName);
     if (mapIter != m_map_overrides.end() && !mapIter->second.empty()) {
-        m_currentMusic = RANDOM_INT(mapIter->second.size());
+        m_currentMusic = COSMETIC_RANDOM_INT(mapIter->second.size());
         const size_t path_idx = mapIter->second[m_currentMusic];
         return m_all_songs[path_idx];
     }
@@ -485,14 +483,14 @@ const fs::path& MusicPack::randomMusic(MusicCategory musicCategory, const std::s
     //Then check if there is specific background music
     const auto bgIter = m_background_overrides.find(background);
     if (bgIter != m_background_overrides.end() && !bgIter->second.empty()) {
-        m_currentMusic = RANDOM_INT(bgIter->second.size());
+        m_currentMusic = COSMETIC_RANDOM_INT(bgIter->second.size());
         const size_t path_idx = bgIter->second[m_currentMusic];
         return m_all_songs[path_idx];
     }
 
     //Then default to the music category
     if (!m_category_songs[musicCategory].empty()) {
-        m_currentMusic = RANDOM_INT(m_category_songs[musicCategory].size());
+        m_currentMusic = COSMETIC_RANDOM_INT(m_category_songs[musicCategory].size());
         const size_t path_idx = m_category_songs[musicCategory][m_currentMusic];
         return m_all_songs[path_idx];
     }
@@ -569,7 +567,7 @@ void WorldMusicList::prev() {
 }
 
 void WorldMusicList::random() {
-    m_currentIndex = RANDOM_INT(m_entries.size());
+    m_currentIndex = COSMETIC_RANDOM_INT(m_entries.size());
 }
 
 void WorldMusicList::updateEntriesWithOverrides(const std::vector<WorldMusicOverride>& overrides)

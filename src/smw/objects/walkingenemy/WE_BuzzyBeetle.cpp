@@ -6,6 +6,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/carriable/CO_Shell.h"
 
 
@@ -70,5 +71,5 @@ void MO_BuzzyBeetle::DropShell(bool fBounce, bool fFlip)
     if (fFlip)
         shell->Flip();
 
-    objectcontainer[1].add(shell);
+    g_sim.objectcontainer[1].add(shell);
 }

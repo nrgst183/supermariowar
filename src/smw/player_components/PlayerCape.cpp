@@ -6,6 +6,7 @@
 #include "GlobalConstants.h"
 #include "ObjectContainer.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_SpinAttack.h"
 
 
@@ -31,7 +32,7 @@ void PlayerCape::spin(CPlayer &player)
 
     player.spin.spin(player);
 
-    objectcontainer[1].add(new MO_SpinAttack(player.getGlobalID(), player.getTeamID(),  KillStyle::Feather, player.isFacingRight(), 24));
+    g_sim.objectcontainer[1].add(new MO_SpinAttack(player.getGlobalID(), player.getTeamID(),  KillStyle::Feather, player.isFacingRight(), 24));
 }
 
 void PlayerCape::draw(CPlayer &player)
@@ -86,7 +87,7 @@ void PlayerCape::draw(CPlayer &player)
         rm->spr_cape.draw(
             player.leftX() - PWOFFSET + (fPlayerFacingRight ? - 18 : 18), player.topY() - PHOFFSET + 4 + iCapeYOffset,
             {(fPlayerFacingRight ? 128 : 0) + iCapeFrameX, iCapeFrameY, 32, 32},
-            static_cast<ClipEdge>((short)player.state % 4), player.GetWarpPlane());
+            static_cast<ClipEdge>(static_cast<short>(player.state) % 4), player.GetWarpPlane());
     } else {
         rm->spr_cape.draw(
             player.leftX() - PWOFFSET + (fPlayerFacingRight ? - 18 : 18), player.topY() - PHOFFSET + 4 + iCapeYOffset,

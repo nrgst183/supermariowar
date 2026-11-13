@@ -3,6 +3,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/overmap/WO_KingOfTheHillZone.h"
 
 
@@ -18,7 +19,7 @@ CGM_KingOfTheHill::CGM_KingOfTheHill() : CGM_Domination()
 void CGM_KingOfTheHill::init()
 {
     CGameMode::init();
-    objectcontainer[2].add(new OMO_KingOfTheHillZone(&rm->spr_kingofthehillarea));
+    g_sim.objectcontainer[2].add(new OMO_KingOfTheHillZone(&rm->spr_kingofthehillarea));
 }
 
 PlayerKillType CGM_KingOfTheHill::playerkilledplayer(CPlayer &inflictor, CPlayer &other, KillStyle style)

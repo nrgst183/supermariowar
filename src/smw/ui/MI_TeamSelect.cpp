@@ -18,7 +18,7 @@ MI_TeamSelect::MI_TeamSelect(gfxSprite * spr_background_ref, short x, short y) :
     UI_Control(x, y)
 {
     spr = spr_background_ref;
-    miImage = new MI_Image(spr, m_pos.x, m_pos.y, 0, 0, 416, 256, 1, 1, 0);
+    miImage = std::make_unique<MI_Image>(spr, m_pos.x, m_pos.y, 0, 0, 416, 256, 1, 1, 0);
 
     for (short iTeam = 0; iTeam < 4; iTeam++) {
         iTeamCounts[iTeam] = game_values.teamcounts[iTeam];
@@ -34,10 +34,7 @@ MI_TeamSelect::MI_TeamSelect(gfxSprite * spr_background_ref, short x, short y) :
     iRandomAnimationFrame = 0;
 }
 
-MI_TeamSelect::~MI_TeamSelect()
-{
-    delete miImage;
-}
+MI_TeamSelect::~MI_TeamSelect() = default;
 
 void MI_TeamSelect::Update()
 {
@@ -118,7 +115,7 @@ MenuCodeEnum MI_TeamSelect::SendInput(CPlayerInput * playerInput)
                             game_values.skinids[iPlayer] = RANDOM_INT(skinlist->count());
                         } else {
                             if (--game_values.skinids[iPlayer] < 0)
-                                game_values.skinids[iPlayer] = (short)skinlist->count() - 1;
+                                game_values.skinids[iPlayer] = static_cast<short>(skinlist->count()) - 1;
                         }
                     } while (!rm->LoadMenuSkin(iPlayer, game_values.skinids[iPlayer], game_values.colorids[iPlayer], false));
                 } else if (playerKeys->menu_up.fDown) {
@@ -130,7 +127,7 @@ MenuCodeEnum MI_TeamSelect::SendInput(CPlayerInput * playerInput)
                         if (++iFastScrollTimer[iPlayer] > 5) {
                             do {
                                 if (--game_values.skinids[iPlayer] < 0)
-                                    game_values.skinids[iPlayer] = (short)skinlist->count() - 1;
+                                    game_values.skinids[iPlayer] = static_cast<short>(skinlist->count()) - 1;
                             } while (!rm->LoadMenuSkin(iPlayer, game_values.skinids[iPlayer], game_values.colorids[iPlayer], false));
 
                             iFastScrollTimer[iPlayer] = 0;

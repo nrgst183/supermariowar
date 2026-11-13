@@ -8,6 +8,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "SimulationState.h"
 #include "objects/moving/MO_Coin.h"
 #include "objects/moving/MO_Podobo.h"
 #include "objects/carriable/CO_Shell.h"
@@ -175,10 +176,10 @@ IO_MovingObject* createpowerup(short iType, Vec2s pos, bool side, bool spawn)
 
     if (coin) {
         ifSoundOnPlay(rm->sfx_coin);
-        if (objectcontainer[1].add(coin))
+        if (g_sim.objectcontainer[1].add(coin))
             return coin;
     } else if (powerup) {
-        if (objectcontainer[0].add(powerup)) {
+        if (g_sim.objectcontainer[0].add(powerup)) {
             if (!spawn) {
                 powerup->nospawn(pos.y);
                 powerup->collision_detection_checksides();
@@ -187,7 +188,7 @@ IO_MovingObject* createpowerup(short iType, Vec2s pos, bool side, bool spawn)
             return powerup;
         }
     } else if (shell) {
-        if (objectcontainer[1].add(shell)) {
+        if (g_sim.objectcontainer[1].add(shell)) {
             if (!spawn) {
                 shell->nospawn(pos.y, true);
                 shell->collision_detection_checksides();
@@ -196,7 +197,7 @@ IO_MovingObject* createpowerup(short iType, Vec2s pos, bool side, bool spawn)
             return shell;
         }
     } else if (feather) {
-        if (objectcontainer[0].add(feather)) {
+        if (g_sim.objectcontainer[0].add(feather)) {
             if (!spawn)
                 feather->nospawn(pos.y);
 
@@ -204,9 +205,7 @@ IO_MovingObject* createpowerup(short iType, Vec2s pos, bool side, bool spawn)
         }
     } else {
         //If no powerups were selected for this block, then fire out a podobo
-        IO_MovingObject * podobo = new MO_Podobo(&rm->spr_podobo, {static_cast<short>(pos.x + 2), pos.y}, -(float(RANDOM_INT(5)) / 2.0f) - 6.0f, -1, -1, -1, true);
-        objectcontainer[2].add(podobo);
-        return podobo;
+        return g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {static_cast<short>(pos.x + 2), pos.y}, -(float(RANDOM_INT(5)) / 2.0f) - 6.0f, -1, -1, -1, true));
     }
 
     return nullptr;

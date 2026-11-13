@@ -86,8 +86,8 @@ void MI_Image::Draw()
     short iYOffset = 0;
 
     if (fSwirl) {
-        iXOffset = (short)(dSwirlRadius * cos(dSwirlAngle));
-        iYOffset = (short)(dSwirlRadius * sin(dSwirlAngle));
+        iXOffset = static_cast<short>(dSwirlRadius * cos(dSwirlAngle));
+        iYOffset = static_cast<short>(dSwirlRadius * sin(dSwirlAngle));
     }
 
     const SDL_Rect srcRect {iXFrame, iYFrame, iw, ih};

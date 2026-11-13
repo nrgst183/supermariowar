@@ -6,6 +6,7 @@
 #include "player.h"
 #include "ResourceManager.h"
 #include "Score.h"
+#include "SimulationState.h"
 
 
 //shyguy tag mode
@@ -30,11 +31,11 @@ void CGM_ShyGuyTag::init()
     fRunClock = false;
     gameClock.Init(0, true);
 
-    for (short iScore = 0; iScore < score_cnt; iScore++) {
-        score[iScore]->SetScore(0);
+    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
+        g_sim.score[iScore].SetScore(0);
     }
 
-    for (CPlayer* player : players) {
+    for (CPlayer* player : g_sim.players) {
         player->ownerColorOffsetX = player->getColorID() * 48;
     }
 }
@@ -51,7 +52,7 @@ void CGM_ShyGuyTag::think()
 
     //If we are not waiting to clear, check if we need to start waiting
     if (!fRunClock) {
-        if (static_cast<short>(players.size()) == shyguycount) {
+        if (static_cast<short>(g_sim.players.size()) == shyguycount) {
             if (game_values.gamemodesettings.shyguytag.freetime > 0) {
                 fRunClock = true;
                 gameClock.SetTime(game_values.gamemodesettings.shyguytag.freetime);
@@ -78,7 +79,7 @@ void CGM_ShyGuyTag::think()
 
             CPlayer * pCheckWinner = nullptr;
             bool fAlreadyScored[4] = {false, false, false, false};
-            for (CPlayer* player : players) {
+            for (CPlayer* player : g_sim.players) {
                 if (!player->shyguy) {
                     short iTeam = player->getTeamID();
                     if (!fAlreadyScored[iTeam]) {
@@ -137,7 +138,7 @@ void CGM_ShyGuyTag::playerextraguy(CPlayer &player, short iType)
 
 void CGM_ShyGuyTag::SetShyGuy(short iTeam)
 {
-    for (CPlayer* player : players) {
+    for (CPlayer* player : g_sim.players) {
         if (player->getTeamID() == iTeam) {
             player->shyguy = true;
             eyecandy[2].emplace<EC_GravText>(&rm->game_font_large, player->centerX(), player->bottomY(), "Shyguy!", -VELJUMP*1.5);
@@ -155,7 +156,7 @@ void CGM_ShyGuyTag::FreeShyGuys()
 {
     ifSoundOnPlay(rm->sfx_thunder);
 
-    for (CPlayer* player : players) {
+    for (CPlayer* player : g_sim.players) {
         player->shyguy = false;
         eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, player->centerX() - 16, player->centerY() - 16, 3, 8);
     }
@@ -185,7 +186,7 @@ PlayerKillType CGM_ShyGuyTag::CheckWinner(CPlayer * player)
 short CGM_ShyGuyTag::CountShyGuys()
 {
     short shyguycount = 0;
-    for (CPlayer* player : players) {
+    for (CPlayer* player : g_sim.players) {
         if (player->shyguy)
             shyguycount++;
     }

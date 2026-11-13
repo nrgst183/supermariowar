@@ -7,6 +7,7 @@
 #include "ObjectContainer.h"
 #include "player.h"
 #include "RandomNumberGenerator.h"
+#include "SimulationState.h"
 #include "gamemodes/Chicken.h"
 #include "gamemodes/Race.h"
 #include "gamemodes/Star.h"
@@ -101,14 +102,14 @@ void CPlayerAI::Init()
         bool fYoshi[4] = {false, false, false, false};
 
         //Scan Yoshis to see which ones are present
-        for (const std::unique_ptr<CObject>& obj : objectcontainer[1].list()) {
+        for (const std::unique_ptr<CObject>& obj : g_sim.objectcontainer[1].list()) {
             if (auto* yoshi = dynamic_cast<MO_Yoshi*>(obj.get())) {
                 fYoshi[yoshi->getColor()] = true;
             }
         }
 
         //Now scan eggs and ignore any egg that doesn't have a yoshi
-        for (const std::unique_ptr<CObject>& obj : objectcontainer[1].list()) {
+        for (const std::unique_ptr<CObject>& obj : g_sim.objectcontainer[1].list()) {
             if (auto* egg = dynamic_cast<CO_Egg*>(obj.get())) {
                 if (!fYoshi[egg->getColor()]) {
                     AttentionObject * ao = new AttentionObject();
@@ -132,7 +133,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     playerKeys->game_right.fDown = false;
 
     //A percentage of the time the cpu will do nothing based on the difficulty level
-    if (RandomNumberGenerator::generator().getBoolean(100, iDecisionPercentage[game_values.cpudifficulty]) && pPlayer->isready())
+    if (RandomNumberGenerator::gameplay().getBoolean(100, iDecisionPercentage[game_values.cpudifficulty]) && pPlayer->isready())
         return;
 
     playerKeys->game_jump.fDown = false;
@@ -238,7 +239,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
             if (nearestObjects.playerdistance <= 4096 || nearestObjects.stompdistance <= 4096 || nearestObjects.threatdistance <= 4096)
                 playerKeys->game_turbo.fDown = true;
         } else {
-            if (pPlayer->powerup == -1 || !RandomNumberGenerator::generator().getBoolean(20))
+            if (pPlayer->powerup == -1 || !RandomNumberGenerator::gameplay().getBoolean(20))
                 playerKeys->game_turbo.fDown = true;
 
             if (carriedItem) {
@@ -267,7 +268,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
             //Move player relative to opponent when we are playing star mode and we are holding a star
             if (game_values.gamemode->gamemode == game_mode_star) {
                 if (carriedItem && carriedItem->getMovingObjectType() == movingobject_star) {
-                    if (((CO_Star*)carriedItem)->getType() == 1)
+                    if ((static_cast<CO_Star*>(carriedItem))->getType() == 1)
                         *moveAway = true;
                     else {
                         *moveToward = true;
@@ -321,7 +322,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
                 playerKeys->game_jump.fDown = true;
             } else if (player->iy > iy &&			//try to down jump if player is below us
                        player->ix - ix < 45 &&
-                       player->ix - ix > -45 && RandomNumberGenerator::generator().getBoolean()) {
+                       player->ix - ix > -45 && RandomNumberGenerator::gameplay().getBoolean()) {
                 //or if player is high
                 if (!pPlayer->inair) playerKeys->game_down.fDown = true;
 
@@ -469,9 +470,9 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     //"Star Mode" specific stuff
     //Drop the star if we're not it
     if (game_values.gamemode->gamemode == game_mode_star) {
-        CGM_Star * starmode = (CGM_Star*)game_values.gamemode;
+        CGM_Star * starmode = static_cast<CGM_Star*>(game_values.gamemode);
 
-        if (carriedItem && carriedItem->getMovingObjectType() == movingobject_star && ((CO_Star*)carriedItem)->getType() == 0 && !starmode->isplayerstar(pPlayer))
+        if (carriedItem && carriedItem->getMovingObjectType() == movingobject_star && (static_cast<CO_Star*>(carriedItem))->getType() == 0 && !starmode->isplayerstar(pPlayer))
             playerKeys->game_turbo.fDown = false;
         else if (starmode->isplayerstar(pPlayer) && pPlayer->throw_star == 0)
             playerKeys->game_turbo.fDown = true;
@@ -520,11 +521,21 @@ void CPlayerAI::Think(COutputControl * playerKeys)
 
     //Make sure we don't jump over something that could kill us
     short iDeathY = iy / TILESIZE;
-    short iDeathX1 = ix / TILESIZE;
+    short iDeathX1;
     short iDeathX2;
+
+    //The player's position is not wrapped around the screen edges yet when it was pushed after its last move
+    if (ix < 0 && ix / TILESIZE < 0)
+        iDeathX1 = (ix + App::screenWidth) / TILESIZE;
+    else if (ix >= App::screenWidth)
+        iDeathX1 = (ix - App::screenWidth) / TILESIZE;
+    else
+        iDeathX1 = ix / TILESIZE;
 
     if (ix + PW >= App::screenWidth)
         iDeathX2 = (ix + PW - App::screenWidth) / TILESIZE;
+    else if (ix + PW < 0 && (ix + PW) / TILESIZE < 0)
+        iDeathX2 = (ix + PW + App::screenWidth) / TILESIZE;
     else
         iDeathX2 = (ix + PW) / TILESIZE;
 
@@ -665,11 +676,11 @@ ExitDeathCheck:
                     return pPlayer->jail.isActive();
                 case PowerupType::MysteryMushroom:
                     //See if another player has a powerup
-                    for (size_t iPlayer = 0; iPlayer < players.size(); iPlayer++) {
-                        if (iPlayer == static_cast<size_t>(pPlayer->localID) || players[iPlayer]->teamID == iTeamID) {
+                    for (size_t iPlayer = 0; iPlayer < g_sim.players.size(); iPlayer++) {
+                        if (iPlayer == static_cast<size_t>(pPlayer->localID) || g_sim.players[iPlayer]->teamID == iTeamID) {
                             continue;
                         }
-                        if (game_values.gamepowerups[players[iPlayer]->globalID] > 0) {
+                        if (game_values.gamepowerups[g_sim.players[iPlayer]->globalID] > 0) {
                             return true;
                         }
                     }
@@ -680,462 +691,6 @@ ExitDeathCheck:
         if (canUse(static_cast<PowerupType>(iStoredPowerup))) {
             playerKeys->game_powerup.fDown = true;
         }
-    }
-}
-
-void CPlayerAI::GetNearestObjects()
-{
-    nearestObjects.Reset();
-
-    MO_CarriedObject * carriedItem = pPlayer->carriedItem;
-    bool fInvincible = pPlayer->isInvincible() || pPlayer->isShielded() || pPlayer->shyguy;
-    short iTeamID = pPlayer->teamID;
-
-    std::map<int, AttentionObject*>::iterator lim = attentionObjects.end();
-
-    for (const std::unique_ptr<CObject>& obj : objectcontainer[1].list()) {
-        if (attentionObjects.find(obj->networkId()) != lim) {
-            //DistanceToObject(object, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            continue;
-        }
-
-        ObjectType type = obj->getObjectType();
-
-        switch (type) {
-        case object_moving: {
-            IO_MovingObject * movingobject = (IO_MovingObject*)obj.get();
-            MovingObjectType movingtype = movingobject->getMovingObjectType();
-
-            if (carriedItem == movingobject)
-                continue;
-
-            if (movingobject_shell == movingtype) {
-                CO_Shell * shell = (CO_Shell*)movingobject;
-
-                if (shell->IsThreat()) {
-                    if (fInvincible)
-                        continue;
-
-                    DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-                } else if (carriedItem) {
-                    continue;
-                } else {
-                    DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-                }
-            } else if (movingobject_throwblock == movingtype || (movingobject_throwbox == movingtype && ((CO_ThrowBox*)movingobject)->HasKillVelocity())) {
-                if (fInvincible)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            } else if (movingobject_pirhanaplant == movingtype) {
-                MO_PirhanaPlant * plant = (MO_PirhanaPlant*)movingobject;
-                if (plant->state > 0)
-                    DistanceToObjectCenter(plant, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            } else if (movingobject_flag == movingtype) {
-                CO_Flag * flag = (CO_Flag*)movingobject;
-
-                if (flag->GetInBase() && flag->GetTeamID() == iTeamID)
-                    continue;
-
-                if (carriedItem && carriedItem->getMovingObjectType() == movingobject_flag)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            } else if (movingobject_yoshi == movingtype) {
-                MO_Yoshi * yoshi = (MO_Yoshi*)movingobject;
-
-                if (!carriedItem || carriedItem->getMovingObjectType() != movingobject_egg)
-                    continue;
-
-                CO_Egg * egg = (CO_Egg*)carriedItem;
-
-                if (yoshi->getColor() != egg->getColor())
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            } else if (movingobject_egg == movingtype) {
-                if (carriedItem && carriedItem->getMovingObjectType() == movingobject_egg)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            } else if (movingobject_throwbox == movingtype) {
-                if (carriedItem)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            } else if (movingobject_star == movingtype) {
-                if (carriedItem && carriedItem->getMovingObjectType() == movingobject_star)
-                    continue;
-
-                CGM_Star * starmode = (CGM_Star*)game_values.gamemode;
-                CO_Star * star = (CO_Star*)movingobject;
-
-                if (star->getType() == 1 || starmode->isplayerstar(pPlayer)) {
-                    DistanceToObject(star, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-                } else {
-                    DistanceToObject(star, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-                }
-            } else if (movingobject_coin == movingtype || movingobject_phantokey == movingtype) {
-                DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            } else if (movingobject_collectioncard == movingtype) {
-                int iNumHeldCards = pPlayer->score->subscore[0];
-                int iHeldCards = pPlayer->score->subscore[1];
-
-                if (iNumHeldCards == 3) {
-                    int iThreeHeldCards = iHeldCards & 63;
-
-                    //If bot is holding all of the same type of card, then ignore all other cards
-                    if (iThreeHeldCards == 42 || iThreeHeldCards == 21 || iThreeHeldCards == 0) {
-                        DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-                        break;
-                    }
-
-                    int iTwoHeldCards = iHeldCards & 15;
-                    if (iTwoHeldCards == 10 || iTwoHeldCards == 5 || iTwoHeldCards == 0) {
-                        DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-                        break;
-                    }
-                } else {
-                    MO_CollectionCard * card = (MO_CollectionCard*)movingobject;
-
-                    if (iNumHeldCards == 2) {
-                        int iTwoHeldCards = iHeldCards & 15;
-
-                        if (iTwoHeldCards == 10 || iTwoHeldCards == 5 || iTwoHeldCards == 0) {
-                            int iCardValue = card->getValue();
-                            if (card->getType() == 1 && ((iTwoHeldCards == 10 && iCardValue != 2) || (iTwoHeldCards == 5 && iCardValue != 1) || (iTwoHeldCards == 0 && iCardValue != 0))) {
-                                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-                                break;
-                            }
-                        }
-                    } else if (iNumHeldCards == 1) {
-                        int iHeldCard = iHeldCards & 3;
-                        int iCardValue = card->getValue();
-                        if (card->getType() == 1 || iHeldCard != iCardValue) {
-                            DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-                            break;
-                        }
-                    }
-                }
-
-                if (iNumHeldCards == 3)
-                    DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-                else
-                    DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            }
-
-            break;
-        }
-        case object_frenzycard: {
-            DistanceToObject(obj.get(), &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            break;
-        }
-
-        case object_pipe_coin: {
-            OMO_PipeCoin * coin = (OMO_PipeCoin*)obj.get();
-
-            if (coin->GetColor() != 0) {
-                if (coin->GetTeam() == -1 || coin->GetTeam() == pPlayer->teamID)
-                    DistanceToObject(coin, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            } else {
-                DistanceToObject(coin, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            }
-
-            break;
-        }
-
-        case object_pipe_bonus: {
-            OMO_PipeBonus * bonus = (OMO_PipeBonus*)obj.get();
-
-            if (bonus->GetType() != 5) {
-                DistanceToObject(bonus, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            } else {
-                DistanceToObject(bonus, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            }
-
-            break;
-        }
-
-        case object_pathhazard:
-        case object_orbithazard: {
-            DistanceToObject(obj.get(), &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            break;
-        }
-
-        case object_phanto: {
-            OMO_Phanto * phanto = (OMO_Phanto*)obj.get();
-
-            if (phanto->GetType() == 2 || (carriedItem && carriedItem->getMovingObjectType() == movingobject_phantokey)) {
-                DistanceToObjectCenter(obj.get(), &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            }
-
-            break;
-        }
-
-        case object_flamecannon: {
-            IO_FlameCannon * cannon = (IO_FlameCannon *)obj.get();
-
-            if (cannon->state > 0)
-                DistanceToObject(cannon, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-
-            break;
-        }
-
-        default: {
-            DistanceToObject(obj.get(), &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            break;
-        }
-        }
-    }
-
-    for (const std::unique_ptr<CObject>& obj : objectcontainer[0].list()) {
-        if (attentionObjects.find(obj->networkId()) != lim) {
-            //DistanceToObject(object, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            continue;
-        }
-
-        ObjectType type = obj->getObjectType();
-
-        switch (type) {
-        case object_moving: {
-            IO_MovingObject * movingobject = (IO_MovingObject*)obj.get();
-            MovingObjectType movingtype = movingobject->getMovingObjectType();
-
-            if (carriedItem == movingobject)
-                continue;
-
-            if (movingobject_powerup == movingtype) {
-                DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            } else if ((movingobject_fireball == movingtype && ((MO_Fireball*)movingobject)->iTeamID != iTeamID)
-                      || movingobject_poisonpowerup == movingtype) {
-                if (fInvincible)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            } else if ((movingobject_goomba == movingtype || movingobject_koopa == movingtype) && movingobject->GetState() == 1) {
-                DistanceToObject(movingobject, &nearestObjects.stomp, &nearestObjects.stompdistance, &nearestObjects.stompwrap);
-            } else if (movingobject_sledgebrother == movingtype) {
-                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            } else if (movingobject_treasurechest == movingtype) {
-                DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            } else if (movingobject_flagbase == movingtype) {
-                MO_FlagBase * flagbase = (MO_FlagBase*)movingobject;
-
-                if (!carriedItem || carriedItem->getMovingObjectType() != movingobject_flag || flagbase->GetTeamID() != iTeamID)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            } else {
-                continue;
-            }
-            break;
-        }
-
-        case object_area: {
-            if (((OMO_Area*)obj.get())->getColorID() == pPlayer->colorID)
-                continue;
-
-            DistanceToObject(obj.get(), &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            break;
-        }
-
-        case object_kingofthehill_area: {
-            DistanceToObjectCenter(obj.get(), &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            break;
-        }
-
-        default: {
-            DistanceToObject(obj.get(), &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            break;
-        }
-        }
-    }
-
-    for (const std::unique_ptr<CObject>& obj : objectcontainer[2].list()) {
-        if (attentionObjects.find(obj->networkId()) != lim) {
-            //DistanceToObject(object, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            continue;
-        }
-
-        ObjectType type = obj->getObjectType();
-
-        switch (type) {
-        case object_moving: {
-            IO_MovingObject * movingobject = (IO_MovingObject*)obj.get();
-            MovingObjectType movingtype = movingobject->getMovingObjectType();
-
-            if (carriedItem == movingobject)
-                continue;
-
-            if (movingobject_cheepcheep == movingtype) {
-                DistanceToObject(movingobject, &nearestObjects.stomp, &nearestObjects.stompdistance, &nearestObjects.stompwrap);
-            } else if (movingobject_bulletbill == movingtype) {
-                if (fInvincible)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            } else if (movingobject_hammer == movingtype && ((MO_Hammer*)movingobject)->iTeamID != iTeamID) {
-                if (fInvincible)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            } else if (movingobject_iceblast == movingtype && ((MO_IceBlast*)movingobject)->iTeamID != iTeamID) {
-                if (fInvincible)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            } else if (movingobject_boomerang == movingtype && ((MO_Boomerang*)movingobject)->iTeamID != iTeamID) {
-                if (fInvincible)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            } else if (movingobject_bomb == movingtype && ((CO_Bomb*)movingobject)->iTeamID != iTeamID) {
-                if (fInvincible)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            } else if (movingobject_podobo == movingtype && ((MO_Podobo*)movingobject)->iTeamID != iTeamID) {
-                if (fInvincible)
-                    continue;
-
-                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            } else if (movingobject_explosion == movingtype && ((MO_Explosion*)movingobject)->iTeamID != iTeamID) {
-                if (fInvincible)
-                    continue;
-
-                DistanceToObjectCenter(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-                break;
-            }
-
-            break;
-        }
-        case object_thwomp:
-        case object_bowserfire: {
-            if (fInvincible)
-                continue;
-
-            DistanceToObjectCenter(obj.get(), &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
-            break;
-        }
-        case object_race_goal: {
-            if (game_values.gamemode->gamemode != game_mode_race)
-                continue;
-
-            OMO_RaceGoal * racegoal = (OMO_RaceGoal*)obj.get();
-
-            if (racegoal->getGoalID() != ((CGM_Race*)game_values.gamemode)->getNextGoal(iTeamID))
-                continue;
-
-            DistanceToObject(racegoal, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            break;
-        }
-
-
-        default: {
-            DistanceToObject(obj.get(), &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
-            break;
-        }
-        }
-    }
-
-    auto* gmChicken = dynamic_cast<CGM_Chicken*>(game_values.gamemode);
-
-    //Figure out where the other players are
-    for (size_t iPlayer = 0; iPlayer < players.size(); iPlayer++) {
-        if (iPlayer == static_cast<size_t>(pPlayer->localID) || players[iPlayer]->state != PlayerState::Ready)
-            continue;
-
-        //Find players in jail on own team to tag
-        if (game_values.gamemode->gamemode == game_mode_jail) {
-            if (players[iPlayer]->jail.isActive() && players[iPlayer]->teamID == iTeamID) {
-                DistanceToPlayer(players[iPlayer], &nearestObjects.teammate, &nearestObjects.teammatedistance, &nearestObjects.teammatewrap);
-            }
-        }
-
-        if (players[iPlayer]->teamID == iTeamID || players[iPlayer]->state != PlayerState::Ready)
-            continue;
-
-        //If there is a chicken, only focus on stomping him
-        if (gmChicken && gmChicken->chicken()) {
-            if (gmChicken->chicken()->teamID != iTeamID && gmChicken->chicken() != players[iPlayer])
-                continue;
-        }
-
-        DistanceToPlayer(players[iPlayer], &nearestObjects.player, &nearestObjects.playerdistance, &nearestObjects.playerwrap);
-    }
-}
-
-void CPlayerAI::DistanceToObject(CObject * object, CObject ** target, int * nearest, bool * wrap)
-{
-    //Calculate normal screen
-    short tx = object->x() - pPlayer->ix;
-    short ty = object->y() - pPlayer->iy;
-    bool fScreenWrap = false;
-
-    //See if it is a shorter distance wrapping around the screen
-    if (tx > App::screenWidth/2) {
-        tx = App::screenWidth - tx;
-        fScreenWrap = true;
-    } else if (tx < -App::screenWidth/2) {
-        tx = App::screenWidth + tx;
-        fScreenWrap = true;
-    }
-
-    int distance_player_pow2 = tx*tx + ty*ty;    // a^2 = b^2 + c^2 :)
-
-    if (distance_player_pow2 < *nearest) {
-        *target = object;
-        *nearest = distance_player_pow2;
-        *wrap = fScreenWrap;
-    }
-}
-
-void CPlayerAI::DistanceToObjectCenter(CObject * object, CObject ** target, int * nearest, bool * wrap)
-{
-    //Calculate normal screen
-    short tx = object->x() + (object->collisionRectW() / 2) - pPlayer->ix - HALFPW;
-    short ty = object->y() + (object->collisionRectH() / 2) - pPlayer->iy - HALFPH;
-    bool fScreenWrap = false;
-
-    if (tx > App::screenWidth/2) {
-        tx = App::screenWidth - tx;
-        fScreenWrap = true;
-    } else if (tx < -App::screenWidth/2) {
-        tx = App::screenWidth + tx;
-        fScreenWrap = true;
-    }
-
-    int distance_player_pow2 = tx*tx + ty*ty;
-
-    if (distance_player_pow2 < *nearest) {
-        *target = object;
-        *nearest = distance_player_pow2;
-        *wrap = fScreenWrap;
-    }
-}
-
-
-void CPlayerAI::DistanceToPlayer(CPlayer * player, CPlayer ** target, int * nearest, bool * wrap)
-{
-    //Calculate normal screen
-    short tx = player->ix - pPlayer->ix;
-    short ty = player->iy - pPlayer->iy;
-    bool fScreenWrap = false;
-
-    if (tx > App::screenWidth/2) {
-        tx = App::screenWidth - tx;
-        fScreenWrap = true;
-    } else if (tx < -App::screenWidth/2) {
-        tx = App::screenWidth + tx;
-        fScreenWrap = true;
-    }
-
-    int distance_player_pow2 = tx*tx + ty*ty;
-
-    if (distance_player_pow2 < *nearest) {
-        *target = player;
-        *nearest = distance_player_pow2;
-        *wrap = fScreenWrap;
     }
 }
 
@@ -1164,7 +719,7 @@ void CSimpleAI::Think(COutputControl * playerKeys)
             playerKeys->game_jump.fDown = true;
     } else {
         //Try to jump 1 out of 50 chances when on ground
-        if (RandomNumberGenerator::generator().getBoolean(50))
+        if (RandomNumberGenerator::gameplay().getBoolean(50))
             playerKeys->game_jump.fDown = true;
         else
             playerKeys->game_jump.fDown = false;
