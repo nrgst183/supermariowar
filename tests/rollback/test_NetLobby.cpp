@@ -134,6 +134,7 @@ struct LobbyNet {
     std::vector<std::unique_ptr<Node>> nodes;
     uint32_t now = 1000;
     std::string downloadDir;
+    std::string skinDir;    // node N: own skins in skinDir/nodeN/own, downloads in skinDir/nodeN/net
 
     Node& add(bool host, const std::string& name = "") {
         auto node = std::make_unique<Node>();
@@ -147,6 +148,10 @@ struct LobbyNet {
         options.name = name;
         if (!downloadDir.empty())
             options.downloadDirs = {downloadDir + "/node" + std::to_string(nodes.size())};
+        if (!skinDir.empty()) {
+            options.skinSearchDirs = {skinDir + "/node" + std::to_string(nodes.size()) + "/own"};
+            options.skinDownloadDirs = {skinDir + "/node" + std::to_string(nodes.size()) + "/net"};
+        }
         node->lobby = std::make_unique<NetLobby>(*node->transport, options, now);
         nodes.push_back(std::move(node));
         return *nodes.back();
@@ -588,4 +593,244 @@ TEST_CASE("Downloaded map names: no paths, unique, existing files kept") {
     CHECK_FALSE(std::filesystem::exists(std::filesystem::path(dir).parent_path() / "escape.map"));
 
     std::filesystem::remove_all(dir);
+}
+
+
+// ---- skins
+
+namespace {
+
+// Bytes that look like a PNG (the signature is checked), different for every salt
+std::vector<uint8_t> fakeSkin(size_t size, uint8_t salt)
+{
+    std::vector<uint8_t> bytes = testBytes(size, salt);
+    const uint8_t png[8] = {0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a};
+    std::copy(png, png + 8, bytes.begin());
+    return bytes;
+}
+
+std::string writeSkin(const std::string& dir, const std::string& file, const std::vector<uint8_t>& bytes)
+{
+    std::filesystem::create_directories(dir);
+    const std::string path = dir + "/" + file;
+    std::ofstream out(path, std::ios::binary);
+    out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    return path;
+}
+
+} // namespace
+
+TEST_CASE("Downloaded skin names: no paths, unique, existing files kept, only images") {
+    CHECK(safeSkinFileName("../../etc/passwd") == "passwd");
+    CHECK(safeSkinFileName("C:\\evil\\Mario.png") == "Mario");
+    CHECK(safeSkinFileName("a\x01*?<>|\"b") == "ab");
+    CHECK(safeSkinFileName("") == "skin");
+    CHECK(safeSkinFileName("..") == "skin");
+    CHECK(safeSkinFileName(std::string(100, 'x')).size() == 40);
+
+    const std::string dir = tempDir("skinnames");
+    const std::vector<uint8_t> one = fakeSkin(900, 1);
+    const std::vector<uint8_t> two = fakeSkin(900, 2);
+    const uint64_t hashOne = net::fnv1a64(one.data(), one.size());
+    const uint64_t hashTwo = net::fnv1a64(two.data(), two.size());
+    std::string path;
+    std::string error;
+
+    REQUIRE(saveDownloadedSkin(dir, "../Mario", one, hashOne, path, error));
+    CHECK(std::filesystem::path(path).parent_path() == std::filesystem::path(dir));
+    CHECK(std::filesystem::path(path).filename() == "Mario.png");
+    const std::string first = path;
+    REQUIRE(saveDownloadedSkin(dir, "Mario", one, hashOne, path, error));    //same contents: reused
+    CHECK(path == first);
+    REQUIRE(saveDownloadedSkin(dir, "Mario", two, hashTwo, path, error));    //same name, other contents: never overwritten
+    CHECK(std::filesystem::path(path).filename() == "Mario (2).png");
+    CHECK(readFile(first) == one);
+    CHECK(readFile(path) == two);
+
+    CHECK_FALSE(saveDownloadedSkin(dir, "Wrong", one, hashTwo, path, error));    //wrong hash
+    CHECK_FALSE(std::filesystem::exists(dir + "/Wrong.png"));
+    const std::vector<uint8_t> text = testBytes(500, 9);                          //not an image
+    CHECK_FALSE(saveDownloadedSkin(dir, "Text", text, net::fnv1a64(text.data(), text.size()), path, error));
+    const std::vector<uint8_t> huge = fakeSkin(SKIN_MAX_BYTES + 1, 3);            //too large
+    CHECK_FALSE(saveDownloadedSkin(dir, "Huge", huge, net::fnv1a64(huge.data(), huge.size()), path, error));
+    std::vector<uint8_t> bmp = testBytes(300, 4);
+    bmp[0] = 'B';
+    bmp[1] = 'M';
+    REQUIRE(saveDownloadedSkin(dir, "Old", bmp, net::fnv1a64(bmp.data(), bmp.size()), path, error));
+    CHECK(std::filesystem::path(path).extension() == ".bmp");
+
+    std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("Skins are announced, downloaded in chunks, hash checked and shown for every slot") {
+    LobbyNet net;
+    net.skinDir = tempDir("skins");
+    Node& host = net.add(true, "Hosty");
+    Node& a = net.add(false, "Alice");
+    Node& b = net.add(false, "Bob");
+
+    const std::vector<uint8_t> hostSkin = fakeSkin(3500, 10);
+    const std::vector<uint8_t> aliceSkin = fakeSkin(2100, 20);    //Alice has a different "Cool" than the host
+    //Bob has the host's skin already, under another folder name
+    const std::string hostFile = writeSkin(net.skinDir + "/node0/own", "Cool.png", hostSkin);
+    const std::string aliceFile = writeSkin(net.skinDir + "/node1/own", "Cool.png", aliceSkin);
+    writeSkin(net.skinDir + "/node2/own", "HostsSkinCopy.png", hostSkin);
+    const std::string bobFile = writeSkin(net.skinDir + "/node2/own", "Bobby.png", fakeSkin(1200, 30));
+
+    host.lobby->setLocalSkins({{"Cool", hostFile}});
+    a.lobby->setLocalSkins({{"Cool", aliceFile}});
+    b.lobby->setLocalSkins({{"Bobby", bobFile}});
+    net.settle(300);
+
+    //Slots: host 0, Alice 1, Bob 2
+    REQUIRE(host.lobby->slot(1).peer == 1);
+    REQUIRE(host.lobby->slot(2).peer == 2);
+    //Our own skin is our own file
+    CHECK(host.lobby->slotSkinPath(0) == hostFile);
+    CHECK(a.lobby->slotSkinPath(1) == aliceFile);
+
+    //Alice has another file called Cool: she downloaded the host's, with its own name, next to hers, and never overwrote hers
+    const std::string aliceGotHost = a.lobby->slotSkinPath(0);
+    CHECK(aliceGotHost == net.skinDir + "/node1/net/Cool.png");
+    CHECK(readFile(aliceGotHost) == hostSkin);
+    CHECK(readFile(aliceFile) == aliceSkin);
+    //The host got Alice's, which is not its own Cool
+    CHECK(host.lobby->slotSkinPath(1) == net.skinDir + "/node0/net/Cool.png");
+    CHECK(readFile(host.lobby->slotSkinPath(1)) == aliceSkin);
+    CHECK(readFile(hostFile) == hostSkin);
+    //Bob already had the host's skin (found by its hash): it downloaded nothing of it
+    CHECK(b.lobby->slotSkinPath(0) == net.skinDir + "/node2/own/HostsSkinCopy.png");
+    CHECK(readFile(b.lobby->slotSkinPath(1)) == aliceSkin);
+    CHECK(a.lobby->slotSkinPath(2) == net.skinDir + "/node1/net/Bobby.png");
+    CHECK(host.lobby->slotSkinPath(2) == net.skinDir + "/node0/net/Bobby.png");
+    //The only "Cool" Bob downloaded is Alice's, not the host's (which it had)
+    CHECK(readFile(net.skinDir + "/node2/net/Cool.png") == aliceSkin);
+    CHECK_FALSE(std::filesystem::exists(net.skinDir + "/node2/net/Cool (2).png"));
+    CHECK_FALSE(a.lobby->slotSkinDownloading(0));
+    //A CPU player has no skin
+    host.lobby->addCpu();
+    net.step(20);
+    CHECK(host.lobby->slotSkinPath(3).empty());
+    //The chunks stay small
+    CHECK(host.transport->biggestReliable <= SKIN_CHUNK_BYTES + 32);
+
+    //A joiner that changes its skin announces the new one
+    const std::string newFile = writeSkin(net.skinDir + "/node1/own", "Other.png", fakeSkin(1800, 40));
+    a.lobby->setLocalSkins({{"Other", newFile}});
+    net.step(60);
+    CHECK(readFile(host.lobby->slotSkinPath(1)) == readFile(newFile));
+    CHECK(host.lobby->skinRevision() > 0);
+
+    std::filesystem::remove_all(net.skinDir);
+}
+
+TEST_CASE("Skins: nothing unrequested, damaged or too large is accepted, and the lobby never waits for one") {
+    LobbyNet net;
+    net.skinDir = tempDir("skinsbad");
+    Node& host = net.add(true, "Hosty");
+    Node& a = net.add(false, "Alice");
+    const std::string hostFile = writeSkin(net.skinDir + "/node0/own", "Cool.png", fakeSkin(2500, 50));
+    host.lobby->setLocalSkins({{"Cool", hostFile}});
+    net.step(1);    //not announced to Alice yet, she lacks it
+    net.settle(5);
+
+    const auto sendTo = [&](Node& from, int peer, const net::ByteWriter& w) {
+        from.transport->send(from.lobby->mesh().connectionOf(peer), Channel::Reliable, w.data(), w.size());
+    };
+    uint8_t buffer[1200];
+
+    //An unrequested SKIN_BEGIN and its chunk (the host never announced this hash)
+    {
+        net::ByteWriter w(buffer, sizeof(buffer));
+        w.u8(static_cast<uint8_t>(net::MsgType::SkinBegin));
+        w.u64(777);
+        w.u32(300);
+        w.str("../../evil");
+        sendTo(host, 1, w);
+        const std::vector<uint8_t> data = fakeSkin(300, 5);
+        net::ByteWriter c(buffer, sizeof(buffer));
+        c.u8(static_cast<uint8_t>(net::MsgType::SkinChunk));
+        c.u64(777);
+        c.u32(0);
+        c.u16(300);
+        c.bytes(data.data(), 300);
+        sendTo(host, 1, c);
+        net.step(3);
+        CHECK(a.lobby->slotSkinPath(0) != net.skinDir + "/node1/net/evil.png");
+        CHECK_FALSE(std::filesystem::exists(net.skinDir + "/node1/net/evil.png"));
+    }
+    //An announcement of a skin above the cap is ignored (nothing is requested)
+    {
+        net::ByteWriter w(buffer, sizeof(buffer));
+        w.u8(static_cast<uint8_t>(net::MsgType::SkinInfo));
+        w.u8(1);
+        w.str("Huge");
+        w.u64(99);
+        w.u32(SKIN_MAX_BYTES + 1);
+        sendTo(host, 1, w);
+        net.step(3);
+        CHECK(a.lobby->slotSkinPath(0).empty());
+        CHECK_FALSE(a.lobby->slotSkinDownloading(0));
+    }
+    //An announced skin whose chunks carry other data: damaged, not saved, and the lobby carries on
+    {
+        const std::vector<uint8_t> data = fakeSkin(1500, 6);
+        net::ByteWriter w(buffer, sizeof(buffer));
+        w.u8(static_cast<uint8_t>(net::MsgType::SkinInfo));
+        w.u8(1);
+        w.str("Fake");
+        w.u64(4242);    //not the hash of what follows
+        w.u32(1500);
+        sendTo(host, 1, w);
+        net.step(3);    //Alice requests it; the host has no such skin and sends nothing
+        CHECK(a.lobby->slotSkinDownloading(0));
+        net::ByteWriter b(buffer, sizeof(buffer));
+        b.u8(static_cast<uint8_t>(net::MsgType::SkinBegin));
+        b.u64(4242);
+        b.u32(1500);
+        b.str("Fake");
+        sendTo(host, 1, b);
+        for (uint32_t offset = 0; offset < 1500; offset += 1000) {
+            const uint16_t len = static_cast<uint16_t>(std::min<uint32_t>(1000, 1500 - offset));
+            net::ByteWriter c(buffer, sizeof(buffer));
+            c.u8(static_cast<uint8_t>(net::MsgType::SkinChunk));
+            c.u64(4242);
+            c.u32(offset);
+            c.u16(len);
+            c.bytes(data.data() + offset, len);
+            sendTo(host, 1, c);
+        }
+        net.step(5);
+        CHECK(a.lobby->slotSkinPath(0).empty());
+        CHECK_FALSE(std::filesystem::exists(net.skinDir + "/node1/net/Fake.png"));
+    }
+    CHECK(a.lobby->phase() == NetLobby::Phase::Lobby);
+    CHECK(host.lobby->phase() == NetLobby::Phase::Lobby);
+
+    std::filesystem::remove_all(net.skinDir);
+}
+
+TEST_CASE("The mode id and goal reach every peer for the lobby screen") {
+    LobbyNet net;
+    Node& host = net.add(true, "Hosty");
+    Node& a = net.add(false, "Alice");
+    net.settle();
+    CHECK(a.lobby->modeId() == -1);
+
+    host.lobby->setMatchInfo("Classic", "Block Piles");
+    host.lobby->setMatchDetail(0, 10, "Lives");
+    net.step(20);
+    CHECK(a.lobby->modeId() == 0);
+    CHECK(a.lobby->goal() == 10);
+    CHECK(a.lobby->goalName() == "Lives");
+    CHECK(a.lobby->modeName() == "Classic");
+
+    //A joiner that comes later gets it too
+    Node& b = net.add(false, "Bob");
+    net.settle();
+    CHECK(b.lobby->goal() == 10);
+    host.lobby->setMatchDetail(1000, 50, "Coins");
+    net.step(20);
+    CHECK(a.lobby->modeId() == 1000);
+    CHECK(b.lobby->goalName() == "Coins");
 }

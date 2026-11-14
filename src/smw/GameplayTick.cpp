@@ -90,7 +90,7 @@ void GameplayState::applyTickInput(const InputFrame& input)
             key.fPressed = false;
 
         //CPU players keep the keys their AI holds down
-        if (game_values.playercontrol[iPlayer] == 1)
+        if (game_values.playercontrol[iPlayer] == 1 && !(g_sim.cpuTakeover & (1u << iPlayer)))
             applyInputByte(input.players[iPlayer], g_sim.previousInput[iPlayer], keys);
 
         g_sim.previousInput[iPlayer] = input.players[iPlayer];
@@ -102,6 +102,29 @@ void GameplayState::resetTickInput()
     for (short iPlayer = 0; iPlayer < 4; iPlayer++) {
         g_sim.playerKeys[iPlayer] = COutputControl {};
         g_sim.previousInput[iPlayer] = 0;
+    }
+    g_sim.cpuTakeover = 0;
+}
+
+void GameplayState::takeOverByCpu(uint8_t slotMask)
+{
+    for (short iPlayer = 0; iPlayer < 4; iPlayer++) {
+        const uint8_t bit = static_cast<uint8_t>(1u << iPlayer);
+        if (!(slotMask & bit) || (g_sim.cpuTakeover & bit) || game_values.playercontrol[iPlayer] != 1)
+            continue;
+        g_sim.cpuTakeover |= bit;
+        //Let go of the keys the human held; the AI presses its own
+        g_sim.playerKeys[iPlayer] = COutputControl {};
+
+        //The same AI as a CPU player that started the match (in the arena,
+        //like the player: rolled back with it)
+        for (CPlayer* player : g_sim.players) {
+            if (player->getGlobalID() != iPlayer || player->pPlayerAI)
+                continue;
+            player->pPlayerAI = new CPlayerAI();
+            player->pPlayerAI->SetPlayer(player);
+            player->pPlayerAI->Init();
+        }
     }
 }
 

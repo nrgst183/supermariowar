@@ -2,6 +2,8 @@
 #define GAMESTATE_MENU_H
 
 #include "GameState.h"
+#include "MatchTypes.h"
+#include "rollback/NetSeries.h"
 #include "ui/MenuCode.h"
 
 #include <memory>
@@ -118,6 +120,21 @@ class MenuState : public GameState
 		MenuCodeEnum ShotsMenuUpdate();
 		void AutoTestAfterDraw();
 
+		// Online tournament, tour and world (MenuOnlineSeries.cpp, rollback/NetSeries.h)
+		void StartOnlineSeries();
+		bool SetupOnlineSeries(const rollback::SeriesBeginMsg& begin, std::string& error);
+		void HandleOnlineSeries();
+		bool OnlineSeriesInput(MenuCodeEnum& code);
+		void OnlineSeriesWorldTick(MenuCodeEnum& code);
+		void OnlineSeriesShowScreen(const rollback::SeriesScreenMsg& screen);
+		void OnlineSeriesEnterScreen(rollback::SeriesScreen screen);
+		void OnlineSeriesEnded(const std::string& reason);
+		void OnlineSeriesAfterMatch();
+		void DrawOnlineSeriesNotice();
+		rollback::SeriesScreen OnlineSeriesHostScreen() const;
+		bool OnlineSeriesLocalInWheelTeam() const;
+		MenuCodeEnum AutoTestSeriesUpdate();
+
 		void SetControllingTeamForSettingsMenu(short iControlTeam, bool fDisplayMessage);
 		void DisplayControllingTeamMessage(short iControlTeam);
 
@@ -157,6 +174,15 @@ class MenuState : public GameState
 		std::unique_ptr<UI_OnlineLobbyMenu> mOnlineLobbyMenu;
 		bool mOnlineSetup = false;      //The host is choosing the match from the lobby (the match menus lead back to it)
 		bool mOnlineMinigame = false;   //The host's choice: a minigame instead of a single game
+		MatchType mOnlineSeriesType = MatchType::SingleGame;    //The host's choice: a tournament, tour or world (else SingleGame)
+
+		// The online series' screens (MenuOnlineSeries.cpp)
+		rollback::SeriesScreen mSeriesScreen = rollback::SeriesScreen::None;
+		uint16_t mSeriesStep = 0;
+		bool mSeriesWheelStopSent = false;
+		bool mSeriesWheelPressSent = false;
+		bool mSeriesSkipUpdate = false;     //The world map waits for its next lockstep tick
+		uint8_t mWorldPrevKeys[4] = {};
 
 		DisplayError iDisplayError = DISPLAY_ERROR_NONE;
 		short iDisplayErrorTimer = 0;

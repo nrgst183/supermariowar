@@ -26,6 +26,7 @@ add_executable(smw WIN32
 	GSMenu.h
 	MenuAutoTest.cpp
 	MenuOnline.cpp
+	MenuOnlineSeries.cpp
 	MenuScript.cpp
 	MenuStartGame.cpp
 	GSSplashScreen.cpp

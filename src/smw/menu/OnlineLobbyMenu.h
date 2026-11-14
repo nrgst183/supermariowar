@@ -6,18 +6,23 @@
 
 class MI_Button;
 class MI_Image;
+class MI_LobbyButton;
 class MI_LobbyCard;
-class MI_MapBox;
-class MI_MapPreview;
+class MI_LobbyChip;
+class MI_LobbyMap;
+class MI_LobbyScene;
 class MI_Text;
-class MI_WrappedText;
-template<typename T> class MI_SelectField;
+enum class LobbyStyle : int;
 
 /*
-    The online lobby, laid out like the original menus: the preview of the map the host has selected,
-    the four player cards of the next match (character, team, ping, ready), the secondary settings
-    (local players, input delay) and the ready/start/leave buttons. It shows the state of
-    rollback::NetGame::instance().lobby() and sends the player's changes to it (see rollback/NetLobby.h).
+    The online lobby, built from the pieces of the original menus: the map the host has selected with a
+    banner of its mode and goal, the four players of the next match (character, team, ping, ready), the
+    secondary settings (local players, input delay), a status bar and the ready/start/leave buttons.
+    It shows the state of rollback::NetGame::instance().lobby() and sends the player's changes to it
+    (see rollback/NetLobby.h).
+
+    There are two layouts (LobbyStyle, MI_LobbyWidgets.h); the default one is chosen in the constructor,
+    `--autotest --at-lobby-style N` picks another one (for the screenshots of scripts/menu-screenshots.sh).
 */
 class UI_OnlineLobbyMenu : public UI_Menu {
 public:
@@ -49,22 +54,21 @@ private:
     void ApplyLayout(bool host, bool joining);
     void Focus(UI_Control* control);
     void RebuildDelayItems(int autoDelay);
+    MI_Button* LeaveButton() const;
 
     static constexpr int SLOTS = 4;
 
-    MI_MapPreview* miMapPreview = nullptr;
-    MI_MapBox* miMapBox = nullptr;
-    MI_WrappedText* miCaption = nullptr;
+    MI_LobbyScene* miScene = nullptr;
+    MI_LobbyMap* miMap = nullptr;
     MI_LobbyCard* miCard[SLOTS] {};
-    MI_SelectField<short>* miLocalPlayers = nullptr;
-    MI_SelectField<short>* miInputDelay = nullptr;
-    MI_Button* miReadyButton = nullptr;
-    MI_Button* miSettingsButton = nullptr;
+    MI_LobbyChip* miLocalPlayers = nullptr;
+    MI_LobbyChip* miInputDelay = nullptr;
+    MI_Button* miReadyButton = nullptr;      // joiners
+    MI_Button* miLeaveJoiner = nullptr;
+    MI_Button* miSettingsButton = nullptr;   // the host
     MI_Button* miStartButton = nullptr;
-    MI_Button* miStartDisabled = nullptr;
+    MI_LobbyButton* miStartDisabled = nullptr;
     MI_Button* miLeaveButton = nullptr;
-    MI_WrappedText* miStatus = nullptr;
-    MI_WrappedText* miHint = nullptr;
 
     MI_Image* miDialogImage = nullptr;
     MI_Text* miDialogLine1 = nullptr;
@@ -72,6 +76,7 @@ private:
     MI_Button* miDialogYes = nullptr;
     MI_Button* miDialogNo = nullptr;
 
+    LobbyStyle m_style;
     Dialog m_dialog = Dialog::None;
     int m_kickPeer = -1;
     std::string m_notice;

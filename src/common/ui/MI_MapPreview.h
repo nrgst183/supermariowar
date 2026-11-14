@@ -34,6 +34,9 @@ public:
 
 protected:
 
+    //The map itself (its layers, platforms and hazards) at rectDst, without the frame
+    void DrawContent();
+
     gfxSprite * spr;
 
     gfxSprite surfaceMapBackground;

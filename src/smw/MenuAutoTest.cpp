@@ -118,15 +118,27 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
 
     //Online (--net-*): the host picks the matches; the joiners are ready for them
     rollback::NetGame& net = rollback::NetGame::instance();
+    static bool sawSeries = false;
     if (net.active() || net.finished()) {
-        if (net.finished())
+        //(a series that ended runs its last world map ticks first)
+        if (net.finished() && !net.seriesActive())
             return net.canQuit() ? MENU_CODE_EXIT_APPLICATION : MENU_CODE_NONE;
+        if (net.seriesActive()) {
+            //A tournament, tour or world: its screens (the host ends it after --at-matches matches)
+            sawSeries = true;
+            if (net.isHost() && g_autoTestMatchesDone >= at.matches) {
+                net.endSeries("autotest: " + std::to_string(at.matches) + " matches played");
+                OnlineSeriesEnded("");
+                return MENU_CODE_NONE;
+            }
+            return AutoTestSeriesUpdate();
+        }
         if (!net.isHost()) {
             if (net.lobby()->phase() == rollback::NetLobby::Phase::Lobby && !net.lobby()->peer(net.localPeer()).ready)
                 net.lobby()->setReady(true);
             return MENU_CODE_NONE;
         }
-        if (g_autoTestMatchesDone >= at.matches || !net.lastMatchError().empty()) {
+        if (g_autoTestMatchesDone >= at.matches || !net.lastMatchError().empty() || sawSeries) {
             //Done, or a peer is gone (disconnect tests): close the lobby
             if (net.matchDrained())
                 net.endSession(net.lastMatchError().empty() ? "autotest done" : "autotest: a match was aborted");
@@ -180,10 +192,23 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
                 case Kind::Tour:
                     game_values.matchtype = MatchType::Tour;
                     game_values.tourindex = static_cast<short>(idx % tourlist->count());
+                    //--at-map: a tour by its file name
+                    for (size_t i = 0; !at.map.empty() && i < tourlist->count(); i++) {
+                        if (tourlist->at(i).stem().string() == at.map)
+                            game_values.tourindex = static_cast<short>(i);
+                    }
                     break;
                 case Kind::World:
                     game_values.matchtype = MatchType::World;
                     game_values.worldindex = static_cast<short>(idx % worldlist->count());
+                    for (size_t i = 0; !at.map.empty() && i < worldlist->count(); i++) {
+                        if (worldlist->at(i).stem().string() == at.map)
+                            game_values.worldindex = static_cast<short>(i);
+                    }
+                    break;
+                case Kind::Tournament:
+                    game_values.matchtype = MatchType::Tournament;
+                    game_values.tournamentgames = 2;
                     break;
                 default:
                     game_values.matchtype = MatchType::SingleGame;
@@ -242,6 +267,10 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
                 timer = 0;
                 return MENU_CODE_NONE;
             }
+
+            //Tournament: its screens, deterministically
+            if (at.kind == Kind::Tournament)
+                return AutoTestSeriesUpdate();
 
             if (++timer > 6000) {
                 //Stuck (e.g. unreadable tour/world file): go back to the main menu
@@ -351,6 +380,81 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         if (t == 18)
             next();
         return MENU_CODE_NONE;
+    }
+
+    if (at.shotsRole == "fuzz") {
+        //Random keys in the lobby of a host (with a second process joining it, if there is one): must not crash
+        static std::mt19937 rng(777);
+        if (step == 2) {
+            if (t == 1)
+                return MENU_CODE_ONLINE_HOST;
+            if (lobby && lobby->phase() == Phase::Lobby && t > 20)
+                next();
+            timedOut(60 * 20, "the lobby");
+            return MENU_CODE_NONE;
+        }
+        if (step == 3 && mCurrentMenu == mOnlineLobbyMenu.get()) {
+            COutputControl& keys = game_values.playerInput.outputControls[rng() % 2];
+            if (rng() % 3 == 0) {
+                switch (rng() % 8) {
+                    case 0: keys.menu_up.fPressed = true; break;
+                    case 1: keys.menu_down.fPressed = true; break;
+                    case 2: keys.menu_left.fPressed = true; break;
+                    case 3: keys.menu_right.fPressed = true; break;
+                    case 4:
+                    case 5: keys.menu_select.fPressed = true; break;
+                    case 6: keys.menu_random.fPressed = true; break;
+                    default: if (rng() % 4 == 0) keys.menu_cancel.fPressed = true; break;
+                }
+            }
+            if (t % 600 == 0 && lobby)
+                lobby->setCpuCount(static_cast<int>(rng() % 4));
+            return MENU_CODE_NONE;
+        }
+        if (step == 3 && t > 30)
+            return exitSoon();
+        return MENU_CODE_NONE;
+    }
+
+    if (at.shotsRole == "orig") {
+        //The original offline screens the lobby borrows from: match selection, team select, game settings
+        switch (step) {
+            case 2:
+                if (t == 1)
+                    return MENU_CODE_TO_MATCH_SELECTION_MENU;
+                if (t == 20)
+                    shot("o1_match_selection");
+                if (t == 23)
+                    next();
+                return MENU_CODE_NONE;
+            case 3:
+                if (t == 1) {
+                    for (int k = 0; k < 4; k++)
+                        game_values.playercontrol[k] = k < 2 ? 1 : 2;
+                    return MENU_CODE_MATCH_SELECTION_START;
+                }
+                if (t == 30)
+                    shot("o2_team_select");
+                if (t == 33)
+                    next();
+                return MENU_CODE_NONE;
+            case 4:
+                if (t == 1) {
+                    game_values.matchtype = MatchType::SingleGame;
+                    const short mode = static_cast<short>(at.mode >= 0 ? at.mode : 0);
+                    mGameSettingsMenu->GameModeChanged(mode);
+                    game_values.gamemode = gamemodes[mGameSettingsMenu->GetCurrentGameModeID()];
+                    currentgamemode = mode;
+                    return MENU_CODE_TO_GAME_SETUP_MENU;
+                }
+                if (t == 30)
+                    shot("o3_game_settings");
+                if (t == 33)
+                    next();
+                return MENU_CODE_NONE;
+            default:
+                return exitSoon();
+        }
     }
 
     if (at.shotsRole == "errors") {

@@ -8,7 +8,7 @@ namespace cmd {
 /// Options of the opt-in headless auto-play harness (a debugging aid).
 /// Everything is off unless `--autotest` is given.
 struct AutoTestArgs {
-    enum class Kind { Single, Minigame, Tour, World, Menus, Shots };
+    enum class Kind { Single, Minigame, Tour, World, Menus, Shots, Tournament };
 
     bool enabled = false;
     Kind kind = Kind::Single;
@@ -33,6 +33,7 @@ struct AutoTestArgs {
     std::string shotsRole = "host";  // --at-role host|join: host a lobby, or join --at-addr
     std::string shotsAddr;   // --at-addr IP[:PORT]: the lobby to join
     std::string shotsName;   // --at-nick NAME: the nickname to enter in the online menu
+    int lobbyStyle = -1;     // --at-lobby-style N: the online lobby layout to show (-1: the default)
     int shotsMap = 0;        // --at-shotmap N: host: pick the N-th map of the list (to be downloaded by joiners without it)
 };
 
@@ -46,6 +47,8 @@ struct NetArgs {
     int joinPort = 0;
     int port = 0;              // --net-port: the local UDP port of a joiner (0: any)
     std::string name;          // --net-name: nickname in the lobby
+    std::string skin;          // --net-skin NAME[,NAME2]: skin of our player(s) (testing: skins are otherwise chosen in the menus)
+    int slowMap = 1;           // --net-slow-map N: the host sends one map chunk per N frames (testing: to catch the transfer in screenshots)
     int delay = -1;            // --net-delay: input delay in ticks (-1: automatic)
     int checksumInterval = 60; // --net-checksum N: compare (and print) state checksums every N frames
     int statsInterval = 300;   // --net-stats N: print statistics every N frames (0: off)

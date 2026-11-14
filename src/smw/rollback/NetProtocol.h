@@ -24,6 +24,10 @@
 // PEER_LEFT (host -> all), PING/PONG and RTT_REPORT (round trip times), BYE.
 // Per match (NetLobby.h): CONFIG (host), CONFIG_ACK (each peer), MAP_BEGIN and
 // MAP_CHUNK (host -> a peer that lacks the map), START (host), MATCH_ABORT.
+// LOBBY_EXTRA (host -> all, with every LOBBY_STATE): the mode id and goal for the lobby screen (NetLobby.h).
+// Skins (SkinTransfer.h): SKIN_INFO, SKIN_REQUEST, SKIN_BEGIN, SKIN_CHUNK between any two peers.
+// Multi-match modes (NetSeries.h): SERIES_BEGIN, SERIES_SCREEN, SERIES_END,
+// WHEEL_PRESS/WHEEL_STOP (bonus wheel), WORLD_INPUT/WORLD_TICK (world map).
 //
 // INPUT (sender -> one receiver, 26 + frames * slots bytes):
 //   u8  type
@@ -41,10 +45,21 @@
 //
 // CHECKSUM (reliable): u8 type, u8 match id, u32 frame, u64 peerChecksum()
 // of the confirmed state at that frame.
+//
+// PEER_DROP (reliable, sender -> every peer of the match it still counts in;
+// the agreement on a lost peer, see "LOST PEERS" in RollbackSession.h):
+//   u8  type
+//   u8  match id
+//   u8  lost mask        (bit p: the sender counts peer p as gone)
+//   per peer in the mask, ascending:
+//     i32 decided frame  (from this frame on its slots are CPU players; -1: not decided yet)
+//     u32 known          (the sender has all of its inputs below this frame)
+//     u8  n              (inputs relayed: the frames known - n .. known - 1)
+//     n x (one byte per player slot that peer drove, by slot order)
 namespace rollback::net {
 
 constexpr uint32_t PROTOCOL_MAGIC = 0x52574d53; // "SMWR"
-constexpr uint16_t PROTOCOL_VERSION = 2;
+constexpr uint16_t PROTOCOL_VERSION = 3;
 
 constexpr int MAX_PEERS = 4;
 
@@ -62,6 +77,7 @@ enum class MsgType : uint8_t {
 
     Input = 32,
     Checksum = 33,
+    PeerDrop = 34,
 
     PeerInfo = 48,
     LobbyState = 49,
@@ -73,7 +89,26 @@ enum class MsgType : uint8_t {
 
     MapBegin = 64,
     MapChunk = 65,
+
+    // Multi-match modes (NetSeries.h): host -> all unless noted
+    SeriesBegin = 80,
+    SeriesScreen = 81,
+    SeriesEnd = 82,
+    WheelPress = 83,     // joiner -> host
+    WheelStop = 84,
+    WorldInput = 85,     // joiner -> host
+    WorldTick = 86,
+
+    SkinInfo = 100,
+    SkinRequest = 101,
+    SkinBegin = 102,
+    SkinChunk = 103,
+
+    LobbyExtra = 104,
 };
+
+// The series messages are the range [SeriesBegin, SERIES_MSG_END)
+constexpr uint8_t SERIES_MSG_END = 96;
 
 constexpr size_t INPUT_HEADER_SIZE = 26;
 constexpr int MAX_INPUT_FRAMES_PER_PACKET = 120;

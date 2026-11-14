@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "uicontrol.h"
 #include "gfx/gfxSprite.h"
 
@@ -23,6 +25,10 @@ public:
     void DisplayTeamControlAnnouncement();
 
     void SetCurrentStageToCompleted(short iWinningTeam);
+    // For logs (--autotest)
+    std::string DebugState() const;
+    // A team's item popup is open (--autotest closes it again)
+    bool IsItemPopupOpen(short iTeam) const { return iTeam >= 0 && iTeam < 4 && iStateTransition[iTeam] == 3; }
     void ClearCloud() {
         fUsingCloud = false;
     }

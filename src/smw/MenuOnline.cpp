@@ -2,6 +2,7 @@
 // lobby to the usual match menus and back. The backend is rollback/NetGame.h and NetLobby.h.
 #include "GSMenu.h"
 
+#include "rollback/MatchConfig.h"
 #include "rollback/NetGame.h"
 
 #include "GameMode.h"
@@ -89,6 +90,7 @@ void MenuState::EnterOnlineLobby()
 {
     mOnlineSetup = false;
     mOnlineMinigame = false;
+    mOnlineSeriesType = MatchType::SingleGame;
 
     if (rollback::NetGame::instance().isHost())
         ApplyOnlineMatchSelection();
@@ -163,12 +165,14 @@ void MenuState::HandleOnlineEvents()
     }
 }
 
-// "Settings": the host picks single game or minigame in the match type menu, then (single game) the
-// mode, goal and map in the game menu; both lead back to the lobby
+// "Settings": the host picks the match type in the match type menu, then (single game) the mode, goal
+// and map in the game menu; both lead back to the lobby. A tournament's games are chosen as it goes.
 void MenuState::OpenOnlineMatchSettings()
 {
     mOnlineSetup = true;
     mMatchSelectionMenu->SetOnlineMode(true, mOnlineMinigame);
+    if (mOnlineSeriesType != MatchType::SingleGame)
+        mMatchSelectionMenu->SetSelectedMatchType(mOnlineSeriesType);
     mCurrentMenu = mMatchSelectionMenu.get();
     mCurrentMenu->ResetMenu();
 }
@@ -214,6 +218,12 @@ void MenuState::ReturnToOnlineLobby()
 void MenuState::ApplyOnlineMatchSelection()
 {
     game_values.tournamentcontrolteam = -1;
+
+    if (mOnlineSeriesType != MatchType::SingleGame) {
+        //Tournament, tour or world: what the match type menu selected (wins, tour, world)
+        game_values.matchtype = mOnlineSeriesType;
+        return;
+    }
 
     if (mOnlineMinigame) {
         game_values.matchtype = MatchType::MiniGame;
@@ -274,7 +284,11 @@ void MenuState::StartOnlineMatch()
         return;
     }
 
-    //Like any match: the fade to black, then NetGame::startMatch() (see the end of update())
+    //Like any match: the fade to black, then NetGame::startMatch() (see the end of update()).
+    //A tournament, tour or world starts with its first screen (MenuOnlineSeries.cpp).
     ApplyOnlineMatchSelection();
-    StartGame();
+    if (mOnlineSeriesType != MatchType::SingleGame)
+        StartOnlineSeries();
+    else
+        StartGame();
 }

@@ -24,6 +24,18 @@ public:
     bool GetPowerupSelectionDone() const { return fPowerupSelectionDone; }
     void Reset(bool fTournament);
 
+    // Online (rollback/NetSeries.h): the host decides when the wheel stops.
+    // A remote wheel doesn't stop by itself, only by ApplyStop().
+    void SetRemote(bool remote) { fRemote = remote; }
+    short GetWinningTeam() const { return iWinningTeam; }
+    bool IsStopped() const { return fPressedSelect; }
+    // The wheel's state when it was stopped (IsStopped())
+    void GetStop(float& angle, float& speed, float& winddown, short& powerup) const;
+    // Stops the wheel as another one was stopped: it lands on the same powerup
+    void ApplyStop(float angle, float speed, float winddown, short powerup);
+    // A stopped wheel winds down at once (its powerup is given)
+    void Finish();
+
 private:
     short iState = 0;
     short iDisplayPowerupIndex = 0;
@@ -58,4 +70,8 @@ private:
     short iWinningTeam = 0;
 
     bool fCpuControlled = false;
+
+    bool fRemote = false;
+    float dStopAngle = 0.f;
+    float dStopSpeed = 0.f;
 };

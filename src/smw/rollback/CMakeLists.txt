@@ -3,6 +3,9 @@ target_sources(smw PRIVATE
     MatchConfig.h
     NetGame.cpp
     NetGame.h
+    NetGameSeries.cpp
+    SeriesState.cpp
+    SeriesState.h
     Snapshot.cpp
     Snapshot.h
     StateChecksum.cpp
@@ -21,8 +24,12 @@ add_library(SmwRollbackNet STATIC
     NetMesh.cpp
     NetMesh.h
     NetProtocol.h
+    NetSeries.cpp
+    NetSeries.h
     RollbackSession.cpp
     RollbackSession.h
+    SkinTransfer.cpp
+    SkinTransfer.h
     Transport.h
 )
 target_include_directories(SmwRollbackNet PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

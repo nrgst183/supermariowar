@@ -865,6 +865,32 @@ void GameplayState::update()
     playMusic();
 }
 
+// --autotest online, in a tournament, tour or world: a match that the frame limit ended without a
+// winner is won by the leading team (the first of them if tied), so that the series goes on. The
+// state is the confirmed final one: every peer decides the same.
+void GameplayState::autoTestDecideSeriesMatch()
+{
+    CGameMode* mode = game_values.gamemode;
+    if (mode->gameover || mode->gamemode == game_mode_bonus || g_sim.score_cnt < 1)
+        return;
+    short leader = 0;
+    bool tied = false;
+    for (short t = 1; t < g_sim.score_cnt; t++) {
+        if (g_sim.score[t].score > g_sim.score[leader].score) {
+            leader = t;
+            tied = false;
+        } else if (g_sim.score[t].score == g_sim.score[leader].score) {
+            tied = true;
+        }
+    }
+    if (tied)
+        g_sim.score[leader].score++;
+    mode->gameover = true;
+    mode->winningteam = leader;
+    SetupScoreBoard(false);
+    printf("autotest: the frame limit ended the match: team %d wins\n", leader);
+}
+
 // One frame of an online match (see rollback/NetGame.h). The session decides
 // how many ticks run: usually one, none while it waits for the other peers,
 // more after a rollback. The pause dialog is disabled online; leaving the
@@ -910,6 +936,8 @@ void GameplayState::updateNetplay()
         if (cmd::g_autotest.enabled) {
             ++g_autoTestMatchesDone;
             printf("autotest: match %d ended after %d frames\n", g_autoTestMatchesDone, g_sim.tick);
+            if (outcome.ended && net.seriesActive())
+                autoTestDecideSeriesMatch();
         }
         if (game_values.gamemode->gameover && (game_values.matchtype == MatchType::Tour || game_values.matchtype == MatchType::Tournament))
             UpdateScoreBoard();

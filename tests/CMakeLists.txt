@@ -12,6 +12,7 @@ add_executable(smw-tests
 	common/math/test_vec2.cpp
 	common/util/test_DirIterator.cpp
 	rollback/test_NetLobby.cpp
+	rollback/test_NetSeries.cpp
 	rollback/test_RollbackSession.cpp
 )
 target_link_libraries(smw-tests PRIVATE doctest CommonFiles SmwRollbackNet)

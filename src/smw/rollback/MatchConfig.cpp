@@ -6,6 +6,7 @@
 #include "GSGameplay.h"
 #include "map.h"
 #include "MapList.h"
+#include "NetGame.h"
 #include "NetLobby.h"
 #include "NetProtocol.h"
 #include "path.h"
@@ -15,6 +16,9 @@
 #include "TilesetManager.h"
 #include "FileList.h"
 #include "sfx.h"
+#include "SeriesState.h"
+#include "WorldTourStop.h"
+#include "gamemodes/BonusHouse.h"
 #include "gamemodes/MiniBoss.h"
 #include "gamemodes/MiniBoxes.h"
 #include "gamemodes/MiniPipe.h"
@@ -169,7 +173,7 @@ struct SettingsReader {
     }
 };
 
-std::vector<uint8_t> captureSimulationSettings()
+std::vector<uint8_t> captureSettings()
 {
     std::vector<uint8_t> bytes(4096);
     ByteWriter w(bytes.data(), bytes.size());
@@ -181,7 +185,7 @@ std::vector<uint8_t> captureSimulationSettings()
 
 // The size was checked by checkMatchConfig(): peers of the same build write
 // the same fields
-bool applySimulationSettings(const std::vector<uint8_t>& bytes)
+bool applySettings(const std::vector<uint8_t>& bytes)
 {
     ByteReader r(bytes.data(), bytes.size());
     SettingsReader reader {r};
@@ -215,6 +219,16 @@ bool g_devicesFromConfig = false;
 
 } // namespace
 
+std::vector<uint8_t> captureSimulationSettings()
+{
+    return captureSettings();
+}
+
+bool applySimulationSettings(const std::vector<uint8_t>& bytes)
+{
+    return bytes.size() == captureSettings().size() && applySettings(bytes);
+}
+
 uint32_t simulationPlayerDevice(short slot)
 {
     if (g_devicesFromConfig)
@@ -232,6 +246,35 @@ void setSimulationPlayerDevices(const std::array<bool, INPUT_MAX_PLAYERS>* keybo
 std::vector<std::string> mapDownloadDirs()
 {
     return {convertPath("maps/net/"), GetHomeDirectory() + "maps/net/"};
+}
+
+std::vector<std::string> skinSearchDirs()
+{
+    std::vector<std::string> dirs {convertPath("gfx/skins/")};
+    for (const std::string& dir : skinDownloadDirs())
+        dirs.push_back(dir);
+    return dirs;
+}
+
+std::vector<std::string> skinDownloadDirs()
+{
+    return {convertPath("skins/net/"), GetHomeDirectory() + "skins/net/"};
+}
+
+void loadMatchSkin(int slot, short color)
+{
+    const NetLobby* lobby = NetGame::instance().lobby();
+    const std::string path = lobby ? lobby->slotSkinPath(slot) : std::string();
+    if (!path.empty()) {
+        try {
+            rm->spr_player[slot] = rm->LoadFullSkin(std::filesystem::path(path), color);
+            return;
+        } catch (const std::string& what) {
+            printf("netplay: can't use the skin %s: %s\n", path.c_str(), what.c_str());
+        }
+    }
+    //Not here (yet), or humans only: the default skin in the color of the slot
+    rm->spr_player[slot] = rm->LoadFullSkin(static_cast<short>(0), color);
 }
 
 std::string matchMapPath(const MatchConfig& config)
@@ -264,7 +307,7 @@ uint64_t simulationDataHash()
 
 std::vector<uint8_t> MatchConfig::serialize() const
 {
-    std::vector<uint8_t> bytes(512 + settings.size());
+    std::vector<uint8_t> bytes(512 + settings.size() + series.size());
     ByteWriter w(bytes.data(), bytes.size());
     w.u16(FORMAT_VERSION);
     w.u32(seed);
@@ -293,6 +336,8 @@ std::vector<uint8_t> MatchConfig::serialize() const
         w.i16(count);
     w.u16(static_cast<uint16_t>(settings.size()));
     w.bytes(settings.data(), settings.size());
+    w.u16(static_cast<uint16_t>(series.size()));
+    w.bytes(series.data(), series.size());
     bytes.resize(w.ok() ? w.size() : 0);
     return bytes;
 }
@@ -328,16 +373,20 @@ bool MatchConfig::deserialize(const uint8_t* data, size_t size)
         count = r.i16();
     const uint16_t settingsSize = r.u16();
     const uint8_t* settingsBytes = r.bytes(settingsSize);
+    const uint16_t seriesSize = r.u16();
+    const uint8_t* seriesBytes = r.bytes(seriesSize);
     if (!r.ok() || r.remaining() != 0)
         return false;
     settings.assign(settingsBytes, settingsBytes + settingsSize);
+    series.assign(seriesBytes, seriesBytes + seriesSize);
     return teamCount >= 1 && teamCount <= 4;
 }
 
 bool captureMatchConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot, uint32_t seed, int inputDelay, std::string& error)
 {
-    if (game_values.matchtype != MatchType::SingleGame && game_values.matchtype != MatchType::MiniGame) {
-        error = "only single games and minigames can be played online for now";
+    const bool series = isSeriesMatchType(game_values.matchtype);
+    if (game_values.matchtype != MatchType::SingleGame && game_values.matchtype != MatchType::MiniGame && !series) {
+        error = "this match type can't be played online";
         return false;
     }
 
@@ -349,9 +398,20 @@ bool captureMatchConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_
     config.bossType = static_cast<uint8_t>(game_values.gamemodesettings.boss.bosstype);
     config.inputDelay = static_cast<uint8_t>(std::clamp(inputDelay, 0, 16));
 
-    //The minigames have fixed maps (see MenuState::update)
+    //The minigames have fixed maps (see MenuState::update), except the
+    //world's, which may name one; the bonus houses have theirs
     std::string path;
-    switch (game_values.gamemode->gamemode) {
+    const short mode = game_values.gamemode->gamemode;
+    const bool minigame = mode == game_mode_pipe_minigame || mode == game_mode_boss_minigame || mode == game_mode_boxes_minigame;
+    const bool worldMinigameMap = minigame && game_values.matchtype == MatchType::World && game_values.tourstopcurrent < game_values.tourstops.size() &&
+        maplist->findexact(game_values.tourstops[game_values.tourstopcurrent]->pszMapFile.c_str(), true);
+    if (mode == game_mode_bonus) {
+        config.mapRef = "maps/special/two52_special_bonushouse.map";
+    } else if (worldMinigameMap) {
+        const std::string& file = maplist->currentFilename();
+        const std::string root = convertPath("");
+        config.mapRef = !root.empty() && file.rfind(root, 0) == 0 ? file.substr(root.size()) : "@" + maplist->currentShortmapname();
+    } else switch (game_values.gamemode->gamemode) {
         case game_mode_pipe_minigame:
             config.mapRef = "maps/special/two52_special_pipe_minigame.map";
             break;
@@ -404,29 +464,59 @@ bool captureMatchConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_
             config.teamIds[t][m] = game_values.teamids[t][m];
     }
 
-    config.settings = captureSimulationSettings();
+    config.settings = captureSettings();
     if (config.settings.empty()) {
         error = "the settings don't fit in a message";
         return false;
     }
+    if (series) {
+        prepareSeriesStateForMatch(config.gameMode);
+        config.series = captureSeriesState();
+        if (config.series.empty()) {
+            error = "the series state doesn't fit in a message";
+            return false;
+        }
+    }
     return true;
+}
+
+bool isSeriesMatchType(MatchType type)
+{
+    return type == MatchType::Tournament || type == MatchType::Tour || type == MatchType::World;
+}
+
+void prepareSeriesStateForMatch(int gameMode)
+{
+    //Only a bonus house is for one player (the menus leave it set after one)
+    if (gameMode != game_mode_bonus)
+        game_values.singleplayermode = -1;
 }
 
 bool checkMatchConfig(const MatchConfig& config, std::string& error, bool* needMap)
 {
     if (needMap)
         *needMap = false;
-    if (config.matchType != MatchType::SingleGame && config.matchType != MatchType::MiniGame) {
+    const bool series = isSeriesMatchType(config.matchType);
+    if (config.matchType != MatchType::SingleGame && config.matchType != MatchType::MiniGame && !series) {
         error = "unsupported match type";
         return false;
     }
+    if (series != !config.series.empty()) {
+        error = "the series state is missing";
+        return false;
+    }
+    if (series && (game_values.matchtype != config.matchType || !isSeriesMatchType(game_values.matchtype))) {
+        error = "this peer isn't playing this tournament, tour or world";
+        return false;
+    }
     const int mode = config.gameMode;
-    if (!(mode >= 0 && mode < GAMEMODE_LAST) && mode != game_mode_pipe_minigame && mode != game_mode_boss_minigame && mode != game_mode_boxes_minigame) {
+    if (!(mode >= 0 && mode < GAMEMODE_LAST) && mode != game_mode_pipe_minigame && mode != game_mode_boss_minigame && mode != game_mode_boxes_minigame &&
+            !(mode == game_mode_bonus && config.matchType == MatchType::World)) {
         error = "unknown game mode " + std::to_string(mode);
         return false;
     }
 
-    if (config.settings.size() != captureSimulationSettings().size()) {
+    if (config.settings.size() != captureSettings().size()) {
         error = "the settings don't match this game version";
         return false;
     }
@@ -457,6 +547,9 @@ void startConfiguredMatch(const MatchConfig& config)
         case game_mode_boxes_minigame:
             game_values.gamemode = boxesgamemode;
             break;
+        case game_mode_bonus:
+            game_values.gamemode = bonushousemode;
+            break;
         default:
             game_values.gamemode = gamemodes[config.gameMode];
             currentgamemode = config.gameMode;
@@ -482,17 +575,22 @@ void startConfiguredMatch(const MatchConfig& config)
     }
 
     //Settings
-    applySimulationSettings(config.settings);
-    game_values.gamemodemenusettings = game_values.gamemodesettings;
+    applySettings(config.settings);
+    //(a tour stop's own settings don't become the menu's)
+    if (config.matchType != MatchType::Tour && config.matchType != MatchType::World)
+        game_values.gamemodemenusettings = game_values.gamemodesettings;
     game_values.singleplayermode = -1;
     game_values.autokill = false;
+    //The series state: the host's (a peer's own was compared with it, see NetGame::beginMatch)
+    if (!config.series.empty())
+        applySeriesState(config.series);
 
     //From here on every peer consumes the same random numbers
     RandomNumberGenerator::gameplay().seed(config.seed);
 
     for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
         if (game_values.playercontrol[k] > 0)
-            rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
+            loadMatchSkin(k, game_values.colorids[k]);
     }
 
     //The same steps as the menu's match start (MenuState::update)

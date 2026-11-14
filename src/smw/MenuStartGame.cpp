@@ -1,5 +1,7 @@
 #include "GSMenu.h"
 
+#include "rollback/NetGame.h"
+
 #include "CmdArgs.h"
 #include "FileList.h"
 #include "Game.h"
@@ -121,6 +123,16 @@ bool MenuState::ReadTourFile()
 
 void MenuState::StartGame()
 {
+    //Online, in a tournament, tour or world, only the host starts the matches (its config
+    //starts them here); the world map's stage start is just the fade here
+    const rollback::NetGame& net = rollback::NetGame::instance();
+    if (net.seriesActive() && !net.isHost()) {
+        game_values.appstate = AppState::StartGame;
+        game_values.screenfade = 8;
+        game_values.screenfadespeed = 8;
+        return;
+    }
+
     printf("> StartGame\n");
 #ifdef _DEBUG
     iScriptState = 2;

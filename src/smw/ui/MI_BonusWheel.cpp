@@ -59,6 +59,8 @@ MenuCodeEnum MI_BonusWheel::Modify(bool fModify)
                 break;
             }
         }
+        dStopAngle = dSelectionAngle;
+        dStopSpeed = dSelectionSpeed;
     }
 
     if (fPowerupSelectionDone)
@@ -85,7 +87,7 @@ void MI_BonusWheel::Update()
             }
         }
     } else {
-        if (!fPressedSelect && (fCpuControlled || ++iPressSelectTimer > 620))
+        if (!fPressedSelect && !fRemote && (fCpuControlled || ++iPressSelectTimer > 620))
             Modify(true);
 
         for (int iImage = 0; iImage < NUMBONUSITEMSONWHEEL; iImage++) {
@@ -274,4 +276,41 @@ void MI_BonusWheel::Reset(bool fTournament)
         if (game_values.playercontrol[game_values.teamids[iWinningTeam][iPlayer]] == 1)
             fCpuControlled = false;
     }
+}
+
+void MI_BonusWheel::GetStop(float& angle, float& speed, float& winddown, short& powerup) const
+{
+    angle = dStopAngle;
+    speed = dStopSpeed;
+    winddown = dSelectionWinddownSpeed;
+    powerup = iSelectedPowerup;
+}
+
+void MI_BonusWheel::ApplyStop(float angle, float speed, float winddown, short powerup)
+{
+    if (fPressedSelect)
+        return;
+    fPressedSelect = true;
+    dSelectionAngle = angle;
+    dSelectionSpeed = speed;
+    dSelectionWinddownSpeed = winddown;
+    iSelectedPowerup = powerup;
+    dStopAngle = angle;
+    dStopSpeed = speed;
+
+    iNextSelectionSoundIndex = 1;
+    for (short iSector = 0; iSector < NUMBONUSITEMSONWHEEL; iSector++) {
+        if (dSelectionAngle > dSelectionSector[iSector])
+            iNextSelectionSoundIndex = iSector + 1;
+        else
+            break;
+    }
+}
+
+void MI_BonusWheel::Finish()
+{
+    iState = 1;
+    iDisplayPowerupIndex = NUMBONUSITEMSONWHEEL;
+    for (int i = 0; i < 100000 && fPressedSelect && !fPowerupSelectionDone; i++)
+        Update();
 }

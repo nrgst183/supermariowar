@@ -143,6 +143,13 @@ void UI_MatchSelectionMenu::SetMinigame(Minigame minigame)
     miMinigameField->setCurrentValue(minigame);
 }
 
+void UI_MatchSelectionMenu::SetSelectedMatchType(MatchType type)
+{
+    miMatchSelectionField->setCurrentValue(type);
+    game_values.matchtype = type;
+    SelectionChanged();
+}
+
 MatchType UI_MatchSelectionMenu::GetSelectedMatchType() const
 {
     return miMatchSelectionField->currentValue();
@@ -153,10 +160,7 @@ void UI_MatchSelectionMenu::SetOnlineMode(bool online, bool minigame)
     if (online)
         miMatchSelectionField->setCurrentValue(minigame ? MatchType::MiniGame : MatchType::SingleGame);
 
-    miMatchSelectionField->hideItem(MatchType::Tournament, online);
-    miMatchSelectionField->hideItem(MatchType::Tour, online);
-    miMatchSelectionField->hideItem(MatchType::World, online);
-
+    //(every match type can be played online: tournaments, tours and worlds too, see rollback/NetSeries.h)
     miMatchSelectionMenuHeaderText->SetText(online ? "Online Match Type Menu" : "Match Type Menu");
     miMatchSelectionStartButton->SetName(online ? "Next" : "Start");
 

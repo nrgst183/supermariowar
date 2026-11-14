@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <climits>
 #include <cstring>
 #include <deque>
 #include <map>
@@ -29,7 +30,17 @@ uint8_t testInput(int slot, int frame)
 struct FakeState {
     int frame = 0;
     uint64_t acc = 0;
+    uint8_t cpu = 0;    // slots the CPU took over (takeOverSlots)
 };
+
+// What the game does in takeOverSlots(): part of the state, done once
+void takeOver(FakeState& s, uint8_t mask)
+{
+    if (mask & ~s.cpu) {
+        s.cpu |= mask;
+        s.acc = (s.acc ^ (0x9e3779b97f4a7c15ull * s.cpu)) * 0x100000001b3ull;
+    }
+}
 
 FakeState step(FakeState s, const InputFrame& in)
 {
@@ -85,6 +96,9 @@ struct FakeSim : ISessionCallbacks {
     uint64_t checksum() override {
         return state.acc + (state.frame == corruptFrame ? 1 : 0);
     }
+    void takeOverSlots(uint8_t mask) override {
+        takeOver(state, mask);
+    }
     void onConfirmedChecksum(int frame, uint64_t sum) override {
         REQUIRE(confirmed.count(frame) == 0);
         confirmed[frame] = sum;
@@ -110,6 +124,7 @@ struct FakeNetwork {
     uint32_t now = 0;
     std::vector<Packet> inFlight;
     std::vector<bool> silenced = std::vector<bool>(net::MAX_PEERS, false);
+    bool blocked[net::MAX_PEERS][net::MAX_PEERS] = {};    // [from][to]: everything on this link is lost
 
     uint32_t random() {
         rng ^= rng << 13;
@@ -119,7 +134,7 @@ struct FakeNetwork {
     }
 
     void send(int from, int to, Channel channel, const uint8_t* data, size_t size) {
-        if (silenced[from])
+        if (silenced[from] || blocked[from][to])
             return;
         if (channel == Channel::Unreliable && lossPercent > 0 && static_cast<int>(random() % 100) < lossPercent)
             return;
@@ -152,6 +167,7 @@ struct Peer {
     std::unique_ptr<RollbackSession> session;
     int startStep = 0;
     bool running = true;     // keeps calling advanceFrame
+    bool dead = false;       // killed: does nothing, receives nothing
     int endedAt = -1;        // frame of the confirmed barrier
 };
 
@@ -190,6 +206,8 @@ struct Harness {
         network.inFlight.erase(it, network.inFlight.end());
         for (const FakeNetwork::Packet& p : due) {
             Peer& to = peers[static_cast<size_t>(p.to)];
+            if (to.dead)
+                continue;
             to.session->onMessage(p.from, p.data.data(), p.data.size(), network.now);
         }
     }
@@ -199,7 +217,7 @@ struct Harness {
         deliver();
         for (int i = 0; i < static_cast<int>(peers.size()); i++) {
             Peer& peer = peers[static_cast<size_t>(i)];
-            if (stepIndex < peer.startStep)
+            if (stepIndex < peer.startStep || peer.dead)
                 continue;
             if (!peer.running) {
                 peer.session->idle(network.now);
@@ -220,16 +238,71 @@ struct Harness {
             stepAll(s);
     }
 
-    // The state each frame should have, from the real inputs
-    std::vector<FakeState> reference(int frames) const {
+    // Kills a peer: it stops, and what it hasn't sent yet is lost
+    void kill(int p) {
+        peers[static_cast<size_t>(p)].dead = true;
+        network.silenced[static_cast<size_t>(p)] = true;
+    }
+
+    // The state each frame should have, from the real inputs. `dropFrame[p]`
+    // (>= 0): from there on the CPU plays peer p's slot
+    std::vector<FakeState> reference(int frames, const std::vector<int>& dropFrame = {}) const {
         std::vector<FakeState> states(1);
+        auto dropOf = [&dropFrame](int slot) { return slot < static_cast<int>(dropFrame.size()) && dropFrame[slot] >= 0 ? dropFrame[slot] : INT_MAX; };
         for (int f = 0; f < frames; f++) {
             InputFrame in;
-            for (int slot = 0; slot < static_cast<int>(peers.size()); slot++)
-                in.players[static_cast<size_t>(slot)] = f >= base.inputDelay ? testInput(slot, f - base.inputDelay) : 0;
-            states.push_back(step(states.back(), in));
+            uint8_t cpu = 0;
+            for (int slot = 0; slot < static_cast<int>(peers.size()); slot++) {
+                if (f >= dropOf(slot))
+                    cpu |= static_cast<uint8_t>(1u << slot);
+                else
+                    in.players[static_cast<size_t>(slot)] = f >= base.inputDelay ? testInput(slot, f - base.inputDelay) : 0;
+            }
+            FakeState s = states.back();
+            if (cpu)
+                takeOver(s, cpu);
+            states.push_back(step(s, in));
         }
         return states;
+    }
+
+    // The drop frame of each peer (one slot each), as peer `viewer` agreed on it
+    std::vector<int> dropFrames(int viewer) const {
+        std::vector<int> frames;
+        for (int p = 0; p < static_cast<int>(peers.size()); p++)
+            frames.push_back(peers[static_cast<size_t>(viewer)].session->dropFrame(p));
+        return frames;
+    }
+
+    // The survivors agree on every lost peer's drop frame, and every frame
+    // they confirmed has the reference state of the inputs up to there and
+    // the CPU from there on
+    void checkSurvivorsAgree(const std::vector<int>& survivors, uint8_t lost) {
+        REQUIRE(!survivors.empty());
+        const std::vector<int> drops = dropFrames(survivors[0]);
+        int maxFrame = 0;
+        for (int s : survivors) {
+            const Peer& peer = peers[static_cast<size_t>(s)];
+            CAPTURE(s);
+            CHECK(peer.session->state() != RollbackSession::State::Failed);
+            CHECK(peer.session->lostPeers() == lost);
+            CHECK(dropFrames(s) == drops);
+            maxFrame = std::max(maxFrame, peer.session->frame());
+        }
+        for (int p = 0; p < static_cast<int>(peers.size()); p++)
+            CHECK((drops[static_cast<size_t>(p)] >= 0) == (((lost >> p) & 1) != 0));
+
+        const std::vector<FakeState> ref = reference(maxFrame + 1, drops);
+        for (int s : survivors) {
+            const Peer& peer = peers[static_cast<size_t>(s)];
+            CAPTURE(s);
+            CHECK(peer.sim.confirmed.size() > 5);
+            for (const auto& [frame, sum] : peer.sim.confirmed) {
+                CAPTURE(frame);
+                CHECK(sum == ref[static_cast<size_t>(frame)].acc);
+            }
+            CHECK(peer.sim.desyncFrames.empty());
+        }
     }
 
     // Every confirmed checksum of every peer is the reference one
@@ -330,12 +403,11 @@ TEST_CASE("Only remote inputs that differ from the prediction cause a rollback")
     CHECK(st.rollbacks < 400 / 4);
 }
 
-TEST_CASE("A peer stalls at the prediction window, then times out a silent peer") {
+TEST_CASE("A peer stalls at the prediction window, then the last one plays on with the CPU") {
     Harness h(2);
     h.base.timeoutMs = 2000;
     h.start();
-    h.network.silenced[1] = true;
-    h.peers[1].running = false;
+    h.kill(1);
     h.run(60);
 
     Peer& a = h.peers[0];
@@ -343,23 +415,176 @@ TEST_CASE("A peer stalls at the prediction window, then times out a silent peer"
     CHECK(a.session->frame() == h.base.inputDelay + h.base.maxPrediction);
     CHECK(a.session->stats().stallFrames > 0);
     CHECK(a.session->state() == RollbackSession::State::Running);
+    CHECK(a.session->lostPeers() == 0);    // lagging is not lost: only after the timeout
 
-    h.run(100);
-    CHECK(a.session->state() == RollbackSession::State::Failed);
-    CHECK(a.session->failedPeer() == 1);
-    CHECK(std::string(a.session->failReason()) == "timed out");
+    h.run(200);
+    CHECK(a.session->state() == RollbackSession::State::Running);
+    CHECK(a.session->lostPeers() == 2);
+    CHECK(std::string(a.session->lostReason(1)) == "timed out");
+    // nothing of it is known after the input delay: the CPU plays from there
+    CHECK(a.session->dropFrame(1) == h.base.inputDelay);
+    CHECK(a.session->cpuSlots() == 2);
+    CHECK(a.session->frame() > 100);
+    h.checkSurvivorsAgree({0}, 2);
 }
 
-TEST_CASE("A disconnected peer fails the session") {
+TEST_CASE("A disconnected peer is dropped: the others agree on its drop frame and go on") {
+    for (int count = 3; count <= 4; count++) {
+        CAPTURE(count);
+        Harness h(count);
+        h.network.latencyMs = 30;
+        h.network.jitterMs = 10;
+        h.network.lossPercent = 5;
+        h.start();
+        h.run(50);
+        h.kill(2);
+        h.run(10);
+        // the transport tells everyone (at different times)
+        for (int p = 0; p < count; p++) {
+            if (p != 2)
+                h.peers[static_cast<size_t>(p)].session->onPeerDisconnected(2, h.network.now, "disconnected");
+            h.run(3);
+        }
+        h.run(300);
+
+        std::vector<int> survivors;
+        for (int p = 0; p < count; p++) {
+            if (p != 2)
+                survivors.push_back(p);
+        }
+        h.checkSurvivorsAgree(survivors, 4);
+        for (int s : survivors) {
+            CHECK(h.peers[static_cast<size_t>(s)].session->frame() > 300);
+            CHECK(h.peers[static_cast<size_t>(s)].session->stats().maxRollback <= h.base.maxPrediction);
+        }
+    }
+}
+
+TEST_CASE("A lost peer is dropped at the same frame whenever it is lost, rollbacks included") {
+    // Killed at many points, under latency: survivors are often in the middle
+    // of a rollback window (inputs of the lost peer predicted, some wrongly)
+    int rollbacksBeforeDecision = 0;
+    for (int killStep = 20; killStep < 120; killStep += 7) {
+        for (int count = 2; count <= 4; count++) {
+            CAPTURE(killStep);
+            CAPTURE(count);
+            Harness h(count);
+            h.base.timeoutMs = 600;
+            h.network.latencyMs = 50;
+            h.network.jitterMs = 20;
+            h.network.lossPercent = 10;
+            h.network.rng = static_cast<uint32_t>(killStep * 31 + count);
+            h.start();
+            h.run(killStep);
+            const int victim = killStep % count;
+            h.kill(victim);
+            h.run(250);
+
+            std::vector<int> survivors;
+            for (int p = 0; p < count; p++) {
+                if (p != victim)
+                    survivors.push_back(p);
+            }
+            h.checkSurvivorsAgree(survivors, static_cast<uint8_t>(1u << victim));
+            for (int s : survivors) {
+                const RollbackSession::Stats& st = h.peers[static_cast<size_t>(s)].session->stats();
+                CHECK(st.maxRollback <= h.base.maxPrediction);
+                rollbacksBeforeDecision += st.rollbacks > 0;
+            }
+        }
+    }
+    CHECK(rollbacksBeforeDecision > 0);
+}
+
+TEST_CASE("A survivor that has fewer of the lost peer's inputs gets them from the others") {
     Harness h(3);
+    h.base.timeoutMs = 800;
+    h.network.latencyMs = 20;
     h.start();
-    h.run(50);
-    h.peers[0].session->onPeerDisconnected(2, h.network.now);
-    CHECK(h.peers[0].session->state() == RollbackSession::State::Failed);
-    CHECK(h.peers[0].session->failedPeer() == 2);
-    const FrameResult r = h.peers[0].session->advanceFrame(InputFrame(), h.network.now);
-    CHECK(r.ticks == 0);
-    CHECK(r.stalled == StallReason::Ended);
+    h.run(100);
+    // peer 2's packets to peer 1 are lost, then peer 2 dies: peer 0 has more of its inputs
+    h.network.blocked[2][1] = true;
+    h.run(4);
+    h.kill(2);
+    h.run(200);
+
+    h.checkSurvivorsAgree({0, 1}, 4);
+    // the drop frame is past what peer 1 had: it took peer 0's
+    CHECK(h.peers[0].session->dropFrame(2) > 100);
+}
+
+TEST_CASE("Two peers lost at once, and the coordinator lost while they agree") {
+    SUBCASE("two at once") {
+        Harness h(4);
+        h.base.timeoutMs = 600;
+        h.network.latencyMs = 40;
+        h.network.jitterMs = 10;
+        h.start();
+        h.run(80);
+        h.kill(1);
+        h.kill(3);
+        h.run(300);
+        h.checkSurvivorsAgree({0, 2}, 0b1010);
+    }
+    SUBCASE("the coordinator (peer 0) goes, then the next one, during the agreement") {
+        for (int gap = 0; gap < 60; gap += 6) {
+            CAPTURE(gap);
+            Harness h(4);
+            h.base.timeoutMs = 500;
+            h.network.latencyMs = 40;
+            h.network.jitterMs = 10;
+            h.network.rng = static_cast<uint32_t>(gap + 3);
+            h.start();
+            h.run(70);
+            h.kill(0);
+            h.run(32 + gap);    // around the timeout: the others are agreeing on peer 0
+            h.kill(1);
+            h.run(300);
+            h.checkSurvivorsAgree({2, 3}, 0b0011);
+        }
+    }
+}
+
+TEST_CASE("A peer that is cut off but still runs learns that it was dropped") {
+    Harness h(3);
+    h.base.timeoutMs = 500;
+    h.network.latencyMs = 20;
+    h.start();
+    h.run(60);
+    // nothing from peer 2 reaches anyone; it still hears the others
+    h.network.silenced[2] = true;
+    h.run(200);
+    h.checkSurvivorsAgree({0, 1}, 4);
+    const Peer& cut = h.peers[2];
+    CHECK(cut.session->state() == RollbackSession::State::Failed);
+    CHECK(cut.session->failedPeer() == 2);
+}
+
+TEST_CASE("A peer lost at the end: the match still ends at the same frame for the others") {
+    for (int killStep = 180; killStep <= 215; killStep += 5) {
+        CAPTURE(killStep);
+        Harness h(3);
+        h.base.timeoutMs = 500;
+        h.network.latencyMs = 60;
+        h.network.jitterMs = 10;
+        for (Peer& peer : h.peers)
+            peer.sim.barrier.fixedFrame = 200;
+        h.start();
+        h.run(killStep);
+        h.kill(1);
+        h.run(300);
+        for (int s : {0, 2}) {
+            const Peer& peer = h.peers[static_cast<size_t>(s)];
+            CAPTURE(s);
+            CHECK(peer.endedAt == 200);
+            CHECK(peer.session->state() == RollbackSession::State::Ended);
+        }
+        CHECK(h.peers[0].sim.confirmed == h.peers[2].sim.confirmed);
+        CHECK(h.peers[0].sim.confirmed.rbegin()->first == 200);
+        // agreed (or not needed) the same way on both
+        CHECK(h.peers[0].session->dropFrame(1) == h.peers[2].session->dropFrame(1));
+        h.checkSurvivorsAgree({0, 2}, h.peers[0].session->lostPeers());
+    }
 }
 
 TEST_CASE("Time sync lets a peer that started early wait for the other") {

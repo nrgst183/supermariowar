@@ -28,6 +28,10 @@ class GameplayState : public GameState
         // the objects, so they are captured before every tick, re-simulated
         // or not.
         void advanceTick(const InputFrame& input);
+        // Online, a player's peer is gone: the CPU plays these slots (bit s)
+        // from the next tick on. Simulation state (rolled back with it);
+        // repeating it changes nothing.
+        void takeOverByCpu(uint8_t slotMask);
 
         // Draws the current state, `alpha` (0..1) of the way from the
         // previous tick to the latest one (smooth motion). Doesn't change the
@@ -52,6 +56,7 @@ class GameplayState : public GameState
         void handleInput();
         bool updateAutoTest();
         void updateNetplay();
+        void autoTestDecideSeriesMatch();
         bool updateMatchTransition();
 
         void applyTickInput(const InputFrame& input);

@@ -55,6 +55,46 @@
 // result says it is at least a frame ahead, the session skips ticks, one at
 // a time, so the peers converge without big rollbacks or stalls.
 //
+// LOST PEERS: THE MATCH GOES ON. A peer that disconnects, says it leaves or
+// is silent for `timeoutMs` is *lost*; the others play on and the CPU takes
+// over its player slots. Every remaining peer must make that change at the
+// same frame and with the same inputs before it, or they drift apart. The
+// agreement (PEER_DROP in NetProtocol.h) works like this:
+//  - Lost set. Each peer keeps the set of peers it counts as gone: the ones
+//    it noticed itself, plus every set it receives from another peer that is
+//    still in (so the sets only grow and every survivor ends up with the
+//    union). Once a peer is lost, nothing more is accepted from it, so how
+//    many of its inputs each survivor has (`known`) is frozen.
+//  - Reports. Whenever its set, its known inputs or a decision change, a
+//    peer sends every survivor a report: its set and, per lost peer, `known`
+//    with that peer's last inputs (up to DROP_RELAY_FRAMES). A survivor that
+//    has fewer of them takes the missing ones from the report (they are the
+//    same everywhere: the lost peer sent the same inputs to all), and rolls
+//    back if it predicted them wrongly; one that has more reports them.
+//  - Decision. The coordinator is the lowest peer id that isn't lost. When
+//    the latest report of every survivor shows the same lost set as its own,
+//    every input any survivor had of a lost peer has reached it, and it
+//    decides that peer's *drop frame* D: the highest `known` of all, so no
+//    survivor ever has to forget an input it used (and none has to roll back
+//    further than for an ordinary late input: at most maxPrediction frames,
+//    which the snapshots cover). A report with a decision is final: every
+//    peer that gets one adopts it, also from a coordinator it later loses,
+//    and a new coordinator adopts any decision a survivor reports, so a
+//    lost peer never gets two different drop frames.
+//  - Takeover. Until the decision, the lost peer's inputs past `known` are
+//    unknown (the confirmed frame waits, the session stalls as for late
+//    inputs). From frame D on, its slots are known and zero, and before every
+//    tick from D on the session calls ISessionCallbacks::takeOverSlots(): the
+//    game turns those players into CPU players at tick D, inside the
+//    simulation, so a rollback before D undoes it and the re-simulation
+//    does it again. If a survivor already simulated past D, it rolls back to
+//    D. A lost peer that is still running (it was only cut off) learns from a
+//    report that it was dropped: its session fails (failedPeer() is itself).
+//  - Timeouts and the end. A lagging peer is only lost after the usual
+//    timeout. An Ended session (its barrier was confirmed) still takes part
+//    in the reports (idle()); its drop frames are at or after its end.
+// When every other peer is lost, the last one plays on against the CPUs.
+//
 // LIGHTNESS. Everything is fixed-size: no allocation after construction.
 namespace rollback {
 
@@ -87,6 +127,10 @@ public:
     virtual bool advance(const InputFrame& input, bool resimulating) = 0;
     // Cross-machine checksum of the current state (peerChecksum())
     virtual uint64_t checksum() = 0;
+    // Called before every tick from a lost peer's drop frame on (see LOST
+    // PEERS): the CPU plays these slots (bit s) from this tick on. Must be
+    // part of the simulation (rolled back with it) and harmless when repeated.
+    virtual void takeOverSlots(uint8_t /*slotMask*/) {}
 
     // A frame's state is confirmed; `sum` is its checksum (the "netsum:" lines)
     virtual void onConfirmedChecksum(int /*frame*/, uint64_t /*sum*/) {}
@@ -115,14 +159,15 @@ public:
     enum class State : uint8_t {
         Running,
         Ended,     // the barrier was confirmed; inputs are still sent until acknowledged
-        Failed,    // a peer left or timed out
+        Failed,    // we can't go on: the others dropped us (see LOST PEERS)
     };
 
     RollbackSession(const SessionConfig& config, ITransport& transport, ISessionCallbacks& callbacks, uint32_t nowMs);
 
-    // A message of this match's types (Input, Checksum) from a peer
+    // A message of this match's types (Input, Checksum, PeerDrop) from a peer
     void onMessage(int peer, const uint8_t* data, size_t size, uint32_t nowMs);
-    // The transport lost the connection to a peer (or it said it leaves)
+    // The transport lost the connection to a peer (or it said it leaves): it
+    // is lost, the match goes on without it (see LOST PEERS)
     void onPeerDisconnected(int peer, uint32_t nowMs, const char* reason = "disconnected");
 
     // Runs this frame (see above). `localInput` holds the local players'
@@ -144,6 +189,16 @@ public:
     // Set when the session failed: which peer and why
     int failedPeer() const { return m_failedPeer; }
     const char* failReason() const { return m_failReason; }
+
+    // ---- lost peers (see LOST PEERS)
+    // The peers counted as gone (bit p)
+    uint8_t lostPeers() const { return m_lostMask; }
+    // Why a lost peer is gone ("timed out", "disconnected", ...)
+    const char* lostReason(int peer) const { return (peer >= 0 && peer < net::MAX_PEERS) ? m_peers[peer].lostReason : ""; }
+    // The frame from which the CPU plays a lost peer's slots, -1 until agreed
+    int dropFrame(int peer) const { return (peer >= 0 && peer < net::MAX_PEERS) ? m_peers[peer].dropFrame : -1; }
+    // The slots the CPU has taken over (bit s; once their drop frame is agreed)
+    uint8_t cpuSlots() const;
 
     struct PeerStats {
         float rttMs = 0;          // smoothed round trip time
@@ -172,6 +227,11 @@ public:
 
     static constexpr int INPUT_HISTORY = 256;     // frames of input kept (power of two)
     static constexpr int CHECKSUM_HISTORY = 32;   // checksum frames kept
+    // Inputs of a lost peer relayed in a PEER_DROP report. The survivors'
+    // counts of its inputs differ by far less (the stall at maxPrediction
+    // keeps everyone within a few input delays of each other); a survivor
+    // that still finds a gap can't go on and fails.
+    static constexpr int DROP_RELAY_FRAMES = 64;
 
 private:
     struct Peer {
@@ -188,6 +248,14 @@ private:
         float avgLocalAdvantage = 0;
         float avgRemoteAdvantage = 0;
         bool connected = true;
+        // Lost (see LOST PEERS)
+        bool lost = false;
+        const char* lostReason = "";
+        int lostKnown = 0;            // `received` when it was lost (its later checksums aren't compared)
+        int dropFrame = -1;           // agreed: the CPU plays its slots from here
+        // Its latest PEER_DROP report: its lost set
+        bool hasReport = false;
+        uint8_t reportMask = 0;
     };
 
     struct ChecksumEntry {
@@ -220,6 +288,15 @@ private:
     void checkTimeouts(uint32_t nowMs);
     void fail(int peer, const char* reason);
 
+    // Lost peers (see LOST PEERS)
+    bool isLost(int peer) const { return peer >= 0 && peer < net::MAX_PEERS && m_peers[peer].lost; }
+    void markLost(int peer, const char* reason);
+    void receiveDrop(int peer, const uint8_t* data, size_t size);
+    bool mergeLostInputs(int peer, int known, int count, const uint8_t* inputs);
+    void decideDrop(int peer, int frame);
+    void updateDrops();
+    void sendDropReport();
+
     SessionConfig m_config;
     ITransport& m_transport;
     ISessionCallbacks& m_callbacks;
@@ -246,6 +323,11 @@ private:
     int m_failedPeer = -1;
     const char* m_failReason = "";
     Stats m_stats;
+
+    uint8_t m_lostMask = 0;
+    bool m_dropDirty = false;       // our report changed: send it
+    std::array<int, INPUT_MAX_PLAYERS> m_cpuFrom {};    // the drop frame of each slot's peer (INT_MAX: none)
+    uint8_t m_dropPacket[3 + (net::MAX_PEERS - 1) * (9 + DROP_RELAY_FRAMES * INPUT_MAX_PLAYERS)] = {};
 };
 
 const char* stallReasonName(StallReason reason);

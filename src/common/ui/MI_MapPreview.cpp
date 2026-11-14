@@ -6,6 +6,7 @@
 #include "map.h"
 #include "MapList.h"
 #include "ObjectContainer.h"
+#include "path.h"
 #include "objecthazard.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
@@ -70,6 +71,11 @@ void MI_MapPreview::Draw()
 
     rectDst.x = iMapBoxX + 16;
 
+    DrawContent();
+}
+
+void MI_MapPreview::DrawContent()
+{
     surfaceMapBackground.draw(blitdest, rectDst);
 
     g_map->drawPlatforms(rectDst.x, rectDst.y, 0);
@@ -147,7 +153,8 @@ void MI_MapPreview::SetSpecialMap(const char * mapName, const char * szMapPath)
 {
     szMapName = mapName;
 
-    LoadMap(szMapPath);
+    //(a path below the data directory)
+    LoadMap(convertPath(szMapPath));
 }
 
 std::string MI_MapPreview::GetMapFilePath() const

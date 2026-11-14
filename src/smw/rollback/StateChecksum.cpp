@@ -93,6 +93,8 @@ uint64_t peerChecksum()
     h.add(g_sim.nextWind);
     for (uint8_t input : g_sim.previousInput)
         h.add(input);
+    if (g_sim.cpuTakeover)    //online only: leaves the other checksums as they were
+        h.add(g_sim.cpuTakeover);
 
     h.add(static_cast<uint32_t>(g_sim.players.size()));
     for (const CPlayer* player : g_sim.players)

@@ -1,5 +1,6 @@
 #include "GSMenu.h"
 
+#include "rollback/MatchConfig.h"
 #include "rollback/NetGame.h"
 
 #include "CmdArgs.h"
@@ -138,8 +139,8 @@ void MenuState::onEnterState()
     fNeedMenuMusicReset = false;
 
     rollback::NetGame& onlineNet = rollback::NetGame::instance();
-    if (onlineNet.active() && onlineNet.lobby() && !cmd::g_net.enabled()) {
-        //Back from an online match: the lobby again
+    if (onlineNet.active() && onlineNet.lobby() && !cmd::g_net.enabled() && !onlineNet.seriesActive()) {
+        //Back from an online match: the lobby again (a tournament, tour or world goes on below)
         mOnlineSetup = false;
         mCurrentMenu = mOnlineLobbyMenu.get();
         if (onlineNet.isHost())
@@ -325,6 +326,8 @@ void MenuState::onEnterState()
         if (mCurrentMenu == mGameSettingsMenu.get() || mCurrentMenu == mTournamentScoreboardMenu.get())
             mGameSettingsMenu->miMapField->LoadCurrentMap();
     }
+
+    OnlineSeriesAfterMatch();
 }
 
 void MenuState::update()
@@ -459,6 +462,7 @@ void MenuState::update()
 #endif
 
     bool fGenerateMapThumbs = false;
+    HandleOnlineSeries();
     if (AppState::Menu == game_values.appstate) {
         if (!cmd::g_net.enabled())
             HandleOnlineEvents();
@@ -466,9 +470,12 @@ void MenuState::update()
             mOnlineLobbyMenu->Sync();
 
         MenuCodeEnum code = MENU_CODE_NONE;
+        //(online, the world map runs only on the frames its lockstep has a tick for: OnlineSeriesWorldTick)
+        mSeriesSkipUpdate = rollback::NetGame::instance().seriesActive();
         if (cmd::g_autotest.enabled)
             code = AutoTestMenuUpdate();
-        if (MENU_CODE_NONE == code)
+        //Online tournaments, tours and worlds: the host leads the menus (MenuOnlineSeries.cpp)
+        if (MENU_CODE_NONE == code && !OnlineSeriesInput(code))
             code = mCurrentMenu->SendInput(&game_values.playerInput);
 
         if (MENU_CODE_EXIT_APPLICATION == code) {
@@ -529,9 +536,11 @@ void MenuState::update()
             mCurrentMenu->ResetMenu();
             iUnlockMinigameOptionIndex = 0;
         } else if (mOnlineSetup && MENU_CODE_MATCH_SELECTION_START == code) {
-            //The host chose single game or minigame for the lobby
-            mOnlineMinigame = mMatchSelectionMenu->GetSelectedMatchType() == MatchType::MiniGame;
-            if (mOnlineMinigame)
+            //The host chose the match type for the lobby
+            const MatchType selected = mMatchSelectionMenu->GetSelectedMatchType();
+            mOnlineMinigame = selected == MatchType::MiniGame;
+            mOnlineSeriesType = rollback::isSeriesMatchType(selected) ? selected : MatchType::SingleGame;
+            if (mOnlineMinigame || mOnlineSeriesType != MatchType::SingleGame)
                 ReturnToOnlineLobby();
             else
                 OpenOnlineGameSettings();
@@ -588,6 +597,11 @@ void MenuState::update()
         else if (MENU_CODE_TOGGLE_FULLSCREEN == code) {
 			gfx_changefullscreen(game_values.fullscreen);
             blitdest = screen;
+        }
+        else if (MENU_CODE_TO_GAME_SETUP_MENU == code && rollback::isSeriesMatchType(game_values.matchtype) && rollback::NetGame::instance().active() &&
+                rollback::NetGame::instance().isHost()) {
+            //Online (--autotest): the host starts a tournament, tour or world for everybody
+            StartOnlineSeries();
         }
         else if (MENU_CODE_TO_GAME_SETUP_MENU == code) {
             printf("MENU_CODE_TO_GAME_SETUP_MENU\n");
@@ -1044,8 +1058,13 @@ void MenuState::update()
     else
         SDL_FillSurfaceRect(screen, nullptr, SDL_MapSurfaceRGB(screen, 0, 0, 0));
 
-    mCurrentMenu->Update();
+    //(online, the world map only runs with the ticks of its lockstep)
+    const bool worldWaits = mCurrentMenu == mWorldMenu.get() && rollback::NetGame::instance().seriesActive() &&
+        (mSeriesSkipUpdate || game_values.appstate != AppState::Menu);
+    if (!worldWaits)
+        mCurrentMenu->Update();
     mCurrentMenu->Draw();
+    DrawOnlineSeriesNotice();
 
     if (iDisplayError > DISPLAY_ERROR_NONE) {
         rm->spr_selectfield.draw(70, 400, {0, 0, 484, 32});
@@ -1084,6 +1103,10 @@ void MenuState::update()
 
     if (game_values.screenfade == 255) {
         rollback::NetGame& net = rollback::NetGame::instance();
+        if (AppState::StartGame == game_values.appstate && net.active() && net.seriesActive() && !net.isHost()) {
+            //A stage of the world map: the host's config starts it
+            return;
+        }
         if (AppState::StartGame == game_values.appstate && net.active()) {
             //Online: the host sends the match it set up to the peers; the game
             //switches to it by itself once they accept (see rollback/NetLobby.h)
@@ -1091,6 +1114,10 @@ void MenuState::update()
             if (!net.startMatch(error)) {
                 printf("netplay: can't start this match online: %s\n", error.c_str());
                 mOnlineLobbyMenu->SetNotice("Can't start the match: " + error);
+                if (net.seriesActive()) {
+                    net.endSeries("the match couldn't start: " + error);
+                    OnlineSeriesEnded("Can't start the match: " + error);
+                }
             }
             game_values.appstate = AppState::Menu;
             game_values.screenfadespeed = -8;

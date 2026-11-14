@@ -2,6 +2,7 @@
 
 #include "NetMesh.h"
 #include "NetProtocol.h"
+#include "SkinTransfer.h"
 #include "Transport.h"
 
 #include <array>
@@ -42,6 +43,8 @@
 //                               color 0..3. Humans come first, in peer order,
 //                               then the CPU players.
 //   lobby.modeName(), lobby.mapName()    what the host's menus have selected
+//   lobby.modeId(), lobby.goal(), lobby.goalName()    the mode's id (GameModeType; the
+//                               minigames' ids are above 1000), its goal and what it counts, for the screen
 //   lobby.inputDelay(), lobby.inputDelayIsAuto()
 //                               the input delay the next match will use
 //   lobby.statusText()          one line for the screen: "Waiting for players",
@@ -49,6 +52,11 @@
 //                               the last match was aborted, ... (empty: nothing)
 //   lobby.mapTransfer()         map download/upload progress (bytesDone/bytesTotal)
 //   lobby.canStart(why)         host: whether startMatch() would start now
+//   lobby.slotSkinPath(s)       the skin file of a human slot's player ("" while it
+//                               isn't here yet: draw the default skin); skins are
+//                               downloaded from their owners (SkinTransfer.h) and
+//                               are cosmetic only. lobby.skinRevision() grows when
+//                               one arrives. lobby.setLocalSkins(...) announces ours.
 //
 // Lobby actions:
 //   lobby.setName(name)                     our nickname (default "Player N")
@@ -74,8 +82,9 @@
 // Events (lobby.pollEvent(event), call until false, e.g. once per frame):
 //   PeerJoined/PeerLeft (peer, text: why it left), MatchStarting (the host
 //   sent the match; maps may be downloading), MatchStarted (the game switched
-//   to the gameplay state by itself), MatchAborted (text: why; a peer left or
-//   timed out), ReturnedToLobby (after every match, ended or aborted: the
+//   to the gameplay state by itself), MatchAborted (text: why; while it
+//   starts: a peer left, refused or timed out; in a running match: we were
+//   dropped. A peer lost mid-match doesn't abort it), ReturnedToLobby (after every match, ended or aborted: the
 //   game is back in MenuState and the lobby screen should show), Closed
 //   (text: why; e.g. "The host closed the lobby").
 //   Joined: we are in (joiners).
@@ -125,7 +134,19 @@
 //                 (at most MAP_CHUNK_BYTES; a few per frame so that the
 //                 connection stays responsive)
 //   START         host -> all: u8 match id: frame 0 starts now
-//   MATCH_ABORT   anyone -> all: u8 match id, u8 the peer at fault, str reason
+//   MATCH_ABORT   anyone -> all: u8 match id, u8 the peer at fault, str reason.
+//                 Sent in a running match by a peer that can't go on (it was
+//                 dropped): the others go on without it. A peer that leaves
+//                 or is lost doesn't end the match for the others (LOST PEERS
+//                 in RollbackSession.h); while the match runs, the lobby
+//                 passes on PEER_DROP (NetProtocol.h) like INPUT, also once
+//                 the lobby is closed (the host is gone).
+//   LOBBY_EXTRA   host -> all, after every LOBBY_STATE (display only): i16 game mode id (-1: unknown),
+//                 i16 goal, str goal name ("Kills", "Points"...)
+//   SKIN_INFO, SKIN_REQUEST, SKIN_BEGIN, SKIN_CHUNK
+//                 between any two peers: the skins of the players (SkinTransfer.h)
+//   SERIES_*, WHEEL_*, WORLD_*   the multi-match modes (NetSeries.h), handed
+//                 to the game like CONFIG
 namespace rollback {
 
 constexpr int LOBBY_SLOTS = 4;
@@ -247,6 +268,12 @@ public:
         int localPlayers = 1;
         // Where downloaded maps go: the first one that can be written
         std::vector<std::string> downloadDirs;
+        // Skins: the folders whose skin files are hashed (to see which skins we have), and where
+        // downloaded skins go (the first one that can be written)
+        std::vector<std::string> skinSearchDirs;
+        std::vector<std::string> skinDownloadDirs;
+        // Testing: the host sends one map chunk every N frames (1: at full speed)
+        int mapSlowdown = 1;
     };
 
     // The transport must outlive the lobby
@@ -266,6 +293,9 @@ public:
     int memberCount() const;
     const std::string& modeName() const { return m_modeName; }
     const std::string& mapName() const { return m_mapName; }
+    int modeId() const { return m_modeId; }
+    int goal() const { return m_goal; }
+    const std::string& goalName() const { return m_goalName; }
     int inputDelay() const { return m_inputDelay; }
     bool inputDelayIsAuto() const { return m_delayIsAuto; }
     const std::string& statusText() const { return m_status; }
@@ -279,10 +309,17 @@ public:
     // The slowest pair of members: round trip and jitter (ms), as measured in the lobby
     void worstRtt(float& rttMs, float& jitterMs) const;
     bool pollEvent(LobbyEvent& event);
+    // The skin file of the player in a human slot, "" if it isn't here (yet)
+    std::string slotSkinPath(int slot) const;
+    // True while the skin of the player in this slot is being downloaded
+    bool slotSkinDownloading(int slot) const;
+    uint32_t skinRevision() const { return m_skins.revision(); }
 
     // ---- actions (see the contract above)
     void setName(const std::string& name);
     void setLocalPlayers(int count);
+    // The skins of our local players (the first of each is announced to the peers)
+    void setLocalSkins(const std::vector<LocalSkinFile>& skins) { m_skins.setLocal(skins); }
     void setReady(bool ready);
     void setSlotTeam(int slot, int team);
     void setSlotColor(int slot, int color);
@@ -299,6 +336,8 @@ public:
     NetMesh& mesh() { return m_mesh; }
     // Host: what its menus have selected (shown in the lobby)
     void setMatchInfo(const std::string& mode, const std::string& map);
+    // Host: the mode's id, goal and what the goal counts (shown in the lobby, never played from)
+    void setMatchDetail(int modeId, int goal, const std::string& goalName);
     // The game's part of the state machine
     void setPhase(Phase phase);
     // Shows a message (and adds an event)
@@ -318,6 +357,11 @@ public:
     void sendConfigAck(uint8_t matchId, uint8_t status, const std::string& reason);
     void sendStart(uint8_t matchId);
     void sendMatchAbort(uint8_t matchId, int culprit, const std::string& reason);
+    // A series message (NetSeries.h) to a peer, or to everyone (-1). Reliable.
+    void sendGameMessage(int peer, const uint8_t* data, size_t size);
+    // Host: a series (tournament, tour, world) runs: new joiners are refused
+    // between its matches too
+    void setSeriesLocked(bool locked);
     // Host: sends a map file to a peer (in chunks, over the next frames)
     void sendMap(int peer, uint8_t matchId, std::shared_ptr<const std::vector<uint8_t>> file, uint64_t hash, const std::string& name);
     void cancelMapTransfers();
@@ -357,6 +401,7 @@ private:
     };
 
     bool handleMesh(const NetMesh::Event& me, LobbyGameEvent& event, uint32_t nowMs);
+    bool pollClosed(const NetMesh::Event& me, LobbyGameEvent& event);
     bool handleMessage(int peer, Channel channel, const uint8_t* data, size_t size, LobbyGameEvent& event, uint32_t nowMs);
     void onLobbyState(net::ByteReader& r);
     void onPeerInfo(int peer, net::ByteReader& r);
@@ -378,6 +423,7 @@ private:
 
     NetMesh m_mesh;
     Options m_options;
+    SkinExchange m_skins;
     Phase m_phase = Phase::Joining;
     std::array<LobbyPeer, net::MAX_PEERS> m_peers {};
     std::array<LobbySlot, LOBBY_SLOTS> m_slots {};
@@ -387,6 +433,9 @@ private:
     uint8_t m_cpuColor[LOBBY_SLOTS] = {};
     std::string m_modeName;
     std::string m_mapName;
+    int m_modeId = -1;
+    int m_goal = 0;
+    std::string m_goalName;
     int m_delayOverride = -1;
     int m_inputDelay = 2;
     bool m_delayIsAuto = true;
@@ -415,6 +464,7 @@ private:
     size_t m_eventCount = 0;
     std::array<uint8_t, 2048> m_buffer {};
     bool m_closed = false;
+    bool m_seriesLocked = false;
 };
 
 // MAP FILES (map transfer). The name a peer sends is only a hint for a

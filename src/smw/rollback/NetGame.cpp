@@ -1,6 +1,8 @@
 #include "NetGame.h"
 
 #include "CmdArgs.h"
+#include "FileList.h"
+#include "ResourceManager.h"
 #include "GameMode.h"
 #include "GameValues.h"
 #include "GSGameplay.h"
@@ -10,6 +12,7 @@
 #include "StateChecksum.h"
 
 #include "RandomNumberGenerator.h"
+#include "SeriesState.h"
 
 #ifndef NETWORK_DISABLED
 #include "EnetTransport.h"
@@ -120,6 +123,11 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
     options.name = args.name;
     options.localPlayers = 1;
     options.downloadDirs = mapDownloadDirs();
+    options.mapSlowdown = args.slowMap;
+    options.skinSearchDirs = skinSearchDirs();
+    options.skinDownloadDirs = skinDownloadDirs();
+    m_skinsAnnounced = false;
+    m_skinRevision = 0;
     m_lobby = std::make_unique<NetLobby>(*transport, options, monotonicMs());
     m_transport = std::move(transport);
     if (m_lobby->phase() == NetLobby::Phase::Closed) {
@@ -196,6 +204,9 @@ void NetGame::shutdown()
     m_mapFile.reset();
     m_closeAfterMatch.clear();
     m_abortText.clear();
+    m_series = Series();
+    m_world.end();
+    m_seriesEvents.clear();
 }
 
 // ---- the main loop
@@ -216,14 +227,18 @@ void NetGame::pump()
             m_closeMs = now;
         }
     } else {
+        updateSkins();
         //Joiner: a config that arrived while the previous match was still ending
-        if (m_pendingConfig && !inMatch())
+        //(or while the world map still has ticks to run before it)
+        if (m_pendingConfig && !inMatch() && !(m_world.active() && m_world.pending() > 0))
             processConfig();
         if (isHost() && m_lobby->phase() == NetLobby::Phase::Starting)
             hostUpdateStart(now);
         if (isHost() && m_lobby->phase() == NetLobby::Phase::Lobby)
             updateMatchInfo(now);
     }
+
+    seriesUpdate();
 
     //After a match: keep sending until the others have every input they need
     if (m_session && m_session->state() == RollbackSession::State::Ended && !inMatch())
@@ -233,13 +248,68 @@ void NetGame::pump()
     m_transport->flush();
 }
 
+// Skins are cosmetic: announces ours, and when a skin arrives during a match, the sprites are reloaded
+void NetGame::updateSkins()
+{
+    if (!skinlist || skinlist->count() == 0)
+        return;
+
+    //--net-skin NAME[,NAME2]: the skins of the local players (testing)
+    static bool commandLineApplied = false;
+    if (!commandLineApplied) {
+        commandLineApplied = true;
+        size_t start = 0;
+        for (int i = 0; i < MAX_LOCAL_PLAYERS && start <= cmd::g_net.skin.size() && !cmd::g_net.skin.empty(); i++) {
+            size_t end = cmd::g_net.skin.find(',', start);
+            if (end == std::string::npos)
+                end = cmd::g_net.skin.size();
+            const std::string name = cmd::g_net.skin.substr(start, end - start);
+            start = end + 1;
+            for (size_t s = 0; s < skinlist->count(); s++) {
+                if (skinlist->at(s).name == name)
+                    game_values.skinids[i] = static_cast<short>(s);
+            }
+        }
+    }
+
+    const auto valid = [](short id) { return id >= 0 && id < static_cast<short>(skinlist->count()); };
+    const uint32_t key = (static_cast<uint32_t>(static_cast<uint16_t>(game_values.skinids[0])) << 16) | static_cast<uint16_t>(game_values.skinids[1]);
+    if (!m_skinsAnnounced || key != m_skinKey) {
+        m_skinsAnnounced = true;
+        m_skinKey = key;
+        std::vector<LocalSkinFile> skins;
+        for (int i = 0; i < MAX_LOCAL_PLAYERS; i++) {
+            const short id = game_values.skinids[i];
+            const SkinListNode& node = skinlist->at(valid(id) ? static_cast<size_t>(id) : 0);
+            skins.push_back({node.name, node.path.string()});
+        }
+        m_lobby->setLocalSkins(skins);
+    }
+
+    const uint32_t revision = m_lobby->skinRevision();
+    if (revision != m_skinRevision) {
+        m_skinRevision = revision;
+        if (inMatch()) {
+            for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
+                if (game_values.playercontrol[k] > 0)
+                    loadMatchSkin(k, game_values.colorids[k]);
+            }
+        }
+    }
+}
+
 void NetGame::updateMatchInfo(uint32_t nowMs)
 {
     if (nowMs - m_lastInfoMs < 250 || !game_values.gamemode)
         return;
     m_lastInfoMs = nowMs;
+    if (isSeriesMatchType(game_values.matchtype) && !m_series.active) {
+        m_lobby->setMatchInfo(seriesMatchName(), seriesFileName());
+        return;
+    }
     const bool minigame = game_values.matchtype == MatchType::MiniGame;
     m_lobby->setMatchInfo(game_values.gamemode->GetModeName(), minigame ? "(minigame)" : maplist->currentShortmapname());
+    m_lobby->setMatchDetail(game_values.gamemode->getgamemode(), game_values.gamemode->goal, game_values.gamemode->GetGoalName());
 }
 
 void NetGame::handle(const LobbyGameEvent& event, uint32_t nowMs)
@@ -253,16 +323,17 @@ void NetGame::handle(const LobbyGameEvent& event, uint32_t nowMs)
         case Type::PeerGone: {
             const int peer = event.peer;
             const bool inThisMatch = (matchPeers() >> peer) & 1;
-            if (inMatch() && inThisMatch) {
-                if (m_abortText.empty())
-                    m_abortText = peerName(peer) + " " + event.text;
-                m_session->onPeerDisconnected(peer, nowMs, "left the match");
-            } else if (m_lobby->phase() == NetLobby::Phase::Starting && inThisMatch) {
+            //The match goes on without it (also one that ended here: the others may still need us to agree)
+            if (m_session && inThisMatch && (inMatch() || m_session->state() == RollbackSession::State::Ended))
+                m_session->onPeerDisconnected(peer, nowMs, event.text == "left" ? "left the match" : "lost the connection");
+            if (!inMatch() && m_lobby->phase() == NetLobby::Phase::Starting && inThisMatch) {
                 if (isHost())
                     abortStart(peer, peerName(peer) + " " + event.text);
                 else
                     m_lobby->sendMatchAbort(m_matchId, peer, peerName(localPeer()) + " lost the connection to " + peerName(peer));
             }
+            if (m_series.active)
+                seriesPeerGone(peer);
             break;
         }
 
@@ -280,12 +351,24 @@ void NetGame::handle(const LobbyGameEvent& event, uint32_t nowMs)
 
         case Type::Closed:
             if (inMatch()) {
-                //A match the host finished first; otherwise it ends now
-                if (!event.ok) {
-                    m_abortText = event.text;
-                    m_session->onPeerDisconnected(0, nowMs, "left the match");
-                }
+                //The host closed the lobby after this match; or it is gone, and
+                //the match goes on without it. (Removed from the lobby: the
+                //others' PEER_DROP report, which comes first, ends our match.)
+                if (!event.ok && event.text.rfind("You were removed", 0) != 0)
+                    m_session->onPeerDisconnected(0, nowMs, "left the lobby");
                 m_closeAfterMatch = event.text;
+            }
+            if (m_series.active && m_series.endPending) {
+                //The series ended just before: it ends once the world map has run its last ticks (seriesUpdate)
+            } else if (m_series.active) {
+                //Without the lobby there is no series
+                printf("netplay: the series ends: %s\n", event.text.c_str());
+                m_series.active = false;
+                m_world.end();
+                SeriesEvent end;
+                end.type = SeriesEvent::Type::End;
+                end.text = event.text;
+                addSeriesEvent(end);
             }
             break;
 
@@ -356,11 +439,8 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
                 break;
             const std::string& text = reason;    //a whole sentence, e.g. "Player 3 timed out"
             if (inMatch()) {
-                if (m_abortText.empty())
-                    m_abortText = text;
-                //Whoever is at fault, the session ends like this
-                const int gone = culprit != localPeer() && culprit < net::MAX_PEERS && m_session->config().peerConnection[culprit] >= 0 ? culprit : peer;
-                m_session->onPeerDisconnected(gone, nowMs, "aborted the match");
+                //In a running match: the sender can't go on and leaves it; we go on without it
+                m_session->onPeerDisconnected(peer, nowMs, "left the match");
             } else if (m_lobby->phase() == NetLobby::Phase::Starting) {
                 if (isHost())
                     abortStart(culprit, text);
@@ -372,11 +452,14 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
 
         case net::MsgType::Input:
         case net::MsgType::Checksum:
+        case net::MsgType::PeerDrop:
             if (m_session)
                 m_session->onMessage(peer, data, size, nowMs);
             break;
 
         default:
+            if (data[0] >= static_cast<uint8_t>(net::MsgType::SeriesBegin) && data[0] < net::SERIES_MSG_END)
+                handleSeriesMessage(peer, data, size);
             break;
     }
 }
@@ -434,12 +517,19 @@ bool NetGame::startMatch(std::string& error)
         error = "only the host starts matches";
         return false;
     }
-    if (!m_lobby->canStart(error))
+    //A series keeps its players (the ready flags were for its first match)
+    if (m_series.active ? m_lobby->phase() != NetLobby::Phase::Lobby : !m_lobby->canStart(error)) {
+        if (m_series.active)
+            error = "a match is already starting";
         return false;
+    }
 
     SetGameModeSettingsFromMenu();
     std::array<int8_t, INPUT_MAX_PLAYERS> peerOfSlot {{-1, -1, -1, -1}};
-    applyLobbySlots(peerOfSlot);
+    if (m_series.active)
+        applySeriesSlots(peerOfSlot);
+    else
+        applyLobbySlots(peerOfSlot);
 
     //A fresh seed from the host's generator: every peer seeds with it
     const uint32_t seed = static_cast<uint32_t>(RandomNumberGenerator::gameplay().getInteger(0x7fffffff));
@@ -481,7 +571,8 @@ void NetGame::hostUpdateStart(uint32_t nowMs)
         beginMatch();
         return;
     }
-    if (nowMs - m_startMs > START_TIMEOUT_MS) {
+    //(signed: a match started again during this pump has a start time after nowMs)
+    if (static_cast<int32_t>(nowMs - m_startMs) > static_cast<int32_t>(START_TIMEOUT_MS)) {
         for (int p = 1; p < net::MAX_PEERS; p++) {
             if (((peers >> p) & 1) && !((m_ackedMask >> p) & 1)) {
                 abortStart(p, peerName(p) + " didn't accept the match in time");
@@ -498,6 +589,22 @@ void NetGame::abortStart(int culprit, const std::string& reason)
         m_lobby->sendMatchAbort(m_matchId, culprit, reason);
     m_mapFile.reset();
     returnToLobby(reason);
+
+    //A series goes on without a peer that is gone: the same match again, with its players as CPU players
+    if (m_series.active && isHost() && culprit > 0 && culprit < net::MAX_PEERS && !m_series.startRetried) {
+        //(a peer that another one lost: out of the lobby too, as when we lose it)
+        m_series.startRetried = true;
+        if (m_lobby->peer(culprit).present)
+            m_lobby->removePeer(culprit, "lost the connection", true);
+        seriesPeerGone(culprit);
+        std::string error;
+        if (startMatch(error))
+            printf("netplay: series: starting the match again without %s\n", peerName(culprit).c_str());
+        else
+            endSeries("the match couldn't start: " + error);
+    } else if (m_series.active && isHost()) {
+        endSeries("the match couldn't start: " + reason);
+    }
 }
 
 // Joiner: checks the config the host sent
@@ -514,6 +621,12 @@ void NetGame::processConfig()
         m_lobby->sendConfigAck(m_matchId, NetLobby::ACK_REFUSED, "the match config is malformed (another game version?)");
         returnToLobby("The match config is malformed");
         return;
+    }
+    if (!m_config.series.empty()) {
+        //Our own series state, to compare with the host's when the match starts
+        m_world.end();
+        prepareSeriesStateForMatch(m_config.gameMode);
+        m_series.localStateHash = seriesStateHash(captureSeriesState());
     }
     std::string error;
     bool needMap = false;
@@ -570,7 +683,9 @@ void NetGame::returnToLobby(const std::string& abortReason)
     }
     if (wasInMatch) {
         m_lobby->clearReady();
-        m_lobby->addEvent(LobbyEvent::Type::ReturnedToLobby, -1, abortReason);
+        //(in a series, the menus go on with it)
+        if (!m_series.active)
+            m_lobby->addEvent(LobbyEvent::Type::ReturnedToLobby, -1, abortReason);
     }
 }
 
@@ -606,12 +721,28 @@ void NetGame::beginMatch()
 
     m_session.reset();
     m_matchesStarted++;
+    for (int p = 0; p < net::MAX_PEERS; p++)
+        m_matchNames[static_cast<size_t>(p)] = peerName(p);
+    m_lostSeen = 0;
+    m_dropsSeen = 0;
+    m_dropNotice.clear();
     m_abortText.clear();
     m_closeAfterMatch.clear();
     m_waiting = false;
     m_lastMatchError.clear();
     printf("netplay: match %d starts: mode %d, map %s, %d peers, local peer %d, input delay %d\n", m_matchId, config.gameMode,
         config.mapRef.c_str(), peers, session.localPeer, session.inputDelay);
+    if (!config.series.empty()) {
+        //Every peer must have come to the same series state
+        const uint64_t hostHash = seriesStateHash(config.series);
+        const uint64_t localHash = isHost() ? hostHash : m_series.localStateHash;
+        printf("modesum: series match %d before %016llx\n", m_series.matches + 1, static_cast<unsigned long long>(localHash));
+        if (localHash != hostHash)
+            printf("netplay: SERIES DESYNC before series match %d: local state %016llx, the host's %016llx (playing from the host's)\n",
+                m_series.matches + 1, static_cast<unsigned long long>(localHash), static_cast<unsigned long long>(hostHash));
+        m_series.startRetried = false;
+        m_world.end();
+    }
 
     m_lobby->setPhase(NetLobby::Phase::InMatch);
     m_lobby->setRound(m_matchId);
@@ -642,6 +773,7 @@ NetGame::Outcome NetGame::advance(const InputFrame& localInput)
         return outcome;
     const uint32_t now = monotonicMs();
     const FrameResult result = m_session->advanceFrame(localInput, now);
+    updateLostPeers(now);
     m_transport->flush();
 
     const double seconds = secondsSince(start);
@@ -667,37 +799,96 @@ NetGame::Outcome NetGame::advance(const InputFrame& localInput)
 
     if (result.matchEnded) {
         printf("netplay: match %d ended at confirmed frame %d\n", m_matchId, frame);
+        if (m_series.active) {
+            //The menus between the matches use the gameplay generator too: from the same seed everywhere
+            m_series.matches++;
+            RandomNumberGenerator::gameplay().seed(static_cast<uint32_t>(peerChecksum() ^ (peerChecksum() >> 32)) ^ m_series.seed);
+        }
         m_matchEndMs = monotonicMs();
         printStats(true);
         outcome.ended = true;
         m_waiting = false;
         m_inMatch = false;
         returnToLobby("");
-        if (!m_closeAfterMatch.empty())
+        if (!m_closeAfterMatch.empty()) {
             printf("netplay: session closed: %s\n", m_closeAfterMatch.c_str());
-    } else if (m_session->state() == RollbackSession::State::Failed) {
-        const int culprit = m_session->failedPeer();
-        const std::string what = m_abortText.empty() ? peerName(culprit) + " " + m_session->failReason() : m_abortText;
-        printf("netplay: peer %d %s at frame %d: the match ends (%s)\n", culprit, m_session->failReason(), frame, what.c_str());
-        printStats(true);
-        outcome.failed = true;
-        m_waiting = false;
-        m_inMatch = false;
-        //Tell the others why (they may not have noticed yet)
-        m_lobby->sendMatchAbort(m_matchId, culprit, what);
-        if (isHost() && culprit > 0 && m_lobby->peer(culprit).present)
-            m_lobby->removePeer(culprit, m_session->failReason(), true);    //timed out or gone: out of the lobby
-        if (!isHost() && culprit == 0 && m_lobby->phase() != NetLobby::Phase::Closed)
-            m_lobby->leave("lost the host", false);
-        m_transport->flush();
-        returnToLobby("Match aborted: " + what);
-        if (m_lobby->phase() == NetLobby::Phase::Closed) {
-            m_lastMatchError = "Match aborted: " + what;
-            if (m_lobby->statusText().empty() || m_lobby->statusText() == "You left the lobby")
-                m_lobby->setStatus(m_lastMatchError);
+            if (m_lobby->phase() == NetLobby::Phase::Closed)
+                m_lobby->setStatus(m_closeAfterMatch + " (the match was played to its end)");
         }
+    } else if (m_session->state() == RollbackSession::State::Failed) {
+        onSessionFailed();
+        outcome.failed = true;
     }
     return outcome;
+}
+
+// The lost peers of the running match (see LOST PEERS in RollbackSession.h):
+// tells about them, and the host removes them from the lobby
+void NetGame::updateLostPeers(uint32_t nowMs)
+{
+    const uint8_t lost = m_session->lostPeers();
+    if (lost == m_lostSeen && m_dropsSeen == m_lostSeen)
+        return;
+
+    for (int p = 0; p < net::MAX_PEERS; p++) {
+        const uint8_t bit = static_cast<uint8_t>(1u << p);
+        const std::string& name = m_matchNames[static_cast<size_t>(p)];
+        if ((lost & bit) && !(m_lostSeen & bit)) {
+            m_lostSeen |= bit;
+            const char* reason = m_session->lostReason(p);
+            printf("netplay: peer %d (%s) %s at frame %d: the match goes on without it\n", p, name.c_str(), reason, m_session->frame());
+            if (isHost() && p > 0 && m_lobby->peer(p).present)
+                m_lobby->removePeer(p, std::string(reason) == "timed out" ? "timed out" : "left the match", true);
+            if (!isHost() && p == 0 && m_closeAfterMatch.empty())
+                m_closeAfterMatch = "Lost the connection to the host";
+        }
+        const int dropFrame = m_session->dropFrame(p);
+        if (dropFrame >= 0 && !(m_dropsSeen & bit)) {
+            m_dropsSeen |= bit;
+            int slots = 0;
+            for (int8_t slotPeer : m_session->config().slotPeer)
+                slots += slotPeer == p;
+            printf("netplay: peer %d dropped from frame %d: %d player(s) played by the CPU\n", p, dropFrame, slots);
+            m_dropNotice = name + (slots > 0 ? " disconnected - CPU takes over" : " disconnected");
+            m_dropNoticeMs = nowMs;
+        }
+    }
+}
+
+// Our session can't go on: the others dropped us (we were cut off or too
+// late), or inputs of a lost peer are missing here. We leave the match and
+// the lobby; the others play on without us.
+void NetGame::onSessionFailed()
+{
+    const int culprit = m_session->failedPeer();
+    const std::string what = culprit == localPeer() ? std::string("You ") + m_session->failReason()
+                                                    : "Can't go on: " + std::string(m_session->failReason());
+    printf("netplay: leaving the match at frame %d: %s\n", m_session->frame(), what.c_str());
+    printStats(true);
+    m_waiting = false;
+    m_inMatch = false;
+    if (m_series.active) {
+        //The match doesn't count: its state isn't the same everywhere. Back to the series state it started from.
+        applySeriesState(m_config.series);
+        game_values.gamemode->gameover = false;
+        game_values.gamemode->winningteam = -1;
+        printf("netplay: series: the aborted match doesn't count\n");
+    }
+    m_lobby->sendMatchAbort(m_matchId, localPeer(), what);
+    m_lobby->leave(culprit == localPeer() ? "was dropped from the match" : "left the match", true);
+    m_transport->flush();
+    m_lastMatchError = what;
+    m_lobby->setStatus(what);
+}
+
+NetGame::DropNotice NetGame::dropNotice() const
+{
+    DropNotice notice;
+    if (!inMatch() || m_dropNotice.empty())
+        return notice;
+    notice.text = m_dropNotice;
+    notice.ageMs = monotonicMs() - m_dropNoticeMs;
+    return notice;
 }
 
 void NetGame::onMatchLeft()
@@ -840,6 +1031,11 @@ bool NetGame::advance(const InputFrame& input, bool resimulating)
 uint64_t NetGame::checksum()
 {
     return peerChecksum();
+}
+
+void NetGame::takeOverSlots(uint8_t slotMask)
+{
+    GameplayState::instance().takeOverByCpu(slotMask);
 }
 
 void NetGame::onConfirmedChecksum(int frame, uint64_t sum)

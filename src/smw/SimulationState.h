@@ -40,6 +40,8 @@
 //                      keys held across ticks.
 //  - previousInput:    each player's InputFrame byte of the previous tick,
 //                      to derive "just pressed"
+//  - cpuTakeover:      online, the slots (bit s) whose human player the CPU
+//                      took over because their peer is gone
 //  - tick:             number of ticks simulated in this match
 //  - gameoverTick:     the tick at which the game mode declared the match
 //                      over (-1 while it isn't): a deterministic "time since
@@ -93,6 +95,7 @@ struct SimulationState {
 
     COutputControl playerKeys[4] {};
     uint8_t previousInput[4] {};
+    uint8_t cpuTakeover = 0;
 
     int tick = 0;
     int gameoverTick = -1;

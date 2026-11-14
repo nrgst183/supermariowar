@@ -38,10 +38,11 @@ void print_help(const char* title, const char* version)
     printf("      --debug             Shows the debug console on Windows\n");
     printf("\nHeadless auto-play (debugging aid, CPU players, no device input):\n");
     printf("      --autotest          Enables auto-play; the options below only apply with it\n");
-    printf("      --at-match <KIND>   single (default), minigame, tour, world, menus or shots\n");
+    printf("      --at-match <KIND>   single (default), minigame, tournament, tour, world, menus or shots\n");
     printf("      --at-mode <N>       Game mode index 0..21 (minigame: 0 pipe, 1 hammer boss,\n"
            "                          2 bomb boss, 3 fire boss, 4 boxes); default: cycle all\n");
-    printf("      --at-map <NAME>     Map short name (e.g. 0smw); default: cycle the map list\n");
+    printf("      --at-map <NAME>     Map short name (e.g. 0smw); default: cycle the map list\n"
+           "                          (tour, world: the file name of the tour or world, e.g. 0smw)\n");
     printf("      --at-players <N>    Players 1..4 (default 4, 0 = cycle 2..4)\n");
     printf("      --at-frames <N>     Max frames per match (menus: total frames), default 3000\n");
     printf("      --at-matches <N>    Quit after N matches (tour/world: stages), default 1\n");
@@ -53,7 +54,8 @@ void print_help(const char* title, const char* version)
            "                          eyecandy and other side effects suppressed); the\n"
            "                          results must match a normal run\n");
     printf("      --at-shots <DIR>    --at-match shots: save screenshots of the main, online and lobby menus\n"
-           "                          to DIR (with --at-role host|join, --at-addr IP[:PORT], --at-nick NAME)\n");
+           "                          to DIR (with --at-role host|join|orig, --at-addr IP[:PORT], --at-nick NAME)\n"
+           "      --at-lobby-style <N> The online lobby layout (0: team stage, 1: polished cards)\n");
     printf("      --at-norender <0|1> 1: don't draw or present frames (faster headless runs,\n"
            "                          e.g. under valgrind); the simulation is unaffected\n");
     printf("      --at-humans <N>     The first N players are \"human\" players, driven by\n"
@@ -70,7 +72,9 @@ void print_help(const char* title, const char* version)
     printf("      --net-peers <N>     --autotest host: wait for N peers, the host included (default 2)\n");
     printf("      --net-join <IP:PORT> Join the lobby of a host\n");
     printf("      --net-name <NAME>   Nickname in the lobby (default \"Player N\")\n");
+    printf("      --net-skin <NAME[,NAME2]> Skin of the local player(s) in the lobby (testing)\n");
     printf("      --net-port <PORT>   Local UDP port of a joiner (default: any)\n");
+    printf("      --net-slow-map <N>  Send one map chunk per N frames (to look at the transfer)\n");
     printf("      --net-delay <N>     Input delay in ticks (default: automatic, from the ping)\n");
     printf("      --net-checksum <N>  Compare state checksums every N frames (\"netsum:\" lines)\n");
     printf("      --net-stats <N>     Print \"netstats:\" lines every N frames (default 300, 0 off)\n");
@@ -117,6 +121,7 @@ Args parse_args(int argc, char* argv[])
                 else if (val == "minigame") at.kind = AutoTestArgs::Kind::Minigame;
                 else if (val == "tour") at.kind = AutoTestArgs::Kind::Tour;
                 else if (val == "world") at.kind = AutoTestArgs::Kind::World;
+                else if (val == "tournament") at.kind = AutoTestArgs::Kind::Tournament;
                 else if (val == "menus") at.kind = AutoTestArgs::Kind::Menus;
                 else if (val == "shots") at.kind = AutoTestArgs::Kind::Shots;
                 else {
@@ -141,6 +146,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-shot-dir") at.shotDir = val;
             else if (arg == "--at-shots") at.shotsDir = val;
             else if (arg == "--at-role") at.shotsRole = val;
+            else if (arg == "--at-lobby-style") at.lobbyStyle = atoi(val.c_str());
             else if (arg == "--at-addr") at.shotsAddr = val;
             else if (arg == "--at-nick") at.shotsName = val;
             else if (arg == "--at-shotmap") at.shotsMap = atoi(val.c_str());
@@ -171,6 +177,8 @@ Args parse_args(int argc, char* argv[])
             }
             else if (arg == "--net-port") net.port = atoi(val.c_str());
             else if (arg == "--net-name") net.name = val;
+            else if (arg == "--net-skin") net.skin = val;
+            else if (arg == "--net-slow-map") net.slowMap = std::max(1, atoi(val.c_str()));
             else if (arg == "--net-delay") net.delay = atoi(val.c_str());
             else if (arg == "--net-checksum") net.checksumInterval = atoi(val.c_str());
             else if (arg == "--net-stats") net.statsInterval = atoi(val.c_str());

@@ -25,6 +25,8 @@
 //   i16 team count, 4 x 3 x i16 team members, 4 x i16 team sizes
 //   u16 size + the simulation settings (simulationSettings() in MatchConfig.cpp:
 //   every game_values setting the simulation reads, and all game mode settings)
+//   u16 size + the series state (SeriesState.h; empty outside a tournament,
+//   tour or world)
 //
 // THE RULE FOR NEW SETTINGS: a setting that the simulation reads must be
 // listed in visitSimulationSettings() (MatchConfig.cpp), or peers with
@@ -40,7 +42,7 @@ struct MatchSlot {
 };
 
 struct MatchConfig {
-    static constexpr uint16_t FORMAT_VERSION = 2;
+    static constexpr uint16_t FORMAT_VERSION = 3;
 
     uint32_t seed = 0;
     MatchType matchType = MatchType::SingleGame;
@@ -59,6 +61,8 @@ struct MatchConfig {
     int16_t teamIds[4][3] = {};
     int16_t teamCounts[4] = {};
     std::vector<uint8_t> settings;
+    // Tournament, tour, world: the host's state of the series (SeriesState.h)
+    std::vector<uint8_t> series;
 
     std::vector<uint8_t> serialize() const;
     // False if the data is malformed
@@ -70,6 +74,12 @@ struct MatchConfig {
 // False (with a message) if this match can't be played online.
 bool captureMatchConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot, uint32_t seed, int inputDelay, std::string& error);
 
+// Tournament, tour and world: the multi-match modes (NetSeries.h)
+bool isSeriesMatchType(MatchType type);
+// Before a series match is captured or compared: the series state that the
+// match doesn't use is normalized (the single player of a bonus house)
+void prepareSeriesStateForMatch(int gameMode);
+
 // Every peer: checks that the match can be played here. `needMap` (if given)
 // tells whether what is missing is the map (it can be downloaded: then it is
 // found by its hash in mapDownloadDirs())
@@ -80,6 +90,13 @@ std::string matchMapPath(const MatchConfig& config);
 // Where downloaded maps are saved and looked for: maps/net/ in the data
 // directory, else in the home directory (if the data directory is read-only)
 std::vector<std::string> mapDownloadDirs();
+// Skins: the folders whose skin files are compared by hash (the game's skins and the downloaded
+// ones), and where downloaded skins are saved (skins/net/ in the data directory, else the home directory)
+std::vector<std::string> skinSearchDirs();
+std::vector<std::string> skinDownloadDirs();
+// Loads the sprites of the player in a slot of the running online match: the skin of its owner
+// (downloaded if need be), the default skin while it isn't here. Cosmetic only.
+void loadMatchSkin(int slot, short color);
 
 // Every peer: sets up game_values, loads the map and enters the gameplay
 // state with the match ready to run frame 0
@@ -90,6 +107,11 @@ void startConfiguredMatch(const MatchConfig& config);
 uint32_t simulationPlayerDevice(short slot);
 // Online: the device types the config set (cleared when the match ends)
 void setSimulationPlayerDevices(const std::array<bool, INPUT_MAX_PLAYERS>* keyboard);
+
+// The simulation settings of game_values (see visitSimulationSettings), as
+// in MatchConfig::settings; the series send them too (NetSeries.h)
+std::vector<uint8_t> captureSimulationSettings();
+bool applySimulationSettings(const std::vector<uint8_t>& bytes);
 
 // Hash of the loaded simulation data that isn't part of a map: the tile types
 // of every tileset (they decide collisions), for the connection handshake

@@ -73,6 +73,8 @@ void RttEstimate::add(float sampleMs)
 NetLobby::NetLobby(IMeshTransport& transport, const Options& options, uint32_t nowMs)
     : m_mesh(transport, options.mesh, nowMs)
     , m_options(options)
+    , m_skins(SkinExchange::Options {options.skinSearchDirs, options.skinDownloadDirs},
+          [this](int peer, const uint8_t* data, size_t size) { m_mesh.send(peer, Channel::Reliable, data, size); }, -1)
     , m_lastPingMs(nowMs)
     , m_lastReportMs(nowMs)
     , m_lastChunkMs(nowMs)
@@ -228,6 +230,7 @@ void NetLobby::removePeer(int peer, const std::string& reason, bool tellIt)
         sendTo(peer, w);
     }
     m_mesh.dropPeer(peer);
+    m_skins.dropPeer(peer);
     p = LobbyPeer();
     m_rtt[static_cast<size_t>(peer)] = RttEstimate();
     m_reports[static_cast<size_t>(peer)] = Report();
@@ -469,15 +472,40 @@ void NetLobby::setMatchInfo(const std::string& mode, const std::string& map)
     }
 }
 
+void NetLobby::setMatchDetail(int modeId, int goal, const std::string& goalName)
+{
+    if (modeId != m_modeId || goal != m_goal || goalName != m_goalName) {
+        m_modeId = modeId;
+        m_goal = goal;
+        m_goalName = goalName;
+        markDirty();
+    }
+}
+
 void NetLobby::setPhase(Phase phase)
 {
     if (m_phase == Phase::Closed || phase == m_phase)
         return;
     m_phase = phase;
     if (isHost())
-        m_mesh.setRefuseJoins(phase == Phase::Lobby ? "" : "a match is in progress, try again in a moment");
+        m_mesh.setRefuseJoins(phase == Phase::Lobby && !m_seriesLocked ? "" : "a match is in progress, try again in a moment");
     if (phase != Phase::Starting)
         cancelMapTransfers();
+}
+
+void NetLobby::setSeriesLocked(bool locked)
+{
+    m_seriesLocked = locked;
+    if (isHost() && m_phase != Phase::Closed)
+        m_mesh.setRefuseJoins(m_phase == Phase::Lobby && !locked ? "" : "a match is in progress, try again in a moment");
+}
+
+void NetLobby::sendGameMessage(int peer, const uint8_t* data, size_t size)
+{
+    if (peer < 0)
+        m_mesh.sendToAll(Channel::Reliable, data, size);
+    else
+        m_mesh.send(peer, Channel::Reliable, data, size);
 }
 
 void NetLobby::leave(const std::string& reason, bool abortMatch)
@@ -682,6 +710,13 @@ void NetLobby::sendLobbyState()
         w.u8(s.color);
     }
     sendToAll(w);
+
+    ByteWriter extra(m_buffer.data(), m_buffer.size());
+    extra.u8(static_cast<uint8_t>(MsgType::LobbyExtra));
+    extra.i16(static_cast<int16_t>(m_modeId));
+    extra.i16(static_cast<int16_t>(m_goal));
+    extra.str(m_goalName);
+    sendToAll(extra);
     m_dirty = false;
 }
 
@@ -758,11 +793,12 @@ void NetLobby::cancelMapTransfers()
 
 void NetLobby::sendMapChunks(uint32_t nowMs)
 {
+    const uint32_t slowdown = static_cast<uint32_t>(std::max(1, m_options.mapSlowdown));
     const uint32_t frames = (nowMs - m_lastChunkMs) / 16;
-    if (frames == 0)
+    if (frames < slowdown)
         return;
     m_lastChunkMs = nowMs;
-    const int budget = MAP_CHUNKS_PER_FRAME * static_cast<int>(std::min<uint32_t>(frames, 4));
+    const int budget = slowdown > 1 ? 1 : MAP_CHUNKS_PER_FRAME * static_cast<int>(std::min<uint32_t>(frames, 4));
 
     bool any = false;
     for (int p = 1; p < net::MAX_PEERS; p++) {
@@ -1063,6 +1099,7 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
                 break;
             const std::string name = m_peers[static_cast<size_t>(gone)].name;
             m_mesh.dropPeer(gone);
+            m_skins.dropPeer(gone);
             m_peers[static_cast<size_t>(gone)] = LobbyPeer();
             m_rtt[static_cast<size_t>(gone)] = RttEstimate();
             addEvent(LobbyEvent::Type::PeerLeft, gone, (name.empty() ? defaultName(gone) : name) + " " + reason);
@@ -1105,12 +1142,34 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
                 return onMapChunk(r, event);
             break;
 
+        case MsgType::LobbyExtra:
+            if (fromHost && !isHost()) {
+                const int modeId = r.i16();
+                const int goal = r.i16();
+                std::string goalName = r.str();
+                if (r.ok()) {
+                    m_modeId = modeId;
+                    m_goal = goal;
+                    m_goalName = std::move(goalName);
+                }
+            }
+            break;
+
+        case MsgType::SkinInfo:
+        case MsgType::SkinRequest:
+        case MsgType::SkinBegin:
+        case MsgType::SkinChunk:
+            //Cosmetic and best effort, in the lobby and during matches
+            m_skins.handle(peer, type, r);
+            break;
+
         case MsgType::Config:
         case MsgType::ConfigAck:
         case MsgType::Start:
         case MsgType::MatchAbort:
         case MsgType::Input:
         case MsgType::Checksum:
+        case MsgType::PeerDrop:
             event = LobbyGameEvent();
             event.type = LobbyGameEvent::Type::Message;
             event.peer = peer;
@@ -1120,6 +1179,15 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
             return true;
 
         default:
+            //The multi-match modes (NetSeries.h): NetGame's
+            if (data[0] >= static_cast<uint8_t>(MsgType::SeriesBegin) && data[0] < net::SERIES_MSG_END) {
+                event = LobbyGameEvent();
+                event.type = LobbyGameEvent::Type::Message;
+                event.peer = peer;
+                event.data = data;
+                event.size = size;
+                return true;
+            }
             break;
     }
     return false;
@@ -1153,6 +1221,7 @@ bool NetLobby::handleMesh(const NetMesh::Event& me, LobbyGameEvent& event, uint3
             }
             m_rtt[static_cast<size_t>(me.peer)] = RttEstimate();
             m_peers[static_cast<size_t>(me.peer)].pingMs = -1;
+            m_skins.dropPeer(me.peer);
             if (isHost()) {
                 if (!m_peers[static_cast<size_t>(me.peer)].present)
                     return false;
@@ -1172,16 +1241,49 @@ bool NetLobby::handleMesh(const NetMesh::Event& me, LobbyGameEvent& event, uint3
     }
 }
 
+// The lobby is closed, a match may still run: its messages, and the peers that leave it
+bool NetLobby::pollClosed(const NetMesh::Event& me, LobbyGameEvent& event)
+{
+    if (me.type == NetMesh::Event::Type::PeerLost) {
+        event = LobbyGameEvent();
+        event.type = LobbyGameEvent::Type::PeerGone;
+        event.peer = me.peer;
+        event.text = "lost the connection";
+        return true;
+    }
+    if (me.type != NetMesh::Event::Type::Message || me.size == 0)
+        return false;
+    const auto type = static_cast<MsgType>(me.data[0]);
+    if (type == MsgType::Bye) {
+        ByteReader r(me.data + 1, me.size - 1);
+        if (static_cast<ByeKind>(r.u8()) != ByeKind::Leave || !r.ok())
+            return false;
+        event = LobbyGameEvent();
+        event.type = LobbyGameEvent::Type::PeerGone;
+        event.peer = me.peer;
+        event.text = "left";
+        return true;
+    }
+    if (type != MsgType::Input && type != MsgType::Checksum && type != MsgType::PeerDrop && type != MsgType::MatchAbort)
+        return false;
+    event = LobbyGameEvent();
+    event.type = LobbyGameEvent::Type::Message;
+    event.peer = me.peer;
+    event.data = me.data;
+    event.size = me.size;
+    return true;
+}
+
 bool NetLobby::poll(LobbyGameEvent& event, uint32_t nowMs)
 {
     NetMesh::Event me;
     if (m_phase == Phase::Closed) {
-        //Keep the transport serviced (what is queued still goes out). Only a
-        //match that the host lets finish still gets its last inputs.
+        //Keep the transport serviced (what is queued still goes out). A match
+        //that goes on (the host let it finish, or is gone) still gets its
+        //messages, and hears of the peers that leave it.
         while (m_mesh.poll(me, nowMs)) {
-            const auto type = me.size > 0 ? static_cast<MsgType>(me.data[0]) : MsgType::Bye;
-            if (me.type == NetMesh::Event::Type::Message && (type == MsgType::Input || type == MsgType::Checksum))
-                return handleMessage(me.peer, me.channel, me.data, me.size, event, nowMs);
+            if (pollClosed(me, event))
+                return true;
         }
         return false;
     }
@@ -1202,6 +1304,16 @@ void NetLobby::update(uint32_t nowMs)
 {
     if (m_phase == Phase::Closed)
         return;
+
+    if (localPeer() >= 0) {
+        uint8_t connected = 0;
+        for (int p = 0; p < net::MAX_PEERS; p++) {
+            if (p != localPeer() && m_mesh.peerConnected(p))
+                connected |= static_cast<uint8_t>(1u << p);
+        }
+        m_skins.setLocalPeer(localPeer());
+        m_skins.update(nowMs, connected);
+    }
 
     //Round trips, measured outside matches (the session measures its own)
     if (m_phase != Phase::InMatch && nowMs - m_lastPingMs >= PING_INTERVAL_MS) {
@@ -1256,6 +1368,20 @@ void NetLobby::update(uint32_t nowMs)
         sendLobbyState();
     }
     sendMapChunks(nowMs);
+}
+
+std::string NetLobby::slotSkinPath(int slot) const
+{
+    const LobbySlot& s = m_slots[static_cast<size_t>(slot & 3)];
+    if (s.kind != SlotKind::Human || s.peer < 0)
+        return {};
+    return m_skins.pathOf(s.peer, s.localIndex);
+}
+
+bool NetLobby::slotSkinDownloading(int slot) const
+{
+    const LobbySlot& s = m_slots[static_cast<size_t>(slot & 3)];
+    return s.kind == SlotKind::Human && s.peer >= 0 && m_skins.downloading(s.peer, s.localIndex);
 }
 
 // ---- map files

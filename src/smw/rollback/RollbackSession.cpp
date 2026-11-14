@@ -53,6 +53,8 @@ RollbackSession::RollbackSession(const SessionConfig& config, ITransport& transp
         }
     }
 
+    m_cpuFrom.fill(INT_MAX);
+
     //Inputs below the input delay are zero on every peer
     m_localReceived = m_config.inputDelay;
     for (Peer& peer : m_peers) {
@@ -65,7 +67,7 @@ RollbackSession::RollbackSession(const SessionConfig& config, ITransport& transp
 int RollbackSession::knownFrames(int slot) const
 {
     const int peer = m_config.slotPeer[slot];
-    if (peer < 0)
+    if (peer < 0 || m_cpuFrom[slot] != INT_MAX)
         return ALL_KNOWN;
     if (peer == m_config.localPeer)
         return m_localReceived;
@@ -85,7 +87,7 @@ uint8_t RollbackSession::laggingPeers() const
     const int confirmed = confirmedFrame();
     uint8_t mask = 0;
     for (int p = 0; p < m_config.peerCount; p++) {
-        if (isRemote(p) && m_peers[p].slotCount > 0 && m_peers[p].received <= confirmed)
+        if (isRemote(p) && m_peers[p].slotCount > 0 && m_peers[p].dropFrame < 0 && m_peers[p].received <= confirmed)
             mask |= static_cast<uint8_t>(1u << p);
     }
     return mask;
@@ -95,8 +97,8 @@ InputFrame RollbackSession::tickInput(int frame)
 {
     InputFrame in;
     for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
-        if (m_config.slotPeer[slot] < 0)
-            continue;
+        if (m_config.slotPeer[slot] < 0 || frame >= m_cpuFrom[slot])
+            continue;    //nobody's, or a lost peer's slot that the CPU plays: zero
 
         const int known = knownFrames(slot);
         if (frame < known)
@@ -112,6 +114,16 @@ void RollbackSession::runTick(bool resimulating)
     const InputFrame in = tickInput(m_frame);
     for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++)
         used(m_frame, slot) = in.players[slot];
+
+    //From a lost peer's drop frame on, the CPU plays its slots (every tick: a
+    //rollback to before the drop frame undoes the takeover)
+    uint8_t cpu = 0;
+    for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
+        if (m_frame >= m_cpuFrom[slot])
+            cpu |= static_cast<uint8_t>(1u << slot);
+    }
+    if (cpu)
+        m_callbacks.takeOverSlots(cpu);
 
     m_atBarrier = m_callbacks.advance(in, resimulating);
     m_frame++;
@@ -163,7 +175,7 @@ float RollbackSession::localAdvantage(const Peer& peer, uint32_t nowMs) const
 void RollbackSession::updateTimeSync(uint32_t nowMs)
 {
     for (int p = 0; p < m_config.peerCount; p++) {
-        if (!isRemote(p))
+        if (!isRemote(p) || m_peers[p].lost)
             continue;
         Peer& peer = m_peers[p];
         peer.avgLocalAdvantage += (localAdvantage(peer, nowMs) - peer.avgLocalAdvantage) * AVERAGE_WEIGHT;
@@ -178,7 +190,7 @@ void RollbackSession::updateTimeSync(uint32_t nowMs)
     //directions: half their difference is how far ahead we really are
     float ahead = 0.0f;
     for (int p = 0; p < m_config.peerCount; p++) {
-        if (isRemote(p))
+        if (isRemote(p) && !m_peers[p].lost)
             ahead = std::max(ahead, (m_peers[p].avgLocalAdvantage - m_peers[p].avgRemoteAdvantage) * 0.5f);
     }
     if (ahead >= 1.0f)
@@ -195,6 +207,7 @@ FrameResult RollbackSession::advanceFrame(const InputFrame& localInput, uint32_t
     }
 
     checkTimeouts(nowMs);
+    updateDrops();
     if (m_state != State::Running) {
         result.stalled = StallReason::Ended;
         return result;
@@ -247,8 +260,12 @@ FrameResult RollbackSession::advanceFrame(const InputFrame& localInput, uint32_t
 
 void RollbackSession::idle(uint32_t nowMs)
 {
-    if (m_state == State::Ended)
+    if (m_state == State::Ended) {
+        //The others may still be agreeing on a lost peer: take part (but
+        //don't look for lost peers ourselves, the match is over here)
+        updateDrops();
         sendInputs(nowMs);
+    }
 }
 
 bool RollbackSession::drained() const
@@ -257,7 +274,7 @@ bool RollbackSession::drained() const
         return m_state == State::Failed;
 
     for (int p = 0; p < m_config.peerCount; p++) {
-        if (isRemote(p) && m_peers[p].connected && m_peers[p].acked < std::min(m_localReceived, m_endFrame))
+        if (isRemote(p) && m_peers[p].connected && !m_peers[p].lost && m_peers[p].acked < std::min(m_localReceived, m_endFrame))
             return false;
     }
     return true;
@@ -269,7 +286,7 @@ void RollbackSession::sendInputs(uint32_t nowMs)
     const uint32_t sendTime = nowMs ? nowMs : 1;    //0 means "no time" in an echo
 
     for (int p = 0; p < m_config.peerCount; p++) {
-        if (!isRemote(p) || !m_peers[p].connected)
+        if (!isRemote(p) || !m_peers[p].connected || m_peers[p].lost)
             continue;
         Peer& peer = m_peers[p];
 
@@ -302,7 +319,8 @@ void RollbackSession::sendInputs(uint32_t nowMs)
 
 void RollbackSession::onMessage(int peer, const uint8_t* data, size_t size, uint32_t nowMs)
 {
-    if (!isRemote(peer) || size < 2 || data[1] != m_config.matchId)
+    //Nothing counts from a lost peer: what it sent before is all there is
+    if (!isRemote(peer) || isLost(peer) || size < 2 || data[1] != m_config.matchId)
         return;
 
     m_peers[peer].lastReceiveMs = nowMs;
@@ -312,6 +330,8 @@ void RollbackSession::onMessage(int peer, const uint8_t* data, size_t size, uint
         receiveInput(peer, data, size, nowMs);
     else if (data[0] == static_cast<uint8_t>(net::MsgType::Checksum))
         receiveChecksum(peer, data, size);
+    else if (data[0] == static_cast<uint8_t>(net::MsgType::PeerDrop))
+        receiveDrop(peer, data, size);
 }
 
 void RollbackSession::receiveInput(int p, const uint8_t* data, size_t size, uint32_t nowMs)
@@ -417,6 +437,10 @@ void RollbackSession::compareChecksums(ChecksumEntry& entry)
     for (int p = 0; p < m_config.peerCount; p++) {
         if (!entry.hasRemote[p] || entry.compared[p])
             continue;
+        //A lost peer's checksums of frames past its known inputs may be of
+        //a state the others never had (it played on with its own inputs)
+        if (m_peers[p].lost && entry.frame > m_peers[p].lostKnown)
+            continue;
         entry.compared[p] = true;
         m_stats.checksumsCompared++;
         if (entry.remote[p] != entry.local) {
@@ -452,7 +476,7 @@ void RollbackSession::finalizeChecksums()
         w.u32(static_cast<uint32_t>(frame));
         w.u64(entry.local);
         for (int p = 0; p < m_config.peerCount; p++) {
-            if (isRemote(p) && m_peers[p].connected)
+            if (isRemote(p) && m_peers[p].connected && !m_peers[p].lost)
                 m_transport.send(m_config.peerConnection[p], Channel::Reliable, w.data(), w.size());
         }
 
@@ -463,10 +487,8 @@ void RollbackSession::finalizeChecksums()
 void RollbackSession::checkTimeouts(uint32_t nowMs)
 {
     for (int p = 0; p < m_config.peerCount; p++) {
-        if (isRemote(p) && m_peers[p].connected && msDiff(nowMs, m_peers[p].lastReceiveMs) > static_cast<int32_t>(m_config.timeoutMs)) {
-            fail(p, "timed out");
-            return;
-        }
+        if (isRemote(p) && m_peers[p].connected && !m_peers[p].lost && msDiff(nowMs, m_peers[p].lastReceiveMs) > static_cast<int32_t>(m_config.timeoutMs))
+            markLost(p, "timed out");
     }
 }
 
@@ -477,7 +499,7 @@ void RollbackSession::onPeerDisconnected(int peer, uint32_t /*nowMs*/, const cha
 
     m_peers[peer].connected = false;
     if (m_state == State::Running)
-        fail(peer, reason);
+        markLost(peer, reason);
 }
 
 void RollbackSession::fail(int peer, const char* reason)
@@ -485,6 +507,192 @@ void RollbackSession::fail(int peer, const char* reason)
     m_state = State::Failed;
     m_failedPeer = peer;
     m_failReason = reason;
+}
+
+// ---- lost peers (see LOST PEERS in the header)
+
+uint8_t RollbackSession::cpuSlots() const
+{
+    uint8_t mask = 0;
+    for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
+        if (m_cpuFrom[slot] != INT_MAX)
+            mask |= static_cast<uint8_t>(1u << slot);
+    }
+    return mask;
+}
+
+void RollbackSession::markLost(int p, const char* reason)
+{
+    if (!isRemote(p) || m_peers[p].lost)
+        return;
+    Peer& peer = m_peers[p];
+    peer.lost = true;
+    peer.lostReason = reason;
+    peer.lostKnown = peer.received;
+    m_lostMask |= static_cast<uint8_t>(1u << p);
+    m_dropDirty = true;
+}
+
+bool RollbackSession::mergeLostInputs(int p, int known, int count, const uint8_t* inputs)
+{
+    Peer& peer = m_peers[p];
+    if (known <= peer.received)
+        return true;
+    const int start = known - count;
+    if (start > peer.received)
+        return false;    //a gap: inputs nobody relayed
+
+    for (int frame = peer.received; frame < known; frame++) {
+        for (int k = 0; k < peer.slotCount; k++) {
+            const int slot = peer.slots[k];
+            const uint8_t value = inputs[(frame - start) * peer.slotCount + k] & InputBit::MASK;
+            input(frame, slot) = value;
+            if (frame < m_frame && used(frame, slot) != value && (m_firstWrongFrame < 0 || frame < m_firstWrongFrame))
+                m_firstWrongFrame = frame;
+        }
+    }
+    peer.received = known;
+    m_dropDirty = true;
+    return true;
+}
+
+void RollbackSession::decideDrop(int p, int frame)
+{
+    Peer& peer = m_peers[p];
+    if (peer.dropFrame >= 0)
+        return;
+    peer.dropFrame = frame;
+    peer.received = std::max(peer.received, frame);
+    for (int k = 0; k < peer.slotCount; k++)
+        m_cpuFrom[peer.slots[k]] = frame;
+    //Frames from there on were simulated with the human player: again, with the CPU
+    if (m_state == State::Running && peer.slotCount > 0 && frame < m_frame && (m_firstWrongFrame < 0 || frame < m_firstWrongFrame))
+        m_firstWrongFrame = frame;
+    m_dropDirty = true;
+}
+
+void RollbackSession::receiveDrop(int from, const uint8_t* data, size_t size)
+{
+    if (m_state == State::Failed)
+        return;
+
+    net::ByteReader r(data, size);
+    r.u8();
+    r.u8();
+    const uint8_t mask = r.u8();
+    struct Entry {
+        int decided;
+        int known;
+        int count;
+        const uint8_t* inputs;
+    };
+    Entry entries[net::MAX_PEERS] = {};
+    for (int p = 0; p < net::MAX_PEERS; p++) {
+        if (!(mask & (1u << p)))
+            continue;
+        Entry& e = entries[p];
+        e.decided = r.i32();
+        e.known = static_cast<int>(r.u32());
+        e.count = r.u8();
+        const int slots = p < m_config.peerCount ? m_peers[p].slotCount : 0;
+        e.inputs = r.bytes(static_cast<size_t>(e.count) * static_cast<size_t>(slots));
+        if (e.known < 0 || e.decided < -1 || (e.decided >= 0 && e.known != e.decided) || e.count > e.known)
+            return;
+    }
+    if (!r.ok() || r.remaining() != 0)
+        return;
+
+    //The others don't count us in any more
+    if (mask & (1u << m_config.localPeer)) {
+        if (m_state == State::Running)
+            fail(m_config.localPeer, "was dropped by the other players");
+        return;
+    }
+
+    Peer& sender = m_peers[from];
+    sender.hasReport = true;
+    sender.reportMask = mask;
+
+    for (int p = 0; p < net::MAX_PEERS; p++) {
+        if (!(mask & (1u << p)) || !isRemote(p))
+            continue;
+        markLost(p, "is gone (seen by another player)");
+        const Entry& e = entries[p];
+        if (m_peers[p].dropFrame >= 0)
+            continue;    //decided already (and the decision is the same everywhere)
+        if (!mergeLostInputs(p, e.known, e.count, e.inputs)) {
+            if (m_state == State::Running)
+                fail(p, "inputs of a lost player are missing here");
+            return;
+        }
+        if (e.decided >= 0)
+            decideDrop(p, e.decided);
+    }
+}
+
+void RollbackSession::updateDrops()
+{
+    if (m_lostMask == 0 || m_state == State::Failed)
+        return;
+
+    //The coordinator: the lowest peer id that isn't lost
+    int coordinator = -1;
+    for (int p = 0; p < m_config.peerCount && coordinator < 0; p++) {
+        if ((p == m_config.localPeer || isRemote(p)) && !isLost(p))
+            coordinator = p;
+    }
+
+    if (coordinator == m_config.localPeer) {
+        bool agreed = true;
+        for (int p = 0; p < m_config.peerCount; p++) {
+            if (isRemote(p) && !isLost(p) && (!m_peers[p].hasReport || m_peers[p].reportMask != m_lostMask))
+                agreed = false;
+        }
+        if (agreed) {
+            //Every input any survivor had of the lost peers is here: the drop
+            //frame is the highest known one (merged from all the reports)
+            for (int p = 0; p < m_config.peerCount; p++) {
+                if (isLost(p) && m_peers[p].dropFrame < 0)
+                    decideDrop(p, m_peers[p].received);
+            }
+        }
+    }
+
+    if (m_dropDirty)
+        sendDropReport();
+}
+
+void RollbackSession::sendDropReport()
+{
+    m_dropDirty = false;
+
+    net::ByteWriter w(m_dropPacket, sizeof(m_dropPacket));
+    w.u8(static_cast<uint8_t>(net::MsgType::PeerDrop));
+    w.u8(m_config.matchId);
+    w.u8(m_lostMask);
+    for (int p = 0; p < net::MAX_PEERS; p++) {
+        if (!(m_lostMask & (1u << p)))
+            continue;
+        const Peer& peer = m_peers[p];
+        const int known = peer.dropFrame >= 0 ? peer.dropFrame : peer.received;
+        const int count = std::clamp(known - m_config.inputDelay, 0, DROP_RELAY_FRAMES);
+        w.i32(peer.dropFrame);
+        w.u32(static_cast<uint32_t>(known));
+        w.u8(static_cast<uint8_t>(count));
+        for (int f = known - count; f < known; f++) {
+            for (int k = 0; k < peer.slotCount; k++)
+                w.u8(input(f, peer.slots[k]));
+        }
+    }
+    if (!w.ok())
+        return;
+
+    //Also to the lost peers that may still listen: a peer that was only cut
+    //off learns from it that it was dropped
+    for (int p = 0; p < m_config.peerCount; p++) {
+        if (isRemote(p) && m_peers[p].connected)
+            m_transport.send(m_config.peerConnection[p], Channel::Reliable, w.data(), w.size());
+    }
 }
 
 } // namespace rollback

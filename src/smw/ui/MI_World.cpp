@@ -991,3 +991,11 @@ void MI_World::UseCloud(bool fUseCloud)
     const Vec2s iPlayerDrawPos = g_worldmap.GetPlayerPosition();
     m_parentMenu->AddEyeCandy<EC_SingleAnimation>(&rm->spr_poof, iPlayerDrawPos.x + iMapOffsetX - 8, iPlayerDrawPos.y + iMapOffsetY - 8, 4, 5);
 }
+
+std::string MI_World::DebugState() const
+{
+    const Vec2s tile = g_worldmap.GetPlayerCurrentTile();
+    return std::format("team {} player {} state {} popups {} flags {}{}{}{} player-state {} tile {},{} no-moves {} sleep {} cloud {} vehicles-moving {}", iControllingTeam,
+        iControllingPlayerId, iState, iNumPopups, iPopupFlag[0] ? 1 : 0, iPopupFlag[1] ? 1 : 0, iPopupFlag[2] ? 1 : 0, iPopupFlag[3] ? 1 : 0,
+        g_worldmap.GetPlayerState(), tile.x, tile.y, fNoInterestingMoves ? 1 : 0, iSleepTurns, fUsingCloud ? 1 : 0, g_worldmap.IsVehicleMoving() ? 1 : 0);
+}

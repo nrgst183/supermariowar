@@ -17,8 +17,10 @@ namespace {
 
 // Short stalls (a late packet) are normal and must not flicker
 constexpr uint32_t SHOW_WAIT_AFTER_MS = 150;
-// From here on, tell that the match ends at the timeout
+// From here on, tell what happens at the timeout
 constexpr uint32_t SHOW_HINT_AFTER_MS = 3000;
+// "X disconnected - CPU takes over" stays this long
+constexpr uint32_t SHOW_DROP_MS = 4000;
 
 constexpr int DIALOG_W = 192;
 constexpr int DIALOG_H = 128;
@@ -58,7 +60,7 @@ void drawWaitingBox(const rollback::NetGame& net, const rollback::NetGame::WaitI
 
     if (wait.waitingMs >= SHOW_HINT_AFTER_MS) {
         const int timeout = std::max(1, cmd::g_net.timeoutMs / 1000);
-        rm->menu_font_small.drawCentered(cx, y + 95, std::format("Match ends after {} s", timeout));
+        rm->menu_font_small.drawCentered(cx, y + 95, std::format("CPU takes over after {} s", timeout));
     }
 }
 
@@ -113,6 +115,10 @@ void drawNetOverlay()
 
     if (game_values.shownetstats)
         drawNetStats(net);
+
+    const rollback::NetGame::DropNotice drop = net.dropNotice();
+    if (!drop.text.empty() && drop.ageMs < SHOW_DROP_MS)
+        rm->menu_font_large.drawCentered(App::screenWidth / 2, 64, drop.text);
 
     const rollback::NetGame::WaitInfo wait = net.waitInfo();
     if (wait.waiting && wait.waitingMs >= SHOW_WAIT_AFTER_MS)

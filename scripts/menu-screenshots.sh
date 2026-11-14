@@ -11,7 +11,9 @@
 #   OUTDIR     where the PNGs go (default: ./menu_shots)
 #   BUILD_DIR  the build directory with the smw binary (default: build)
 # Environment: PORT (default 7300) is the host's UDP port, BUSY_PORT (default 7390) the one that is
-# blocked for the "port in use" error.
+# blocked for the "port in use" error. STYLE (0, 1...) picks the lobby layout (--at-lobby-style).
+# HOST_SKIN and JOIN_SKIN (default Kirby and Link) are the players' skins; the joiner's data directory
+# lacks the host's, so that it is downloaded.
 
 set -u
 
@@ -23,6 +25,10 @@ BUSY_PORT=${BUSY_PORT:-7390}
 WORK=$(mktemp -d)
 MAP_FILE="4matsy_Block Piles.map"
 MAP_NAME="Block Piles"
+HOST_SKIN=${HOST_SKIN:-Kirby}
+JOIN_SKIN=${JOIN_SKIN:-Link}
+STYLE_ARGS=()
+[ -n "${STYLE:-}" ] && STYLE_ARGS=(--at-lobby-style "$STYLE")
 
 mkdir -p "$OUT"
 OUT=$(cd "$OUT" && pwd)
@@ -32,6 +38,7 @@ rm -f "$OUT"/*.png
 JOIN_DATA="$WORK/joindata"
 cp -rs "$(readlink -f "$ROOT/data")/." "$JOIN_DATA"
 rm -f "$JOIN_DATA/maps/$MAP_FILE"
+rm -f "$JOIN_DATA/gfx/skins/$HOST_SKIN.png" "$JOIN_DATA/gfx/skins/$HOST_SKIN.bmp"
 
 run() {    # NAME DATADIR ARGS...
     local name=$1 data=$2
@@ -39,7 +46,7 @@ run() {    # NAME DATADIR ARGS...
     mkdir -p "$WORK/home_$name"
     (cd "$BUILD" && HOME="$WORK/home_$name" SDL_VIDEO_DRIVER=dummy SDL_AUDIO_DRIVER=dummy timeout 400 \
         ./smw --datadir "$data" --autotest --at-match shots --at-shots "$OUT" --at-realtime 3 \
-        --at-frames 30000 --at-humans 1 --at-mode 0 --at-seed 5 "$@" > "$WORK/$name.log" 2>&1)
+        --at-frames 30000 --at-humans 1 --at-mode 0 --at-seed 5 "${STYLE_ARGS[@]}" "$@" > "$WORK/$name.log" 2>&1)
 }
 
 # The error messages: a UDP port in use, and nobody to connect to
@@ -55,10 +62,10 @@ run errors "$ROOT/data" --at-role errors --at-addr "$BUSY_PORT" --at-nick Mario
 kill $BLOCKER 2>/dev/null
 
 # The lobby: host and joiner at the same time
-run host "$ROOT/data" --at-role host --at-nick Mario --at-map "$MAP_NAME" --at-addr "$PORT" --net-sim-latency 15 &
+run host "$ROOT/data" --at-role host --at-nick Mario --at-map "$MAP_NAME" --at-addr "$PORT" --net-sim-latency 15 --net-skin "$HOST_SKIN" --net-slow-map 8 &
 HOST=$!
 sleep 4
-run join "$JOIN_DATA" --at-role join --at-nick Luigi --at-addr "127.0.0.1:$PORT" --net-sim-latency 15 &
+run join "$JOIN_DATA" --at-role join --at-nick Luigi --at-addr "127.0.0.1:$PORT" --net-sim-latency 15 --net-skin "$JOIN_SKIN" &
 JOIN=$!
 wait $HOST $JOIN
 
