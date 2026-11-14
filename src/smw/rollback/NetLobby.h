@@ -141,8 +141,14 @@
 //                 in RollbackSession.h); while the match runs, the lobby
 //                 passes on PEER_DROP (NetProtocol.h) like INPUT, also once
 //                 the lobby is closed (the host is gone).
-//   LOBBY_EXTRA   host -> all, after every LOBBY_STATE (display only): i16 game mode id (-1: unknown),
-//                 i16 goal, str goal name ("Kills", "Points"...)
+//   LOBBY_EXTRA   host -> all, after every LOBBY_STATE (display only): i16 game mode id (-1: unknown,
+//                 -2: a tournament, tour or world), i16 goal, str goal name ("Kills", "Points"...),
+//                 u8 everyone may change the settings (the host chooses; see settingsEveryone())
+//   SETTINGS_REQUEST  joiner -> host: u8 what (1 mode, 2 goal, 3 map), i16 number (mode id, goal), str text
+//                 (the map's name). Honored only while the host lets everyone change the settings and
+//                 the lobby is idle; the host applies it through its menus (a LobbyGameEvent::SettingsRequest)
+//                 and the result comes back in LOBBY_STATE/LOBBY_EXTRA. The host is the authority:
+//                 the last request wins, a refused one is dropped.
 //   SKIN_INFO, SKIN_REQUEST, SKIN_BEGIN, SKIN_CHUNK
 //                 between any two peers: the skins of the players (SkinTransfer.h)
 //   SERIES_*, WHEEL_*, WORLD_*   the multi-match modes (NetSeries.h), handed
@@ -249,11 +255,14 @@ struct LobbyGameEvent {
         PeerGone,      // a peer left the lobby or lost its connection (peer, text)
         MapReceived,   // a map download finished (ok; text: the file, or the error)
         Closed,        // the lobby is over (text; ok: a running match may finish first)
+        SettingsRequest, // host: a joiner asks to change the match settings (peer; `what` in size: 1 mode, 2 goal, 3 map;
+                         // `value`: the mode id or goal; text: the map name). Only sent when everyone may change them.
     };
     Type type = Type::None;
     int peer = -1;
     bool ok = false;
     std::string text;
+    int value = 0;
     const uint8_t* data = nullptr;    // valid until the next poll()
     size_t size = 0;
 };
@@ -296,6 +305,10 @@ public:
     int modeId() const { return m_modeId; }
     int goal() const { return m_goal; }
     const std::string& goalName() const { return m_goalName; }
+    // Whether joiners may change the match settings (mode, goal, map) too; else only the host (it chooses)
+    bool settingsEveryone() const { return m_settingsEveryone; }
+    // Whether we may change them now
+    bool canChangeSettings() const { return isHost() || m_settingsEveryone; }
     int inputDelay() const { return m_inputDelay; }
     bool inputDelayIsAuto() const { return m_delayIsAuto; }
     const std::string& statusText() const { return m_status; }
@@ -328,6 +341,11 @@ public:
     void setCpuCount(int count);
     void kick(int peer);
     void setInputDelay(int delay);
+    // Host: who may change the match settings
+    void setSettingsEveryone(bool everyone);
+    // Joiner: asks the host to change a setting (ignored while only the host may); what = SETTING_*
+    enum : uint8_t { SETTING_MODE = 1, SETTING_GOAL = 2, SETTING_MAP = 3 };
+    void requestSetting(uint8_t what, int value, const std::string& text);
     // Leaves (joiner) or closes (host) the lobby. `abortMatch`: a running
     // match is aborted for the others (they go back to the lobby without us)
     void leave(const std::string& reason, bool abortMatch);
@@ -436,6 +454,7 @@ private:
     int m_modeId = -1;
     int m_goal = 0;
     std::string m_goalName;
+    bool m_settingsEveryone = false;
     int m_delayOverride = -1;
     int m_inputDelay = 2;
     bool m_delayIsAuto = true;

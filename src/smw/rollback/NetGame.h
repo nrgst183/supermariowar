@@ -122,6 +122,16 @@ public:
     // The series ended and its last screen is done: prints the final state (modesum)
     void printSeriesFinal();
 
+    // Host: a joiner's request to change the match settings (only while the host allows it, see
+    // NetLobby::settingsEveryone()); the menus apply it to their widgets, last one wins
+    struct SettingRequest {
+        int peer = -1;
+        int what = 0;     // NetLobby::SETTING_*
+        int value = 0;
+        std::string text;
+    };
+    bool popSettingRequest(SettingRequest& request);
+
     // ---- in a match (overlays)
     struct WaitInfo {
         bool waiting = false;    // the match waits for late inputs
@@ -239,6 +249,7 @@ private:
     uint32_t m_closeMs = 0;
     uint32_t m_matchEndMs = 0;
     uint32_t m_lastInfoMs = 0;
+    std::deque<SettingRequest> m_settingRequests;
     bool m_skinsAnnounced = false;   // our skins were handed to the lobby
     uint32_t m_skinKey = 0;          // the skin ids they were made from
     uint32_t m_skinRevision = 0;     // of the lobby: when it changes, a running match reloads the sprites

@@ -142,6 +142,8 @@ void MenuState::onEnterState()
     if (onlineNet.active() && onlineNet.lobby() && !cmd::g_net.enabled() && !onlineNet.seriesActive()) {
         //Back from an online match: the lobby again (a tournament, tour or world goes on below)
         mOnlineSetup = false;
+        mOnlineView = false;
+        mGameSettingsMenu->SetOnlineView(UI_GameSettingsMenu::OnlineView::Off);
         mCurrentMenu = mOnlineLobbyMenu.get();
         if (onlineNet.isHost())
             ApplyOnlineMatchSelection();
@@ -468,6 +470,7 @@ void MenuState::update()
             HandleOnlineEvents();
         if (mCurrentMenu == mOnlineLobbyMenu.get())
             mOnlineLobbyMenu->Sync();
+        SyncOnlineSettings();
 
         MenuCodeEnum code = MENU_CODE_NONE;
         //(online, the world map runs only on the frames its lockstep has a tick for: OnlineSeriesWorldTick)
@@ -499,12 +502,16 @@ void MenuState::update()
             JoinOnlineGame();
         } else if (MENU_CODE_ONLINE_LOBBY_CHANGED == code) {
             mOnlineLobbyMenu->ApplyChanges();
-        } else if (MENU_CODE_ONLINE_SLOT_ACTION == code) {
-            mOnlineLobbyMenu->SlotAction();
-        } else if (MENU_CODE_ONLINE_READY == code) {
-            mOnlineLobbyMenu->ToggleReady();
-        } else if (MENU_CODE_ONLINE_START == code) {
-            StartOnlineMatch();
+        } else if (MENU_CODE_ONLINE_OPTIONS == code) {
+            mOnlineLobbyMenu->ShowPage(UI_OnlineLobbyMenu::Page::Options);
+        } else if (MENU_CODE_ONLINE_OPTIONS_BACK == code) {
+            mOnlineLobbyMenu->ShowPage(UI_OnlineLobbyMenu::Page::Team);
+        } else if (MENU_CODE_ONLINE_KICK == code) {
+            mOnlineLobbyMenu->KickSelected();
+        } else if (MENU_CODE_ONLINE_VIEW_SETTINGS == code) {
+            OpenOnlineSettingsView();
+        } else if (MENU_CODE_ONLINE_SETTINGS_BACK == code) {
+            CloseOnlineSettingsView();
         } else if (MENU_CODE_ONLINE_MATCH_SETTINGS == code) {
             OpenOnlineMatchSettings();
         } else if (MENU_CODE_ONLINE_LEAVE == code) {
@@ -541,7 +548,7 @@ void MenuState::update()
             mOnlineMinigame = selected == MatchType::MiniGame;
             mOnlineSeriesType = rollback::isSeriesMatchType(selected) ? selected : MatchType::SingleGame;
             if (mOnlineMinigame || mOnlineSeriesType != MatchType::SingleGame)
-                ReturnToOnlineLobby();
+                StartOnlineFromSettings();
             else
                 OpenOnlineGameSettings();
         } else if (MENU_CODE_MATCH_SELECTION_START == code || MENU_CODE_QUICK_GAME_START == code) {
@@ -855,7 +862,7 @@ void MenuState::update()
             game_values.music = game_values.musicvolume > 0;
         } else if (MENU_CODE_START_GAME == code) {
             if (mOnlineSetup)
-                ReturnToOnlineLobby();
+                StartOnlineFromSettings();
             else
                 StartGame();
         } else if (MENU_CODE_EXIT_TOURNAMENT_YES == code || MENU_CODE_EXIT_TOURNAMENT_NO == code) {

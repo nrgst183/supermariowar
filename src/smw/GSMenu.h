@@ -117,6 +117,12 @@ class MenuState : public GameState
 		void ReturnToOnlineLobby();
 		void ApplyOnlineMatchSelection();
 		void StartOnlineMatch();
+		void StartOnlineFromSettings();
+		void OpenOnlineSettingsView();
+		void CloseOnlineSettingsView();
+		void SyncOnlineSettings();
+		void ApplyOnlineSettingRequests();
+		void SyncOnlineSettingsView();
 		MenuCodeEnum ShotsMenuUpdate();
 		void AutoTestAfterDraw();
 
@@ -172,6 +178,13 @@ class MenuState : public GameState
 		// Online menus
 		std::unique_ptr<UI_OnlineMenu> mOnlineMenu;
 		std::unique_ptr<UI_OnlineLobbyMenu> mOnlineLobbyMenu;
+		bool mOnlineView = false;       //A player who is not the host looks at (or, if the host allows it, edits) the match settings
+		short mOnlineShownMode = -1;    //What the settings screen shows of the lobby's mode, goal and map (to tell the player's edits from the lobby's changes)
+		short mOnlineShownGoal = -1;
+		std::string mOnlineShownMap;
+		bool mOnlineMapHere = false;
+		int mOnlineViewPending = 0;     //Frames during which the lobby's state doesn't override the player's edit
+		std::string mOnlineAppliedKey;  //What the host's menus last published to the lobby
 		bool mOnlineSetup = false;      //The host is choosing the match from the lobby (the match menus lead back to it)
 		bool mOnlineMinigame = false;   //The host's choice: a minigame instead of a single game
 		MatchType mOnlineSeriesType = MatchType::SingleGame;    //The host's choice: a tournament, tour or world (else SingleGame)

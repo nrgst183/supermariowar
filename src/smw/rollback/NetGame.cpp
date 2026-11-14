@@ -298,6 +298,15 @@ void NetGame::updateSkins()
     }
 }
 
+bool NetGame::popSettingRequest(SettingRequest& request)
+{
+    if (m_settingRequests.empty())
+        return false;
+    request = std::move(m_settingRequests.front());
+    m_settingRequests.pop_front();
+    return true;
+}
+
 void NetGame::updateMatchInfo(uint32_t nowMs)
 {
     if (nowMs - m_lastInfoMs < 250 || !game_values.gamemode)
@@ -305,6 +314,7 @@ void NetGame::updateMatchInfo(uint32_t nowMs)
     m_lastInfoMs = nowMs;
     if (isSeriesMatchType(game_values.matchtype) && !m_series.active) {
         m_lobby->setMatchInfo(seriesMatchName(), seriesFileName());
+        m_lobby->setMatchDetail(-2, 0, "");
         return;
     }
     const bool minigame = game_values.matchtype == MatchType::MiniGame;
@@ -336,6 +346,11 @@ void NetGame::handle(const LobbyGameEvent& event, uint32_t nowMs)
                 seriesPeerGone(peer);
             break;
         }
+
+        case Type::SettingsRequest:
+            if (isHost() && m_settingRequests.size() < 16)
+                m_settingRequests.push_back({event.peer, static_cast<int>(event.size), event.value, event.text});
+            break;
 
         case Type::MapReceived:
             if (!m_waitingForMap || isHost())

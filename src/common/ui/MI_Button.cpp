@@ -36,8 +36,9 @@ void MI_Button::Draw()
     if (!m_visible)
         return;
 
-    spr->draw(m_pos.x, m_pos.y, {0, (fSelected ? 32 : 0) + iAdjustmentY, iHalfWidth, 32});
-    spr->draw(m_pos.x + iHalfWidth, m_pos.y, {512 - iWidth + iHalfWidth, (fSelected ? 32 : 0) + iAdjustmentY, iWidth - iHalfWidth, 32});
+    gfxSprite* body = fLocked ? &rm->spr_selectfielddisabled : spr;
+    body->draw(m_pos.x, m_pos.y, {0, (fSelected ? 32 : 0) + iAdjustmentY, iHalfWidth, 32});
+    body->draw(m_pos.x + iHalfWidth, m_pos.y, {512 - iWidth + iHalfWidth, (fSelected ? 32 : 0) + iAdjustmentY, iWidth - iHalfWidth, 32});
 
     const SDL_Rect srcRect {iImageSrcX, iImageSrcY, iImageW, iImageH};
 

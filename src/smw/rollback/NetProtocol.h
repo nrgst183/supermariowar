@@ -105,6 +105,7 @@ enum class MsgType : uint8_t {
     SkinChunk = 103,
 
     LobbyExtra = 104,
+    SettingsRequest = 105,    // joiner -> host (only honored when everyone may change the settings)
 };
 
 // The series messages are the range [SeriesBegin, SERIES_MSG_END)

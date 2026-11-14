@@ -1,14 +1,11 @@
 #include "OnlineLobbyMenu.h"
 
-#include "CmdArgs.h"
-#include "MapList.h"
 #include "ResourceManager.h"
 #include "rollback/NetGame.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
 #include "ui/MI_LobbyWidgets.h"
 #include "ui/MI_SelectField.h"
-#include "GameModeType.h"
 #include "ui/MI_Text.h"
 
 #include <cctype>
@@ -16,56 +13,76 @@
 
 
 namespace {
-constexpr int PENDING_FRAMES = 60;    // a joiner's change reaches the host and comes back in LOBBY_STATE
+constexpr int PENDING_FRAMES = 60;    // a change reaches the host and comes back in LOBBY_STATE
 
 rollback::NetLobby* lobbyOrNull()
 {
     return rollback::NetGame::instance().lobby();
 }
+
+std::string capitalized(std::string text)
+{
+    if (!text.empty())
+        text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
+    return text;
+}
+
+bool contains(const std::string& text, const char* part)
+{
+    return text.find(part) != std::string::npos;
+}
+
+constexpr short FIELD_X = 70;
+constexpr short FIELD_W = 500;
+constexpr short FIELD_INDENT = 200;
 } // namespace
 
 
 UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     : UI_Menu()
 {
-    const LobbyLayout layout = lobbyLayout();
-
     miScene = new MI_LobbyScene();
-    miMap = new MI_LobbyMap(layout.mapFrame, layout.map);
-    miMode = new MI_LobbyField(layout.field[0], layout.fieldIndent, "Mode");
-    miGoal = new MI_LobbyField(layout.field[1], layout.fieldIndent, "Goal");
-    miMapName = new MI_LobbyField(layout.field[2], layout.fieldIndent, "Map");
 
-    // The four players of the next match
-    for (int i = 0; i < SLOTS; i++)
-        miCard[i] = new MI_LobbyCard(layout.card[i], i);
+    // The team and character selection, with the buttons where the original has "Continue"
+    miTeam = new MI_OnlineTeamSelect(112, 96);
+    miTeam->SetAutoModify(true);
+    miOptionsButton = new MI_LobbyButton(&rm->spr_selectfield, 108, 318, "Options", 200, false);
+    miOptionsButton->SetCode(MENU_CODE_ONLINE_OPTIONS);
+    miContinueButton = new MI_LobbyButton(&rm->spr_selectfield, 332, 318, "Continue", 200, true);
+    miContinueButton->SetCode(MENU_CODE_ONLINE_MATCH_SETTINGS);
 
-    // The settings that are rarely touched
-    miLocalPlayers = new MI_SelectField<short>(&rm->spr_selectfield, layout.players.x, layout.players.y, "Players", layout.players.w, 100);
+    // The options page: the settings that are rarely touched
+    miLocalPlayers = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 92, "My players", FIELD_W, FIELD_INDENT);
     miLocalPlayers->add("1", 1);
     miLocalPlayers->add("2", 2);
     miLocalPlayers->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
 
-    miInputDelay = new MI_SelectField<short>(&rm->spr_selectfield, layout.delay.x, layout.delay.y, "Delay", layout.delay.w, 100);
+    miCpuPlayers = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 132, "CPU players", FIELD_W, FIELD_INDENT);
+    for (short n = 0; n <= 3; n++)
+        miCpuPlayers->add(std::to_string(n), n);
+    miCpuPlayers->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
+
+    miInputDelay = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 172, "Input delay", FIELD_W, FIELD_INDENT);
     miInputDelay->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
     RebuildDelayItems(2);
 
-    // The buttons: the host has start, match settings and leave in three equal columns, the others
-    // ready and leave in two
-    const short y = layout.buttonY;
-    const short w = layout.buttonW;
-    miStartButton = new MI_LobbyButton(&rm->spr_selectfield, layout.buttonX[0], y, "Start match", w, true);
-    miStartButton->SetCode(MENU_CODE_ONLINE_START);
-    //Shown instead of the start button while the match can't start (it can't be selected)
-    miStartDisabled = new MI_LobbyButton(&rm->spr_selectfielddisabled, layout.buttonX[0], y, "Start match", w, true);
-    miSettingsButton = new MI_LobbyButton(&rm->spr_selectfield, layout.buttonX[1], y, "Match settings", w, false);
-    miSettingsButton->SetCode(MENU_CODE_ONLINE_MATCH_SETTINGS);
-    miLeaveButton = new MI_LobbyButton(&rm->spr_selectfield, layout.buttonX[2], y, "Leave", w, false);
-    miLeaveButton->SetCode(MENU_CODE_ONLINE_LEAVE);
-    miReadyButton = new MI_LobbyButton(&rm->spr_selectfield, layout.buttonX[0], y, "Ready", layout.joinerW, true);
-    miReadyButton->SetCode(MENU_CODE_ONLINE_READY);
-    miLeaveJoiner = new MI_LobbyButton(&rm->spr_selectfield, static_cast<short>(layout.buttonX[0] + layout.joinerW + 12), y, "Leave", layout.joinerW, false);
-    miLeaveJoiner->SetCode(MENU_CODE_ONLINE_LEAVE);
+    miEveryone = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 212, "Match settings", FIELD_W, FIELD_INDENT);
+    miEveryone->add("Host only", 0);
+    miEveryone->add("Everyone can change", 1);
+    miEveryone->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
+
+    miKickWho = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 252, "Kick player", FIELD_W, FIELD_INDENT);
+    miKickWho->add("-", -1);
+
+    miKickButton = new MI_LobbyButton(&rm->spr_selectfield, FIELD_X, 300, "Kick", 200, false);
+    miKickButton->SetCode(MENU_CODE_ONLINE_KICK);
+    miOptionsDone = new MI_LobbyButton(&rm->spr_selectfield, static_cast<short>(FIELD_X + FIELD_W - 200), 300, "Back", 200, true);
+    miOptionsDone->SetCode(MENU_CODE_ONLINE_OPTIONS_BACK);
+
+    // What only the host can change says so
+    const short tagY[4] = {140, 180, 220, 260};
+    for (int i = 0; i < 4; i++)
+        miHostTag[i] = new MI_LockTag(FIELD_X + FIELD_W - 16, tagY[i], "Host");
 
     // Confirmation dialog (leave the lobby, kick a player)
     miDialogImage = new MI_Image(&rm->spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);
@@ -77,39 +94,23 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     miDialogNo->SetCode(MENU_CODE_ONLINE_LEAVE_NO);
 
     AddNonControl(miScene);
-    AddNonControl(miMap);
-    AddNonControl(miMode);
-    AddNonControl(miGoal);
-    AddNonControl(miMapName);
-    AddNonControl(miStartDisabled);
 
-    // Navigation. The Stage layout has the cards side by side, the Cards layout in a column; below them
-    // the settings, then the buttons: ready (joiners) or start (the host, when it can start) | match
-    // settings | leave. Hidden controls are skipped by following their neighbors, so the "down" chain
-    // runs ready, start, settings. Leave is reached from everywhere by the cancel button.
-    const bool stage = false;
-    for (int i = 0; i < SLOTS; i++) {
-        UI_Control* up = i == 0 ? nullptr : miCard[i - 1];
-        UI_Control* down = i == SLOTS - 1 ? static_cast<UI_Control*>(miLocalPlayers) : miCard[i + 1];
-        UI_Control* left = nullptr;
-        UI_Control* right = nullptr;
-        if (stage) {
-            up = nullptr;
-            down = i < 2 ? static_cast<UI_Control*>(miLocalPlayers) : miInputDelay;
-            left = i == 0 ? nullptr : miCard[i - 1];
-            right = i == SLOTS - 1 ? nullptr : miCard[i + 1];
-        }
-        AddControl(miCard[i], up, down, left, right);
-    }
-    UI_Control* chipUp0 = stage ? static_cast<UI_Control*>(miCard[1]) : miCard[SLOTS - 1];
-    UI_Control* chipUp1 = stage ? static_cast<UI_Control*>(miCard[2]) : miCard[SLOTS - 1];
-    AddControl(miLocalPlayers, chipUp0, miReadyButton, nullptr, miInputDelay);
-    AddControl(miInputDelay, chipUp1, miLeaveJoiner, miLocalPlayers, nullptr);
-    AddControl(miReadyButton, miLocalPlayers, miStartButton, nullptr, miLeaveJoiner);
-    AddControl(miLeaveJoiner, miInputDelay, miLeaveButton, miReadyButton, nullptr);
-    AddControl(miStartButton, miLocalPlayers, miSettingsButton, miReadyButton, miSettingsButton);
-    AddControl(miSettingsButton, miLocalPlayers, nullptr, miStartButton, miLeaveButton);
-    AddControl(miLeaveButton, miInputDelay, nullptr, miSettingsButton, nullptr);
+    // Team page: the selection, and below it the buttons (down from the selection once ready)
+    AddControl(miTeam, nullptr, miContinueButton, nullptr, nullptr);
+    AddControl(miOptionsButton, miTeam, nullptr, nullptr, miContinueButton);
+    AddControl(miContinueButton, miTeam, nullptr, miOptionsButton, nullptr);
+    miTeam->SetLeaveDown([this]() { Focus(miContinueButton); });
+
+    // Options page
+    AddControl(miLocalPlayers, nullptr, miCpuPlayers, nullptr, nullptr);
+    AddControl(miCpuPlayers, miLocalPlayers, miInputDelay, nullptr, nullptr);
+    AddControl(miInputDelay, miCpuPlayers, miEveryone, nullptr, nullptr);
+    AddControl(miEveryone, miInputDelay, miKickWho, nullptr, nullptr);
+    AddControl(miKickWho, miEveryone, miKickButton, nullptr, nullptr);
+    AddControl(miKickButton, miKickWho, nullptr, nullptr, miOptionsDone);
+    AddControl(miOptionsDone, miKickWho, nullptr, miKickButton, nullptr);
+    for (MI_LockTag* tag : miHostTag)
+        AddNonControl(tag);
 
     AddNonControl(miDialogImage);
     AddNonControl(miDialogLine1);
@@ -123,13 +124,9 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     miDialogYes->setVisible(false);
     miDialogNo->setVisible(false);
 
-    setInitialFocus(miLeaveJoiner);
+    setInitialFocus(miTeam);
     SetCancelCode(MENU_CODE_ONLINE_LEAVE);
-}
-
-MI_Button* UI_OnlineLobbyMenu::LeaveButton() const
-{
-    return m_layoutHost == 1 ? miLeaveButton : miLeaveJoiner;
+    ShowPage(Page::Team);
 }
 
 void UI_OnlineLobbyMenu::RebuildDelayItems(int autoDelay)
@@ -140,6 +137,28 @@ void UI_OnlineLobbyMenu::RebuildDelayItems(int autoDelay)
     for (short delay = 1; delay <= 6; delay++)
         miInputDelay->add(std::to_string(delay), delay);
     miInputDelay->setCurrentIndex(0);
+}
+
+// The kick field lists the players of the other computers
+void UI_OnlineLobbyMenu::RebuildKickItems()
+{
+    const rollback::NetLobby* lobby = lobbyOrNull();
+    std::string signature;
+    if (lobby)
+        for (int p = 1; p < 4; p++)
+            if (lobby->peer(p).present)
+                signature += std::format("{}:{};", p, lobby->peer(p).name);
+    if (signature == m_kickSignature)
+        return;
+    m_kickSignature = signature;
+
+    miKickWho->clear();
+    miKickWho->add("-", -1);
+    if (lobby)
+        for (int p = 1; p < 4; p++)
+            if (lobby->peer(p).present)
+                miKickWho->add(std::string(lobby->peer(p).name), static_cast<short>(p));
+    miKickWho->setCurrentIndex(0);
 }
 
 void UI_OnlineLobbyMenu::Focus(UI_Control* control)
@@ -154,24 +173,42 @@ void UI_OnlineLobbyMenu::Focus(UI_Control* control)
     fModifyingItem = m_currentFocus ? m_currentFocus->Select(true) : false;
 }
 
-void UI_OnlineLobbyMenu::Open()
+void UI_OnlineLobbyMenu::ShowPage(Page page)
+{
+    m_page = page;
+    const bool team = page == Page::Team;
+    const rollback::NetLobby* lobby = lobbyOrNull();
+    const bool joining = !lobby || lobby->phase() == rollback::NetLobby::Phase::Joining;
+
+    miTeam->setVisible(team && !joining);
+    miOptionsButton->setVisible(team && !joining);
+    miContinueButton->setVisible(team && !joining);
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton, miOptionsDone})
+        control->setVisible(!team && !joining);
+    for (MI_LockTag* tag : miHostTag)
+        tag->setVisible(!team && !joining);
+    miScene->SetTitle(team ? "Team and Character Selection" : "Online Options");
+
+    SetCancelCode(team ? MENU_CODE_ONLINE_LEAVE : MENU_CODE_ONLINE_OPTIONS_BACK);
+    if (m_dialog == Dialog::None)
+        Focus(team ? static_cast<UI_Control*>(miTeam) : miLocalPlayers);
+    m_layoutHost = m_layoutJoining = -1;
+}
+
+void UI_OnlineLobbyMenu::Open(bool fresh)
 {
     m_notice.clear();
     m_layoutHost = -1;
     m_layoutJoining = -1;
-    m_previewValid = false;
-    m_shownMap.clear();
-    m_pendingPlayers = m_pendingDelay = 0;
+    m_pendingPlayers = m_pendingCpus = m_pendingDelay = m_pendingEveryone = 0;
+    m_kickSignature = "?";
 
     if (m_dialog != Dialog::None)
         CloseDialog();
 
-    const rollback::NetLobby* lobby = lobbyOrNull();
-    const bool host = lobby && lobby->isHost();
-    const bool joining = !lobby || lobby->phase() == rollback::NetLobby::Phase::Joining;
-    ApplyLayout(host, joining);
-
-    setInitialFocus(joining ? static_cast<UI_Control*>(LeaveButton()) : host ? static_cast<UI_Control*>(miSettingsButton) : miReadyButton);
+    if (fresh)
+        miTeam->Reset();
+    ShowPage(Page::Team);
     Sync();
 }
 
@@ -180,8 +217,8 @@ void UI_OnlineLobbyMenu::SetNotice(std::string text)
     m_notice = std::move(text);
 }
 
-// Which controls there are: joining shows only the status; the host has the match settings, start
-// and the input delay; the others have the ready button and see the input delay
+// What there is on screen: joining shows only the status; the host's button goes to the match type and
+// game settings, the others' to a look at them; the options only the host can change look disabled
 void UI_OnlineLobbyMenu::ApplyLayout(bool host, bool joining)
 {
     if (m_layoutHost == static_cast<int>(host) && m_layoutJoining == static_cast<int>(joining))
@@ -190,52 +227,27 @@ void UI_OnlineLobbyMenu::ApplyLayout(bool host, bool joining)
     m_layoutJoining = joining;
 
     miScene->SetJoining(joining);
-    miMap->setVisible(!joining);
-    miMode->setVisible(!joining);
-    miGoal->setVisible(!joining);
-    miMapName->setVisible(!joining);
-    for (int i = 0; i < SLOTS; i++)
-        miCard[i]->setVisible(!joining);
-    miLocalPlayers->setVisible(!joining);
-    miInputDelay->setVisible(!joining);
-    miReadyButton->setVisible(!joining && !host);
-    miLeaveJoiner->setVisible(!host);
-    miSettingsButton->setVisible(!joining && host);
-    miStartButton->setVisible(!joining && host);
-    miStartDisabled->setVisible(!joining && host);
-    miLeaveButton->setVisible(host);
+    const bool team = m_page == Page::Team;
+    miTeam->setVisible(team && !joining);
+    miOptionsButton->setVisible(team && !joining);
+    miContinueButton->setVisible(team && !joining);
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton, miOptionsDone})
+        control->setVisible(!team && !joining);
+    for (MI_LockTag* tag : miHostTag)
+        tag->setVisible(!team && !joining && !host);
 
-    // While joining there is only the leave button: it takes the width of the whole row
-    // The focused control may be gone now
-    if (m_currentFocus && !m_currentFocus->IsVisible() && m_dialog == Dialog::None)
-        Focus(joining ? static_cast<UI_Control*>(LeaveButton()) : host ? static_cast<UI_Control*>(miSettingsButton) : miReadyButton);
-}
+    miContinueButton->SetName(host ? "Continue" : "Settings");
+    miContinueButton->SetCode(host ? MENU_CODE_ONLINE_MATCH_SETTINGS : MENU_CODE_ONLINE_VIEW_SETTINGS);
 
-namespace {
-int modeIconIndexFor(int modeId)
-{
-    if (modeId >= 0 && modeId < GAMEMODE_LAST)
-        return modeId;
-    switch (modeId) {
-        case game_mode_pipe_minigame: return 25;
-        case game_mode_boss_minigame: return 23;
-        case game_mode_boxes_minigame: return 27;
-        default: return -1;
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton})
+        control->SetLocked(!host);
+
+    // While joining the leave dialog is the only thing to do: the cancel button leaves right away
+    if (joining) {
+        Focus(nullptr);
+        SetCancelCode(MENU_CODE_ONLINE_LEAVE);
     }
 }
-
-std::string capitalized(std::string text)
-{
-    if (!text.empty())
-        text[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(text[0])));
-    return text;
-}
-
-bool contains(const std::string& text, const char* part)
-{
-    return text.find(part) != std::string::npos;
-}
-} // namespace
 
 void UI_OnlineLobbyMenu::Sync()
 {
@@ -251,23 +263,28 @@ void UI_OnlineLobbyMenu::Sync()
     const bool inLobby = phase == Phase::Lobby;
 
     ApplyLayout(host, joining);
+    if (!joining && !m_currentFocus && m_dialog == Dialog::None)
+        Focus(m_page == Page::Team ? static_cast<UI_Control*>(miTeam) : miLocalPlayers);
 
-    // Local players
+    // The options page
     if (local >= 0) {
-        const rollback::LobbyPeer& self = lobby->peer(local);
         if (m_pendingPlayers > 0)
             --m_pendingPlayers;
         if (m_pendingPlayers == 0 && !miLocalPlayers->IsModifying())
-            miLocalPlayers->setCurrentValue(static_cast<short>(self.localPlayers));
+            miLocalPlayers->setCurrentValue(static_cast<short>(lobby->peer(local).localPlayers));
         miLocalPlayers->Disable(!inLobby);
-        miReadyButton->SetName(self.ready ? "Cancel ready" : "Ready");
-        miReadyButton->Disable(!inLobby);
     }
 
-    // Input delay
+    int cpus = 0;
+    for (int s = 0; s < 4; s++)
+        cpus += lobby->slot(s).kind == rollback::SlotKind::Cpu;
+    if (m_pendingCpus > 0)
+        --m_pendingCpus;
+    if (m_pendingCpus == 0 && !miCpuPlayers->IsModifying())
+        miCpuPlayers->setCurrentValue(static_cast<short>(cpus));
+
     const int delay = lobby->inputDelay();
     const bool automatic = lobby->inputDelayIsAuto();
-    miInputDelay->Disable(!inLobby || !host);
     if (m_pendingDelay > 0)
         --m_pendingDelay;
     if (m_pendingDelay == 0 && !miInputDelay->IsModifying()) {
@@ -275,55 +292,22 @@ void UI_OnlineLobbyMenu::Sync()
             RebuildDelayItems(delay);
         miInputDelay->setCurrentValue(static_cast<short>(automatic ? -1 : delay));
     }
-    miSettingsButton->Disable(!inLobby);
 
-    // The map: its preview, or a text while it is not here (with the progress of the transfer)
-    const std::string& mapName = lobby->mapName();
-    const bool minigame = mapName == "(minigame)";
-    const rollback::MapTransferInfo& transfer = lobby->mapTransfer();
-    const bool transferring = transfer.active && transfer.bytesTotal > 0;
-    if (!joining && (!m_previewValid || mapName != m_shownMap)) {
-        m_shownMap = mapName;
-        m_previewValid = !mapName.empty() && !minigame && maplist->findexact(mapName.c_str(), false);
-        if (m_previewValid)
-            miMap->LoadCurrentMap();
-    }
-    miMap->SetAvailable(m_previewValid && !joining);
-    {
-        const std::string goalName = lobby->goalName().empty() ? "Goal" : lobby->goalName();
-        miMode->SetValue(lobby->modeName().empty() ? "-" : lobby->modeName(), modeIconIndexFor(lobby->modeId()));
-        miGoal->SetLabel(goalName);
-        miGoal->SetValue(lobby->goal() > 0 ? std::to_string(lobby->goal()) : "-");
-        std::string shown = mapName.empty() ? "-" : minigame ? "Minigame" : mapName;
-        if (transferring && !joining)
-            shown = std::format("{} {}%", transfer.sending ? "Uploading" : "Downloading", transfer.bytesDone * 100ull / transfer.bytesTotal);
-        miMapName->SetValue(shown);
-    }
-    if (mapName.empty())
-        miMap->SetText("No map selected yet");
-    else if (minigame)
-        miMap->SetText(lobby->modeName().empty() ? "Minigame" : lobby->modeName());
-    else if (!m_previewValid)
-        miMap->SetText(transferring ? mapName : mapName + "\nnot here yet");
-    else
-        miMap->SetText({});
-    if (transferring && !joining) {
-        const float fraction = static_cast<float>(transfer.bytesDone) / static_cast<float>(transfer.bytesTotal);
-        miMap->SetProgress(fraction, std::format("{} {}%", transfer.sending ? "Uploading" : "Downloading", static_cast<int>(fraction * 100.0f)));
-    } else {
-        miMap->SetProgress(-1.0f, {});
-    }
+    if (m_pendingEveryone > 0)
+        --m_pendingEveryone;
+    if (m_pendingEveryone == 0 && !miEveryone->IsModifying())
+        miEveryone->setCurrentValue(lobby->settingsEveryone() ? 1 : 0);
 
-    // Start
+    RebuildKickItems();
+    miKickButton->Disable(!host || miKickWho->currentValue() < 0);
+
+    // That the match settings are the host's, or everyone's, in the header of the team page
+    miScene->SetSettingsNote(m_page == Page::Team && !joining ? (lobby->settingsEveryone() ? "Match settings: everyone can change" : "Match settings: host only") : std::string());
+
+    // The status line: what the lobby says, else what is going on with the players. The hint under
+    // the buttons says what the player can do.
     std::string why;
     const bool canStart = host && inLobby && lobby->canStart(why);
-    miStartButton->setVisible(!joining && canStart);
-    miStartDisabled->setVisible(!joining && host && !canStart);
-    if (!canStart && m_currentFocus == miStartButton && m_dialog == Dialog::None)
-        Focus(miSettingsButton);
-
-    // The status line: what the lobby says, else what is going on with the players; its color says how
-    // good or bad it is. The hint under it says what the focused control does.
     using Tone = MI_LobbyScene::Tone;
     std::string status = lobby->statusText();
     Tone tone = Tone::Info;
@@ -334,37 +318,41 @@ void UI_OnlineLobbyMenu::Sync()
     if (contains(status, "abort") || contains(status, "ailed") || contains(status, "lost") || contains(status, "losed") || contains(status, "an't")
         || contains(status, "removed") || contains(status, "efused"))
         tone = Tone::Error;
-    else if (contains(status, "ownload") || contains(status, "pload"))
-        tone = Tone::Info;
     if (status.empty() && joining)
         status = "Connecting to the host...";
     if (status.empty() && phase == Phase::Starting)
         status = "Starting the match...";
     if (status.empty() && inLobby && local >= 0) {
         if (host) {
-            status = canStart ? "Everyone is ready: start the match" : capitalized(why);
+            status = canStart ? "Everyone is ready: select Continue" : capitalized(why);
             tone = canStart ? Tone::Good : Tone::Warn;
         } else {
             const bool ready = lobby->peer(local).ready;
-            status = ready ? "Waiting for the host to start the match" : "Select Ready when you are set";
+            status = ready ? "Waiting for the host to start the match" : "Pick your character and team, then get ready";
             tone = ready ? Tone::Good : Tone::Info;
         }
     }
+    m_statusLine = status;
 
     std::string hint;
-    if (m_dialog == Dialog::None) {
-        if (const MI_LobbyCard* card = dynamic_cast<const MI_LobbyCard*>(m_currentFocus))
-            hint = card->hint();
-        else if (m_currentFocus == miInputDelay && !host)
-            hint = "Only the host can change the input delay";
+    if (m_dialog == Dialog::None && m_page == Page::Team && !joining) {
+        if (m_currentFocus == miTeam)
+            hint = miTeam->hint();
+        else if (m_currentFocus == miContinueButton)
+            hint = host ? "Choose the match type, game mode and map" : "See what the host has chosen";
+        else if (m_currentFocus == miOptionsButton)
+            hint = host ? "Players, CPUs, input delay, who changes the settings" : "Your players on this computer";
+    } else if (m_dialog == Dialog::None && !joining) {
+        if (!host && (m_currentFocus == miCpuPlayers || m_currentFocus == miInputDelay || m_currentFocus == miEveryone || m_currentFocus == miKickWho))
+            hint = "Only the host can change this";
+        else if (m_currentFocus == miLocalPlayers)
+            hint = "Players on this computer (the second uses the second controls)";
         else if (m_currentFocus == miInputDelay)
             hint = "How many frames inputs are held back, to hide the lag";
-        else if (m_currentFocus == miLocalPlayers)
-            hint = "Players on this computer: a second one plays with the second controls";
-        else if (m_currentFocus == miSettingsButton)
-            hint = "Choose the game mode, goal and map";
+        else if (m_currentFocus == miEveryone)
+            hint = "Whether the others can also change the mode, goal and map";
     }
-    miScene->SetStatus(status, tone, capitalized(hint));
+    miScene->SetStatus(status, tone, hint);
 }
 
 void UI_OnlineLobbyMenu::ApplyChanges()
@@ -382,53 +370,36 @@ void UI_OnlineLobbyMenu::ApplyChanges()
     }
 
     if (host) {
+        int cpus = 0;
+        for (int s = 0; s < 4; s++)
+            cpus += lobby->slot(s).kind == rollback::SlotKind::Cpu;
+        if (miCpuPlayers->currentValue() != cpus) {
+            lobby->setCpuCount(miCpuPlayers->currentValue());
+            m_pendingCpus = PENDING_FRAMES;
+        }
+
         const short wanted = miInputDelay->currentValue();
         const short current = static_cast<short>(lobby->inputDelayIsAuto() ? -1 : lobby->inputDelay());
         if (wanted != current) {
             lobby->setInputDelay(wanted);
             m_pendingDelay = PENDING_FRAMES;
         }
+
+        const bool everyone = miEveryone->currentValue() != 0;
+        if (everyone != lobby->settingsEveryone()) {
+            lobby->setSettingsEveryone(everyone);
+            m_pendingEveryone = PENDING_FRAMES;
+        }
     }
 }
 
-void UI_OnlineLobbyMenu::SlotAction()
+void UI_OnlineLobbyMenu::KickSelected()
 {
-    rollback::NetLobby* lobby = lobbyOrNull();
-    const MI_LobbyCard* control = dynamic_cast<const MI_LobbyCard*>(m_currentFocus);
-    if (!lobby || !control || !lobby->isHost())
+    const rollback::NetLobby* lobby = lobbyOrNull();
+    if (!lobby || !lobby->isHost() || miKickWho->currentValue() <= 0)
         return;
-
-    fModifyingItem = false;
-    const int index = control->slot();
-    const rollback::LobbySlot& slot = lobby->slot(index);
-    switch (slot.kind) {
-        case rollback::SlotKind::Empty:
-            lobby->addCpu();
-            break;
-        case rollback::SlotKind::Cpu:
-            lobby->removeCpu(index);
-            break;
-        case rollback::SlotKind::Human:
-            if (slot.peer != lobby->localPeer()) {
-                m_kickPeer = slot.peer;
-                OpenDialog(Dialog::Kick);
-            }
-            break;
-    }
-}
-
-void UI_OnlineLobbyMenu::ToggleReady()
-{
-    rollback::NetLobby* lobby = lobbyOrNull();
-    if (!lobby || lobby->localPeer() < 0 || lobby->phase() != rollback::NetLobby::Phase::Lobby)
-        return;
-    lobby->setReady(!lobby->peer(lobby->localPeer()).ready);
-}
-
-void UI_OnlineLobbyMenu::FocusSlot(int slot)
-{
-    if (slot >= 0 && slot < SLOTS && m_dialog == Dialog::None)
-        Focus(miCard[slot]);
+    m_kickPeer = miKickWho->currentValue();
+    OpenDialog(Dialog::Kick);
 }
 
 void UI_OnlineLobbyMenu::OpenDialog(Dialog dialog)
@@ -459,6 +430,8 @@ void UI_OnlineLobbyMenu::OpenDialog(Dialog dialog)
 
 void UI_OnlineLobbyMenu::CloseDialog()
 {
+    if (m_dialog == Dialog::None)
+        return;
     m_dialog = Dialog::None;
     m_kickPeer = -1;
 
@@ -468,8 +441,8 @@ void UI_OnlineLobbyMenu::CloseDialog()
     miDialogYes->setVisible(false);
     miDialogNo->setVisible(false);
 
-    setInitialFocus(LeaveButton());
-    SetCancelCode(MENU_CODE_ONLINE_LEAVE);
+    setInitialFocus(m_page == Page::Team ? static_cast<UI_Control*>(miTeam) : miLocalPlayers);
+    SetCancelCode(m_page == Page::Team ? MENU_CODE_ONLINE_LEAVE : MENU_CODE_ONLINE_OPTIONS_BACK);
 
     RestoreCurrent();
 }

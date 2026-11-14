@@ -834,3 +834,109 @@ TEST_CASE("The mode id and goal reach every peer for the lobby screen") {
     CHECK(a.lobby->modeId() == 1000);
     CHECK(b.lobby->goalName() == "Coins");
 }
+
+
+TEST_CASE("A joiner can't change another player's slot or the host's lobby settings") {
+    LobbyNet net;
+    Node& host = net.add(true, "Hosty");
+    Node& a = net.add(false, "Alice");
+    Node& b = net.add(false, "Bob");
+    net.settle();
+    REQUIRE(host.lobby->slot(2).peer == 2);
+
+    const LobbySlot hostSlot = host.lobby->slot(0);
+    const LobbySlot bobSlot = host.lobby->slot(2);
+    const int delay = host.lobby->inputDelay();
+
+    //Alice asks for the slots of the host and of Bob, for CPU players, a kick and the input delay
+    a.lobby->setSlotTeam(0, (hostSlot.team + 1) & 3);
+    a.lobby->setSlotColor(0, (hostSlot.color + 1) & 3);
+    a.lobby->setSlotTeam(2, (bobSlot.team + 1) & 3);
+    a.lobby->setSlotColor(2, (bobSlot.color + 1) & 3);
+    a.lobby->addCpu();
+    a.lobby->setCpuCount(2);
+    a.lobby->kick(2);
+    a.lobby->setInputDelay(delay == 5 ? 4 : 5);
+    net.step(30);
+
+    CHECK(host.lobby->slot(0).team == hostSlot.team);
+    CHECK(host.lobby->slot(0).color == hostSlot.color);
+    CHECK(host.lobby->slot(2).team == bobSlot.team);
+    CHECK(host.lobby->slot(2).color == bobSlot.color);
+    CHECK(host.lobby->slot(3).kind == SlotKind::Empty);
+    CHECK(host.lobby->peer(2).present);
+    CHECK(b.lobby->phase() == NetLobby::Phase::Lobby);
+    CHECK(host.lobby->inputDelay() == delay);
+    CHECK(b.lobby->slot(2).team == bobSlot.team);
+
+    //Her own slot is hers
+    a.lobby->setSlotTeam(1, 3);
+    net.step(30);
+    CHECK(host.lobby->slot(1).team == 3);
+    CHECK(b.lobby->slot(1).team == 3);
+}
+
+TEST_CASE("Match settings: the host's, unless it lets everyone change them") {
+    LobbyNet net;
+    Node& host = net.add(true, "Hosty");
+    Node& a = net.add(false, "Alice");
+    net.settle();
+
+    const auto settingRequests = [](const Node& node) {
+        return std::count_if(node.gameEvents.begin(), node.gameEvents.end(), [](const LobbyGameEvent& e) { return e.type == LobbyGameEvent::Type::SettingsRequest; });
+    };
+
+    //By default only the host
+    CHECK_FALSE(host.lobby->settingsEveryone());
+    CHECK(host.lobby->canChangeSettings());
+    CHECK_FALSE(a.lobby->canChangeSettings());
+    a.lobby->requestSetting(NetLobby::SETTING_GOAL, 20, "");
+    a.lobby->requestSetting(NetLobby::SETTING_MAP, 0, "Block Piles");
+    net.step(30);
+    CHECK(settingRequests(host) == 0);
+
+    //A joiner can't switch it on, and the host's own requests go nowhere
+    a.lobby->setSettingsEveryone(true);
+    host.lobby->requestSetting(NetLobby::SETTING_GOAL, 5, "");
+    net.step(30);
+    CHECK_FALSE(host.lobby->settingsEveryone());
+    CHECK_FALSE(a.lobby->settingsEveryone());
+    CHECK(settingRequests(host) == 0);
+
+    //The host lets everyone: everybody knows, and the requests reach the host with their sender
+    host.lobby->setSettingsEveryone(true);
+    net.step(30);
+    CHECK(host.lobby->settingsEveryone());
+    CHECK(a.lobby->settingsEveryone());
+    CHECK(a.lobby->canChangeSettings());
+
+    a.lobby->requestSetting(NetLobby::SETTING_MODE, 3, "");
+    a.lobby->requestSetting(NetLobby::SETTING_GOAL, 20, "");
+    a.lobby->requestSetting(NetLobby::SETTING_MAP, 0, "Block Piles");
+    a.lobby->requestSetting(99, 1, "");    //(not a setting)
+    net.step(30);
+    REQUIRE(settingRequests(host) == 3);
+    std::vector<LobbyGameEvent> requests;
+    for (const LobbyGameEvent& e : host.gameEvents)
+        if (e.type == LobbyGameEvent::Type::SettingsRequest)
+            requests.push_back(e);
+    CHECK(requests[0].peer == 1);
+    CHECK(requests[0].size == NetLobby::SETTING_MODE);
+    CHECK(requests[0].value == 3);
+    CHECK(requests[1].size == NetLobby::SETTING_GOAL);
+    CHECK(requests[1].value == 20);
+    CHECK(requests[2].size == NetLobby::SETTING_MAP);
+    CHECK(requests[2].text == "Block Piles");
+
+    //A joiner that comes later is told, too; and the host takes it back
+    Node& b = net.add(false, "Bob");
+    net.settle();
+    CHECK(b.lobby->settingsEveryone());
+    host.lobby->setSettingsEveryone(false);
+    net.step(30);
+    CHECK_FALSE(a.lobby->settingsEveryone());
+    CHECK_FALSE(b.lobby->canChangeSettings());
+    a.lobby->requestSetting(NetLobby::SETTING_GOAL, 30, "");
+    net.step(30);
+    CHECK(settingRequests(host) == 3);
+}

@@ -25,9 +25,10 @@ void MI_ImageSelectField::Draw()
     if (!m_visible)
         return;
 
-    m_spr->draw(m_pos.x, m_pos.y, {0, (fSelected ? 32 : 0), m_indent - 16, 32});
-    m_spr->draw(m_pos.x + m_indent - 16, m_pos.y, {0, (fSelected ? 96 : 64), 32, 32});
-    m_spr->draw(m_pos.x + m_indent + 16, m_pos.y, {528 - m_width + m_indent, (fSelected ? 32 : 0), m_width - m_indent - 16, 32});
+    gfxSprite* body = fLocked ? &rm->spr_selectfielddisabled : m_spr;
+    body->draw(m_pos.x, m_pos.y, {0, (fSelected ? 32 : 0), m_indent - 16, 32});
+    body->draw(m_pos.x + m_indent - 16, m_pos.y, {0, (fSelected ? 96 : 64), 32, 32});
+    body->draw(m_pos.x + m_indent + 16, m_pos.y, {528 - m_width + m_indent, (fSelected ? 32 : 0), m_width - m_indent - 16, 32});
 
     rm->menu_font_large.drawChopRight(m_pos.x + 16, m_pos.y + 5, m_indent - 8, m_name.c_str());
 

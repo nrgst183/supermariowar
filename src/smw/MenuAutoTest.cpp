@@ -393,7 +393,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             timedOut(60 * 20, "the lobby");
             return MENU_CODE_NONE;
         }
-        if (step == 3 && mCurrentMenu == mOnlineLobbyMenu.get()) {
+        if (step == 3 && lobby && lobby->phase() != Phase::Closed && mCurrentMenu != mOnlineMenu.get()) {
             COutputControl& keys = game_values.playerInput.outputControls[rng() % 2];
             if (rng() % 3 == 0) {
                 switch (rng() % 8) {
@@ -514,6 +514,9 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         }
     }
 
+    //(the keys pressed here are read by the menu right after this)
+    COutputControl& keys0 = game_values.playerInput.outputControls[0];
+
     if (at.shotsRole == "host") {
         switch (step) {
             case 2:
@@ -526,7 +529,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                     return MENU_CODE_NONE;
                 }
                 if (lobby && lobby->phase() == Phase::Lobby && t > 20) {
-                    shot("03_lobby_host_alone");
+                    shot("03_team_host_alone");
                     next();
                 }
                 return MENU_CODE_NONE;
@@ -539,22 +542,30 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                 timedOut(60 * 90, "a joiner");
                 return MENU_CODE_NONE;
 
-            case 4:    //not everyone is ready yet
-                if (t == 40) {
-                    mOnlineLobbyMenu->FocusSlot(1);
-                    shot("04_lobby_host_joiner_and_cpu");
+            case 4:    //the joiner is not ready yet
+                if (t == 40)
+                    shot("04_team_host_joiner_and_cpu");
+                if (t == 44) {
+                    //The host is ready too (the first player's select key): the buttons come into focus
+                    keys0.menu_select.fPressed = true;
                 }
-                if (t > 45 && lobby && lobby->peer(1).ready)
+                if (t > 50 && lobby && lobby->peer(1).ready)
                     next();
                 timedOut(60 * 60, "the joiner to be ready");
                 return MENU_CODE_NONE;
 
             case 5:
-                if (t == 10) {
-                    mOnlineLobbyMenu->FocusSlot(2);
-                    shot("05_lobby_host_everyone_ready");
+                if (t == 10)
+                    shot("05_team_host_everyone_ready");
+                if (t == 12) {
+                    //The options page
+                    return MENU_CODE_ONLINE_OPTIONS;
                 }
-                if (t == 14)
+                if (t == 24)
+                    shot("05b_options_host");
+                if (t == 26)
+                    return MENU_CODE_ONLINE_OPTIONS_BACK;
+                if (t == 30)
                     next();
                 return MENU_CODE_NONE;
 
@@ -570,14 +581,21 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             case 7:
                 if (t == 1)
                     return MENU_CODE_MATCH_SELECTION_START;
-                if (t == 20)
-                    shot("07_online_game_menu");
-                if (t == 23)
+                if (t == 2 && lobby)
+                    lobby->setInputDelay(3);    //(the joiner takes this for its cue)
+                if (t == 60)
+                    shot("07_host_game_settings");
+                if (t == 63)
                     next();
                 return MENU_CODE_NONE;
 
-            case 8: {    //pick mode, goal and map, then back to the lobby
-                if (t == 1) {
+            case 8:    //the joiner looks at the settings, then may change them
+                if (t == 300 && lobby)
+                    lobby->setSettingsEveryone(true);
+                if (t == 440 && lobby)
+                    printf("shots: the host's goal after the joiner's change: %d (%s)\n", lobby->goal(), lobby->goalName().c_str());
+                if (t == 480) {
+                    //pick mode, goal and map
                     const short mode = static_cast<short>((at.mode >= 0 ? at.mode : 0) % GAMEMODE_LAST);
                     mGameSettingsMenu->GameModeChanged(mode);
                     game_values.gamemode = gamemodes[mGameSettingsMenu->GetCurrentGameModeID()];
@@ -590,22 +608,18 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                         mGameSettingsMenu->miMapField->LoadCurrentMap();
                         szCurrentMapName = mGameSettingsMenu->miMapField->GetMapName();
                     }
-                    return MENU_CODE_START_GAME;
                 }
-                if (t == 40) {
-                    mOnlineLobbyMenu->FocusSlot(0);
-                    shot("08_lobby_host_match_selected");
-                }
-                if (t == 44)
+                if (t == 560)
+                    shot("08_host_game_settings_map_picked");
+                if (t == 700)
                     next();
                 return MENU_CODE_NONE;
-            }
 
             case 9: {
                 std::string why;
                 if (lobby && lobby->canStart(why)) {
                     next();
-                    return MENU_CODE_ONLINE_START;
+                    return MENU_CODE_START_GAME;
                 }
                 timedOut(60 * 20, "canStart");
                 return MENU_CODE_NONE;
@@ -614,10 +628,10 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             case 10:    //the match starts (the map is sent), is played, and ends
                 if (lobby && lobby->mapTransfer().active && !shotTaken) {
                     shotTaken = true;
-                    shot("09_lobby_host_map_upload");
+                    shot("09_host_map_upload");
                 }
-                if (g_autoTestMatchesDone >= 1 && lobby && lobby->phase() == Phase::Lobby && t > 40) {
-                    shot("10_lobby_host_after_match");
+                if (g_autoTestMatchesDone >= 1 && lobby && lobby->phase() == Phase::Lobby && mCurrentMenu == mOnlineLobbyMenu.get() && t > 40) {
+                    shot("10_team_host_after_match");
                     next();
                 }
                 timedOut(60 * 60, "the match to end");
@@ -663,39 +677,82 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             for (int s = 0; lobby && s < rollback::LOBBY_SLOTS; s++)
                 cpu |= lobby->slot(s).kind == rollback::SlotKind::Cpu;
             if (cpu && t > 40) {
-                shot("15_lobby_joiner_not_ready");
+                shot("15_team_joiner_others_locked");
                 next();
             }
             timedOut(60 * 90, "the host's CPU player");
             return MENU_CODE_NONE;
         }
 
-        case 4:
-            if (t == 4)
-                return MENU_CODE_ONLINE_READY;
-            if (t == 40) {
-                shot("16_lobby_joiner_ready");
+        case 4:    //the joiner picks another character (up/down), then is ready (select)
+            if (t >= 4 && t <= 40 && (t % 4) == 0)
+                keys0.menu_down.fPressed = true;    //(nine skins further)
+            if (t == 4 + 36 + 4)
+                keys0.menu_right.fPressed = true;   //(and another team)
+            if (t == 70)
+                shot("15b_team_joiner_changes_skin");
+            if (t == 80)
+                keys0.menu_select.fPressed = true;
+            if (t == 120) {
+                shot("16_team_joiner_ready");
                 next();
             }
             return MENU_CODE_NONE;
 
-        case 5: {    //the match starts: the map is downloaded
+        case 5:    //the host opens the settings (and sets the input delay as a sign): a look at them
+            if (lobby && !lobby->inputDelayIsAuto() && lobby->inputDelay() == 3) {
+                next();
+                return MENU_CODE_ONLINE_VIEW_SETTINGS;
+            }
+            timedOut(60 * 90, "the host's settings");
+            return MENU_CODE_NONE;
+
+        case 6:
+            if (t == 80)
+                shot("17_joiner_settings_host_only");
+            if (lobby && lobby->settingsEveryone() && t > 90) {
+                next();
+            }
+            timedOut(60 * 60, "the host to let everyone change the settings");
+            return MENU_CODE_NONE;
+
+        case 7:    //everyone may change them: the joiner changes the goal, which the host takes over
+            if (t == 20)
+                shot("18_joiner_settings_everyone");
+            //(the focus is on Back: two downs reach the goal field, select and right raise it)
+            if (t == 30 || t == 34)
+                keys0.menu_down.fPressed = true;
+            if (t == 38 || t == 46)
+                keys0.menu_select.fPressed = true;
+            if (t == 42)
+                keys0.menu_right.fPressed = true;
+            if (t == 70)
+                shot("18b_joiner_settings_edited_goal");
+            if (!at.map.empty() && lobby && lobby->mapName() == at.map && t > 30) {
+                next();
+            }
+            timedOut(60 * 60, "the host's map");
+            return MENU_CODE_NONE;
+
+        case 8: {    //the map is not here: the start downloads it
+            if (t == 40)
+                shot("19_joiner_settings_map_missing");
             const rollback::MapTransferInfo tr = lobby ? lobby->mapTransfer() : rollback::MapTransferInfo {};
             if (tr.active && !shotTaken && tr.bytesDone > 0) {
                 shotTaken = true;
-                shot("17_lobby_joiner_map_download");
+                shot("20_joiner_map_download");
             }
-            if (g_autoTestMatchesDone >= 1 && lobby && lobby->phase() == Phase::Lobby && t > 40) {
-                shot("18_lobby_joiner_after_match");
+            if (g_autoTestMatchesDone >= 1 && lobby && lobby->phase() == Phase::Lobby && mCurrentMenu == mOnlineLobbyMenu.get() && t > 40) {
+                shot("21_team_joiner_after_match");
                 next();
             }
             timedOut(60 * 60, "the match to end");
             return MENU_CODE_NONE;
         }
 
-        case 6:    //the host leaves: the lobby is closed
+        case 9:    //the host leaves: the lobby is closed
             if (mCurrentMenu == mOnlineMenu.get() && t > 12) {
-                shot("19_online_menu_lobby_closed");
+                shot("22_online_menu_lobby_closed");
                 next();
             }
             timedOut(60 * 60, "the host to close the lobby");

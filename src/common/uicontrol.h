@@ -54,6 +54,16 @@ public:
         fDisable = disable;
     }
 
+    /// The control can't be changed by this player (the online match settings, when only the host may):
+    /// inert like a disabled control, and drawn with the disabled look of the select fields
+    void SetLocked(bool locked) {
+        fLocked = locked;
+        Disable(locked);
+    }
+    bool IsLocked() const {
+        return fLocked;
+    }
+
     bool Select(bool select) {
         fSelected = select;
 
@@ -107,6 +117,7 @@ protected:
     bool fModifying = false;
     bool fAutoModify = false;
     bool fDisable = false;
+    bool fLocked = false;
     bool m_visible = true;
 
     std::array<UI_Control*, 4> m_neighbors;

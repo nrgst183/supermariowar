@@ -5,18 +5,20 @@
 #include "ui/MI_Button.h"
 #include "ui/MI_MapPreview.h"
 
+#include <functional>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
 class gfxSprite;
+class MI_Image;
 
 
-// The controls of the online lobby screen that show the state of the lobby
+// The controls of the online lobby screens that show the state of the lobby
 // (rollback::NetGame::instance().lobby()); they read it every frame. They are drawn only from the
-// art of the original menus (pipe fields and buttons, the orange player cards and Ready mushrooms of the
-// team select screen, the cream map frame, the menu fonts), laid out like the Single Game menu: the
-// mode, goal and map fields and the map preview on the left, the four players on the right.
+// art of the original menus: the Team and Character Selection screen (its team box, the orange player
+// cards and Ready mushrooms), the pipe fields and buttons, the cream map frame and the menu fonts.
 
 struct LobbyRect {
     short x = 0;
@@ -24,25 +26,6 @@ struct LobbyRect {
     short w = 0;
     short h = 0;
 };
-
-struct LobbyLayout {
-    LobbyRect field[3];      // mode, goal, map (read-only pipe fields)
-    short fieldIndent = 0;   // where the value starts in a field
-    LobbyRect mapFrame;      // the cream frame of the map picture
-    LobbyRect map;           // the map picture inside it
-    LobbyRect card[4];       // the four player cards
-    LobbyRect players;       // the "Players" select field
-    LobbyRect delay;         // the "Delay" select field
-    LobbyRect status;        // the status bar
-    LobbyRect hint;          // the hint under the fields
-    short buttonY = 0;       // the buttons: y, height 32 and the x of the three columns
-    short buttonX[3] {};
-    short buttonW = 0;       // width of each of the three (host)
-    short joinerW = 0;       // width of the two of a joiner
-};
-
-LobbyLayout lobbyLayout();
-
 
 /// A button of the lobby: the pipes of the original menus, green for the main action (ready, start),
 /// gray for the others, whatever their width
@@ -56,63 +39,73 @@ public:
 };
 
 
-/// One of the four players of the next match, drawn like the player cards at the bottom of the team select
-/// screen: the boxed number, the skin sprite in the player's color, the name, and the Ready mushroom.
-/// Left/right change the team and up/down the color of the player's own card (the host's: of any card)
-/// while it is being edited; "select" starts and ends editing. The host's "select" on an empty card adds
-/// a CPU player; while editing, "random" kicks the player or removes the CPU player.
-class MI_LobbyCard : public UI_Control {
+/// The Team and Character Selection screen of the online lobby, like MI_TeamSelect: the four teams as
+/// columns of the players in them, and a card for each player at the bottom (number, name, Ready mushroom,
+/// and the role and ping in the small font). Each player controls only its own character on this
+/// computer: up/down choose the skin, left/right the team and select is ready (the original's keys); the
+/// others (remote players, CPU players) are shown, locked. While a player is ready (locked), "down" moves
+/// to the buttons under the box and "cancel" takes the ready back; cancel when not ready leaves the lobby.
+class MI_OnlineTeamSelect : public UI_Control {
 public:
-    MI_LobbyCard(const LobbyRect& rect, int slot);
+    MI_OnlineTeamSelect(short x, short y);
 
     void Update() override;
     void Draw() override;
-    MenuCodeEnum Modify(bool modify) override;
     MenuCodeEnum SendInput(CPlayerInput* playerInput) override;
-    MenuCodeEnum MouseClick(short iMouseX, short iMouseY) override;
+    MenuCodeEnum Modify(bool modify) override;
 
-    int slot() const { return m_slot; }
-    /// What the player can do with this card now, for the hint line
+    /// The screen was opened: nobody is locked
+    void Reset();
+    /// Whether this computer's players are ready (the host's lock is only a feature of the screen)
+    bool locked() const;
+    void Lock(bool lock);
+    /// Called when the focus should go to the buttons under the box
+    void SetLeaveDown(std::function<void()> leave) { m_leaveDown = std::move(leave); }
+    /// What the local players can do now, for the hint line
     std::string hint() const;
 
 private:
     struct Info;
-    bool editable() const;
-    bool gather(Info& info) const;
-    const gfxSprite* skinFrame(const Info& info, int frame);
-    void drawCard(const Info& info);
+    bool gather(int slot, Info& info) const;
+    int mySlot(int localIndex) const;
+    int teamOf(int slot) const;
+    void changeTeam(int slot, int direction);
+    void changeSkin(int localIndex, int direction, bool random);
+    const gfxSprite* skinFrame(int slot, const Info& info, int frame);
 
-    short m_width = 0;
-    short m_height = 0;
-    int m_slot = 0;
-
-    int m_overrideTeam = 0;       // what the player has just chosen, until the lobby's state says so too
-    int m_overrideColor = 0;
-    int m_overrideFrames = 0;
-
+    std::unique_ptr<MI_Image> m_background;
+    std::function<void()> m_leaveDown;
+    bool m_hostLocked = false;
     int m_tick = 0;
-    SpriteStrip m_skin;
-    std::string m_skinPath;
-    short m_skinColor = -1;
+
+    int m_overrideTeam[4] {};
+    int m_overrideFrames[4] {};
+    int m_holdFrames[4] {};     // how long up/down are held, for the fast scroll of the skins
+
+    struct Skin {
+        SpriteStrip strip;
+        std::string path;
+        short color = -1;
+    };
+    Skin m_skins[4];
 };
 
 
-/// A read-only field in the style of the Single Game menu's pipe fields: a label, then the value
-/// (optionally after a small mode icon)
-class MI_LobbyField : public UI_Control {
+/// A small marker for something only the host can change ("Host", "Set by host")
+class MI_LockTag : public UI_Control {
 public:
-    MI_LobbyField(const LobbyRect& rect, short indent, std::string label);
+    MI_LockTag(short x, short y, std::string text, bool rightJustified = true)
+        : UI_Control(x, y)
+        , m_text(std::move(text))
+        , m_right(rightJustified)
+    {}
 
-    void SetLabel(std::string label) { m_label = std::move(label); }
-    void SetValue(std::string value, int modeIcon = -1);
+    void SetText(std::string text) { m_text = std::move(text); }
     void Draw() override;
 
 private:
-    LobbyRect m_rect;
-    short m_indent = 0;
-    std::string m_label;
-    std::string m_value;
-    int m_icon = -1;
+    std::string m_text;
+    bool m_right = true;
 };
 
 
@@ -137,7 +130,8 @@ private:
 };
 
 
-/// The status bar (the blue bar of the headers), the hint and the "connecting" screen
+/// The header and the status bar (the blue bar of the headers) of the lobby screens, the hint line,
+/// and the "connecting" screen
 class MI_LobbyScene : public UI_Control {
 public:
     enum class Tone { Info, Good, Warn, Error };
@@ -146,15 +140,22 @@ public:
 
     void Draw() override;
 
-    /// The status line, and the hint under the settings (the tone is not shown any more)
+    /// The header, the status line, and the hint under the buttons
+    void SetTitle(std::string title) { m_title = std::move(title); }
     void SetStatus(std::string text, Tone tone, std::string hint);
     void SetJoining(bool joining) { m_joining = joining; }
+    /// The line "Settings: host only" at the bottom right of the header bar
+    void SetSettingsNote(std::string note) { m_note = std::move(note); }
 
 private:
-    LobbyLayout m_layout;
+    LobbyRect m_statusRect;
+    LobbyRect m_hintRect;
+    std::string m_title;
     std::string m_status;
     std::string m_hint;
+    std::string m_note;
     bool m_joining = false;
+    int m_tick = 0;
 };
 
 

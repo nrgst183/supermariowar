@@ -12,6 +12,8 @@
 #   BUILD_DIR  the build directory with the smw binary (default: build)
 # Environment: PORT (default 7300) is the host's UDP port, BUSY_PORT (default 7390) the one that is
 # blocked for the "port in use" error.
+# HOST_LACKS_FROM=L: the host's data directory lacks every skin from "L" on, so that the joiner's skin
+# (Link, and the ones it scrolls to) is downloaded by the host (the end-to-end test of the other direction).
 # HOST_SKIN and JOIN_SKIN (default Kirby and Link) are the players' skins; the joiner's data directory
 # lacks the host's, so that it is downloaded.
 
@@ -38,6 +40,16 @@ cp -rs "$(readlink -f "$ROOT/data")/." "$JOIN_DATA"
 rm -f "$JOIN_DATA/maps/$MAP_FILE"
 rm -f "$JOIN_DATA/gfx/skins/$HOST_SKIN.png" "$JOIN_DATA/gfx/skins/$HOST_SKIN.bmp"
 
+HOST_DATA="$ROOT/data"
+if [ -n "${HOST_LACKS_FROM:-}" ]; then
+    HOST_DATA="$WORK/hostdata"
+    cp -rs "$(readlink -f "$ROOT/data")/." "$HOST_DATA"
+    for f in "$HOST_DATA"/gfx/skins/*; do
+        name=$(basename "$f")
+        if [[ "${name^^}" > "${HOST_LACKS_FROM^^}" || "${name^^}" == "${HOST_LACKS_FROM^^}"* ]]; then rm -f "$f"; fi
+    done
+fi
+
 run() {    # NAME DATADIR ARGS...
     local name=$1 data=$2
     shift 2
@@ -60,10 +72,10 @@ run errors "$ROOT/data" --at-role errors --at-addr "$BUSY_PORT" --at-nick Mario
 kill $BLOCKER 2>/dev/null
 
 # The lobby: host and joiner at the same time
-run host "$ROOT/data" --at-role host --at-nick Mario --at-map "$MAP_NAME" --at-addr "$PORT" --net-sim-latency 15 --net-skin "$HOST_SKIN" --net-slow-map 8 &
+run host "$HOST_DATA" --at-role host --at-nick Mario --at-map "$MAP_NAME" --at-addr "$PORT" --net-sim-latency 15 --net-skin "$HOST_SKIN" --net-slow-map 8 &
 HOST=$!
 sleep 4
-run join "$JOIN_DATA" --at-role join --at-nick Luigi --at-addr "127.0.0.1:$PORT" --net-sim-latency 15 --net-skin "$JOIN_SKIN" &
+run join "$JOIN_DATA" --at-role join --at-map "$MAP_NAME" --at-nick Luigi --at-addr "127.0.0.1:$PORT" --net-sim-latency 15 --net-skin "$JOIN_SKIN" &
 JOIN=$!
 wait $HOST $JOIN
 

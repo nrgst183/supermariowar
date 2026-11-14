@@ -2,8 +2,12 @@
 
 #include "uimenu.h"
 
+#include <string>
+
 class MI_Button;
 class MI_Image;
+class MI_LobbyMap;
+class MI_LockTag;
 class MI_ImageSelectField;
 class MI_MapField;
 class MI_MapFilterScroll;
@@ -29,6 +33,16 @@ public:
     const char* GetCurrentMapName();
     bool IsOnStartBtn();
 
+    /// The online lobby's view of these settings, for the players who are not the host: the settings the
+    /// host has chosen, not editable (Locked: with the disabled look and a "Host" marker) or, when the host
+    /// lets everyone change them, editable (Editable). The Start button becomes "Back".
+    enum class OnlineView { Off, Locked, Editable };
+    void SetOnlineView(OnlineView view);
+    OnlineView onlineView() const { return m_onlineView; }
+    /// While the map isn't here (yet): covers its picture with a text, and the progress of the download
+    void SetMapOverlay(bool show, std::string text = {}, float fraction = -1.0f, std::string label = {});
+    MenuCodeEnum CancelCodeNow() const;
+
     MI_MapFilterScroll* miMapFilterScroll = nullptr;
     MI_MapField* miMapField = nullptr;
     MI_SelectField<short>* miGoalField[22];
@@ -45,6 +59,11 @@ private:
     MI_Image* miGameSettingsLeftHeaderBar = nullptr;
     MI_Image* miGameSettingsMenuRightHeaderBar = nullptr;
     MI_Text* miGameSettingsMenuHeaderText = nullptr;
+
+    MI_LockTag* miHostNote = nullptr;
+    MI_LockTag* miHostTag[3] {};
+    MI_LobbyMap* miMapOverlay = nullptr;
+    OnlineView m_onlineView = OnlineView::Off;
 
     MI_Image* miGameSettingsExitDialogImage = nullptr;
     MI_Text* miGameSettingsExitDialogExitText = nullptr;

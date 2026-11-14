@@ -151,3 +151,10 @@ The disconnect tests check that the survivors play the match to its end, agree o
 **Screenshots of the overlays.** Run two processes with rendering on (no `--at-norender`) and add `--at-shot-every 30 --at-shot-dir DIR` to the one to look at. Stopping the other process for a few seconds (`kill -STOP` / `kill -CONT`) shows the waiting box, `--net-sim-latency` makes rollbacks that the stats line shows.
 
 **Unit tests.** `smw-tests` covers the session, lobby, mesh, snapshots and config.
+
+
+## Lobby screens and who may change what
+
+The lobby follows the offline flow. Its home is the **Team and Character Selection** screen (`MI_OnlineTeamSelect`): each player picks the skin (up/down) and team (left/right) of its own character and presses select to be ready; remote players and CPU players are shown, locked. The host's Continue opens the match type and game settings screens (the game's own `UI_GameSettingsMenu`, whose Start begins the match); the others' Settings button shows the same screen live, read-only. The Options page has the local players, CPU players, input delay, "Match settings" (Host only / Everyone can change) and kick.
+
+Only the host changes the lobby unless it sets "Everyone can change" (`LOBBY_EXTRA` carries the flag). Then a joiner's mode, goal or map edit is sent as `SETTINGS_REQUEST` (`NetLobby::requestSetting`); the host ignores it while the flag is off, applies it to its own menus otherwise (`NetGame::popSettingRequest`, `MenuState::ApplyOnlineSettingRequests`) and the lobby broadcast shows the result (last write wins). Series setups, delay and CPU players stay host-only. `HOST_LACKS_FROM=L scripts/menu-screenshots.sh` tests skin transfer to the host.

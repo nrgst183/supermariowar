@@ -103,13 +103,15 @@ enum MenuCodeEnum {
     MENU_CODE_ONLINE_HOST,
     MENU_CODE_ONLINE_JOIN,
     MENU_CODE_ONLINE_LOBBY_CHANGED,     // a team, color, player count or input delay field was edited
-    MENU_CODE_ONLINE_SLOT_ACTION,       // host: kick the player / add or remove a CPU player of the focused slot
-    MENU_CODE_ONLINE_READY,
-    MENU_CODE_ONLINE_START,
     MENU_CODE_ONLINE_MATCH_SETTINGS,
     MENU_CODE_ONLINE_LEAVE,             // asks for confirmation
     MENU_CODE_ONLINE_LEAVE_YES,
     MENU_CODE_ONLINE_LEAVE_NO,
+    MENU_CODE_ONLINE_VIEW_SETTINGS,     // a joiner opens the host's match settings (read-only, or live when everyone may change them)
+    MENU_CODE_ONLINE_OPTIONS,           // the lobby's options page (players, CPUs, delay, who changes the settings, kick)
+    MENU_CODE_ONLINE_OPTIONS_BACK,
+    MENU_CODE_ONLINE_KICK,
+    MENU_CODE_ONLINE_SETTINGS_BACK,     // a joiner leaves the settings view
 };
 
 enum class MenuNavDirection : unsigned char {

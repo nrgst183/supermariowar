@@ -8,6 +8,7 @@
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
 #include "ui/MI_ImageSelectField.h"
+#include "ui/MI_LobbyWidgets.h"
 #include "ui/MI_MapField.h"
 #include "ui/MI_MapFilterScroll.h"
 #include "ui/MI_SelectField.h"
@@ -143,9 +144,64 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     AddControl(miGameSettingsExitDialogYesButton, nullptr, nullptr, nullptr, miGameSettingsExitDialogNoButton);
     AddControl(miGameSettingsExitDialogNoButton, nullptr, nullptr, miGameSettingsExitDialogYesButton, nullptr);
 
+    // What only the host can change, in the online lobby (hidden until SetOnlineView())
+    miHostNote = new MI_LockTag(622, 10, "");
+    miHostTag[0] = new MI_LockTag(562, 93, "Host");
+    miHostTag[1] = new MI_LockTag(414, 133, "Host");
+    miHostTag[2] = new MI_LockTag(562, 173, "Host");
+    miMapOverlay = new MI_LobbyMap({70, 195, 352, 270}, {86, 211, 320, 240});
+    miMapOverlay->setVisible(false);
+    miMapOverlay->SetAvailable(false);
+    AddNonControl(miMapOverlay);
+    AddNonControl(miHostNote);
+    for (MI_LockTag* tag : miHostTag) {
+        tag->setVisible(false);
+        AddNonControl(tag);
+    }
+
     setInitialFocus(miSettingsStartButton);
 
     SetCancelCode(MENU_CODE_BACK_TEAM_SELECT_MENU);
+}
+
+MenuCodeEnum UI_GameSettingsMenu::CancelCodeNow() const
+{
+    return m_onlineView != OnlineView::Off ? MENU_CODE_ONLINE_SETTINGS_BACK : MENU_CODE_BACK_TEAM_SELECT_MENU;
+}
+
+void UI_GameSettingsMenu::SetOnlineView(OnlineView view)
+{
+    m_onlineView = view;
+    const bool on = view != OnlineView::Off;
+    const bool locked = view == OnlineView::Locked;
+
+    miModeField->SetLocked(locked);
+    for (MI_SelectField<short>* goal : miGoalField)
+        goal->SetLocked(locked);
+    miMapField->SetLocked(locked);
+    miModeSettingsButton->SetLocked(on);
+    miMapFiltersButton->SetLocked(on);
+    miMapThumbnailsButton->SetLocked(on);
+
+    miSettingsStartButton->SetName(on ? "Back" : "Start");
+    miSettingsStartButton->SetCode(on ? MENU_CODE_ONLINE_SETTINGS_BACK : MENU_CODE_START_GAME);
+    SetCancelCode(CancelCodeNow());
+
+    miHostNote->SetText(locked ? "Set by host" : on ? "Everyone can change" : "");
+    // (the header says it: "Set by host"; the fields have only their disabled look)
+    for (MI_LockTag* tag : miHostTag)
+        tag->setVisible(false);
+    if (!on)
+        SetMapOverlay(false);
+}
+
+void UI_GameSettingsMenu::SetMapOverlay(bool show, std::string text, float fraction, std::string label)
+{
+    miMapOverlay->setVisible(show);
+    if (show) {
+        miMapOverlay->SetText(std::move(text));
+        miMapOverlay->SetProgress(fraction, std::move(label));
+    }
 }
 
 void UI_GameSettingsMenu::RefreshGameModeButtons()
@@ -174,7 +230,7 @@ void UI_GameSettingsMenu::CloseMapFilters()
     miMapFilterScroll->setVisible(false);
 
     setInitialFocus(miSettingsStartButton);
-    SetCancelCode(MENU_CODE_BACK_TEAM_SELECT_MENU);
+    SetCancelCode(CancelCodeNow());
 
     RestoreCurrent();
 
@@ -205,7 +261,7 @@ void UI_GameSettingsMenu::CloseExitDialog()
     miGameSettingsExitDialogNoButton->setVisible(false);
 
     setInitialFocus(miSettingsStartButton);
-    SetCancelCode(MENU_CODE_BACK_TEAM_SELECT_MENU);
+    SetCancelCode(CancelCodeNow());
 
     RestoreCurrent();
 }

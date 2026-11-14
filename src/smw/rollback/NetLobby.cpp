@@ -463,6 +463,26 @@ void NetLobby::setInputDelay(int delay)
     markDirty();
 }
 
+void NetLobby::setSettingsEveryone(bool everyone)
+{
+    if (!isHost() || everyone == m_settingsEveryone)
+        return;
+    m_settingsEveryone = everyone;
+    markDirty();
+}
+
+void NetLobby::requestSetting(uint8_t what, int value, const std::string& text)
+{
+    if (isHost() || localPeer() < 0 || !m_settingsEveryone || m_phase != Phase::Lobby)
+        return;
+    ByteWriter w(m_buffer.data(), m_buffer.size());
+    w.u8(static_cast<uint8_t>(MsgType::SettingsRequest));
+    w.u8(what);
+    w.i16(static_cast<int16_t>(value));
+    w.str(text);
+    sendTo(0, w);
+}
+
 void NetLobby::setMatchInfo(const std::string& mode, const std::string& map)
 {
     if (mode != m_modeName || map != m_mapName) {
@@ -716,6 +736,7 @@ void NetLobby::sendLobbyState()
     extra.i16(static_cast<int16_t>(m_modeId));
     extra.i16(static_cast<int16_t>(m_goal));
     extra.str(m_goalName);
+    extra.u8(m_settingsEveryone ? 1 : 0);
     sendToAll(extra);
     m_dirty = false;
 }
@@ -1147,13 +1168,32 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
                 const int modeId = r.i16();
                 const int goal = r.i16();
                 std::string goalName = r.str();
+                const bool everyone = r.u8() != 0;
                 if (r.ok()) {
+                    m_settingsEveryone = everyone;
                     m_modeId = modeId;
                     m_goal = goal;
                     m_goalName = std::move(goalName);
                 }
             }
             break;
+
+        case MsgType::SettingsRequest: {
+            const uint8_t what = r.u8();
+            const int number = r.i16();
+            const std::string text = r.str();
+            if (!r.ok() || !isHost() || !m_settingsEveryone || m_phase != Phase::Lobby || !m_peers[static_cast<size_t>(peer & 3)].present)
+                break;
+            if (what < SETTING_MODE || what > SETTING_MAP)
+                break;
+            event = LobbyGameEvent();
+            event.type = LobbyGameEvent::Type::SettingsRequest;
+            event.peer = peer;
+            event.size = what;
+            event.value = number;
+            event.text = text.substr(0, 120);
+            return true;
+        }
 
         case MsgType::SkinInfo:
         case MsgType::SkinRequest:
