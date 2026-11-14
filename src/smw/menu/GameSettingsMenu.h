@@ -21,6 +21,7 @@ public:
     void CloseExitDialog();
 
     void SetHeaderText(const char*);
+    void SetStartButtonText(const char*);
     void HideGMSettingsBtn();
     void GameModeChanged(short gmID);
     void RefreshGameModeButtons();
@@ -50,6 +51,4 @@ private:
     MI_Text* miGameSettingsExitDialogTournamentText = nullptr;
     MI_Button* miGameSettingsExitDialogYesButton = nullptr;
     MI_Button* miGameSettingsExitDialogNoButton = nullptr;
-
-friend class UI_NetNewRoomSettingsMenu;
 };

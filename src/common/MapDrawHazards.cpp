@@ -219,7 +219,7 @@ void DrawMapHazard(const MapHazard& hazard, short iSize, bool fDrawCenter, SDL_S
 
 void DrawPlatform(
     PlatformPathType pathtype,
-    const std::vector<TilesetTile>& tiles,
+    std::span<const TilesetTile> tiles,
     short startX, short startY,
     short endX, short endY,
     float angle, float radiusX, float radiusY,

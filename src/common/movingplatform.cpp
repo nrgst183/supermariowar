@@ -18,7 +18,7 @@ enum CollisionStyle {collision_none, collision_normal, collision_overlap_left, c
 // Moving Platform
 //------------------------------------------------------------------------------
 
-MovingPlatform::MovingPlatform(std::vector<TilesetTile>&& tiledata, std::vector<TileType>&& tiletypes, short w, short h, short drawlayer, MovingPlatformPath * path, bool fPreview)
+MovingPlatform::MovingPlatform(const std::vector<TilesetTile>& tiledata, const std::vector<TileType>& tiletypes, short w, short h, short drawlayer, MovingPlatformPath * path, bool fPreview)
 {
     fDead = false;
     iPlayerId = -1;
@@ -31,8 +31,8 @@ MovingPlatform::MovingPlatform(std::vector<TilesetTile>&& tiledata, std::vector<
         drawsize = DrawSize::Preview;
     }
 
-    iTileData = std::move(tiledata);
-    iTileType = std::move(tiletypes);
+    iTileData.assign(tiledata.begin(), tiledata.end());
+    iTileType.assign(tiletypes.begin(), tiletypes.end());
     assert(iTileData.size() == iTileType.size());
     assert(iTileData.size() == static_cast<size_t>(w * h));
 
@@ -92,10 +92,44 @@ MovingPlatform::MovingPlatform(std::vector<TilesetTile>&& tiledata, std::vector<
     rSrcRect.w = w * iTileSize;
     rSrcRect.h = h * iTileSize;
 
-    rDstRect.x = ix - iHalfWidth;
-    rDstRect.y = iy - iHalfHeight;
-    rDstRect.w = w * iTileSize;
-    rDstRect.h = h * iTileSize;
+    fVelX = pPath->velocity0().x;
+    fVelY = pPath->velocity0().y;
+
+    fOldVelX = fVelX;
+    fOldVelY = fVelY;
+}
+
+MovingPlatform::MovingPlatform(const gfxSprite& sprite, short w, short h, short drawlayer, MovingPlatformPath * path)
+{
+    fDead = false;
+    iPlayerId = -1;
+
+    TilesetTile tile;
+    tile.iID = TILESETNONE;
+    tile.iCol = 0;
+    tile.iRow = 0;
+    iTileData.assign(static_cast<size_t>(w * h), tile);
+    iTileType.assign(static_cast<size_t>(w * h), TileType::Solid);
+
+    iTileWidth = w;
+    iTileHeight = h;
+
+    iDrawLayer = drawlayer;
+
+    iWidth = w * TILESIZE;
+    iHeight = h * TILESIZE;
+
+    iHalfWidth = iWidth >> 1;
+    iHalfHeight = iHeight >> 1;
+
+    customSprite = &sprite;
+
+    pPath = path;
+    pPath->SetPlatform(this);
+
+    ResetPath();
+
+    rSrcRect = {0, 0, iWidth, iHeight};
 
     fVelX = pPath->velocity0().x;
     fVelY = pPath->velocity0().y;
@@ -119,28 +153,29 @@ TileType MovingPlatform::tileTypeAt(size_t col, size_t row) const
     return iTileType[col * iTileHeight + row];
 }
 
-//Draw a custom sprite on a tile of the platform, instead of a tileset tile
-void MovingPlatform::paintSpriteAt(const gfxSprite& spr, size_t col, size_t row)
-{
-    const short iTileSize = iWidth / iTileWidth;
-    const Vec2i dstPos(col * iTileSize, row * iTileSize);
-
-    for (gfxSprite& layer : sprites)
-        spr.draw(layer.getSurface(), dstPos);
-}
-
 void MovingPlatform::draw()
 {
     //Comment this back in to see the no spawn area of the platform
     //SDL_Rect r = {(int)pPath->currentPos1().x - iHalfWidth, (int)pPath->currentPos1().y - iHalfHeight, iWidth, iHeight};
     //SDL_FillSurfaceRect(blitdest, &r, SDL_MapSurfaceRGB(blitdest->format, 0, 0, 255));
 
-    rDstRect.x = ix - iHalfWidth + x_shake;
-    rDstRect.y = iy - iHalfHeight + y_shake;
-    rDstRect.w = iWidth;
-    rDstRect.h = iHeight;
+    const SDL_Rect rDstRect = {ix - iHalfWidth + x_shake, iy - iHalfHeight + y_shake, iWidth, iHeight};
 
-    sprites[1 - g_iCurrentDrawIndex].draw(rSrcRect, blitdest, rDstRect);
+    if (customSprite) {
+        customSprite->draw(rSrcRect, blitdest, rDstRect);
+
+        //Wrap around the screen edges, like the prerendered tiles do
+        SDL_Rect rWrapRect = rDstRect;
+        if (rDstRect.x + iWidth >= App::screenWidth)
+            rWrapRect.x -= App::screenWidth;
+        else if (rDstRect.x < 0)
+            rWrapRect.x += App::screenWidth;
+
+        if (rWrapRect.x != rDstRect.x)
+            customSprite->draw(rSrcRect, blitdest, rWrapRect);
+    } else {
+        sprites[1 - g_iCurrentDrawIndex].draw(rSrcRect, blitdest, rDstRect);
+    }
 }
 
 //Draw path for map preview

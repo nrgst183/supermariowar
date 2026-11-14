@@ -34,7 +34,6 @@ CO_Bomb::CO_Bomb(gfxSprite* nspr, Vec2s pos, Vec2f vel, short aniSpeed, short iG
     iOwnerLeftOffset = -16;
     iOwnerUpOffset = 40;
 
-    sSpotlight = nullptr;
 }
 
 bool CO_Bomb::collide(CPlayer* player)
@@ -80,13 +79,7 @@ void CO_Bomb::update()
     animate();
 
     if (game_values.spotlights) {
-        if (!sSpotlight) {
-            sSpotlight = spotlightManager.AddSpotlight(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
-        }
-
-        if (sSpotlight) {
-            sSpotlight->UpdatePosition(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1));
-        }
+        spotlightManager.track(this, iNetworkID, ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
     }
 }
 

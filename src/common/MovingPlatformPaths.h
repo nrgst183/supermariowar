@@ -1,6 +1,7 @@
 #pragma once
 
 #include "math/Vec2.h"
+#include "SimArena.h"
 
 class MovingPlatform;
 
@@ -14,7 +15,8 @@ enum class PlatformPathType: unsigned char {
 };
 
 
-class MovingPlatformPath {
+// Simulation state: lives in the simulation arena (see SimArena.h)
+class MovingPlatformPath : public sim::ArenaAllocated {
 public:
     MovingPlatformPath(float speed, Vec2f startPos, Vec2f endPos, bool preview);
     virtual ~MovingPlatformPath() = default;

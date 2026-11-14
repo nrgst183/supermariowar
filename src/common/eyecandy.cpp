@@ -6,6 +6,8 @@
 #include "map.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "RenderFrame.h"
+#include "Resimulation.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1106,14 +1108,31 @@ void Spotlight::Draw()
     }
 }
 
-Spotlight* SpotlightManager::AddSpotlight(short ix, short iy, short iSize)
+void SpotlightManager::track(const void* owner, int ownerId, short ix, short iy, short iSize)
 {
-    if (!game_values.spotlights)
-        return nullptr;
+    if (!game_values.spotlights || sim::isResimulating())
+        return;
+
+    for (Spotlight* s : spotlightList) {
+        if (s->owner == owner && s->ownerId == ownerId && !s->IsDead()) {
+            s->UpdatePosition(ix, iy);
+            return;
+        }
+    }
 
     Spotlight* s = new Spotlight(ix, iy, iSize);
+    s->owner = owner;
+    s->ownerId = ownerId;
+    s->UpdatePosition(ix, iy);
     spotlightList.push_back(s);
-    return s;
+}
+
+void SpotlightManager::release(const void* owner, int ownerId)
+{
+    for (Spotlight* s : spotlightList) {
+        if (s->owner == owner && s->ownerId == ownerId)
+            s->owner = nullptr;
+    }
 }
 
 void SpotlightManager::DrawSpotlights()
@@ -1124,7 +1143,8 @@ void SpotlightManager::DrawSpotlights()
     std::vector<Spotlight*>::iterator iter = spotlightList.begin(), lim = spotlightList.end();
 
     while (iter != lim) {
-        (*iter)->Update();
+        if (render::advancesAnimations())
+            (*iter)->Update();
 
         if ((*iter)->IsDead()) {
             delete (*iter);

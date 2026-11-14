@@ -8,7 +8,6 @@
 #include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "ObjectContainer.h"
@@ -103,33 +102,6 @@ constexpr short iCountDownRectSize[28] = {3, 2, 1, 0, 1, 2, 3, 3, 2, 1, 0, 1, 2,
 constexpr short iCountDownRectGroup[28] = {0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3};
 void GameplayState::drawScreenFade()
 {
-    if (game_values.screenfadespeed != 0) {
-        g_map->update();
-        game_values.screenfade += game_values.screenfadespeed;
-
-        if (game_values.screenfade <= 0) {
-            game_values.screenfadespeed = 0;
-            game_values.screenfade = 0;
-
-            //display the mode and goal at the start of the game
-            //if (game_values.matchtype == MatchType::QuickGame)
-            if (game_values.startmodedisplay && game_values.singleplayermode == -1) {
-                std::string szMode;
-                if (game_values.gamemode->goal < 0)
-                    szMode = std::format("{}  {}: X", game_values.gamemode->GetModeName(), game_values.gamemode->GetGoalName());
-                else
-                    szMode = std::format("{}  {}: {}", game_values.gamemode->GetModeName(), game_values.gamemode->GetGoalName(), game_values.gamemode->goal);
-
-                short iMode = GetModeIconIndexFromMode(game_values.gamemode->gamemode);
-
-                eyecandy[2].emplace<EC_Announcement>(&rm->game_font_large, &rm->menu_mode_large, szMode, iMode, 130, 90);
-            }
-        } else if (game_values.screenfade >= 255) {
-            game_values.screenfadespeed = 0;
-            game_values.screenfade = 255;
-        }
-    }
-
     if (game_values.screenfade > 0) {
         rm->menu_shade.setalpha(static_cast<Uint8>(game_values.screenfade));
         rm->menu_shade.draw(0, 0);
@@ -176,33 +148,6 @@ void GameplayState::drawPlayerSwap()
                 }
 
                 rm->spr_storedpowerupsmall.draw(iPowerupX, iPowerupY, {storedpowerupid * 16, 0, 16, 16});
-            }
-        }
-
-        if (game_values.swapstyle == MysteryMushroomSwapStyle::Walk) {
-            if (!rm->sfx_skid.isPlaying())
-                ifSoundOnPlay(rm->sfx_skid);
-        }
-
-        if (++game_values.flags.swapplayersblinkcount > 10) {
-            game_values.flags.swapplayersblinkcount = 0;
-            game_values.flags.swapplayersblink = !game_values.flags.swapplayersblink;
-        }
-
-        game_values.flags.swapplayersposition += 0.02f;
-        if (game_values.flags.swapplayersposition >= 1.0f) {
-            game_values.flags.swapplayersposition = 0.0f;
-            game_values.flags.swapplayers = false;
-            game_values.screenfade = 0;
-
-            if (game_values.swapstyle == MysteryMushroomSwapStyle::Walk)
-                rm->sfx_skid.stop();
-
-            ifSoundOnPlay(rm->sfx_transform);
-
-            if (game_values.swapstyle == MysteryMushroomSwapStyle::Blink) {
-                for (CPlayer* player : g_sim.players)
-                    eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, player->leftX() + (HALFPW) - 16, player->topY() + (HALFPH) - 16, 3, 8);
             }
         }
     }

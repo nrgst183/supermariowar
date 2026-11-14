@@ -6,10 +6,10 @@
 #include "GSGameplay.h"
 #include "map.h"
 #include "movingplatform.h"
-#include "net.h"
 #include "ObjectContainer.h"
 #include "objectgame.h"
 #include "RandomNumberGenerator.h"
+#include "RenderFrame.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "gamemodes/Chicken.h"
@@ -32,9 +32,6 @@
 
 bool shouldUpdateSprite()
 {
-    if (netplay.active)
-        return true;
-
     return !game_values.flags.pausegame && !game_values.flags.exitinggame && !game_values.flags.swapplayers;
 }
 
@@ -181,13 +178,7 @@ void CPlayer::updateSprite()
 void CPlayer::draw_spotlight()
 {
     if (game_values.spotlights && state != PlayerState::Dead) {
-        if (!sSpotlight) {
-            sSpotlight = spotlightManager.AddSpotlight(ix + HALFPW, iy + HALFPH, 7);
-        }
-
-        if (sSpotlight) {
-            sSpotlight->UpdatePosition(ix + HALFPW, iy + HALFPH);
-        }
+        spotlightManager.track(this, -1 - globalID, ix + HALFPW, iy + HALFPH, 7);
     }
 }
 
@@ -222,6 +213,25 @@ void CPlayer::draw_winnerCrown()
     }
 }
 
+// Advances the tail animation, which used to happen while drawing. The tail's
+// state is gameplay state (it slows the fall, and finishing a tail attack uses
+// up the leaf), so the simulation calls this once per tick, under exactly the
+// conditions in which draw() used to draw the tail.
+void CPlayer::updateTail()
+{
+    if (state == PlayerState::Waiting || state == PlayerState::Spawning)
+        return;
+
+    if (tanookisuit.isStatue() || kuriboshoe.is_on() || powerup == 3 || powerup == 8)
+        return;
+
+    auto* gmChicken = dynamic_cast<CGM_Chicken*>(game_values.gamemode);
+    const bool isChicken = gmChicken && gmChicken->chicken() == this;
+
+    if (powerup == 7 || (powerup == -1 && isChicken && game_values.gamemodesettings.chicken.glide))
+        tail.update(*this);
+}
+
 void CPlayer::draw()
 {
     //Don't draw a player that is waiting to respawn
@@ -234,6 +244,7 @@ void CPlayer::draw()
         return;
 
     //Draw player
+    SpriteStrip*& pScoreboardSprite = playerRenderState(*this).scoreboardSprite;
     pScoreboardSprite = sprites;
 
     CPlayer* chicken = nullptr;
@@ -257,7 +268,8 @@ void CPlayer::draw()
         pScoreboardSprite = &rm->spr_bobomb[colorID];
 
         //Add smoke to the top of the bomb
-        if (++bobombsmoketimer > 2 && (velx != 0.0f || vely != GRAVITATION) && state == PlayerState::Ready) {
+        short& bobombsmoketimer = playerRenderState(*this).bobombSmokeTimer;
+        if (render::advancesAnimations() && ++bobombsmoketimer > 2 && (velx != 0.0f || vely != GRAVITATION) && state == PlayerState::Ready) {
             bobombsmoketimer = 0;
             eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_bobombsmoke, ix + HALFPH - 8, iy - PHOFFSET - 8, 4, 4);
         }
@@ -348,15 +360,21 @@ void CPlayer::updateswap()
         carriedItem->MoveToOwner();
 }
 
+// The per-tick part of drawswap(), which used to run while drawing
+void CPlayer::updateSwapAnimation()
+{
+    if (state == PlayerState::Ready && game_values.swapstyle != MysteryMushroomSwapStyle::Blink)
+        updateSprite();
+
+    updateTail();
+}
+
 void CPlayer::drawswap()
 {
     if (state != PlayerState::Ready) {
         draw();
         return;
     }
-
-    if (game_values.swapstyle != MysteryMushroomSwapStyle::Blink)
-        updateSprite();
 
     draw();
 

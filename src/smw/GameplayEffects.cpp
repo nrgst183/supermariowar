@@ -8,7 +8,6 @@
 #include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "ObjectContainer.h"
@@ -16,6 +15,7 @@
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "Resimulation.h"
 #include "Score.h"
 #include "sfx.h"
 #include "SimulationState.h"
@@ -131,14 +131,18 @@ void shakeScreen()
 {
     if (game_values.flags.screenshaketimer <= 0) {
         //Make sure we zero out the shake value after it is done
-        x_shake = 0;
+        if (!sim::isResimulating())
+            x_shake = 0;
         return;
     }
 
     game_values.flags.screenshaketimer--;
 
+    //The shaking itself is cosmetic
     static bool shakeleft = false;
-    if (shakeleft) {
+    if (sim::isResimulating()) {
+        // already shaken when the tick was first simulated
+    } else if (shakeleft) {
         x_shake -= 2;
         if (x_shake <= -2) {
             shakeleft = false;
@@ -257,7 +261,8 @@ void shakeScreen()
 //Move the screen in a small circle
 void GameplayState::spinScreen()
 {
-    if (!game_values.spinscreen)
+    //Cosmetic: already spun when the tick was first simulated
+    if (!game_values.spinscreen || sim::isResimulating())
         return;
 
     if (spindirection == 0 || spindirection == 2) {
@@ -299,6 +304,10 @@ void GameplayState::spinScreen()
 
 void updateScreenShake()
 {
+    //Cosmetic: already updated when the tick was first simulated
+    if (sim::isResimulating())
+        return;
+
     if (y_shake > 0 && !game_values.spinscreen) {
         y_shake -= CRUNCHVELOCITY;
 
@@ -317,7 +326,11 @@ void updateBulletBillPowerup()
             if (--game_values.bulletbillspawntimer[iPlayer] <= 0) {
                 game_values.bulletbillspawntimer[iPlayer] = static_cast<short>(RANDOM_INT(20) + 25);
                 float speed = (static_cast<float>(RANDOM_INT(21) + 20)) / 10.0f;
-                g_sim.objectcontainer[2].add(new MO_BulletBill(&rm->spr_bulletbill, &rm->spr_bulletbilldead, {0, static_cast<short>(RANDOM_INT(448))}, (RANDOM_INT(2) ? speed : -speed), iPlayer, false));
+                // Draw random numbers in separate statements: argument evaluation order is
+                // unspecified in C++, and every peer must draw them in the same order
+                const short billY = static_cast<short>(RANDOM_INT(448));
+                const float billVel = RANDOM_INT(2) ? speed : -speed;
+                g_sim.objectcontainer[2].add(new MO_BulletBill(&rm->spr_bulletbill, &rm->spr_bulletbilldead, {0, billY}, billVel, iPlayer, false));
                 ifSoundOnPlay(rm->sfx_bulletbillsound);
             }
         }

@@ -2,7 +2,6 @@
 
 #include "MovingObject.h"
 
-class Spotlight;
 enum class BoomerangStyle : unsigned char;
 
 
@@ -24,5 +23,4 @@ private:
     short iStateTimer;
 
     BoomerangStyle iStyle;
-    Spotlight* sSpotlight;
 };

@@ -9,7 +9,6 @@
 #include "GSGameplay.h"
 #include "GameplayStyles.h"
 #include "joystick.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "path.h"
@@ -58,12 +57,6 @@
 #include "menu/options/SoundOptionsMenu.h"
 #include "menu/options/TeamOptionsMenu.h"
 
-#include "menu/network/NetEditServersMenu.h"
-#include "menu/network/NetLobbyMenu.h"
-#include "menu/network/NetNewRoomMenu.h"
-#include "menu/network/NetNewRoomSettingsMenu.h"
-#include "menu/network/NetRoomMenu.h"
-#include "menu/network/NetServersMenu.h"
 
 #include <format>
 #include <string>
@@ -144,25 +137,7 @@ void MenuState::StartGame()
     printf("Loading player skins...\n");
     for (int k = 0; k < 4; k++) {
         if (game_values.playercontrol[k] > 0) {
-            if (netplay.active) {
-                if (k == netplay.remotePlayerNumber) { // local player uses local skin
-                    printf("  player %d -> local\n", k);
-                    rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
-                }
-                else {
-                    std::ostringstream path;
-                    path << GetHomeDirectory() << "net_skin" << k << ".bmp";
-                    printf("  player %d -> %s\n", k, path.str().c_str());
-
-                    try {
-                        rm->spr_player[k] = rm->LoadFullSkin(path.str(), k);
-                    } catch (...) {
-                        printf("[warning] Could not load netplay skin of player %d, using default\n", k);
-                        rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
-                    }
-                }
-            }
-            else if (game_values.randomskin[k]) {
+            if (game_values.randomskin[k]) {
                 game_values.skinids[k] = RANDOM_INT( skinlist->count());
                 rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
             }

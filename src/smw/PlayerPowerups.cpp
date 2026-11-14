@@ -6,7 +6,6 @@
 #include "GSGameplay.h"
 #include "map.h"
 #include "movingplatform.h"
-#include "net.h"
 #include "ObjectContainer.h"
 #include "objectgame.h"
 #include "RandomNumberGenerator.h"
@@ -153,7 +152,11 @@ void CPlayer::triggerPowerup()
     case PowerupType::Podobo: {
         short numPodobos = RANDOM_INT(6) + 10;
         for (short iPodobo = 0; iPodobo < numPodobos; iPodobo++) {
-            g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {static_cast<short>(RANDOM_INT(App::screenWidth * 0.95f)), App::screenHeight}, -(float(RANDOM_INT(9)) / 2.0f) - 9.0f, globalID, teamID, colorID, false));
+            // Draw random numbers in separate statements: argument evaluation order is
+            // unspecified in C++, and every peer must draw them in the same order
+            const short podoboX = static_cast<short>(RANDOM_INT(App::screenWidth * 0.95f));
+            const float podoboVelY = -(float(RANDOM_INT(9)) / 2.0f) - 9.0f;
+            g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {podoboX, App::screenHeight}, podoboVelY, globalID, teamID, colorID, false));
         }
         ifSoundOnPlay(rm->sfx_thunder);
         break;
@@ -188,9 +191,6 @@ void CPlayer::update_usePowerup()
 
     powerupradius -= static_cast<float>(game_values.storedpowerupdelay) / 2.0f;
     powerupangle += 0.05f;
-
-    if (netplay.active && net_waitingForPowerupTrigger)
-        return;
 
     if (powerupradius < 0.0f)
         triggerPowerup();
@@ -239,28 +239,9 @@ void CPlayer::tryReleasingPowerup()
     game_values.gamepowerups[globalID] = -1;
 
     powerupradius = 100.0f;
-    if (netplay.active)
-        powerupangle = 0.0f;
-    else
-        powerupangle = static_cast<float>(RANDOM_INT(1000) * 0.00628f);
+    powerupangle = static_cast<float>(RANDOM_INT(1000) * 0.00628f);
 
     ifSoundOnPlay(rm->sfx_storedpowerupsound);
-
-    // only the locally controlled player should be able to send requests
-    if (netplay.active && globalID == netplay.remotePlayerNumber) {
-        if (netplay.theHostIsMe) {
-            // this happens when the game host player triggers a powerup
-            netplay.client.local_gamehost.sendPowerupStartByGH();
-
-            // otherwise, when a remote client presses the trigger button,
-            // it sends a powerup trigger request, so we don't have to handle
-            // this on the host side here
-        }
-        else {
-            net_waitingForPowerupTrigger = true;
-            netplay.client.sendPowerupRequest();
-        }
-    }
 }
 
 void CPlayer::useSpecialPowerup()
@@ -504,7 +485,7 @@ void CPlayer::SetPowerup(short iPowerup)
 
     //Minor fix for becoming caped to draw animation correctly
     if (iPowerup == 3)
-        cape.restart_animation();
+        cape.restart_animation(*this);
 }
 
 void CPlayer::SetStoredPowerup(short iPowerup)
@@ -523,7 +504,7 @@ void CPlayer::ClearPowerupStates()
 {
     tail.reset();
     spin.reset();
-    wings.reset();
+    wings.reset(*this);
 
     flying = false;
     flyingtimer = 0;

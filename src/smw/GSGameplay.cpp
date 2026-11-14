@@ -8,18 +8,23 @@
 #include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
-#include "net.h"
+#include "InputFrame.h"
 #include "map.h"
 #include "MapList.h"
 #include "ObjectContainer.h"
 #include "objecthazard.h"
 #include "player.h"
 #include "RandomNumberGenerator.h"
+#include "Resimulation.h"
 #include "ResourceManager.h"
 #include "Score.h"
 #include "sfx.h"
 #include "SimulationState.h"
 #include "WorldTourStop.h"
+#include "NetOverlay.h"
+#include "rollback/NetGame.h"
+#include "rollback/StateChecksum.h"
+#include "rollback/SyncTest.h"
 #include "gamemodes/Chicken.h"
 #include "gamemodes/MiniBoss.h"
 #include "gamemodes/Tag.h"
@@ -102,6 +107,8 @@ GameplayState::GameplayState()
     spintimer = 0;
 }
 
+GameplayState::~GameplayState() = default;
+
 GameplayState& GameplayState::instance() {
     static GameplayState gps;
     return gps;
@@ -128,6 +135,134 @@ int exitgametimer = 0;
 int g_autoTestMatchesDone = 0;
 static int autoTestFrames = 0;
 static int autoTestOverFrames = 0;
+
+namespace {
+// --at-humans: random but plausible input for the "human" players, made
+// outside the simulation the way a netplay peer's input would arrive.
+struct HumanBot {
+    uint8_t direction = 0;
+    int directionTicks = 0;
+    bool turbo = false;
+    int jumpTicks = 0;
+    int downTicks = 0;
+
+    // `next(max)` is a random number below max
+    template <typename Next>
+    uint8_t step(Next&& next)
+    {
+        if (--directionTicks <= 0) {
+            const int r = next(10);
+            direction = r < 4 ? InputBit::Right : (r < 8 ? InputBit::Left : 0);
+            directionTicks = 10 + next(80);
+            turbo = next(3) != 0;
+        }
+
+        if (jumpTicks > 0)
+            --jumpTicks;
+        else if (next(25) == 0)
+            jumpTicks = 1 + next(30);
+
+        if (downTicks > 0)
+            --downTicks;
+        else if (next(150) == 0)
+            downTicks = 5 + next(40);
+
+        uint8_t byte = direction;
+        if (turbo)
+            byte |= InputBit::Turbo;
+        if (jumpTicks > 0)
+            byte |= InputBit::Jump;
+        if (downTicks > 0)
+            byte |= InputBit::Down;
+        if (next(120) == 0)
+            byte |= InputBit::Powerup;
+        return byte;
+    }
+};
+
+//xorshift32
+int nextRandom(uint32_t& state, int max)
+{
+    state ^= state << 13;
+    state ^= state >> 17;
+    state ^= state << 5;
+    return static_cast<int>(state % static_cast<uint32_t>(max));
+}
+
+// Offline: one generator for all human players, seeded from --at-seed
+InputFrame autoTestHumanInput()
+{
+    static HumanBot bots[4];
+    static uint32_t state = 0x9e3779b9u ^ static_cast<uint32_t>(cmd::g_autotest.seed);
+    auto next = [](int max) { return nextRandom(state, max); };
+
+    InputFrame input;
+    for (int i = 0; i < INPUT_MAX_PLAYERS; i++) {
+        if (game_values.playercontrol[i] != 1)
+            continue;
+        input.players[i] = bots[i].step(next);
+    }
+    return input;
+}
+
+// Online: each local human player has its own generator, seeded from
+// --at-seed and the slot, so that the players of different peers differ
+uint8_t autoTestNetHumanInput(int slot)
+{
+    static HumanBot bots[4];
+    static uint32_t states[4] = {};
+    uint32_t& state = states[slot];
+    if (state == 0)
+        state = (0x9e3779b9u ^ static_cast<uint32_t>(cmd::g_autotest.seed + 1 + slot) * 2654435761u) | 1u;
+    return bots[slot].step([&state](int max) { return nextRandom(state, max); });
+}
+
+// Cheap FNV-1a checksum of the simulation state the --autotest harness prints
+// ("atsum:" lines), so that two runs can be compared beyond the match results
+uint32_t autoTestChecksum()
+{
+    uint32_t hash = 2166136261u;
+    auto mix = [&hash](const void* data, size_t size) {
+        const auto* bytes = static_cast<const unsigned char*>(data);
+        for (size_t i = 0; i < size; i++)
+            hash = (hash ^ bytes[i]) * 16777619u;
+    };
+    auto mixInt = [&mix](int value) { mix(&value, sizeof(value)); };
+    auto mixFloat = [&mix](float value) { mix(&value, sizeof(value)); };
+
+    const RandomNumberGenerator::State& rng = g_sim.rng.state();
+    mix(rng.words.data(), sizeof(rng.words));
+    mixInt(rng.index);
+
+    for (const CPlayer* player : g_sim.players) {
+        mixInt(player->getGlobalID());
+        mixInt(player->leftX());
+        mixInt(player->topY());
+        mixFloat(player->getVelX());
+        mixFloat(player->getVelY());
+        mixInt(player->isdead());
+    }
+
+    for (short i = 0; i < g_sim.score_cnt; i++) {
+        mixInt(g_sim.score[i].score);
+        for (short subscore : g_sim.score[i].subscore)
+            mixInt(subscore);
+    }
+
+    for (const CObjectContainer* container : {&g_sim.noncolcontainer, &g_sim.objectcontainer[0], &g_sim.objectcontainer[1], &g_sim.objectcontainer[2]}) {
+        mixInt(static_cast<int>(container->list().size()));
+        for (const std::unique_ptr<CObject>& obj : container->list()) {
+            mixInt(obj->x());
+            mixInt(obj->y());
+        }
+    }
+
+    mixFloat(game_values.flags.gamewindx);
+    mixInt(game_values.screenfade);
+    mixInt(g_sim.countdownState);
+    return hash;
+}
+} // namespace
 
 //Must only be called after organizeteams() is called
 short LookupTeamID(short id, short * teamID, short * subTeamID)
@@ -308,6 +443,11 @@ void GameplayState::onEnterState()
 
     initRunGame();
 
+    //The wind step of the first tick (each tick ends with the next one's, see simulateTick)
+    updateWind();
+
+    lastUpdateTicked = false;
+
 #ifdef _DEBUG
     exitgametimer = 0;
 #endif
@@ -318,7 +458,6 @@ void GameplayState::onEnterState()
 void GameplayState::handleInput()
 {
     game_values.playerInput.ClearPressedKeys(game_values.flags.exitinggame ? 1 : 0);
-    // netplay.netPlayerInput.ClearGameActionKeys();
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -353,6 +492,8 @@ void GameplayState::handleInput()
             }
             if (event.key.key == SDLK_F1) {
                 game_values.showfps = !game_values.showfps;
+            } else if (event.key.key == SDLK_F3) {
+                game_values.shownetstats = !game_values.shownetstats;    //only drawn online
             } else if (event.key.key == SDLK_ESCAPE) {
                 game_values.playerInput.outputControls[0].game_cancel.fPressed = true;
             } else if (event.key.key == SDLK_TAB) {
@@ -361,6 +502,9 @@ void GameplayState::handleInput()
                 gfx_take_screenshot();
             }
 #ifdef _DEBUG
+            else if (rollback::NetGame::instance().inMatch()) {
+                //No debug keys online: they change the simulation on one peer only
+            }
             else if (event.key.key == SDLK_LEFTBRACKET) {
                 game_values.framelimiter++;
             } else if (event.key.key == SDLK_RIGHTBRACKET) {
@@ -468,16 +612,11 @@ void GameplayState::handleInput()
         //Feed the player control structures with input data
         //Use menu controls when exit game dialog is up
         game_values.playerInput.Update(event, (game_values.flags.exitinggame ? 1 : 0));
-        // net player inputs are not updated here,
-        // it is handled in update()
     }
 }
 
 bool shouldUpdate()
 {
-    if (netplay.active)
-        return true;
-
     if (game_values.flags.pausegame || game_values.flags.exitinggame)
         return false;
 
@@ -558,8 +697,7 @@ void GameplayState::update_world()
     if (++game_values.cputurn > 3)
         game_values.cputurn = 0;
 
-    if (!netplay.active || (netplay.active && netplay.theHostIsMe))
-        handleP2PCollisions();
+    handleP2PCollisions();
 
     //Move platforms
     g_map->updatePlatforms();
@@ -613,93 +751,210 @@ void GameplayState::update_world()
     updateScoreboardAnimation();
 }
 
-void GameplayState::update()
+// Opt-in --autotest harness: ends the match after a frame limit (or shortly
+// after it is over). Returns true if it ended the match.
+bool GameplayState::updateAutoTest()
 {
-    read_network();
+    if (!cmd::g_autotest.enabled)
+        return false;
 
-    if (!netplay.active) {
-        checkWindEvent(g_sim.windTimer, g_sim.nextWind);
+    ++autoTestFrames;
+    if (game_values.gamemode->gameover)
+        ++autoTestOverFrames;
+
+    const bool autoTestEnd = autoTestFrames >= cmd::g_autotest.frames || autoTestOverFrames >= 120;
+    if (autoTestEnd || autoTestFrames % 250 == 0)
+        printf("atsum: frame %d %08x\n", autoTestFrames, autoTestChecksum());
+    if (cmd::g_autotest.peersum > 0 && (autoTestEnd || autoTestFrames % cmd::g_autotest.peersum == 0))
+        printf("peersum: frame %d %016llx\n", autoTestFrames, static_cast<unsigned long long>(rollback::peerChecksum()));
+
+    if (!autoTestEnd)
+        return false;
+
+    if (syncTest) {
+        const rollback::SyncTest::Stats& st = syncTest->stats();
+        auto us = [](double seconds, int64_t count) { return count > 0 ? seconds * 1e6 / static_cast<double>(count) : 0.0; };
+        printf("synctest: match %d: %lld ticks, %lld re-simulated, %lld mismatches\n", g_autoTestMatchesDone + 1,
+            static_cast<long long>(st.ticks), static_cast<long long>(st.resimulatedTicks), static_cast<long long>(st.mismatches));
+        printf("synctest: save %.1f us, load %.1f us, hash %.1f us, peer checksum %.1f us; snapshot up to %zu bytes (arena %zu)\n",
+            us(st.saveSeconds, st.saves), us(st.loadSeconds, st.loads), us(st.hashSeconds, st.hashes), us(st.peerChecksumSeconds, st.ticks),
+            st.maxSnapshotBytes, st.maxArenaBytes);
+        syncTest->resetStats();
     }
 
-    for (short iTeam = 0; iTeam < g_sim.score_cnt; iTeam++) {
-        iScoreTextOffset[iTeam] = 34 * game_values.teamcounts[iTeam] + 1;
+    if (game_values.gamemode->gameover && (game_values.matchtype == MatchType::Tour || game_values.matchtype == MatchType::Tournament))
+        UpdateScoreBoard();
+
+    CleanUp();
+    game_values.flags.exitinggame = false;
+    game_values.flags.pausegame = false;
+    game_values.appstate = AppState::Menu;
+    ++g_autoTestMatchesDone;
+    printf("autotest: match %d ended after %d frames\n", g_autoTestMatchesDone, autoTestFrames);
+    GameStateManager::instance().changeStateTo(&MenuState::instance());
+    return true;
+}
+
+// Match start/end transitions happen between ticks, once the screen has faded
+// to black (screenfade reaches 255 at the end of a tick). They are frame logic,
+// not simulation: they tear down the match (CleanUp) and switch the app state.
+// Returns true if the match ended.
+bool GameplayState::updateMatchTransition()
+{
+    if (game_values.screenfade != 255)
+        return false;
+
+    if (game_values.appstate == AppState::StartGame) {
+        start_gameplay();
+        return true;
+    } else if (game_values.appstate == AppState::EndGame) {
+        end_gameplay();
+        return true;
+    }
+
+    return false;
+}
+
+void GameplayState::update()
+{
+    lastUpdateTicked = false;
+
+    if (rollback::NetGame::instance().inMatch()) {
+        updateNetplay();
+        return;
     }
 
 #ifdef _DEBUG
     debug_gameplay();
 #endif
 
-    // Opt-in --autotest harness: end the match after a frame limit (or shortly after it is over)
-    if (cmd::g_autotest.enabled) {
-        ++autoTestFrames;
-        if (game_values.gamemode->gameover)
-            ++autoTestOverFrames;
-
-        if (autoTestFrames >= cmd::g_autotest.frames || autoTestOverFrames >= 120) {
-            if (game_values.gamemode->gameover && (game_values.matchtype == MatchType::Tour || game_values.matchtype == MatchType::Tournament))
-                UpdateScoreBoard();
-
-            CleanUp();
-            game_values.flags.exitinggame = false;
-            game_values.flags.pausegame = false;
-            game_values.appstate = AppState::Menu;
-            ++g_autoTestMatchesDone;
-            printf("autotest: match %d ended after %d frames\n", g_autoTestMatchesDone, autoTestFrames);
-            GameStateManager::instance().changeStateTo(&MenuState::instance());
-            return;
-        }
-    }
+    if (updateAutoTest())
+        return;
 
     handleInput();
-    network_send_local_input();
 
     if (updateExitPauseDialog(g_sim.countdownState)) {
-        if (netplay.active)
-            netplay.client.sendLeaveGameMessage();
         GameStateManager::instance().changeStateTo(&MenuState::instance());
         return;
     }
 
+    //While paused, no ticks run
     if (shouldUpdate()) {
-        if (!game_values.flags.swapplayers && game_values.screenfade == 0) {
-            update_countdown_timer();
+        if (updateMatchTransition())
+            return;
 
-            //Make updates to background stuff (animate map while countdown is counting)
-            if (g_sim.countdownState > COUNTDOWN_START_INDEX) {
-                animateDuringCountdown();
-            } else {
-                update_world();
-            }
+        InputFrame input = gatherLocalInput(game_values.playerInput, game_values.playercontrol);
+        if (cmd::g_autotest.enabled && cmd::g_autotest.humans > 0)
+            input = autoTestHumanInput();
+
+        if (cmd::g_autotest.enabled && cmd::g_autotest.synctest > 0) {
+            if (!syncTest)
+                syncTest = std::make_unique<rollback::SyncTest>(cmd::g_autotest.synctest);
+            syncTest->runTick(input, [this](const InputFrame& tickInput) { advanceTick(tickInput); });
+        } else if (cmd::g_autotest.resim) {
+            interpolator.capture();
+            //Debug check: suppressing the side effects must not change the simulation
+            sim::ResimulationScope resim;
+            simulateTick(input);
+        } else {
+            advanceTick(input);
         }
-        update_playerswap();
-        network_broadcast_game_state();
-
-        if (game_values.screenfade == 255) {
-            if (game_values.appstate == AppState::StartGame) {
-                start_gameplay();
-                return;
-            } else if (game_values.appstate == AppState::EndGame) {
-                end_gameplay();
-                return;
-            }
-        }
-
-        //--------------- draw everything ----------------------
-        drawEverything(g_sim.countdownState, iScoreTextOffset);
-    }
-
-    if (game_values.flags.pausegame || game_values.flags.exitinggame) {
-        drawExitPauseDialog();
+        lastUpdateTicked = true;
     }
 
     playMusic();
+}
 
+// One frame of an online match (see rollback/NetGame.h). The session decides
+// how many ticks run: usually one, none while it waits for the other peers,
+// more after a rollback. The pause dialog is disabled online; leaving the
+// match disconnects.
+void GameplayState::updateNetplay()
+{
+    rollback::NetGame& net = rollback::NetGame::instance();
+
+    handleInput();
+    if (game_values.appstate == AppState::Quit) {
+        net.leaveMatch("quit");
+        return;
+    }
+
+    const bool quitTest = cmd::g_net.quitAt > 0 && g_sim.tick >= cmd::g_net.quitAt;
+    if (updateExitPauseDialog(g_sim.countdownState) || quitTest) {
+        net.leaveMatch(quitTest ? "--net-quit-at" : "the player left");
+        if (quitTest)
+            CleanUp();    //the dialog cleans up itself
+        game_values.appstate = AppState::Menu;
+        net.onMatchLeft();
+        GameStateManager::instance().changeStateTo(&MenuState::instance());
+        return;
+    }
+
+    //The local players use the first input devices, whatever their slots
+    InputFrame input;
+    int device = 0;
+    for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
+        if (!net.isLocalSlot(slot))
+            continue;
+        if (cmd::g_autotest.enabled && cmd::g_autotest.humans > 0)
+            input.players[slot] = autoTestNetHumanInput(slot);
+        else
+            input.players[slot] = toInputByte(game_values.playerInput.outputControls[device]);
+        device++;
+    }
+
+    const rollback::NetGame::Outcome outcome = net.advance(input);
+    lastUpdateTicked = outcome.ticks > 0;
+
+    if (outcome.ended || outcome.failed) {
+        if (cmd::g_autotest.enabled) {
+            ++g_autoTestMatchesDone;
+            printf("autotest: match %d ended after %d frames\n", g_autoTestMatchesDone, g_sim.tick);
+        }
+        if (game_values.gamemode->gameover && (game_values.matchtype == MatchType::Tour || game_values.matchtype == MatchType::Tournament))
+            UpdateScoreBoard();
+
+        CleanUp();
+        game_values.flags.exitinggame = false;
+        game_values.flags.pausegame = false;
+        game_values.appstate = AppState::Menu;
+        game_values.screenfadespeed = -8;
+        net.onMatchLeft();
+        GameStateManager::instance().changeStateTo(&MenuState::instance());
+        return;
+    }
+
+    playMusic();
+}
+
+void GameplayState::render(float alpha)
+{
+    for (short iTeam = 0; iTeam < g_sim.score_cnt; iTeam++) {
+        iScoreTextOffset[iTeam] = 34 * game_values.teamcounts[iTeam] + 1;
+    }
+
+    //Smooth motion: draw between the previous and the latest tick (not while paused)
+    const bool smooth = game_values.smoothmotion && lastUpdateTicked && alpha < 1.0f;
+    if (smooth)
+        interpolator.apply(alpha);
+
+    drawEverything(g_sim.countdownState, iScoreTextOffset);
+
+    if (smooth)
+        interpolator.restore();
+
+    if (game_values.flags.pausegame || game_values.flags.exitinggame) {
+        rm->menu_shade.setalpha(App::menuTransparency);
+        rm->menu_shade.draw(0, 0);
+        drawExitPauseDialog();
+    }
+
+    drawNetOverlay();    //online only; pure drawing
 
 #ifdef _DEBUG
     if (g_fAutoTest)
         rm->menu_font_small.drawRightJustified(635, 5, "Auto");
 #endif
-
 }
 
 bool SwapPlayers(short iUsingPlayerID)

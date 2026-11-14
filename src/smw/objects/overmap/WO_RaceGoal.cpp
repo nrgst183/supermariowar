@@ -44,11 +44,12 @@ OMO_RaceGoal::OMO_RaceGoal(gfxSprite* nspr, short id)
     velx = sin(angle);
     vely = cos(angle);
 
-    placeRaceGoal();
-
+    // quantity must be set before placeRaceGoal(), which spaces the goals by it
     speed = static_cast<float>(game_values.gamemodesettings.race.speed) / 4.0f;
     quantity = game_values.gamemodesettings.race.quantity;
     isfinishline = goalID == quantity - 1;
+
+    placeRaceGoal();
 }
 
 bool OMO_RaceGoal::collide(CPlayer* player)

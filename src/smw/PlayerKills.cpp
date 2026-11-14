@@ -6,7 +6,6 @@
 #include "GSGameplay.h"
 #include "map.h"
 #include "movingplatform.h"
-#include "net.h"
 #include "ObjectContainer.h"
 #include "objectgame.h"
 #include "RandomNumberGenerator.h"

@@ -34,7 +34,7 @@ This is a fork I've started working on around 2014, with the initial goal of imp
 
 As for the game, unfortunately it became clear very soon that the quality and structure of the original source code will make effective work impossible: most source files were in the "around 10000 lines" category, with 1000+ LOC functions being common, most of them modifying global variables, and there was even an `if-else` with a hundred branches.
 
-Eventually I've managed to make the network multiplayer working, but it's far from perfect. With good conditions, on local networks it may work fine, but subtle bugs and lag usually makes the gameplay over the internet far from optimal. A proper implementation would likely require a redesign of several core parts of the game and another several hundred clean up/refactoring patches to make the code maintainable. And, with this kind of project of course, there's also a chance that next morning you get a cease-and-desist letter from whatever company.
+Eventually I've managed to make the network multiplayer working (with a lobby server, since removed and replaced by rollback netcode), but it was far from perfect. With good conditions, on local networks it may work fine, but subtle bugs and lag usually makes the gameplay over the internet far from optimal. A proper implementation would likely require a redesign of several core parts of the game and another several hundred clean up/refactoring patches to make the code maintainable. And, with this kind of project of course, there's also a chance that next morning you get a cease-and-desist letter from whatever company.
 
 For me, this was the point where I've stopped putting more time on this project (2016). In the long term, a complete rewrite might be faster and more effective than patching the original game for years. Either way, I hope I've left the project in a better state than it was, and that it will be of use for future developers. Have fun!
 
@@ -44,7 +44,7 @@ Update, 2026: Looks like I've ended up working on it some more. While keeping th
 
 ### Main changes since 1.8
 
-- Experimental online mode, including an online lobby server
+- Experimental online mode with rollback netcode: players connect directly to each other, there is no lobby server (see [docs/netplay.md](docs/netplay.md))
 - Lots and lots and lots of bugfixes (seriously, there's at least 200)
 - Added Web, ARM and (an experimental) Android ports, and improved support for Windows, Linux and OSX
 - Improved music and sound quality
@@ -70,6 +70,10 @@ The game uses artwork and sounds from Nintendo games. We hope that this noncomme
 - uses SDL and is fully portable to windows, linux, mac, ...
 - CPU Players
 - will make you happy and gives you a fuzzy feeling
+
+### Online play
+
+Up to four players can play online with rollback netcode (experimental): one player hosts a lobby from **Main menu, Online**, the others join it with the host's address. The game uses UDP port 7300 by default, which the host has to forward on the router unless everybody is on the same LAN. All players need the same version of the game. See [docs/netplay.md](docs/netplay.md) for how to play and for the developer documentation.
 
 ### Supported platforms
 
@@ -136,7 +140,6 @@ The main build targets for `make` are:
 - smw
 - smw-leveleditor
 - smw-worldeditor
-- smw-server
 
 If you prefer to work within an IDE (CodeBlocks, Eclipse, ...), you can also generate project files for it using CMake. You can find more information in [Build configuration](#build-configuration).
 
@@ -150,7 +153,7 @@ You'll probably need Xcode and its command line tools; you can install SDL and C
 
 If you're using MinGW Shell/MSYS or Cygwin, you can follow the Linux guide. You can also generate a project file with CMake for various IDEs, such as CodeBlocks, Eclipse or Visual Studio.
 
-**Visual Studio solution:** run `generate-vs-solution.bat` in the repository root. It generates `build\vs\smw.sln` (`smw.slnx` with Visual Studio 2026) for the newest installed Visual Studio and opens it. SDL3 and the other libraries are downloaded and built automatically on the first run. `smw` is the startup project and runs against the repository's `data` folder, so F5 starts the game. Re-run the script after adding or removing source files.
+**Visual Studio solution:** run `generate-vs-solution.bat` in the repository root. It generates `build\vs\smw.sln` (`smw.slnx` with Visual Studio 2026) for the newest installed Visual Studio and opens it. SDL3 and the other libraries are downloaded and built automatically on the first run. `smw` is the startup project and runs against the repository's `data` folder, so F5 starts the game. Building also copies the `data` folder next to the executables (only changed files after the first build), so `smw.exe` in `build\vs\Debug` or `build\vs\Release` can be started directly too. Re-run the script after adding or removing source files.
 
 **Visual Studio "Open Folder":** opening the repository folder directly also works; pick the `Windows x64 Debug (MSVC)` or `Windows x64 Release (MSVC)` configuration from `CMakePresets.json`.
 

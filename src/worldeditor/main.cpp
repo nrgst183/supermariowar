@@ -12,6 +12,9 @@
 
 #include "WorldEditorState.h"
 
+// Defines the platform entry point (WinMain on Windows), so include it in this file only
+#include <SDL3/SDL_main.h>
+
 #ifdef _WIN32
     #ifdef _MSC_VER
     #if _MSC_VER >= 1400

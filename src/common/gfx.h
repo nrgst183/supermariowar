@@ -30,6 +30,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <string>
 
 using SpriteStrip = std::array<gfxSprite, PGFX_LAST>;
 
@@ -37,9 +38,14 @@ using SpriteStrip = std::array<gfxSprite, PGFX_LAST>;
 bool gfx_init(int w, int h, bool fullscreen);
 void gfx_changefullscreen(bool fullscreen);
 void gfx_flipscreen();
+/// Turns VSync on or off; returns true if the renderer now does what was asked
+bool gfx_setvsync(bool enabled);
+/// The refresh rate of the window's display in Hz, 0 if unknown
+float gfx_refreshrate();
 void gfx_settitle(const char*);
 void gfx_show_catched_error(const std::string&);
 void gfx_take_screenshot();
+bool gfx_save_screenshot(const std::string& path);
 
 void gfx_close();
 bool gfx_loadpalette(const std::filesystem::path& palette_path);

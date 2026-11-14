@@ -160,7 +160,11 @@ void MO_SledgeBrother::update()
                 short numThwomps = RANDOM_INT(5) + 6;
 
                 for (short iThwomp = 0; iThwomp < numThwomps; iThwomp++) {
-                    g_sim.objectcontainer[2].add(new OMO_Thwomp(&rm->spr_thwomp, static_cast<short>(RANDOM_INT(591)), 2.0f + static_cast<float>(RANDOM_INT(20)) / 10.0f));
+                    // Draw random numbers in separate statements: argument evaluation order is
+                    // unspecified in C++, and every peer must draw them in the same order
+                    const short thwompX = static_cast<short>(RANDOM_INT(591));
+                    const float thwompVel = 2.0f + static_cast<float>(RANDOM_INT(20)) / 10.0f;
+                    g_sim.objectcontainer[2].add(new OMO_Thwomp(&rm->spr_thwomp, thwompX, thwompVel));
                 }
 
             } else if (iType == 2) {
@@ -170,7 +174,9 @@ void MO_SledgeBrother::update()
                 short numPodobos = RANDOM_INT(5) + 8;
 
                 for (short iPodobo = 0; iPodobo < numPodobos; iPodobo++) {
-                    g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {static_cast<short>(RANDOM_INT(608)), App::screenHeight}, -(float(RANDOM_INT(9)) / 2.0f) - 9.0f, -1, -1, -1, false));
+                    const short podoboX = static_cast<short>(RANDOM_INT(608));  // see above: draw order
+                    const float podoboVelY = -(float(RANDOM_INT(9)) / 2.0f) - 9.0f;
+                    g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {podoboX, App::screenHeight}, podoboVelY, -1, -1, -1, false));
                 }
             }
         }

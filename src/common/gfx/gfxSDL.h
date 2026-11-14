@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <string>
+
 
 class GraphicsSDL {
 public:
@@ -14,6 +16,9 @@ public:
     void setTitle(const char*) const;
     void showErrorBox(const char*) const;
     void takeScreenshot() const;
+    bool saveScreenshot(const std::string& path) const;
+    bool setVSync(bool enabled) const;
+    float refreshRate() const;
 
 private:
     // surface -> texture -> renderer -> window

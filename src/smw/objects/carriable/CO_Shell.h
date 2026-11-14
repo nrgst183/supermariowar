@@ -4,7 +4,6 @@
 
 class CPlayer;
 class gfxSprite;
-class Spotlight;
 
 
 enum class ShellType : unsigned char {
@@ -76,8 +75,6 @@ private:
     short frozentimer;
     float frozenvelocity;
     short frozenanimationspeed;
-
-    Spotlight* sSpotlight;
 
     friend class MO_AttackZone;
     friend class MO_SpinAttack;

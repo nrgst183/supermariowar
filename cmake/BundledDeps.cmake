@@ -63,25 +63,41 @@ FetchContent_Declare(
 )
 
 # SDL_mixer
+# The game's data uses Ogg Vorbis music and WAV sound effects. Prefer the
+# decoders built into SDL_mixer (stb_vorbis, dr_mp3, dr_flac) over separate
+# codec libraries; this keeps the build (and the Visual Studio solution) small.
 set(SDLMIXER_VENDORED ON CACHE BOOL "")
+# FORCE: these must match the submodules fetched below, even in old build folders
+set(SDLMIXER_VORBIS_STB ON CACHE BOOL "" FORCE)
+set(SDLMIXER_VORBIS_VORBISFILE OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_MP3_DRMP3 ON CACHE BOOL "" FORCE)
+set(SDLMIXER_MP3_MPG123 OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_FLAC_DRFLAC ON CACHE BOOL "" FORCE)
+set(SDLMIXER_FLAC_LIBFLAC OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_GME OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_OPUS OFF CACHE BOOL "" FORCE)
+set(SDLMIXER_WAVPACK OFF CACHE BOOL "" FORCE)
+# MOD/XM/IT/S3M music (libxmp) is kept for older custom music packs
 if(EMSCRIPTEN)
     set(SDLMIXER_DEPS_SHARED OFF CACHE BOOL "")
     set(SDLMIXER_AIFF OFF CACHE BOOL "")
     set(SDLMIXER_VOC OFF CACHE BOOL "")
     set(SDLMIXER_AU OFF CACHE BOOL "")
     set(SDLMIXER_FLAC OFF CACHE BOOL "")
-    set(SDLMIXER_GME OFF CACHE BOOL "")
     set(SDLMIXER_MOD OFF CACHE BOOL "")
     set(SDLMIXER_MP3 OFF CACHE BOOL "")
     set(SDLMIXER_MIDI OFF CACHE BOOL "")
-    set(SDLMIXER_OPUS OFF CACHE BOOL "")
-    set(SDLMIXER_WAVPACK OFF CACHE BOOL "")
-    set(SDLMIXER_OPUS OFF CACHE BOOL "")
 endif()
-smw_declare_gitrepo(
+FetchContent_Declare(
     SDL3_mixer
-    https://github.com/libsdl-org/SDL_mixer.git
-    release-3.2.4
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git
+    GIT_TAG release-3.2.4
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS TRUE
+    # Only libxmp is built from source (see above); skip the other codecs
+    GIT_SUBMODULES "external/libxmp"
+    SYSTEM
+    FIND_PACKAGE_ARGS NAMES SDL3_mixer
 )
 
 

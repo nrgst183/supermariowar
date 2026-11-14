@@ -36,6 +36,7 @@ public:
     void draw(DrawSize drawsize, const SDL_Rect& srcRect, SDL_Surface* dstSurface, const SDL_Rect& dstRect) const;
 
     const std::string& name() const { return m_name; }
+    const std::filesystem::path& directory() const { return m_tileset_dir; }
     short height() const { return m_height; }
     short width() const { return m_width; }
 

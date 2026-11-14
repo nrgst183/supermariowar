@@ -20,6 +20,7 @@
 CGM_Stomp::CGM_Stomp() : CGameMode()
 {
     gamemode = game_mode_stomp;
+    goal = 10;  // same default as GameModeGoals::stomp
     SetupModeStrings("Stomp", "Kills", 10);
 }
 

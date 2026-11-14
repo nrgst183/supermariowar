@@ -35,7 +35,6 @@ MO_Hammer::MO_Hammer(gfxSprite* nspr, Vec2s pos, short iNumSpr, Vec2f vel, short
 
     fObjectCollidesWithMap = false;
 
-    sSpotlight = nullptr;
 }
 
 void MO_Hammer::update()
@@ -68,13 +67,7 @@ void MO_Hammer::update()
     if (iy > App::screenHeight || --ttl <= 0 || (fSuper && iy < -ih)) {
         removeifprojectile(this, false, true);
     } else if (game_values.spotlights) {
-        if (!sSpotlight) {
-            sSpotlight = spotlightManager.AddSpotlight(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
-        }
-
-        if (sSpotlight) {
-            sSpotlight->UpdatePosition(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1));
-        }
+        spotlightManager.track(this, iNetworkID, ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
     }
 
     // Detection collision with hammer breakable blocks

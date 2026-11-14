@@ -18,9 +18,9 @@
 #include "FileList.h"
 #include "GameMode.h"
 #include "GameValues.h"
+#include "GSMenu.h"
 #include "map.h"
 #include "MapList.h"
-#include "net.h"
 #include "path.h"
 #include "player.h"
 #include "RandomNumberGenerator.h"
@@ -28,6 +28,8 @@
 #include "sfx.h"
 #include "SimulationState.h"
 #include "TilesetManager.h"
+#include "rollback/NetGame.h"
+#include "rollback/Snapshot.h"
 #include "gamemodes/BonusHouse.h"
 #include "gamemodes/CaptureTheFlag.h"
 #include "gamemodes/CardCollection.h"
@@ -119,7 +121,21 @@ T* createGameMode()
     auto mode = std::make_unique<T>();
     T* view = mode.get();
     ownedGameModes.push_back(std::move(mode));
+    rollback::registerGameMode(view, sizeof(T));  // its match state is part of rollback snapshots
     return view;
+}
+
+// --at-shot-every: a PNG of the screen every N drawn frames of an online match
+// (for reviewing the overlays; the files are numbered)
+void autoScreenshot()
+{
+    static int drawn = 0;
+    static int saved = 0;
+    if (cmd::g_autotest.shotEvery <= 0 || cmd::g_autotest.shotDir.empty() || !rollback::NetGame::instance().inMatch())
+        return;
+    if (++drawn % cmd::g_autotest.shotEvery != 0)
+        return;
+    gfx_save_screenshot(std::format("{}/shot_{:04d}.png", cmd::g_autotest.shotDir, saved++));
 }
 
 void destroyGameModes()
@@ -163,13 +179,37 @@ void gameloop_frame()
     while (game_values.appstate != AppState::Quit)
 #endif
     {
-        FPSLimiter::instance().frameStart();
+        // Fixed timestep: run the ticks that are due, then render once
+        FPSLimiter& limiter = FPSLimiter::instance();
+        const int ticks = limiter.frameStart();
 
-        GameStateManager::instance().currentState->update();
+        // Rollback netplay (--net-*): starts once everything is loaded, then
+        // handles the network every iteration
+        rollback::NetGame& net = rollback::NetGame::instance();
+        if (cmd::g_net.enabled() && !net.active() && GameStateManager::instance().currentState == &MenuState::instance()) {
+            if (!net.init(cmd::g_net))
+                game_values.appstate = AppState::Quit;
+        }
+        net.pump();
 
-        FPSLimiter::instance().beforeFlip();
-        gfx_flipscreen();
-        FPSLimiter::instance().afterFlip();
+        for (int i = 0; i < ticks && game_values.appstate != AppState::Quit; i++)
+            GameStateManager::instance().currentState->update();
+
+        GameState* state = GameStateManager::instance().currentState;
+        if (cmd::g_autotest.enabled && cmd::g_autotest.norender) {
+            // Headless test runs: skip drawing entirely (and wait for the next tick when paced)
+            limiter.idle();
+        } else if (limiter.shouldRender(ticks, state->rendersBetweenTicks())) {
+            if (state->rendersBetweenTicks())
+                state->render(limiter.alpha());
+
+            limiter.beforeFlip();
+            autoScreenshot();
+            gfx_flipscreen();
+            limiter.afterFlip();
+        } else {
+            limiter.idle();
+        }
     }
 
 #ifndef __EMSCRIPTEN__
@@ -362,7 +402,6 @@ void main_game()
 #endif
 
     sfx_init();                     //init the sound system
-    net_init();                     //init the networking
     JoystickManager::instance().init();
 
     //currently this only sets the title, not the icon.
@@ -378,8 +417,15 @@ void main_game()
 
     game_values.ReadConfig();
 
-    if (cmd::g_autotest.enabled)
-        game_values.framelimiter = 0;   // run as fast as possible
+    // Online, every peer must run at the normal speed: pace --autotest runs
+    if (cmd::g_net.enabled() && cmd::g_autotest.enabled && cmd::g_autotest.realtime == 0)
+        cmd::g_autotest.realtime = 3;
+
+    // The --autotest harness runs unthrottled (see FPSLimiter), unless measuring the frame pacing
+    if (cmd::g_autotest.realtime > 0) {
+        static constexpr FrameRateMode modes[] = {FrameRateMode::VSync, FrameRateMode::Uncapped, FrameRateMode::TickRate};
+        game_values.framelimiter = static_cast<short>(modes[(cmd::g_autotest.realtime - 1) % 3]);
+    }
 
     //Assign the powerup weights to the selected preset
     for (short iPowerup = 0; iPowerup < NUM_POWERUPS; iPowerup++) {
@@ -409,6 +455,12 @@ void main_game()
         RandomNumberGenerator::gameplay().seed(static_cast<uint32_t>(cmd::g_autotest.seed));
     }
 
+    if (cmd::g_autotest.enabled) {
+        // Debug builds turn suicide kills off by default (see GameValues.cpp);
+        // use the release value so Debug and Release test runs are comparable
+        game_values.suicidetime = 310;
+    }
+
 
     //**********************************************************
 
@@ -421,12 +473,13 @@ void main_game()
 
     printf("\n---------------- shutdown ----------------\n");
 
+    rollback::NetGame::instance().shutdown();
+
     destroyGameModes();
 
     JoystickManager::instance().shutdown();
     sfx_close();
     gfx_close();
-    net_close();
 
 	// release all resources
 	delete rm;

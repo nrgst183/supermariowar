@@ -3,6 +3,7 @@
 #include "eyecandy.h"
 #include "GameValues.h"
 #include "player.h"
+#include "RenderFrame.h"
 #include "ResourceManager.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
@@ -39,7 +40,6 @@ CO_ThrowBlock::CO_ThrowBlock(gfxSprite* nspr, Vec2s pos, ThrowBlockType type)
     frozenvelocity = 0.0f;
     frozenanimationspeed = 2;
 
-    sSpotlight = nullptr;
 }
 
 bool CO_ThrowBlock::collide(CPlayer* player)
@@ -197,13 +197,7 @@ void CO_ThrowBlock::update()
     animate();
 
     if (game_values.spotlights && state == 1) {
-        if (!sSpotlight) {
-            sSpotlight = spotlightManager.AddSpotlight(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
-        }
-
-        if (sSpotlight) {
-            sSpotlight->UpdatePosition(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1));
-        }
+        spotlightManager.track(this, iNetworkID, ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
     }
 }
 
@@ -217,7 +211,7 @@ void CO_ThrowBlock::draw()
 
     if (frozen) {
         rm->spr_iceblock.draw(ix - collisionOffsetX, iy - collisionOffsetY, {0, 0, 32, 32});
-    } else if (fSmoking) {
+    } else if (fSmoking && render::advancesAnimations()) {
         eyecandy[0].emplace<EC_SingleAnimation>(&rm->spr_burnup, ix - collisionOffsetX + (iw >> 1) - 16, iy - collisionOffsetY + (ih >> 1) - 16, 5, 3);
     }
 }

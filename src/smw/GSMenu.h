@@ -5,6 +5,7 @@
 #include "ui/MenuCode.h"
 
 #include <memory>
+#include <string>
 #include <vector>
 
 class UI_Menu;
@@ -15,6 +16,8 @@ class UI_MainMenu;
 class UI_MapFilterEditMenu;
 class UI_MatchSelectionMenu;
 class UI_ModeOptionsMenu;
+class UI_OnlineLobbyMenu;
+class UI_OnlineMenu;
 class UI_OptionsMenu;
 class UI_PlayerControlsMenu;
 class UI_PlayerControlsSelectMenu;
@@ -33,12 +36,6 @@ class UI_ProjectileOptionsMenu;
 class UI_SoundOptionsMenu;
 class UI_TeamOptionsMenu;
 
-class UI_NetEditServersMenu;
-class UI_NetLobbyMenu;
-class UI_NetNewRoomMenu;
-class UI_NetNewRoomSettingsMenu;
-class UI_NetRoomMenu;
-class UI_NetServersMenu;
 
 
 #ifdef _DEBUG
@@ -106,6 +103,21 @@ class MenuState : public GameState
 		MenuCodeEnum AutoTestMenuUpdate();
 		void ResetTournamentBackToMainMenu();
 
+		// Online (rollback netplay) menus
+		void HostOnlineGame();
+		void JoinOnlineGame();
+		void EnterOnlineLobby();
+		void LeaveOnlineLobby(const std::string& message);
+		void LeaveOnlineLobbyNow();
+		void HandleOnlineEvents();
+		void OpenOnlineMatchSettings();
+		void OpenOnlineGameSettings();
+		void ReturnToOnlineLobby();
+		void ApplyOnlineMatchSelection();
+		void StartOnlineMatch();
+		MenuCodeEnum ShotsMenuUpdate();
+		void AutoTestAfterDraw();
+
 		void SetControllingTeamForSettingsMenu(short iControlTeam, bool fDisplayMessage);
 		void DisplayControllingTeamMessage(short iControlTeam);
 
@@ -140,13 +152,11 @@ class MenuState : public GameState
 		std::unique_ptr<UI_TournamentScoreboardMenu> mTournamentScoreboardMenu;
 		std::unique_ptr<UI_BonusWheelMenu> mBonusWheelMenu;
 
-		// Multiplayer menu
-		std::unique_ptr<UI_NetServersMenu> mNetServersMenu;
-		std::unique_ptr<UI_NetEditServersMenu> mNetEditServersMenu;
-		std::unique_ptr<UI_NetLobbyMenu> mNetLobbyMenu;
-		std::unique_ptr<UI_NetNewRoomMenu> mNetNewRoomMenu;
-		std::unique_ptr<UI_NetNewRoomSettingsMenu> mNetNewRoomSettingsMenu;
-		std::unique_ptr<UI_NetRoomMenu> mNetRoomMenu;
+		// Online menus
+		std::unique_ptr<UI_OnlineMenu> mOnlineMenu;
+		std::unique_ptr<UI_OnlineLobbyMenu> mOnlineLobbyMenu;
+		bool mOnlineSetup = false;      //The host is choosing the match from the lobby (the match menus lead back to it)
+		bool mOnlineMinigame = false;   //The host's choice: a minigame instead of a single game
 
 		DisplayError iDisplayError = DISPLAY_ERROR_NONE;
 		short iDisplayErrorTimer = 0;

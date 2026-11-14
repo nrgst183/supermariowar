@@ -57,18 +57,10 @@ bool B_DonutBlock::hittop(CPlayer * player, bool useBehavior)
 
 void B_DonutBlock::triggerBehavior(short iPlayerId)
 {
-    //The falling block uses this block's own graphic instead of a tileset tile
-    TilesetTile tile;
-    tile.iID = TILESETNONE;
-    tile.iCol = 0;
-    tile.iRow = 0;
-
-    TileType type = TileType::Solid;
-
+    //The falling block is drawn with this block's own graphic instead of a tileset tile
     MovingPlatformPath * path = new FallingPath(Vec2f(static_cast<float>(ix) + 16.0f, static_cast<float>(iy) + 15.8f));
-    MovingPlatform * platform = new MovingPlatform({ tile }, { type }, 1, 1, 2, path, false);
+    MovingPlatform * platform = new MovingPlatform(*spr, 1, 1, 2, path);
     platform->SetPlayerId(iPlayerId);
-    platform->paintSpriteAt(*spr, 0, 0);
 
     g_map->AddTemporaryPlatform(platform);
 

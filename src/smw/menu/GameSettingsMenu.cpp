@@ -215,6 +215,11 @@ void UI_GameSettingsMenu::SetHeaderText(const char* string)
     miGameSettingsMenuHeaderText->SetText(string);
 }
 
+void UI_GameSettingsMenu::SetStartButtonText(const char* string)
+{
+    miSettingsStartButton->SetName(string);
+}
+
 void UI_GameSettingsMenu::GameModeChanged(short gmID)
 {
     miModeField->setCurrentValue(gmID);

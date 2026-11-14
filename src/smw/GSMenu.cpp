@@ -1,5 +1,7 @@
 #include "GSMenu.h"
 
+#include "rollback/NetGame.h"
+
 #include "CmdArgs.h"
 #include "FileList.h"
 #include "Game.h"
@@ -9,7 +11,6 @@
 #include "GSGameplay.h"
 #include "GameplayStyles.h"
 #include "joystick.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "path.h"
@@ -40,6 +41,8 @@
 #include "menu/MapFilterEditMenu.h"
 #include "menu/MatchSelectionMenu.h"
 #include "menu/ModeOptionsMenu.h"
+#include "menu/OnlineLobbyMenu.h"
+#include "menu/OnlineMenu.h"
 #include "menu/OptionsMenu.h"
 #include "menu/PlayerControlsMenu.h"
 #include "menu/PlayerControlsSelectMenu.h"
@@ -58,12 +61,6 @@
 #include "menu/options/SoundOptionsMenu.h"
 #include "menu/options/TeamOptionsMenu.h"
 
-#include "menu/network/NetEditServersMenu.h"
-#include "menu/network/NetLobbyMenu.h"
-#include "menu/network/NetNewRoomMenu.h"
-#include "menu/network/NetNewRoomSettingsMenu.h"
-#include "menu/network/NetRoomMenu.h"
-#include "menu/network/NetServersMenu.h"
 
 #include <format>
 #include <string>
@@ -114,13 +111,9 @@ bool MenuState::init()
     mTournamentScoreboardMenu = std::make_unique<UI_TournamentScoreboardMenu>();
     mBonusWheelMenu = std::make_unique<UI_BonusWheelMenu>();
 
-    // Multiplayer menu
-    mNetServersMenu = std::make_unique<UI_NetServersMenu>();
-    mNetEditServersMenu = std::make_unique<UI_NetEditServersMenu>();
-    mNetLobbyMenu = std::make_unique<UI_NetLobbyMenu>();
-    mNetNewRoomMenu = std::make_unique<UI_NetNewRoomMenu>();
-    mNetNewRoomSettingsMenu = std::make_unique<UI_NetNewRoomSettingsMenu>(mGameSettingsMenu.get());
-    mNetRoomMenu = std::make_unique<UI_NetRoomMenu>();
+    // Online menu
+    mOnlineMenu = std::make_unique<UI_OnlineMenu>();
+    mOnlineLobbyMenu = std::make_unique<UI_OnlineLobbyMenu>();
 
     mCurrentMenu = mMainMenu.get();
     szCurrentMapName = mGameSettingsMenu->miMapField->GetMapName();
@@ -144,21 +137,24 @@ void MenuState::onEnterState()
 
     fNeedMenuMusicReset = false;
 
-    if (game_values.gamemode->winningteam > -1 && game_values.tournamentwinner == -1 &&
-            (((game_values.matchtype == MatchType::SingleGame || game_values.matchtype == MatchType::QuickGame || game_values.matchtype == MatchType::MiniGame || game_values.matchtype == MatchType::Tournament || game_values.matchtype == MatchType::NetGame) && game_values.bonuswheel == BonusWheelStyle::EveryGame) || (game_values.matchtype == MatchType::Tour && game_values.tourstops[game_values.tourstopcurrent - 1]->iBonusType))) {
+    rollback::NetGame& onlineNet = rollback::NetGame::instance();
+    if (onlineNet.active() && onlineNet.lobby() && !cmd::g_net.enabled()) {
+        //Back from an online match: the lobby again
+        mOnlineSetup = false;
+        mCurrentMenu = mOnlineLobbyMenu.get();
+        if (onlineNet.isHost())
+            ApplyOnlineMatchSelection();
+        mOnlineLobbyMenu->Open();
+    } else if (game_values.gamemode->winningteam > -1 && game_values.tournamentwinner == -1 &&
+            (((game_values.matchtype == MatchType::SingleGame || game_values.matchtype == MatchType::QuickGame || game_values.matchtype == MatchType::MiniGame || game_values.matchtype == MatchType::Tournament) && game_values.bonuswheel == BonusWheelStyle::EveryGame) || (game_values.matchtype == MatchType::Tour && game_values.tourstops[game_values.tourstopcurrent - 1]->iBonusType))) {
         mBonusWheelMenu->miBonusWheel->Reset(false);
         mCurrentMenu = mBonusWheelMenu.get();
-    } else if (game_values.matchtype != MatchType::SingleGame && game_values.matchtype != MatchType::QuickGame && game_values.matchtype != MatchType::MiniGame && game_values.matchtype != MatchType::NetGame) {
+    } else if (game_values.matchtype != MatchType::SingleGame && game_values.matchtype != MatchType::QuickGame && game_values.matchtype != MatchType::MiniGame) {
         mCurrentMenu = mTournamentScoreboardMenu.get();
     } else if (game_values.matchtype == MatchType::QuickGame) {
         //Reset back to main menu after quick game
         mCurrentMenu = mMainMenu.get();
         mCurrentMenu->ResetMenu();
-    } else if (game_values.matchtype == MatchType::NetGame) {
-        mCurrentMenu = mNetLobbyMenu.get();
-        mCurrentMenu->ResetMenu();
-        netplay.joinSuccessful = false;
-        netplay.gameRunning = false;
     }
 
     if (game_values.matchtype == MatchType::World) {
@@ -311,12 +307,12 @@ void MenuState::onEnterState()
 
     //Keep track if we entered the menu loop as part of a tournament, if we exit the tournament
     //we need to reset the menu music back to normal
-    if (game_values.matchtype != MatchType::SingleGame && game_values.matchtype != MatchType::QuickGame && game_values.matchtype != MatchType::MiniGame && game_values.matchtype != MatchType::NetGame)
+    if (game_values.matchtype != MatchType::SingleGame && game_values.matchtype != MatchType::QuickGame && game_values.matchtype != MatchType::MiniGame)
         fNeedMenuMusicReset = true;
 
     if (game_values.music) {
         if (game_values.tournamentwinner < 0) {
-            if (game_values.matchtype == MatchType::SingleGame || game_values.matchtype == MatchType::QuickGame || game_values.matchtype == MatchType::MiniGame || game_values.matchtype == MatchType::NetGame)
+            if (game_values.matchtype == MatchType::SingleGame || game_values.matchtype == MatchType::QuickGame || game_values.matchtype == MatchType::MiniGame)
                 rm->backgroundmusic[2].play(false, false);
             else if (game_values.matchtype == MatchType::World)
                 rm->backgroundmusic[5].play(false, false);
@@ -325,28 +321,14 @@ void MenuState::onEnterState()
         }
     }
 
-    if (game_values.matchtype != MatchType::World && game_values.matchtype != MatchType::QuickGame && game_values.matchtype != MatchType::NetGame) {
+    if (game_values.matchtype != MatchType::World && game_values.matchtype != MatchType::QuickGame) {
         if (mCurrentMenu == mGameSettingsMenu.get() || mCurrentMenu == mTournamentScoreboardMenu.get())
             mGameSettingsMenu->miMapField->LoadCurrentMap();
-    }
-
-    // On return from a game, refresh room list
-    if (netplay.active) {
-        if (netplay.currentRoom.roomID) {
-            netplay.client.sendLeaveRoomMessage();
-            netplay.currentRoom.roomID = 0;
-            netplay.joinSuccessful = false;
-            netplay.gameRunning = false;
-        }
-        netplay.client.requestRoomList();
     }
 }
 
 void MenuState::update()
 {
-    if (netplay.active)
-        netplay.client.update();
-
     //Reset the keys that were down the last frame
     game_values.playerInput.ClearPressedKeys(1);
 
@@ -478,31 +460,65 @@ void MenuState::update()
 
     bool fGenerateMapThumbs = false;
     if (AppState::Menu == game_values.appstate) {
+        if (!cmd::g_net.enabled())
+            HandleOnlineEvents();
+        if (mCurrentMenu == mOnlineLobbyMenu.get())
+            mOnlineLobbyMenu->Sync();
+
         MenuCodeEnum code = MENU_CODE_NONE;
         if (cmd::g_autotest.enabled)
             code = AutoTestMenuUpdate();
         if (MENU_CODE_NONE == code)
             code = mCurrentMenu->SendInput(&game_values.playerInput);
 
-        // Shortcut to game start
-        if (netplay.active) {
-            uint8_t lastSendType = netplay.client.lastSentMessage.packageType;
-            uint8_t lastRecvType = netplay.client.lastReceivedMessage.packageType;
-
-            if (lastSendType == NET_P2G_SYNC_OK
-                && lastRecvType == NET_G2E_GAME_START)
-            code = MENU_CODE_NET_ROOM_GO;
-        }
-
         if (MENU_CODE_EXIT_APPLICATION == code) {
             Exit();
             return;
         } else if (MENU_CODE_TO_MAIN_MENU == code) {
-            iDisplayError = DISPLAY_ERROR_NONE;
-            iDisplayErrorTimer = 0;
-            net_endSession();
-
-            mCurrentMenu = mMainMenu.get();
+            if (mOnlineSetup) {
+                ReturnToOnlineLobby();
+            } else {
+                iDisplayError = DISPLAY_ERROR_NONE;
+                iDisplayErrorTimer = 0;
+                mCurrentMenu = mMainMenu.get();
+            }
+        } else if (MENU_CODE_TO_ONLINE_MENU == code) {
+            mOnlineMenu->ClearMessage();
+            mOnlineMenu->Open();
+            mCurrentMenu = mOnlineMenu.get();
+        } else if (MENU_CODE_ONLINE_HOST == code) {
+            HostOnlineGame();
+        } else if (MENU_CODE_ONLINE_JOIN == code) {
+            JoinOnlineGame();
+        } else if (MENU_CODE_ONLINE_LOBBY_CHANGED == code) {
+            mOnlineLobbyMenu->ApplyChanges();
+        } else if (MENU_CODE_ONLINE_SLOT_ACTION == code) {
+            mOnlineLobbyMenu->SlotAction();
+        } else if (MENU_CODE_ONLINE_READY == code) {
+            mOnlineLobbyMenu->ToggleReady();
+        } else if (MENU_CODE_ONLINE_START == code) {
+            StartOnlineMatch();
+        } else if (MENU_CODE_ONLINE_MATCH_SETTINGS == code) {
+            OpenOnlineMatchSettings();
+        } else if (MENU_CODE_ONLINE_LEAVE == code) {
+            const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+            if (!lobby || lobby->phase() == rollback::NetLobby::Phase::Joining || lobby->phase() == rollback::NetLobby::Phase::Closed)
+                LeaveOnlineLobbyNow();
+            else
+                mOnlineLobbyMenu->OpenDialog(UI_OnlineLobbyMenu::Dialog::Leave);
+        } else if (MENU_CODE_ONLINE_LEAVE_YES == code) {
+            rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+            if (mOnlineLobbyMenu->dialog() == UI_OnlineLobbyMenu::Dialog::Kick) {
+                const int peer = mOnlineLobbyMenu->kickPeer();
+                mOnlineLobbyMenu->CloseDialog();
+                if (lobby && peer > 0)
+                    lobby->kick(peer);
+            } else {
+                mOnlineLobbyMenu->CloseDialog();
+                LeaveOnlineLobbyNow();
+            }
+        } else if (MENU_CODE_ONLINE_LEAVE_NO == code) {
+            mOnlineLobbyMenu->CloseDialog();
         } else if (MENU_CODE_BACK_TO_MATCH_SELECTION_MENU == code) {
             mCurrentMenu = mMatchSelectionMenu.get();
             iUnlockMinigameOptionIndex = 0;
@@ -512,6 +528,13 @@ void MenuState::update()
             mCurrentMenu = mMatchSelectionMenu.get();
             mCurrentMenu->ResetMenu();
             iUnlockMinigameOptionIndex = 0;
+        } else if (mOnlineSetup && MENU_CODE_MATCH_SELECTION_START == code) {
+            //The host chose single game or minigame for the lobby
+            mOnlineMinigame = mMatchSelectionMenu->GetSelectedMatchType() == MatchType::MiniGame;
+            if (mOnlineMinigame)
+                ReturnToOnlineLobby();
+            else
+                OpenOnlineGameSettings();
         } else if (MENU_CODE_MATCH_SELECTION_START == code || MENU_CODE_QUICK_GAME_START == code) {
             printf("itt vagyok\n");
 
@@ -538,10 +561,6 @@ void MenuState::update()
             mCurrentMenu->ResetMenu();
         } else if (MENU_CODE_BACK_TO_OPTIONS_MENU == code) {
             mCurrentMenu = mOptionsMenu.get();
-        } else if (MENU_CODE_TO_NET_SERVERS_MENU == code) {
-            mCurrentMenu = mNetServersMenu.get();
-            mCurrentMenu->ResetMenu();
-            net_startSession();
         } else if (MENU_CODE_BACK_TO_GRAPHIC_OPTIONS_MENU == code) {
             mCurrentMenu = mGraphicsOptionsMenu.get();
         } else if (MENU_CODE_TO_CONTROLS_MENU == code) {
@@ -696,7 +715,7 @@ void MenuState::update()
                         game_values.tournament_scores[k].total = 0;
                     }
 
-                    if (MatchType::SingleGame == game_values.matchtype || MatchType::Tournament == game_values.matchtype || MatchType::NetGame == game_values.matchtype) {
+                    if (MatchType::SingleGame == game_values.matchtype || MatchType::Tournament == game_values.matchtype) {
                         printf("  MatchType::SingleGame || MatchType::Tournament\n");
                         printf("current map: %s\n", szCurrentMapName);
                         maplist->findexact(szCurrentMapName, false);
@@ -787,16 +806,14 @@ void MenuState::update()
             if (fNeedTeamAnnouncement)
                 mWorldMenu->miWorld->DisplayTeamControlAnnouncement();
         } else if (MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS == code) {
-            if (netplay.active)
-                mCurrentMenu = mNetNewRoomSettingsMenu.get();
-            else
-                mCurrentMenu = mGameSettingsMenu.get();
+            mCurrentMenu = mGameSettingsMenu.get();
         } else if (MENU_CODE_MODE_CHANGED == code) {
             game_values.gamemode = gamemodes[mGameSettingsMenu->GetCurrentGameModeID()];
             mGameSettingsMenu->RefreshGameModeButtons();
-            mNetNewRoomSettingsMenu->RefreshGameModeButtons();
         } else if (MENU_CODE_BACK_TEAM_SELECT_MENU == code) {
-            if (game_values.matchtype == MatchType::World) {
+            if (mOnlineSetup) {
+                ReturnToOnlineLobby();
+            } else if (game_values.matchtype == MatchType::World) {
                 mWorldMenu->OpenExitDialog();
             } else if (game_values.matchtype == MatchType::Tour) {
                 mTourStopMenu->OpenExitDialog();
@@ -823,7 +840,10 @@ void MenuState::update()
 
             game_values.music = game_values.musicvolume > 0;
         } else if (MENU_CODE_START_GAME == code) {
-            StartGame();
+            if (mOnlineSetup)
+                ReturnToOnlineLobby();
+            else
+                StartGame();
         } else if (MENU_CODE_EXIT_TOURNAMENT_YES == code || MENU_CODE_EXIT_TOURNAMENT_NO == code) {
             mGameSettingsMenu->CloseExitDialog();
 
@@ -895,17 +915,11 @@ void MenuState::update()
             mCurrentMenu = mProjectileLimitsMenu.get();
             mCurrentMenu->ResetMenu();
         } else if (MENU_CODE_TO_MODE_SETTINGS_MENU == code) {
-            if (netplay.active) {
-                mCurrentMenu = mModeOptionsMenu->GetOptionsMenu(mNetNewRoomSettingsMenu->getSelectedGameModeID());
-                mCurrentMenu->ResetMenu();
-            }
-            else {
-                for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
-                    if (mGameSettingsMenu->miGoalField[iGameMode]->IsVisible()) {
-                        mCurrentMenu = mModeOptionsMenu->GetOptionsMenu(iGameMode);
-                        mCurrentMenu->ResetMenu();
-                        break;
-                    }
+            for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
+                if (mGameSettingsMenu->miGoalField[iGameMode]->IsVisible()) {
+                    mCurrentMenu = mModeOptionsMenu->GetOptionsMenu(iGameMode);
+                    mCurrentMenu->ResetMenu();
+                    break;
                 }
             }
         } else if (MENU_CODE_MENU_GRAPHICS_PACK_CHANGED == code) {
@@ -971,13 +985,7 @@ void MenuState::update()
             for (short iPlayer = 0; iPlayer < 4; iPlayer++)
                 game_values.storedpowerups[iPlayer] = -1;
         } else if (MENU_CODE_MAP_CHANGED == code) {
-            if (mCurrentMenu == mNetNewRoomSettingsMenu.get()) {
-                assert(netplay.active);
-                netplay.mapfilepath = mNetNewRoomSettingsMenu->getCurrentMapPath();
-                printf("[net] Selected map: %s\n", netplay.mapfilepath.c_str());
-                mNetRoomMenu->SetPreviewMapPath(netplay.mapfilepath);
-            }
-            else if (game_values.matchtype != MatchType::Tour)
+            if (game_values.matchtype != MatchType::Tour)
                 szCurrentMapName = mGameSettingsMenu->miMapField->GetMapName();
         } else if (MENU_CODE_MAP_FILTER_EXIT == code) {
             maplist->ApplyFilters(game_values.pfFilters);
@@ -1026,153 +1034,6 @@ void MenuState::update()
         } else if (MENU_CODE_HEALTH_MODE_MAX_LIFE_CHANGED == code) {
             mModeOptionsMenu->HealthModeMaxLifeChanged();
         }
-
-        if (netplay.active) {
-
-            LastMessage lastSent = netplay.client.lastSentMessage;
-            LastMessage lastRecv = netplay.client.lastReceivedMessage;
-
-            // Override menu code if response has arrived
-            if (netplay.operationInProgress)
-            {
-                MenuCodeEnum previousCode = code;
-
-                //printf("\rlastSendType: %d, lastRecvType: %d", lastSent.packageType, lastRecv.packageType);
-
-                // if sent connect request,
-                // received connect_ok
-                // then sent skin change
-                if (lastSent.packageType == NET_NOTICE_SKIN_CHANGE
-                        && lastRecv.packageType == NET_RESPONSE_CONNECT_OK
-                        && lastSent.timestamp >= lastRecv.timestamp)
-                    code = MENU_CODE_TO_NET_LOBBY_MENU;
-
-                else if (lastSent.packageType == NET_REQUEST_JOIN_ROOM
-                        && lastRecv.packageType == NET_RESPONSE_JOIN_OK
-                        && lastSent.timestamp < lastRecv.timestamp) // ensure that the incoming message arrived after the request
-                    code = MENU_CODE_TO_NET_ROOM_MENU;
-
-                else if (lastSent.packageType == NET_NOTICE_GAMEMODESETTINGS
-                        && lastRecv.packageType == NET_RESPONSE_CREATE_OK)
-                    code = MENU_CODE_TO_NET_ROOM_MENU;
-
-                // ide a hibakezelést
-                // if lastmessage ez és lastresponse emez
-                // control.settext...
-
-                // If we have finished the waiting
-                if (code != previousCode)
-                    netplay.operationInProgress = false;
-            }
-
-            if (MENU_CODE_TO_NET_SERVERLIST == code) {
-                mNetServersMenu->OpenServerList();
-            } else if (MENU_CODE_TO_NET_ADDREMOVE_SERVER_MENU == code) {
-                mCurrentMenu = mNetEditServersMenu.get();
-                mCurrentMenu->ResetMenu();
-                mNetEditServersMenu->Restore();
-            } else if (MENU_CODE_NET_ADDREMOVE_SERVER_ON_ADD_BTN == code) {
-                mNetEditServersMenu->onPressAdd();
-            } else if (MENU_CODE_NET_ADDREMOVE_SERVER_ON_EDIT_BTN == code) {
-                mNetEditServersMenu->onPressEdit();
-            } else if (MENU_CODE_NET_ADDREMOVE_SERVER_ON_DELETE_BTN == code) {
-                mNetEditServersMenu->onPressDelete();
-            } else if (MENU_CODE_NET_ADDREMOVE_SERVER_ON_SELECT == code) {
-                mNetEditServersMenu->onEntrySelect();
-                mNetServersMenu->RefreshScroll();
-            } else if (MENU_CODE_NET_ADDREMOVE_SERVER_ON_DIALOG_OK_BTN == code) {
-                mNetEditServersMenu->onDialogOk();
-                mNetServersMenu->RefreshScroll();
-            } else if (MENU_CODE_NET_SERVERLIST_EXIT == code || MENU_CODE_NET_CONNECT_ABORT == code) {
-                if (MENU_CODE_NET_SERVERLIST_EXIT == code)
-                    netplay.currentMenuChanged = true;
-                else {
-                    net_startSession(); // release & restart socket
-                    netplay.operationInProgress = false;
-                }
-
-                mNetServersMenu->Restore();
-                iDisplayError = DISPLAY_ERROR_NONE;
-            } else if (MENU_CODE_NET_CONNECT_IN_PROGRESS == code) {
-                mNetServersMenu->ConnectInProgress();
-            } else if (MENU_CODE_TO_NET_LOBBY_MENU == code) {
-                // If we are leaving a room
-                if (netplay.currentRoom.roomID) {
-                    netplay.client.sendLeaveRoomMessage();
-                    netplay.currentRoom.roomID = 0;
-                    netplay.joinSuccessful = false;
-                    netplay.gameRunning = false;
-                }
-                netplay.client.requestRoomList();
-
-                // Restore layouts
-                    mNetServersMenu->Restore();
-                    mNetLobbyMenu->Restore();
-                    mNetNewRoomMenu->Restore();
-
-                mCurrentMenu = mNetLobbyMenu.get();
-                mCurrentMenu->ResetMenu();
-            } else if (MENU_CODE_TO_NET_NEW_ROOM_LEVEL_SELECT_MENU == code) {
-                mCurrentMenu = mNetNewRoomSettingsMenu.get();
-                mCurrentMenu->ResetMenu();
-            } else if (MENU_CODE_TO_NET_NEW_ROOM_SETTINGS_MENU == code) {
-                mCurrentMenu = mNetNewRoomMenu.get();
-                mCurrentMenu->ResetMenu();
-            } else if (MENU_CODE_NET_CHAT_SEND == code) {
-                if (!netplay.mychatmessage.empty())
-                    netplay.client.sendChatMessage(netplay.mychatmessage.c_str());
-                else
-                    code = MENU_CODE_TO_NET_ROOM_MENU;
-            } else if (MENU_CODE_TO_NET_ROOM_MENU == code) {
-                mCurrentMenu = mNetRoomMenu.get();
-                mCurrentMenu->ResetMenu();
-                netplay.currentMenuChanged = true;
-                netplay.operationInProgress = false;
-
-                mNetRoomMenu->Restore(); // Restore Room layout
-                mNetLobbyMenu->Restore(); // Restore Lobby layout
-                mNetNewRoomMenu->Restore(); // remove 'in progress' dialog
-            } else if (MENU_CODE_NET_JOIN_ROOM_IN_PROGRESS == code) {
-                mNetLobbyMenu->JoinInProgress();
-            } else if (MENU_CODE_NET_JOIN_ROOM_ABORT == code) {
-                mNetLobbyMenu->AbortJoin();
-                iDisplayError = DISPLAY_ERROR_NONE;
-            } else if (MENU_CODE_TO_NET_NEW_ROOM_CREATE_IN_PROGRESS == code) {
-                mNetNewRoomMenu->CreateInProgress();
-            } else if (MENU_CODE_TO_NET_NEW_ROOM_CREATE_ABORT == code) {
-                mNetNewRoomMenu->AbortCreate();
-                iDisplayError = DISPLAY_ERROR_NONE;
-            } else if (MENU_CODE_TO_NET_ROOM_START_IN_PROGRESS == code) {
-                mNetRoomMenu->StartInProgress();
-            } else if (MENU_CODE_NET_ROOM_GO == code) {
-                netplay.operationInProgress = false;
-                game_values.matchtype = MatchType::NetGame;
-
-                mTeamSelectMenu->ResetTeamSelect();
-                mTeamSelectMenu->ResetMenu();
-                g_sim.score_cnt = mTeamSelectMenu->GetTeamCount();
-
-                game_values.tournamentcontrolteam = -1;
-                game_values.tournamentwinner = -1;
-
-                iDisplayError = DISPLAY_ERROR_NONE;
-                iDisplayErrorTimer = 0;
-
-                //game_values.noexit = true;
-                StartGame();
-            }
-
-            // on room change
-            if (netplay.currentMenuChanged) {
-                //printf("menuChanged\n");
-
-                mNetServersMenu->Refresh();
-                mNetRoomMenu->Refresh();
-
-                netplay.currentMenuChanged = false;
-            }
-        }
-
     }
 
     //--------------- draw everything ----------------------
@@ -1218,12 +1079,26 @@ void MenuState::update()
         rm->menu_shade.draw(0, 0);
     }
 
+    if (cmd::g_autotest.enabled && cmd::g_autotest.kind == cmd::AutoTestArgs::Kind::Shots)
+        AutoTestAfterDraw();
+
     if (game_values.screenfade == 255) {
+        rollback::NetGame& net = rollback::NetGame::instance();
+        if (AppState::StartGame == game_values.appstate && net.active()) {
+            //Online: the host sends the match it set up to the peers; the game
+            //switches to it by itself once they accept (see rollback/NetLobby.h)
+            std::string error;
+            if (!net.startMatch(error)) {
+                printf("netplay: can't start this match online: %s\n", error.c_str());
+                mOnlineLobbyMenu->SetNotice("Can't start the match: " + error);
+            }
+            game_values.appstate = AppState::Menu;
+            game_values.screenfadespeed = -8;
+            return;
+        }
+
         if (AppState::StartGame == game_values.appstate) {
             if (game_values.matchtype == MatchType::QuickGame)
-                mModeOptionsMenu->SetRandomGameModeSettings(game_values.gamemode->gamemode);
-            else if (game_values.matchtype == MatchType::NetGame)
-                // TODO: set from network
                 mModeOptionsMenu->SetRandomGameModeSettings(game_values.gamemode->gamemode);
             else
                 SetGameModeSettingsFromMenu();
@@ -1288,14 +1163,6 @@ void MenuState::update()
                     sShortMapName = stripPathAndExtension(szMapName);
 
                     printf("  State: GS_START_GAME, Match type: MatchType::QuickGame\n");
-                } else if (netplay.active) {
-                    // NOTE: for the host, netplay.mapfilepath will be ./data/something
-                    // while for the other players, it's ~/.smw/net_last.map
-                    g_map->loadMap(netplay.mapfilepath, read_type_full);
-                    // TODO: this is used for setting background music, but
-                    // since the filename is always the same, this will fall
-                    // back to a random music in the loaded music category
-                    sShortMapName = stripPathAndExtension(netplay.mapfilepath);
                 } else {
                     g_map->loadMap(maplist->currentFilename(), read_type_full);
                     sShortMapName = maplist->currentShortmapname();
@@ -1440,6 +1307,11 @@ void MenuState::Exit()
 #ifdef __EMSCRIPTEN__
     return;
 #endif
+    //Online: tell the others that this machine is gone
+    rollback::NetGame& net = rollback::NetGame::instance();
+    if (net.active() && !cmd::g_net.enabled())
+        net.leave();
+
     game_values.appstate = AppState::Quit;
     game_values.WriteConfig();
 }
@@ -1449,7 +1321,7 @@ void MenuState::ResetTournamentBackToMainMenu()
     mCurrentMenu = mMainMenu.get();
     mCurrentMenu->ResetMenu();
 
-    if (game_values.matchtype != MatchType::SingleGame && game_values.matchtype != MatchType::QuickGame && game_values.matchtype != MatchType::MiniGame && game_values.matchtype != MatchType::NetGame) {
+    if (game_values.matchtype != MatchType::SingleGame && game_values.matchtype != MatchType::QuickGame && game_values.matchtype != MatchType::MiniGame) {
         if (fNeedMenuMusicReset) {
             rm->backgroundmusic[3].stop();
             rm->backgroundmusic[2].play(false, false);

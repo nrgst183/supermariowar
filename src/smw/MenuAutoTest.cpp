@@ -1,5 +1,7 @@
 #include "GSMenu.h"
 
+#include "rollback/NetGame.h"
+
 #include "CmdArgs.h"
 #include "FileList.h"
 #include "Game.h"
@@ -9,7 +11,6 @@
 #include "GSGameplay.h"
 #include "GameplayStyles.h"
 #include "joystick.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "path.h"
@@ -58,12 +59,11 @@
 #include "menu/options/SoundOptionsMenu.h"
 #include "menu/options/TeamOptionsMenu.h"
 
-#include "menu/network/NetEditServersMenu.h"
-#include "menu/network/NetLobbyMenu.h"
-#include "menu/network/NetNewRoomMenu.h"
-#include "menu/network/NetNewRoomSettingsMenu.h"
-#include "menu/network/NetRoomMenu.h"
-#include "menu/network/NetServersMenu.h"
+
+#include "menu/OnlineLobbyMenu.h"
+#include "menu/OnlineMenu.h"
+
+#include <SDL3_image/SDL_image.h>
 
 #include <format>
 #include <string>
@@ -91,6 +91,9 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
 
     ++menuFrames;
 
+    if (at.kind == Kind::Shots)
+        return ShotsMenuUpdate();
+
     auto pressRandomKey = [&](bool allowCancel) {
         COutputControl& keys = game_values.playerInput.outputControls[0];
         switch (rng() % (allowCancel ? 7 : 6)) {
@@ -111,6 +114,26 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
         if (rng() % 3 == 0)
             pressRandomKey(mCurrentMenu != mMainMenu.get());
         return MENU_CODE_NONE;
+    }
+
+    //Online (--net-*): the host picks the matches; the joiners are ready for them
+    rollback::NetGame& net = rollback::NetGame::instance();
+    if (net.active() || net.finished()) {
+        if (net.finished())
+            return net.canQuit() ? MENU_CODE_EXIT_APPLICATION : MENU_CODE_NONE;
+        if (!net.isHost()) {
+            if (net.lobby()->phase() == rollback::NetLobby::Phase::Lobby && !net.lobby()->peer(net.localPeer()).ready)
+                net.lobby()->setReady(true);
+            return MENU_CODE_NONE;
+        }
+        if (g_autoTestMatchesDone >= at.matches || !net.lastMatchError().empty()) {
+            //Done, or a peer is gone (disconnect tests): close the lobby
+            if (net.matchDrained())
+                net.endSession(net.lastMatchError().empty() ? "autotest done" : "autotest: a match was aborted");
+            return MENU_CODE_NONE;
+        }
+        if (phase == 0 && !net.readyForMatch())
+            return MENU_CODE_NONE;
     }
 
     if (g_autoTestMatchesDone >= at.matches)
@@ -136,8 +159,16 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
 
             const int idx = at.start + scenario++;
             const int players = at.players > 0 ? at.players : 2 + idx % 3;
+            //CPU players (2), or "humans" (1) driven by GameplayState's random input
             for (int k = 0; k < 4; k++)
-                game_values.playercontrol[k] = k < players ? 2 : 0;
+                game_values.playercontrol[k] = k < players ? (k < at.humans ? 1 : 2) : 0;
+            if (net.active()) {
+                //Online the lobby has the players: the peers', then CPU players
+                int humans = 0;
+                for (int k = 0; k < 4; k++)
+                    humans += net.lobby()->slot(k).kind == rollback::SlotKind::Human;
+                net.lobby()->setCpuCount(players - humans);
+            }
 
             switch (at.kind) {
                 case Kind::Minigame: {
@@ -223,5 +254,350 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
                 pressRandomKey(false);
             return MENU_CODE_NONE;
         }
+    }
+}
+
+
+//---------------------------------------------------------------
+// --autotest --at-match shots: screenshots of the online menus
+//---------------------------------------------------------------
+// A scripted walk through the main menu, the Online menu and the lobby, saving PNGs of the screen
+// (see scripts/menu-screenshots.sh, which runs a host and a joiner at once). Every step waits for
+// what it needs (the other peer, the match...) and times out, so a broken run still ends.
+
+namespace {
+std::string g_pendingShot;
+}
+
+void MenuState::AutoTestAfterDraw()
+{
+    if (g_pendingShot.empty())
+        return;
+
+    const std::string path = cmd::g_autotest.shotsDir + "/" + g_pendingShot + ".png";
+    g_pendingShot.clear();
+    if (IMG_SavePNG(screen, path.c_str()))
+        printf("shots: saved %s\n", path.c_str());
+    else
+        printf("shots: couldn't save %s: %s\n", path.c_str(), SDL_GetError());
+}
+
+MenuCodeEnum MenuState::ShotsMenuUpdate()
+{
+    const cmd::AutoTestArgs& at = cmd::g_autotest;
+    rollback::NetGame& net = rollback::NetGame::instance();
+    using Phase = rollback::NetLobby::Phase;
+
+    static int menuFrames = 0;
+    static int step = 0;
+    static int t = 0;
+    static bool shotTaken = false;
+    ++menuFrames;
+    ++t;
+
+    auto next = [&]() {
+        ++step;
+        t = 0;
+        shotTaken = false;
+    };
+    auto shot = [&](const char* name) {
+        printf("shots: %s\n", name);
+        g_pendingShot = name;
+    };
+    auto exitSoon = [&]() {
+        //Leave the lobby tidily, then quit
+        if (net.active())
+            net.leave();
+        return MENU_CODE_EXIT_APPLICATION;
+    };
+    //A step that gives up after a while: takes a screenshot of what is on the screen and quits
+    auto timedOut = [&](int limit, const char* what) {
+        if (t < limit)
+            return false;
+        printf("shots: timed out waiting for %s (step %d)\n", what, step);
+        shot("zz_timeout");
+        step = 1000;
+        t = 0;
+        return true;
+    };
+
+    if (step == 1000)
+        return t > 3 ? exitSoon() : MENU_CODE_NONE;
+    if (menuFrames >= at.frames)
+        return exitSoon();
+
+    const std::string nick = at.shotsName.empty() ? (at.shotsRole == "join" ? "Luigi" : "Mario") : at.shotsName;
+    rollback::NetLobby* lobby = net.lobby();
+
+    //The main menu, then the Online menu: the same start for every role
+    if (step == 0) {
+        if (t == 25)
+            shot("01_main_menu");
+        if (t == 28)
+            next();
+        return MENU_CODE_NONE;
+    }
+    if (step == 1) {
+        if (t == 1) {
+            game_values.onlinename = nick;
+            if (at.shotsRole == "join")
+                game_values.onlineaddress = at.shotsAddr;
+            if (at.shotsRole == "host" && !at.shotsAddr.empty())
+                game_values.onlineport = at.shotsAddr;
+            return MENU_CODE_TO_ONLINE_MENU;
+        }
+        if (t == 15)
+            shot(at.shotsRole == "join" ? "13_online_menu_join_filled" : "02_online_menu");
+        if (t == 18)
+            next();
+        return MENU_CODE_NONE;
+    }
+
+    if (at.shotsRole == "errors") {
+        //The messages of the Online menu: nothing entered, a bad address, a port in use (--at-addr), nobody there
+        switch (step) {
+            case 2:
+                if (t == 1) {
+                    game_values.onlineaddress.clear();
+                    return MENU_CODE_ONLINE_JOIN;
+                }
+                if (t == 8)
+                    shot("20_error_no_address");
+                if (t == 11)
+                    next();
+                return MENU_CODE_NONE;
+            case 3:
+                if (t == 1) {
+                    game_values.onlineaddress = "127.0.0.1:99999";
+                    return MENU_CODE_ONLINE_JOIN;
+                }
+                if (t == 8)
+                    shot("21_error_bad_address");
+                if (t == 11)
+                    next();
+                return MENU_CODE_NONE;
+            case 4:
+                if (t == 1) {
+                    game_values.onlineport = at.shotsAddr;
+                    return MENU_CODE_ONLINE_HOST;
+                }
+                if (t == 8)
+                    shot("22_error_port_in_use");
+                if (t == 11)
+                    next();
+                return MENU_CODE_NONE;
+            case 5:
+                if (t == 1) {
+                    game_values.onlineaddress = "127.0.0.1:1";
+                    return MENU_CODE_ONLINE_JOIN;
+                }
+                if (t == 6)
+                    shot("23_joining");
+                if (mCurrentMenu == mOnlineMenu.get() && t > 10) {
+                    next();
+                    return MENU_CODE_NONE;
+                }
+                timedOut(60 * 40, "the connection to fail");
+                return MENU_CODE_NONE;
+            case 6:
+                if (t == 8)
+                    shot("24_error_cannot_connect");
+                if (t == 12)
+                    return exitSoon();
+                return MENU_CODE_NONE;
+            default:
+                return exitSoon();
+        }
+    }
+
+    if (at.shotsRole == "host") {
+        switch (step) {
+            case 2:
+                if (t == 1)
+                    return MENU_CODE_ONLINE_HOST;
+                if (mCurrentMenu == mOnlineMenu.get() && t > 20) {
+                    shot("zz_host_failed");
+                    step = 1000;
+                    t = 0;
+                    return MENU_CODE_NONE;
+                }
+                if (lobby && lobby->phase() == Phase::Lobby && t > 20) {
+                    shot("03_lobby_host_alone");
+                    next();
+                }
+                return MENU_CODE_NONE;
+
+            case 3:    //a joiner and a CPU player
+                if (lobby && lobby->peer(1).present && lobby->pingsMeasured() && lobby->peer(1).localPlayers == 2 && t > 30) {
+                    lobby->addCpu();
+                    next();
+                }
+                timedOut(60 * 90, "a joiner");
+                return MENU_CODE_NONE;
+
+            case 4:    //not everyone is ready yet
+                if (t == 40) {
+                    mOnlineLobbyMenu->FocusSlot(1);
+                    shot("04_lobby_host_joiner_and_cpu");
+                }
+                if (t > 45 && lobby && lobby->peer(1).ready)
+                    next();
+                timedOut(60 * 60, "the joiner to be ready");
+                return MENU_CODE_NONE;
+
+            case 5:
+                if (t == 10) {
+                    mOnlineLobbyMenu->FocusSlot(2);
+                    shot("05_lobby_host_everyone_ready");
+                }
+                if (t == 14)
+                    next();
+                return MENU_CODE_NONE;
+
+            case 6:    //the match menus
+                if (t == 1)
+                    return MENU_CODE_ONLINE_MATCH_SETTINGS;
+                if (t == 20)
+                    shot("06_match_type_menu");
+                if (t == 23)
+                    next();
+                return MENU_CODE_NONE;
+
+            case 7:
+                if (t == 1)
+                    return MENU_CODE_MATCH_SELECTION_START;
+                if (t == 20)
+                    shot("07_online_game_menu");
+                if (t == 23)
+                    next();
+                return MENU_CODE_NONE;
+
+            case 8: {    //pick mode, goal and map, then back to the lobby
+                if (t == 1) {
+                    const short mode = static_cast<short>((at.mode >= 0 ? at.mode : 0) % GAMEMODE_LAST);
+                    mGameSettingsMenu->GameModeChanged(mode);
+                    game_values.gamemode = gamemodes[mGameSettingsMenu->GetCurrentGameModeID()];
+                    currentgamemode = mode;
+                    SModeOption* options = game_values.gamemode->GetOptions();
+                    game_values.gamemode->goal = options[1].iValue;
+                    mGameSettingsMenu->miGoalField[mode]->setCurrentValue(game_values.gamemode->goal);
+                    if (!at.map.empty()) {
+                        maplist->findexact(at.map.c_str(), false);
+                        mGameSettingsMenu->miMapField->LoadCurrentMap();
+                        szCurrentMapName = mGameSettingsMenu->miMapField->GetMapName();
+                    }
+                    return MENU_CODE_START_GAME;
+                }
+                if (t == 40) {
+                    mOnlineLobbyMenu->FocusSlot(0);
+                    shot("08_lobby_host_match_selected");
+                }
+                if (t == 44)
+                    next();
+                return MENU_CODE_NONE;
+            }
+
+            case 9: {
+                std::string why;
+                if (lobby && lobby->canStart(why)) {
+                    next();
+                    return MENU_CODE_ONLINE_START;
+                }
+                timedOut(60 * 20, "canStart");
+                return MENU_CODE_NONE;
+            }
+
+            case 10:    //the match starts (the map is sent), is played, and ends
+                if (lobby && lobby->mapTransfer().active && !shotTaken) {
+                    shotTaken = true;
+                    shot("09_lobby_host_map_upload");
+                }
+                if (g_autoTestMatchesDone >= 1 && lobby && lobby->phase() == Phase::Lobby && t > 40) {
+                    shot("10_lobby_host_after_match");
+                    next();
+                }
+                timedOut(60 * 60, "the match to end");
+                return MENU_CODE_NONE;
+
+            case 11:
+                if (t == 4)
+                    return MENU_CODE_ONLINE_LEAVE;
+                if (t == 12)
+                    shot("11_leave_dialog_host");
+                if (t == 16)
+                    return MENU_CODE_ONLINE_LEAVE_YES;
+                if (t == 40)
+                    return exitSoon();
+                return MENU_CODE_NONE;
+
+            default:
+                return exitSoon();
+        }
+    }
+
+    //The joiner
+    switch (step) {
+        case 2:
+            if (t == 1)
+                return MENU_CODE_ONLINE_JOIN;
+            if (t == 4 && lobby && lobby->phase() == Phase::Joining)
+                shot("14_joining");
+            if (lobby && lobby->phase() == Phase::Lobby && t > 10) {
+                lobby->setLocalPlayers(2);
+                next();
+            }
+            if (mCurrentMenu == mOnlineMenu.get() && t > 20) {
+                shot("zz_join_failed");
+                step = 1000;
+                t = 0;
+            }
+            timedOut(60 * 40, "the lobby");
+            return MENU_CODE_NONE;
+
+        case 3: {
+            bool cpu = false;
+            for (int s = 0; lobby && s < rollback::LOBBY_SLOTS; s++)
+                cpu |= lobby->slot(s).kind == rollback::SlotKind::Cpu;
+            if (cpu && t > 40) {
+                shot("15_lobby_joiner_not_ready");
+                next();
+            }
+            timedOut(60 * 90, "the host's CPU player");
+            return MENU_CODE_NONE;
+        }
+
+        case 4:
+            if (t == 4)
+                return MENU_CODE_ONLINE_READY;
+            if (t == 40) {
+                shot("16_lobby_joiner_ready");
+                next();
+            }
+            return MENU_CODE_NONE;
+
+        case 5: {    //the match starts: the map is downloaded
+            const rollback::MapTransferInfo tr = lobby ? lobby->mapTransfer() : rollback::MapTransferInfo {};
+            if (tr.active && !shotTaken && tr.bytesDone > 0) {
+                shotTaken = true;
+                shot("17_lobby_joiner_map_download");
+            }
+            if (g_autoTestMatchesDone >= 1 && lobby && lobby->phase() == Phase::Lobby && t > 40) {
+                shot("18_lobby_joiner_after_match");
+                next();
+            }
+            timedOut(60 * 60, "the match to end");
+            return MENU_CODE_NONE;
+        }
+
+        case 6:    //the host leaves: the lobby is closed
+            if (mCurrentMenu == mOnlineMenu.get() && t > 12) {
+                shot("19_online_menu_lobby_closed");
+                next();
+            }
+            timedOut(60 * 60, "the host to close the lobby");
+            return MENU_CODE_NONE;
+
+        default:
+            return t > 6 ? exitSoon() : MENU_CODE_NONE;
     }
 }

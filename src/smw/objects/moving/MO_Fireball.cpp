@@ -31,7 +31,6 @@ MO_Fireball::MO_Fireball(gfxSprite* nspr, Vec2s pos, short iNumSpr, bool moveToR
 
     ttl = game_values.fireballttl;
 
-    sSpotlight = nullptr;
 }
 
 void MO_Fireball::update()
@@ -41,13 +40,7 @@ void MO_Fireball::update()
     if (--ttl <= 0) {
         removeifprojectile(this, true, true);
     } else if (game_values.spotlights) {
-        if (!sSpotlight) {
-            sSpotlight = spotlightManager.AddSpotlight(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
-        }
-
-        if (sSpotlight) {
-            sSpotlight->UpdatePosition(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1));
-        }
+        spotlightManager.track(this, iNetworkID, ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
     }
 }
 

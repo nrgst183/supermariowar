@@ -3,12 +3,14 @@
 
 #include "gfx.h"
 #include "GlobalConstants.h"
+#include "SimArena.h"
 #include "TileTypes.h"
 
 #include <SDL3/SDL.h>
 
 #include <array>
 #include <list>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -167,7 +169,7 @@ struct MapBlock {
 class IO_Block;
 
 void DrawMapHazard(const MapHazard& hazard, short iSize, bool fDrawCenter, SDL_Surface* dst);
-void DrawPlatform(PlatformPathType pathtype, const std::vector<TilesetTile>& tiles,
+void DrawPlatform(PlatformPathType pathtype, std::span<const TilesetTile> tiles,
 	short startX, short startY, short endX, short endY,
 	float angle, float radiusX, float radiusY,
 	short iSize, short iPlatformWidth, short iPlatformHeight,
@@ -259,6 +261,26 @@ class CMap
 		void AddPermanentPlatform(MovingPlatform * platform);
 		void AddTemporaryPlatform(MovingPlatform * platform);
 
+		const std::vector<MovingPlatform*>& permanentPlatforms() const { return platforms; }
+		const sim::list<MovingPlatform*>& temporaryPlatforms() const { return tempPlatforms; }
+
+		// Calls fn(void* data, size_t size, const char* name) for each part of
+		// the map that changes during a match, for rollback snapshots (see
+		// smw/rollback/Snapshot.h). Everything else in CMap is level data that
+		// stays the same during a match. The permanent moving platforms and
+		// the temporary ones (and their list nodes) live in the simulation
+		// arena, so only the list object itself is listed here.
+		template <typename Fn>
+		void forEachRuntimeRegion(Fn&& fn) {
+			fn(mapdatatop, sizeof(mapdatatop), "map.mapdatatop");
+			fn(blockdata, sizeof(blockdata), "map.blockdata");
+			fn(&tempPlatforms, sizeof(tempPlatforms), "map.tempPlatforms");
+			fn(warpexits, sizeof(warpexits), "map.warpexits");
+			fn(warplocktimer, sizeof(warplocktimer), "map.warplocktimer");
+			fn(warplocked, sizeof(warplocked), "map.warplocked");
+			fn(&iSwitches, sizeof(iSwitches), "map.iSwitches");
+		}
+
 		bool findspawnpoint(short iType, short * x, short * y, short width, short height, bool tilealigned);
 		bool IsInPlatformNoSpawnZone(short x, short y, short width, short height);
 
@@ -285,7 +307,7 @@ class CMap
 		std::vector<AnimatedTile*> animatedtiles;
 
                 std::vector<MovingPlatform*> platforms;
-		std::list<MovingPlatform*> tempPlatforms;
+		sim::list<MovingPlatform*> tempPlatforms;     // allocated in the simulation arena
 
                 std::vector<MapItem> mapitems;
                 std::vector<MapHazard>	maphazards;

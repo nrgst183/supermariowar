@@ -8,7 +8,6 @@
 #include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "ObjectContainer.h"

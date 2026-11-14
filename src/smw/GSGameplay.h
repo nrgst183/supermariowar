@@ -1,18 +1,45 @@
 #ifndef GAMESTATE_GAMEPLAY_H
 #define GAMESTATE_GAMEPLAY_H
 
+#include "GameplayInterpolation.h"
 #include "GameState.h"
 #include "input.h"
 
+#include <memory>
+
+namespace rollback { class SyncTest; }
+
+struct InputFrame;
+
+// The gameplay state. Every 16 ms, update() runs the frame logic around the
+// simulation: input gathering, the pause and exit dialogs, autotest
+// bookkeeping and the match start/end transitions.
+// Then it advances the simulation by one tick with simulateTick(). render()
+// draws the result, as often as the frame rate setting asks for.
 class GameplayState : public GameState
 {
     public:
         void update() override;
 
+        // Exactly one deterministic tick of gameplay (see GameplayTick.cpp)
+        void simulateTick(const InputFrame& input);
+        // Remembers the drawn positions for smooth motion, then runs the tick.
+        // This is what rollback re-runs: the remembered positions are part of
+        // the objects, so they are captured before every tick, re-simulated
+        // or not.
+        void advanceTick(const InputFrame& input);
+
+        // Draws the current state, `alpha` (0..1) of the way from the
+        // previous tick to the latest one (smooth motion). Doesn't change the
+        // simulation.
+        bool rendersBetweenTicks() const override { return true; }
+        void render(float alpha) override;
+
         static GameplayState& instance();
 
     private:
         GameplayState();
+        ~GameplayState();
 
         void onEnterState() override;
 
@@ -23,6 +50,14 @@ class GameplayState : public GameState
         void CleanDeadPlayers();
 
         void handleInput();
+        bool updateAutoTest();
+        void updateNetplay();
+        bool updateMatchTransition();
+
+        void applyTickInput(const InputFrame& input);
+        void resetTickInput();
+        void updateScreenFade();
+        void updatePlayerSwapAnimation();
 
         void drawFrontLayer();
         void drawBackLayer();
@@ -42,11 +77,15 @@ class GameplayState : public GameState
         //..
         //...
         //TODO
-        void read_network();
         void update_countdown_timer();
         void update_world();
 
         short iScoreTextOffset[4] = {};
+
+        RenderInterpolator interpolator;
+        bool lastUpdateTicked = false;  // whether the latest update() ran a tick (not paused)
+
+        std::unique_ptr<rollback::SyncTest> syncTest;    // --at-synctest
 
         short respawnanimationtimer[4];
         short respawnanimationframe[4];

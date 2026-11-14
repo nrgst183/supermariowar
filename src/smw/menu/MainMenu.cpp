@@ -5,6 +5,11 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_PlayerSelect.h"
 
+// The web build (and every NO_NETWORK build) has no online mode
+#if defined(__EMSCRIPTEN__) || defined(NETWORK_DISABLED)
+#define SMW_NO_ONLINE
+#endif
+
 
 UI_MainMenu::UI_MainMenu()
     : UI_Menu()
@@ -22,15 +27,16 @@ UI_MainMenu::UI_MainMenu()
 
     miPlayerSelect = new MI_PlayerSelect(&rm->menu_player_select, 120, 250, "Players", 400, 140);
 
-// disable Multiplayer button for web builds
+#ifndef SMW_NO_ONLINE
+    // Online (rollback netplay); web builds have no network code
+    miOnlineButton = new MI_Button(&rm->spr_selectfield, 120, 322, "Online", 400);
+    miOnlineButton->SetCode(MENU_CODE_TO_ONLINE_MENU);
+#endif
+
 #ifdef __EMSCRIPTEN__
-    miMultiplayerButton = new MI_Button(&rm->spr_selectfield, 120, 322, "Multiplayer - Under Construction", 400);
     miOptionsButton = new MI_Button(&rm->spr_selectfield, 120, 362, "Options", 400);
     miControlsButton = new MI_Button(&rm->spr_selectfield, 120, 402, "Controls", 400);
 #else
-    miMultiplayerButton = new MI_Button(&rm->spr_selectfield, 120, 322, "Multiplayer", 400);
-    miMultiplayerButton->SetCode(MENU_CODE_TO_NET_SERVERS_MENU);
-
     miOptionsButton = new MI_Button(&rm->spr_selectfield, 120, 362, "Options", 200);
     miControlsButton = new MI_Button(&rm->spr_selectfield, 320, 362, "Controls", 200);
 #endif
@@ -47,15 +53,20 @@ UI_MainMenu::UI_MainMenu()
 #ifndef __EMSCRIPTEN__
     AddControl(miMainStartButton, miExitButton, miPlayerSelect, nullptr, miQuickGameButton);
     AddControl(miQuickGameButton, miExitButton, miPlayerSelect, miMainStartButton, nullptr);
-    AddControl(miPlayerSelect, miMainStartButton, miMultiplayerButton, nullptr, nullptr);
-    AddControl(miMultiplayerButton, miPlayerSelect, miOptionsButton, nullptr, nullptr);
-    AddControl(miOptionsButton, miMultiplayerButton, miExitButton, miControlsButton, miControlsButton);
-    AddControl(miControlsButton, miMultiplayerButton, miExitButton, miOptionsButton, miOptionsButton);
+#ifndef SMW_NO_ONLINE
+    AddControl(miPlayerSelect, miMainStartButton, miOnlineButton, nullptr, nullptr);
+    AddControl(miOnlineButton, miPlayerSelect, miOptionsButton, nullptr, nullptr);
+    AddControl(miOptionsButton, miOnlineButton, miExitButton, miControlsButton, miControlsButton);
+    AddControl(miControlsButton, miOnlineButton, miExitButton, miOptionsButton, miOptionsButton);
+#else
+    AddControl(miPlayerSelect, miMainStartButton, miOptionsButton, nullptr, nullptr);
+    AddControl(miOptionsButton, miPlayerSelect, miExitButton, miControlsButton, miControlsButton);
+    AddControl(miControlsButton, miPlayerSelect, miExitButton, miOptionsButton, miOptionsButton);
+#endif
     AddControl(miExitButton, miOptionsButton, miMainStartButton, nullptr, nullptr);
 #else
     AddControl(miMainStartButton, miControlsButton, miPlayerSelect, nullptr, miQuickGameButton);
     AddControl(miQuickGameButton, miControlsButton, miPlayerSelect, miMainStartButton, nullptr);
-    AddNonControl(miMultiplayerButton);
     AddControl(miPlayerSelect, miMainStartButton, miOptionsButton, nullptr, nullptr);
     AddControl(miOptionsButton, miPlayerSelect, miControlsButton, nullptr, nullptr);
     AddControl(miControlsButton, miOptionsButton, miMainStartButton, nullptr, nullptr);

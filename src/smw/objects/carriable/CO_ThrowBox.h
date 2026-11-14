@@ -4,7 +4,6 @@
 
 class CPlayer;
 class gfxSprite;
-class Spotlight;
 
 class CO_ThrowBox : public MO_CarriedObject {
 public:
@@ -36,8 +35,6 @@ private:
     bool frozen;
     short frozentimer;
     short frozenanimationspeed;
-
-    Spotlight* sSpotlight;
 
     friend class MO_Explosion;
     friend class MO_BulletBill;

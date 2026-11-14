@@ -17,6 +17,8 @@ target_sources(smw PRIVATE
     PlayerKuriboShoe.h
     PlayerOutOfArenaTimer.cpp
     PlayerOutOfArenaTimer.h
+    PlayerRenderState.cpp
+    PlayerRenderState.h
     PlayerSecretCode.cpp
     PlayerSecretCode.h
     PlayerShield.cpp

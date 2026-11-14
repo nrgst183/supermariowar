@@ -7,7 +7,6 @@ enum class MatchType : unsigned char {
     MiniGame,
     World,
     QuickGame,
-    NetGame,
 };
 
 

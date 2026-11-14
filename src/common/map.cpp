@@ -9,6 +9,7 @@
 #include "movingplatform.h"
 #include "path.h"
 #include "RandomNumberGenerator.h"
+#include "Resimulation.h"
 #include "ResourceManager.h"
 #include "TilesetManager.h"
 #include "Version.h"
@@ -94,7 +95,7 @@ void CMap::clearPlatforms()
 
     platforms.clear();
 
-    std::list<MovingPlatform*>::iterator iter = tempPlatforms.begin(), lim = tempPlatforms.end();
+    auto iter = tempPlatforms.begin(), lim = tempPlatforms.end();
 
     while (iter != lim) {
         delete (*iter);
@@ -422,7 +423,7 @@ void CMap::updatePlatforms()
         platform->update();
     }
 
-    std::list<MovingPlatform*>::iterator iter = tempPlatforms.begin(), lim = tempPlatforms.end();
+    auto iter = tempPlatforms.begin(), lim = tempPlatforms.end();
 
     while (iter != lim) {
         if ((*iter)->fDead) {
@@ -443,7 +444,7 @@ void CMap::movingPlatformCollision(IO_MovingObject * object)
         platform->collide(object);
     }
 
-    std::list<MovingPlatform*>::iterator iterateAll = tempPlatforms.begin(), lim = tempPlatforms.end();
+    auto iterateAll = tempPlatforms.begin(), lim = tempPlatforms.end();
     while (iterateAll != lim) {
         (*iterateAll)->collide(object);
         iterateAll++;
@@ -457,7 +458,7 @@ bool CMap::movingPlatformCheckSides(IO_MovingObject * object)
         fRet |= platform->collision_detection_check_sides(object);
     }
 
-    std::list<MovingPlatform*>::iterator iterateAll = tempPlatforms.begin(), lim = tempPlatforms.end();
+    auto iterateAll = tempPlatforms.begin(), lim = tempPlatforms.end();
     while (iterateAll != lim) {
         fRet |= (*iterateAll)->collision_detection_check_sides(object);
         iterateAll++;
@@ -472,7 +473,7 @@ void CMap::resetPlatforms()
         platform->ResetPath();
     }
 
-    std::list<MovingPlatform*>::iterator iter = tempPlatforms.begin(), lim = tempPlatforms.end();
+    auto iter = tempPlatforms.begin(), lim = tempPlatforms.end();
 
     while (iter != lim) {
         delete (*iter);
@@ -545,6 +546,11 @@ void CMap::update()
         if (warpexits[iWarpExit].locktimer > 0)
             --warpexits[iWarpExit].locktimer;
     }
+
+    //Animating the tiles is cosmetic (not part of rollback snapshots): a
+    //re-simulated tick doesn't advance it again
+    if (sim::isResimulating())
+        return;
 
     //Animate the animated tiles
     if (++iTileAnimationTimer >= NUM_FRAMES_BETWEEN_TILE_ANIMATION) {
@@ -623,7 +629,7 @@ bool CMap::findspawnpoint(short iType, short * x, short * y, short width, short 
     }
 
     //Check to see if we are spawning into a temporary (falling) platform
-    std::list<MovingPlatform*>::iterator iterateAll = tempPlatforms.begin(), lim = tempPlatforms.end();
+    auto iterateAll = tempPlatforms.begin(), lim = tempPlatforms.end();
     while (iterateAll != lim) {
         if ((*iterateAll)->IsInNoSpawnZone(*x, *y, width, height))
             return false;
@@ -652,7 +658,7 @@ bool CMap::IsInPlatformNoSpawnZone(short x, short y, short width, short height)
             return true;
     }
 
-    std::list<MovingPlatform*>::iterator iterateAll = tempPlatforms.begin(), lim = tempPlatforms.end();
+    auto iterateAll = tempPlatforms.begin(), lim = tempPlatforms.end();
     while (iterateAll != lim) {
         if ((*iterateAll)->IsInNoSpawnZone(x, y, width, height))
             return true;

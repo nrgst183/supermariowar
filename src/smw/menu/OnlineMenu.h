@@ -1,0 +1,46 @@
+#pragma once
+
+#include "uimenu.h"
+
+#include <string>
+
+class MI_Button;
+class MI_Image;
+class MI_Text;
+class MI_TextField;
+class MI_WrappedText;
+
+/*
+    The entry of the online (rollback netplay) mode: your nickname, hosting a lobby on a port and
+    joining one by address. Errors of hosting and joining are shown at the bottom.
+*/
+class UI_OnlineMenu : public UI_Menu {
+public:
+    UI_OnlineMenu();
+
+    /// Shows the remembered nickname, port and address again (when the menu is opened)
+    void Open();
+
+    void ShowMessage(std::string text);
+    void ClearMessage();
+
+    /// The nickname, the port to host on (0: the default) and the address to join, as entered
+    const std::string& nickname() const;
+    const std::string& address() const;
+    int port() const;
+
+private:
+    MI_TextField* miNameField;
+    MI_TextField* miPortField;
+    MI_Button* miHostButton;
+    MI_TextField* miAddressField;
+    MI_Button* miJoinButton;
+    MI_Button* miBackButton;
+
+    MI_Image* miLeftHeaderBar;
+    MI_Image* miRightHeaderBar;
+    MI_Text* miHeaderText;
+    MI_Text* miHostLabel;
+    MI_Text* miJoinLabel;
+    MI_WrappedText* miMessage;
+};

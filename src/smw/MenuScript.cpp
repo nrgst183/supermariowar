@@ -9,7 +9,6 @@
 #include "GSGameplay.h"
 #include "GameplayStyles.h"
 #include "joystick.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "path.h"
@@ -58,12 +57,6 @@
 #include "menu/options/SoundOptionsMenu.h"
 #include "menu/options/TeamOptionsMenu.h"
 
-#include "menu/network/NetEditServersMenu.h"
-#include "menu/network/NetLobbyMenu.h"
-#include "menu/network/NetNewRoomMenu.h"
-#include "menu/network/NetNewRoomSettingsMenu.h"
-#include "menu/network/NetRoomMenu.h"
-#include "menu/network/NetServersMenu.h"
 
 #include <format>
 #include <string>

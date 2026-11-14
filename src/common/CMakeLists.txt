@@ -32,6 +32,8 @@ add_library(CommonFiles STATIC
     global.cpp
     input.cpp
     input.h
+    InputFrame.cpp
+    InputFrame.h
     joystick.cpp
     joystick.h
     linfunc.cpp
@@ -61,10 +63,16 @@ add_library(CommonFiles STATIC
     path.h
     RandomNumberGenerator.cpp
     RandomNumberGenerator.h
+    RenderFrame.h
+    RenderInterpolation.cpp
+    RenderInterpolation.h
+    Resimulation.h
     ResourceManager.cpp
     ResourceManager.h
     sfx.cpp
     sfx.h
+    SimArena.cpp
+    SimArena.h
     TilesetManager.cpp
     TilesetManager.h
     TileTypes.cpp

@@ -8,7 +8,6 @@
 #include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "ObjectContainer.h"
@@ -262,6 +261,9 @@ void GameplayState::initRunGame()
 
     //Reset the keys each time we switch from menu to game and back
     game_values.playerInput.ResetKeys();
+    resetTickInput();
+    g_sim.tick = 0;
+    g_sim.gameoverTick = -1;
 
 
     createPlayers();

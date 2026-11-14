@@ -133,7 +133,7 @@ void CGameValues::init()
     showfps       = false;
     frameadvance    = false;
     autokill      = false;
-    framelimiter    = WAITTIME;
+    framelimiter    = static_cast<short>(FrameRateMode::VSync);
     sound       = true;
     music       = true;
     appstate     = AppState::Splash;
@@ -220,9 +220,6 @@ void CGameValues::init()
     piFilterIcons.resize(NUM_AUTO_FILTERS + filterslist->count(), 0);
     fNeedWriteFilters = false;
 
-    //networktype   = 0;
-    //networkhost   = false;
-    //gamehost      = false;
 
     for (short iPlayer = 0; iPlayer < 4; iPlayer++) {
         storedpowerups[iPlayer] = -1;

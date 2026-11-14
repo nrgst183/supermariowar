@@ -20,6 +20,8 @@ public:
     Minigame GetMinigame() const;
     void SetMinigame(Minigame minigame);
     MatchType GetSelectedMatchType() const;
+    /// Online lobby: only single games and minigames can be played online
+    void SetOnlineMode(bool online, bool minigame);
 
 private:
     MI_Image* miMatchSelectionDisplayImage;

@@ -22,7 +22,8 @@ public:
     void slowDescent(CPlayer& player);
 
     bool isInUse() const;
-    void draw(CPlayer& player);
+    void update(CPlayer& player);
+    void draw(const CPlayer& player) const;
 
 private:
     int8_t iTailTimer;

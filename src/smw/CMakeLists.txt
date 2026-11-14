@@ -13,28 +13,23 @@ add_executable(smw WIN32
 	GameplayDebug.cpp
 	GameplayDraw.cpp
 	GameplayEffects.cpp
+	GameplayInterpolation.cpp
+	GameplayInterpolation.h
 	GameplayMapObjects.cpp
-	GameplayNetwork.cpp
 	GameplayPause.cpp
+	NetOverlay.cpp
+	NetOverlay.h
 	GameplayScoreboard.cpp
 	GameplaySetup.cpp
+	GameplayTick.cpp
 	GSMenu.cpp
 	GSMenu.h
 	MenuAutoTest.cpp
+	MenuOnline.cpp
 	MenuScript.cpp
 	MenuStartGame.cpp
 	GSSplashScreen.cpp
 	GSSplashScreen.h
-	net.cpp
-	NetClientGame.cpp
-	NetClientRoom.cpp
-	NetGameHost.cpp
-	NetInternal.h
-	net.h
-	network/FileCompressor.cpp
-	network/FileCompressor.h
-	network/NetConfigManager.cpp
-	network/NetConfigManager.h
 	ObjectContainer.cpp
 	ObjectContainer.h
 	objectgame.cpp
@@ -61,17 +56,15 @@ add_subdirectory(world)
 add_subdirectory(menu)
 add_subdirectory(gamemodes)
 add_subdirectory(objects)
+add_subdirectory(rollback)
 add_subdirectory(ui)
 
 target_compile_features(smw PUBLIC cxx_std_14)
 
+# NO_NETWORK builds (Emscripten, Android) leave out the rollback netplay's
+# ENet parts (see rollback/CMakeLists.txt); NetGame.cpp checks this define
 if(NO_NETWORK)
 	target_compile_definitions(smw PRIVATE NETWORK_DISABLED)
-else()
-	target_sources(smw PRIVATE
-		platform/network/enet/NetworkLayerENet.cpp
-		platform/network/enet/NetworkLayerENet.h
-	)
 endif()
 
 if (WIN32)
@@ -84,9 +77,6 @@ endif()
 #
 
 target_link_libraries(smw CommonFiles)
-if(NOT NO_NETWORK)
-	target_link_libraries(smw NetplayFiles)
-endif()
 
 if(NOT EMSCRIPTEN)
 	target_link_libraries(smw smw_zlib)

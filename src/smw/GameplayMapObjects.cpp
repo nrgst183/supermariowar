@@ -8,7 +8,6 @@
 #include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "ObjectContainer.h"
@@ -146,6 +145,9 @@ IO_Block* spawnMapBlock(short typeId, Vec2s drawPos, const MapBlock& objdata, co
 
 void LoadMapObjects(bool fPreview)
 {
+    // A new match starts here: restart the deterministic object ids
+    CObject::resetNetworkIds();
+
     LoadMapHazards(fPreview);
 
     //Clear all the previous switch settings

@@ -20,10 +20,10 @@ private:
 
     MI_Button* miMainStartButton;
     MI_Button* miQuickGameButton;
-    MI_Button* miMultiplayerButton;
 
     MI_PlayerSelect* miPlayerSelect;
 
+    MI_Button* miOnlineButton = nullptr;
     MI_Button* miOptionsButton;
     MI_Button* miControlsButton;
 

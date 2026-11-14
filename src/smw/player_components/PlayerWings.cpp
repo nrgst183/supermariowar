@@ -1,19 +1,26 @@
 #include "PlayerWings.h"
 
 #include "../player.h"
+#include "PlayerRenderState.h"
+#include "RenderFrame.h"
 
 #include "ResourceManager.h"
 
-void PlayerWings::reset()
+void PlayerWings::reset(CPlayer& player)
 {
-    iWingsTimer = 0;
-    iWingsFrame = 0;
+    PlayerRenderState& anim = playerRenderState(player);
+    anim.wingsTimer = 0;
+    anim.wingsFrame = 0;
 }
 
 void PlayerWings::draw(CPlayer &player)
 {
+    PlayerRenderState& anim = playerRenderState(player);
+    unsigned char& iWingsTimer = anim.wingsTimer;
+    unsigned short& iWingsFrame = anim.wingsFrame;
+
     if (player.flying) {
-        if (++iWingsTimer >= 8) {
+        if (render::advancesAnimations() && ++iWingsTimer >= 8) {
             iWingsTimer = 0;
             iWingsFrame += 26;
 

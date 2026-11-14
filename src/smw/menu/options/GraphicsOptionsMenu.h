@@ -19,12 +19,14 @@ public:
 
 private:
     MI_SelectField<bool>* miTopLayerField;
-    MI_SelectField<short>* miFrameLimiterField;
+    MI_SelectField<short>* miFrameRateField;
+    MI_SelectField<bool>* miSmoothMotionField;
     MI_SelectField<bool>* miFullscreenField;
 
     MI_PacksField* miMenuGraphicsPackField;
     MI_PacksField* miWorldGraphicsPackField;
     MI_PacksField* miGameGraphicsPackField;
+    MI_SelectField<bool>* miNetStatsField;
     MI_Button* miGraphicsOptionsMenuBackButton;
 
     MI_Image* miGraphicsOptionsMenuLeftHeaderBar;

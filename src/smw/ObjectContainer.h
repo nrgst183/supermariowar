@@ -2,6 +2,7 @@
 
 #include "MovingObjectTypes.h"
 #include "ObjectBase.h"
+#include "SimArena.h"
 
 #include <memory>
 #include <vector>
@@ -40,12 +41,13 @@ public:
     size_t countTypes(ObjectType type) const;
     size_t countMovingTypes(MovingObjectType type) const;
 
-    const std::vector<std::unique_ptr<CObject>>& list() const { return m_list; }
+    using List = sim::vector<std::unique_ptr<CObject>>;
+    const List& list() const { return m_list; }
 
 private:
     static constexpr size_t MAXOBJECTS = 300;
 
     bool addObject(std::unique_ptr<CObject> obj);
 
-    std::vector<std::unique_ptr<CObject>> m_list;
+    List m_list;    // the buffer lives in the simulation arena
 };

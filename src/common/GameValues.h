@@ -81,6 +81,26 @@ struct GameplayFlags {
 };
 
 
+// How often the game renders, stored in CGameConfig::framelimiter (a byte in
+// the old options.bin). The simulation always ticks every 16 ms (62.5 Hz).
+// Any other value (e.g. an old frame delay) means VSync.
+enum class FrameRateMode : short {
+    VSync = 200,        // render once per display refresh
+    Uncapped = 201,     // render as often as possible
+    TickRate = 202,     // render once per tick (62.5 FPS), the lightest
+};
+
+inline FrameRateMode GetFrameRateMode(short framelimiter)
+{
+    switch (static_cast<FrameRateMode>(framelimiter)) {
+        case FrameRateMode::Uncapped:
+        case FrameRateMode::TickRate:
+            return static_cast<FrameRateMode>(framelimiter);
+        default:
+            return FrameRateMode::VSync;
+    }
+}
+
 // the real configuration class
 class CGameConfig {
 public:
@@ -112,7 +132,7 @@ public:
     short		featherlimit;
     short		suicidetime;
     bool		deadteamnotice;
-    short		framelimiter;
+    short		framelimiter;   // how rendering is paced, see FrameRateMode
     short		hiddenblockrespawn;
     CInputPlayerControl inputConfiguration[4][2]; //[NumPlayers][Keyboard/Joystick]
     short		itemrespawntime;
@@ -142,6 +162,8 @@ public:
     TournamentControlStyle tournamentcontrolstyle;  //ID for the player selected control style
     short		wandfreezetime;
     bool		toplayer;
+    bool		smoothmotion = true;    // draw moving things between ticks (interpolated)
+    bool		shownetstats = false;   // online: the network info line (ping, input delay, rollbacks)
     bool		teamcolors;
     bool		sound;
     bool		startgamecountdown;
@@ -149,6 +171,10 @@ public:
     short		storedpowerupdelay;
     MysteryMushroomSwapStyle swapstyle;
     short		respawn;
+    // Online menu: remembered between runs
+    std::string	onlinename;      // nickname in the lobby
+    std::string	onlineaddress;   // last "ip[:port]" joined
+    std::string	onlineport = "7300";   // port to host on
 
     void ReadConfig();
     void WriteConfig() const;

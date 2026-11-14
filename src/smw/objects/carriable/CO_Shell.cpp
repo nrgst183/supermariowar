@@ -4,6 +4,7 @@
 #include "GameValues.h"
 #include "map.h"
 #include "player.h"
+#include "RenderFrame.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "objects/carriable/CO_ThrowBlock.h"
@@ -57,8 +58,6 @@ CO_Shell::CO_Shell(ShellType type, Vec2s pos, bool dieOnMovingPlayerCollision, b
     frozentimer = 0;
     frozenvelocity = 0.0f;
     frozenanimationspeed = 4;
-
-    sSpotlight = nullptr;
 }
 
 bool CO_Shell::collide(CPlayer* player)
@@ -353,15 +352,9 @@ void CO_Shell::update()
 
     if (game_values.spotlights) {
         if (state == 1) {
-            if (!sSpotlight) {
-                sSpotlight = spotlightManager.AddSpotlight(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
-            }
-
-            if (sSpotlight) {
-                sSpotlight->UpdatePosition(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1));
-            }
+            spotlightManager.track(this, iNetworkID, ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
         } else {
-            sSpotlight = nullptr;
+            spotlightManager.release(this, iNetworkID);
         }
     }
 }
@@ -384,7 +377,7 @@ void CO_Shell::draw()
 
     if (frozen) {
         rm->spr_iceblock.draw(ix - collisionOffsetX, iy - collisionOffsetY, {0, 0, 32, 32});
-    } else if (fSmoking) {
+    } else if (fSmoking && render::advancesAnimations()) {
         eyecandy[0].emplace<EC_SingleAnimation>(&rm->spr_burnup, ix - collisionOffsetX + (iw >> 1) - 16, iy - collisionOffsetY + (ih >> 1) - 16, 5, 3);
     }
 }

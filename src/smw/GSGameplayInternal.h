@@ -15,6 +15,11 @@ extern int exitgametimer;
 short LookupTeamID(short id, short* teamID, short* subTeamID);
 short GetModeIconIndexFromMode(short iMode);
 void CleanUp();
+void update_playerswap();
+
+// Defined in GameplayTick.cpp
+void updateWind();
+void updateForceExitTimer();
 
 // Defined in GameplayEffects.cpp
 void checkWindEvent(short& iWindTimer, float& dNextWind);
@@ -38,10 +43,6 @@ bool updateExitPauseDialog(short iCountDownState); // true on exit
 
 // Defined in GameplayScoreboard.cpp
 void updateScoreboardAnimation();
-
-// Defined in GameplayNetwork.cpp
-void network_send_local_input();
-void network_broadcast_game_state();
 
 #ifdef _DEBUG
 // Defined in GameplayDebug.cpp

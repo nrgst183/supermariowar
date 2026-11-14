@@ -11,6 +11,10 @@ target_sources(smw PRIVATE
     MapFilterEditMenu.h
     MatchSelectionMenu.cpp
     MatchSelectionMenu.h
+    OnlineLobbyMenu.cpp
+    OnlineLobbyMenu.h
+    OnlineMenu.cpp
+    OnlineMenu.h
     OptionsMenu.cpp
     OptionsMenu.h
     PlayerControlsMenu.cpp
@@ -45,16 +49,4 @@ target_sources(smw PRIVATE
     options/TeamOptionsMenu.cpp
     options/TeamOptionsMenu.h
 
-    network/NetEditServersMenu.cpp
-    network/NetEditServersMenu.h
-    network/NetLobbyMenu.cpp
-    network/NetLobbyMenu.h
-    network/NetNewRoomMenu.cpp
-    network/NetNewRoomMenu.h
-    network/NetNewRoomSettingsMenu.cpp
-    network/NetNewRoomSettingsMenu.h
-    network/NetRoomMenu.cpp
-    network/NetRoomMenu.h
-    network/NetServersMenu.cpp
-    network/NetServersMenu.h
 )

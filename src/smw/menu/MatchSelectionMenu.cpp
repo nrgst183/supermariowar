@@ -147,3 +147,19 @@ MatchType UI_MatchSelectionMenu::GetSelectedMatchType() const
 {
     return miMatchSelectionField->currentValue();
 }
+
+void UI_MatchSelectionMenu::SetOnlineMode(bool online, bool minigame)
+{
+    if (online)
+        miMatchSelectionField->setCurrentValue(minigame ? MatchType::MiniGame : MatchType::SingleGame);
+
+    miMatchSelectionField->hideItem(MatchType::Tournament, online);
+    miMatchSelectionField->hideItem(MatchType::Tour, online);
+    miMatchSelectionField->hideItem(MatchType::World, online);
+
+    miMatchSelectionMenuHeaderText->SetText(online ? "Online Match Type Menu" : "Match Type Menu");
+    miMatchSelectionStartButton->SetName(online ? "Next" : "Start");
+
+    if (online)
+        SelectionChanged();
+}

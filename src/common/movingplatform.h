@@ -3,6 +3,8 @@
 
 #include "map.h"
 #include "MovingPlatformPaths.h"
+#include "RenderInterpolation.h"
+#include "SimArena.h"
 
 #include <array>
 
@@ -10,10 +12,16 @@ class CPlayer;
 class IO_MovingObject;
 
 
-class MovingPlatform
+// Moving platforms are simulation state: they live in the simulation arena
+// (see SimArena.h), like their paths and the temporary platforms' list.
+class MovingPlatform : public sim::ArenaAllocated
 {
 	public:
-		MovingPlatform(std::vector<TilesetTile>&& tiledata, std::vector<TileType>&& tiletypes, short w, short h, short drawlayer, MovingPlatformPath * path, bool preview);
+		MovingPlatform(const std::vector<TilesetTile>& tiledata, const std::vector<TileType>& tiletypes, short w, short h, short drawlayer, MovingPlatformPath * path, bool preview);
+		// A solid platform of w x h tiles drawn with `sprite` (a loaded
+		// resource, not owned), without prerendered surfaces. Used for the
+		// temporary platforms created during a match (falling donut blocks).
+		MovingPlatform(const gfxSprite& sprite, short w, short h, short drawlayer, MovingPlatformPath * path);
 		~MovingPlatform();
 
 		void draw();
@@ -55,7 +63,11 @@ class MovingPlatform
     const TilesetTile& tileAt(size_t col, size_t row) const;
     TileType tileTypeAt(size_t col, size_t row) const;
 
-    void paintSpriteAt(const gfxSprite& spr, size_t col, size_t row);
+
+    // Render-only (smooth motion, see RenderInterpolation.h); the simulation never reads these
+    RenderPosition renderPosition() const { return {fx, fy, ix, iy}; }
+    void setRenderPosition(const RenderPosition& pos) { fx = pos.fx; fy = pos.fy; ix = pos.ix; iy = pos.iy; }
+    RenderPrevious renderPrevious;
 
 	protected:
 
@@ -67,8 +79,8 @@ class MovingPlatform
 
 		bool collision_detection_check_sides(IO_MovingObject * object);
 
-		std::vector<TilesetTile> iTileData;
-		std::vector<TileType> iTileType;
+		sim::vector<TilesetTile> iTileData;
+		sim::vector<TileType> iTileType;
 		short ix, iy;
 		short iWidth, iHeight;
 		short iTileWidth, iTileHeight;
@@ -83,10 +95,13 @@ class MovingPlatform
 		short iSteps;
 		short iOnStep;
 
+		//The prerendered tiles (front and back buffer of the tile animation),
+		//created when the map is loaded. Empty for a platform drawn with
+		//customSprite.
 		std::array<gfxSprite, 2> sprites;
+		const gfxSprite* customSprite = nullptr;
 
 		SDL_Rect	rSrcRect;
-		SDL_Rect    rDstRect;
 
 		bool fForwardDirection;
 		bool fStartDirection;

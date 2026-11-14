@@ -12,7 +12,6 @@
 #include <cstdlib>
 
 
-constexpr int GFX_BPP = 16;
 constexpr int GFX_SCREEN_W = 640;
 constexpr int GFX_SCREEN_H = 480;
 
@@ -149,12 +148,39 @@ void GraphicsSDL::flipScreen() const
     SDL_RenderPresent(sdl_renderer);
 }
 
+bool GraphicsSDL::setVSync(bool enabled) const
+{
+    if (!SDL_SetRenderVSync(sdl_renderer, enabled ? 1 : 0)) {
+        if (enabled)
+            fprintf(stderr, "[gfx] Couldn't enable VSync: %s\n", SDL_GetError());
+        return false;
+    }
+
+    int vsync = 0;
+    return SDL_GetRenderVSync(sdl_renderer, &vsync) && (vsync != 0) == enabled;
+}
+
+float GraphicsSDL::refreshRate() const
+{
+    const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(sdl_window));
+    return mode ? mode->refresh_rate : 0.0f;
+}
+
 void GraphicsSDL::changeFullScreen(bool fullscreen) const
 {
     if (!SDL_SetWindowFullscreen(sdl_window, fullscreen)) {
         fprintf(stderr, "[gfx] Couldn't toggle fullscreen mode: %s\n", SDL_GetError());
         return;
     }
+}
+
+bool GraphicsSDL::saveScreenshot(const std::string& path) const
+{
+    if (IMG_SavePNG(sdl_screen_surface, path.c_str()) != 0) {
+        fprintf(stderr, "[gfx] Couldn't write the screenshot to file: %s\n", SDL_GetError());
+        return false;
+    }
+    return true;
 }
 
 void GraphicsSDL::takeScreenshot() const

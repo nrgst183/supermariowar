@@ -66,7 +66,11 @@ void CGM_Boss_MiniGame::think()
         } else if (iBossType == Boss::Fire) {
             //Only create podobos if the difficulty is moderate or greater
             if (--enemytimer <= 0 && game_values.gamemodesettings.boss.difficulty >= 2) {
-                g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {static_cast<short>(RANDOM_INT(App::screenWidth * 0.95f)), App::screenHeight}, -(float(RANDOM_INT(9)) / 2.0f) - 9.0f, -1, -1, -1, false));
+                // Draw random numbers in separate statements: argument evaluation order is
+                // unspecified in C++, and every peer must draw them in the same order
+                const short podoboX = static_cast<short>(RANDOM_INT(App::screenWidth * 0.95f));
+                const float podoboVelY = -(float(RANDOM_INT(9)) / 2.0f) - 9.0f;
+                g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {podoboX, App::screenHeight}, podoboVelY, -1, -1, -1, false));
                 enemytimer = static_cast<short>(RANDOM_INT(80) + 60);
             }
 

@@ -4,6 +4,7 @@
 #include "GameValues.h"
 #include "objectgame.h"
 #include "player.h"
+#include "RenderFrame.h"
 #include "ResourceManager.h"
 
 #include <cmath>
@@ -36,10 +37,12 @@ const STextAward awardtexts[PAWARD_LAST] = {
 
 void PlayerAwardEffects::drawRingAward(CPlayer& player)
 {
-    awardangle += 0.02f;
+    if (render::advancesAnimations()) {
+        playerRenderState(player).awardAngle += 0.02f;
 
-    if (awardangle > TWO_PI)
-        awardangle -= TWO_PI;
+        if (playerRenderState(player).awardAngle > TWO_PI)
+            playerRenderState(player).awardAngle -= TWO_PI;
+    }
 
     short numawards = (player.killsinrow > MAXAWARDS ? MAXAWARDS : player.killsinrow);
     float addangle = TWO_PI / static_cast<float>(numawards);
@@ -48,7 +51,7 @@ void PlayerAwardEffects::drawRingAward(CPlayer& player)
     short yoffset = player.centerY() - 8;
 
     for (short k = 0; k < numawards; k++) {
-        float angle = static_cast<float>(k) * addangle + awardangle;
+        float angle = static_cast<float>(k) * addangle + playerRenderState(player).awardAngle;
         short awardx = xoffset + static_cast<short>(30.0f * cos(angle));
         short awardy = yoffset + static_cast<short>(30.0f * sin(angle));
 
@@ -70,7 +73,7 @@ void PlayerAwardEffects::addExploding(CPlayer& player)
     float addangle = TWO_PI / static_cast<float>(numawards);
 
     for (short k = 0; k < numawards; k++) {
-        float angle = static_cast<float>(k) * addangle + awardangle;
+        float angle = static_cast<float>(k) * addangle + playerRenderState(player).awardAngle;
         float cosangle = cos(angle);
         float sinangle = sin(angle);
 
@@ -95,7 +98,7 @@ void PlayerAwardEffects::addSwirling(CPlayer& player)
     float addangle = TWO_PI / static_cast<float>(numawards);
 
     for (short k = 0; k < numawards; k++) {
-        float angle = static_cast<float>(k) * addangle + awardangle;
+        float angle = static_cast<float>(k) * addangle + playerRenderState(player).awardAngle;
 
         if (numawards == MAXAWARDS)
             eyecandy[2].emplace<EC_SwirlingAward>(&rm->spr_awardkillsinrow, player.centerX() - 8, player.centerY() - 8, angle, 30.0f, 0.05f, 60, 10, player.getColorID(), 16, 16, 4, 4);

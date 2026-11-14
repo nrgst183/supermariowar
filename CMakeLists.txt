@@ -61,6 +61,10 @@ endif()
 #
 #-----------------------------------------------------------------------------
 
+# Don't create the CTest dashboard targets (Continuous, Experimental, Nightly...)
+# here or in the dependencies; they would only clutter IDE project lists
+set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED 1)
+
 include(BundledDeps)
 
 #-----------------------------------------------------------------------------
@@ -213,18 +217,12 @@ message("    Docs dir:    ${SMW_DOCDIR}")
 #
 
 include_directories(src/common)
-include_directories(src/common_netplay)
 include_directories(src/smw)
 
 add_subdirectory(src/common)
-add_subdirectory(src/common_netplay)
 add_subdirectory(src/smw)
 add_subdirectory(src/leveleditor)
 add_subdirectory(src/worldeditor)
-
-if(NOT NO_NETWORK)
-	add_subdirectory(src/server)
-endif()
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTS)
 	include(CTest)
@@ -244,6 +242,65 @@ if (CMAKE_GENERATOR MATCHES "Visual Studio")
 		)
 	endforeach()
 endif()
+
+# Copy the game data next to the executables, so the built game and editors
+# also run when started directly (e.g. by double-clicking smw.exe in
+# build/vs/Debug). Only changed files are copied on later builds.
+set(SMW_COPY_DATA_DEFAULT OFF)
+if (CMAKE_GENERATOR MATCHES "Visual Studio")
+	set(SMW_COPY_DATA_DEFAULT ON)
+endif()
+option(SMW_COPY_DATA_TO_BUILD "Copy the data folder next to the built executables" ${SMW_COPY_DATA_DEFAULT})
+
+if (SMW_COPY_DATA_TO_BUILD)
+	if (CMAKE_VERSION VERSION_GREATER_EQUAL 3.26)
+		set(smw_copy_dir_command copy_directory_if_different)
+	else()
+		set(smw_copy_dir_command copy_directory)
+	endif()
+	add_custom_target(copy-data
+		COMMAND ${CMAKE_COMMAND} -E ${smw_copy_dir_command} "${PROJECT_SOURCE_DIR}/data" "$<TARGET_FILE_DIR:smw>/data"
+		COMMENT "Copying game data next to the executables"
+		VERBATIM
+	)
+	set_property(TARGET copy-data PROPERTY FOLDER "Utility")
+	foreach(smw_target IN ITEMS smw smw-leveledit smw-worldedit)
+		add_dependencies(${smw_target} copy-data)
+	endforeach()
+endif()
+
+# IDE folders (Visual Studio, Xcode): keep the game's own projects at the top
+# level and collect the bundled third-party libraries in a "Dependencies" folder
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+function(smw_set_folder_recursive dir folder)
+	get_property(dir_targets DIRECTORY "${dir}" PROPERTY BUILDSYSTEM_TARGETS)
+	foreach(dir_target IN LISTS dir_targets)
+		set_property(TARGET ${dir_target} PROPERTY FOLDER "${folder}")
+	endforeach()
+	get_property(subdirs DIRECTORY "${dir}" PROPERTY SUBDIRECTORIES)
+	foreach(subdir IN LISTS subdirs)
+		smw_set_folder_recursive("${subdir}" "${folder}")
+	endforeach()
+endfunction()
+
+set(smw_src_dir "${PROJECT_SOURCE_DIR}/src")
+set(smw_tests_dir "${PROJECT_SOURCE_DIR}/tests")
+get_property(smw_top_subdirs DIRECTORY "${PROJECT_SOURCE_DIR}" PROPERTY SUBDIRECTORIES)
+foreach(subdir IN LISTS smw_top_subdirs)
+	# Only src/ and tests/ hold the game's own projects; everything else
+	# (FetchContent checkouts under _deps, doctest) is third-party code
+	cmake_path(IS_PREFIX smw_src_dir "${subdir}" NORMALIZE is_src)
+	cmake_path(IS_PREFIX smw_tests_dir "${subdir}" NORMALIZE is_tests)
+	if (NOT is_src AND NOT is_tests)
+		smw_set_folder_recursive("${subdir}" "Dependencies")
+	endif()
+endforeach()
+foreach(smw_lib IN ITEMS CommonFiles)
+	if (TARGET ${smw_lib})
+		set_property(TARGET ${smw_lib} PROPERTY FOLDER "Libraries")
+	endif()
+endforeach()
 
 #-----------------------------------------------------------------------------
 #

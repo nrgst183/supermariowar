@@ -32,7 +32,6 @@ CO_ThrowBox::CO_ThrowBox(gfxSprite* nspr, Vec2s pos, short item)
     frozentimer = 0;
     frozenanimationspeed = 8;
 
-    sSpotlight = nullptr;
 }
 
 bool CO_ThrowBox::collide(CPlayer* player)
@@ -142,13 +141,7 @@ void CO_ThrowBox::update()
     animate();
 
     if (game_values.spotlights && HasKillVelocity()) {
-        if (!sSpotlight) {
-            sSpotlight = spotlightManager.AddSpotlight(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
-        }
-
-        if (sSpotlight) {
-            sSpotlight->UpdatePosition(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1));
-        }
+        spotlightManager.track(this, iNetworkID, ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
     }
 }
 

@@ -5,6 +5,7 @@
 #include <map>
 
 #include "Game.h"
+#include "SimArena.h"
 
 class CObject;
 class CPlayer;
@@ -57,13 +58,14 @@ public:
     bool threatwrap;
 };
 
-struct AttentionObject {
+struct AttentionObject : sim::ArenaAllocated {
     int iID;	  //Global ID of this object
     short iType;  //Ignore it, high priority, etc.
     short iTimer;  //When it the attention expires, 0 for never
 };
 
-class CPlayerAI
+// Simulation state: lives in the simulation arena (see SimArena.h)
+class CPlayerAI : public sim::ArenaAllocated
 {
 public:
     CPlayerAI();
@@ -89,7 +91,7 @@ private:
     short iFallDanger = 0;
     NearestObjects nearestObjects;
 
-    std::map<int, AttentionObject*> attentionObjects;
+    sim::map<int, AttentionObject*> attentionObjects;
     AttentionObject currentAttentionObject;
 };
 

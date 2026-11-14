@@ -20,8 +20,7 @@ private:
     void addSwirling(CPlayer&);
     void addRocket(CPlayer&);
 
-    float awardangle;
-    short awards[MAXAWARDS];
+    short awards[MAXAWARDS];    // the angle of the ring is cosmetic, see PlayerRenderState
 };
 
 

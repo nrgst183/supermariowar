@@ -3,15 +3,12 @@
 
 class CPlayer;
 
+// The wings' animation state is cosmetic and lives in PlayerRenderState
 class PlayerWings
 {
 public:
-    void reset();
+    void reset(CPlayer& player);
     void draw(CPlayer& player);
-
-private:
-    unsigned char iWingsTimer;
-    unsigned short iWingsFrame;
 };
 
 #endif // PLAYER_WINGS

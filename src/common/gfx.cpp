@@ -180,6 +180,14 @@ void gfx_flipscreen() {
     gfx.flipScreen();
 }
 
+bool gfx_setvsync(bool enabled) {
+    return gfx.setVSync(enabled);
+}
+
+float gfx_refreshrate() {
+    return gfx.refreshRate();
+}
+
 void gfx_settitle(const char* title) {
     gfx.setTitle(title);
 }
@@ -201,6 +209,10 @@ void gfx_show_catched_error(const std::string& error)
 
 void gfx_take_screenshot() {
     gfx.takeScreenshot();
+}
+
+bool gfx_save_screenshot(const std::string& path) {
+    return gfx.saveScreenshot(path);
 }
 
 void gfx_close() {}

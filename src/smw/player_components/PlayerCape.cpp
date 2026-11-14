@@ -1,34 +1,37 @@
 #include "PlayerCape.h"
 
 #include "../player.h"
+#include "PlayerRenderState.h"
 
 #include "GameValues.h"
 #include "GlobalConstants.h"
+#include "RenderFrame.h"
 #include "ObjectContainer.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "objects/moving/MO_SpinAttack.h"
 
 
-void PlayerCape::reset()
+void PlayerCape::reset(CPlayer& player)
 {
-    iCapeTimer = 0;
-    iCapeFrameX = 0;
-    iCapeFrameY = 0;
-    fCapeUp = false;
-    iCapeYOffset = 0;
+    PlayerRenderState& anim = playerRenderState(player);
+    anim.capeTimer = 0;
+    anim.capeFrameX = 0;
+    anim.capeFrameY = 0;
+    anim.capeUp = false;
+    anim.capeYOffset = 0;
 }
 
-void PlayerCape::restart_animation()
+void PlayerCape::restart_animation(CPlayer& player)
 {
-    iCapeTimer = 4;
+    playerRenderState(player).capeTimer = 4;
 }
 
 void PlayerCape::spin(CPlayer &player)
 {
     ifSoundOnPlay(rm->sfx_tailspin);
 
-    restart_animation(); //Add one extra frame to sync with spinning player sprite
+    restart_animation(player); //Add one extra frame to sync with spinning player sprite
 
     player.spin.spin(player);
 
@@ -38,8 +41,14 @@ void PlayerCape::spin(CPlayer &player)
 void PlayerCape::draw(CPlayer &player)
 {
     /* See eyecandy/cape.png for reference */
+    PlayerRenderState& anim = playerRenderState(player);
+    unsigned char& iCapeTimer = anim.capeTimer;
+    unsigned short& iCapeFrameX = anim.capeFrameX;
+    unsigned short& iCapeFrameY = anim.capeFrameY;
+    bool& fCapeUp = anim.capeUp;
+    short& iCapeYOffset = anim.capeYOffset;
 
-    if (++iCapeTimer > 3) {
+    if (render::advancesAnimations() && ++iCapeTimer > 3) {
         if (player.spin.isSpinInProgress()) {
             iCapeFrameX = player.spin.toCapeFrameX();
             iCapeFrameY = 32;

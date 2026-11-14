@@ -1,5 +1,7 @@
 #include "sfx.h"
 
+#include "Resimulation.h"
+
 #include <SDL3/SDL.h>
 
 #include <cassert>
@@ -223,6 +225,9 @@ sfxSound::sfxSound(const fs::path& path)
 
 bool sfxSound::play()
 {
+    if (sim::isResimulating())
+        return false;
+
     const Uint32 current_time = SDL_GetTicks();
     if (current_time - m_last_start_time < 40)
         return false;
@@ -237,12 +242,18 @@ bool sfxSound::play()
 
 void sfxSound::playLoop(int loops)
 {
+    if (sim::isResimulating())
+        return;
+
     const auto [track_ptr, track_idx] = s_audiosys->playAsEffect(m_audio, loops);
     m_channels.set(track_idx);
 }
 
 void sfxSound::stop()
 {
+    if (sim::isResimulating())
+        return;
+
     for (size_t i = 0; i < m_channels.size(); i++) {
         if (m_channels.test(i)) {
             s_audiosys->stopEffectTrack(i);
@@ -268,11 +279,17 @@ sfxMusic::sfxMusic(const fs::path& path)
 {}
 
 void sfxMusic::play(bool fPlayonce, bool fResume) {
+    if (sim::isResimulating())
+        return;
+
     s_audiosys->playAsMusic(m_audio, fPlayonce ? 0 : -1);
     fResumeMusic = fResume;
 }
 
 void sfxMusic::stop() {
+    if (sim::isResimulating())
+        return;
+
     s_audiosys->stopMusicTrack();
 }
 

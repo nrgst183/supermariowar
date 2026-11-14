@@ -4,7 +4,6 @@
 
 class CPlayer;
 class gfxSprite;
-class Spotlight;
 
 class CO_Bomb : public MO_CarriedObject {
 public:
@@ -21,6 +20,4 @@ public:
 protected:
     short iColorOffsetY;
     short ttl;
-
-    Spotlight* sSpotlight;
 };

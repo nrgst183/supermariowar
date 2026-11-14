@@ -2,7 +2,6 @@
 
 #include "eyecandy.h"
 #include "GameValues.h"
-#include "net.h"
 #include "ObjectContainer.h"
 #include "player.h"
 #include "RandomNumberGenerator.h"
@@ -182,13 +181,6 @@ void CGameMode::init()  //called once when the game is started
 
 void CGameMode::think()
 {
-    if (netplay.active) {
-        for (size_t k = 0; k < g_sim.players.size(); k++) {
-            if (netplay.player_disconnected[k])
-                g_sim.players[k]->spawnText("Disconnected!");
-        }
-    }
-
     if (gameover)
         displayplayertext();
 }

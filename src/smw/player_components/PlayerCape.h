@@ -3,20 +3,14 @@
 
 class CPlayer;
 
+// The cape's animation state is cosmetic and lives in PlayerRenderState
 class PlayerCape
 {
 public:
-    void reset();
-    void restart_animation();
+    void reset(CPlayer& player);
+    void restart_animation(CPlayer& player);
     void spin(CPlayer& player);
     void draw(CPlayer& player);
-
-private:
-    unsigned char iCapeTimer;
-    unsigned short iCapeFrameX;
-    unsigned short iCapeFrameY;
-    bool fCapeUp;
-    short iCapeYOffset;
 };
 
 

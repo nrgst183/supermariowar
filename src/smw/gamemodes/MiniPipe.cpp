@@ -43,7 +43,8 @@ void CGM_Pipe_MiniGame::think()
     }
 
     if (--iNextItemTimer <= 0) {
-        const Vec2f vel(static_cast<float>(RANDOM_INT(21) - 10) / 2.0f, -(static_cast<float>(RANDOM_INT(11)) / 2.0f + 7.0f));
+        // Brace initialization evaluates left to right, so every peer draws x before y
+        const Vec2f vel{static_cast<float>(RANDOM_INT(21) - 10) / 2.0f, -(static_cast<float>(RANDOM_INT(11)) / 2.0f + 7.0f)};
         const Vec2s pos(304, 256);
 
         if (iBonusType == 0 || iBonusType == 2 || iBonusType == 4) {

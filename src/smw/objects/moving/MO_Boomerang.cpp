@@ -51,7 +51,6 @@ MO_Boomerang::MO_Boomerang(gfxSprite* nspr, Vec2s pos, short iNumSpr, bool moveT
 
     fObjectCollidesWithMap = false;
 
-    sSpotlight = nullptr;
 }
 
 void MO_Boomerang::update()
@@ -254,13 +253,7 @@ void MO_Boomerang::update()
     }
 
     if (game_values.spotlights) {
-        if (!sSpotlight) {
-            sSpotlight = spotlightManager.AddSpotlight(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
-        }
-
-        if (sSpotlight) {
-            sSpotlight->UpdatePosition(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1));
-        }
+        spotlightManager.track(this, iNetworkID, ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
     }
 }
 

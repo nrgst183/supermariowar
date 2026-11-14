@@ -2,7 +2,6 @@
 
 #include "MovingObject.h"
 
-class Spotlight;
 
 
 class MO_IceBlast : public IO_MovingObject {
@@ -15,5 +14,4 @@ public:
 
 private:
     short ttl;
-    Spotlight* sSpotlight;
 };

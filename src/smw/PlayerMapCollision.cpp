@@ -6,7 +6,6 @@
 #include "GSGameplay.h"
 #include "map.h"
 #include "movingplatform.h"
-#include "net.h"
 #include "ObjectContainer.h"
 #include "objectgame.h"
 #include "RandomNumberGenerator.h"
@@ -186,25 +185,19 @@ void CPlayer::mapcolldet_moveHorizontally(short direction)
             return;
         }
 
-        if (netplay.active && netplay.theHostIsMe)
-            netplay.client.local_gamehost.prepareMapCollisionEvent(*this);
-
         bool collisionresult = true;
 
         if (fTopBlockSolid) { // collide with top block
             collisionresult &= topblock->collide(this, counter_direction,
-                netplay.active ? netplay.theHostIsMe || netplay.allowMapCollisionEvent : true);
+                true);
             flipsidesifneeded();
         }
 
         if (fBottomBlockSolid) { // then bottom
             collisionresult &= bottomblock->collide(this, counter_direction,
-                netplay.active ? netplay.theHostIsMe || netplay.allowMapCollisionEvent : true);
+                true);
             flipsidesifneeded();
         }
-
-        if (netplay.active && netplay.theHostIsMe && collisionresult)
-            netplay.client.local_gamehost.sendMapCollisionEvent();
     } else if (superDeathTileBehind || (deathTileBehind && !isInvincible() && !isShielded() && !shyguy)) {
         if (PlayerKillType::NonKill != KillPlayerMapHazard(superDeathTileBehind, KillStyle::Environment, false))
             return;
@@ -258,16 +251,10 @@ void CPlayer::mapcolldet_moveUpward(short txl, short txc, short txr,
     }
 
     if (centerblock && !centerblock->isTransparent()) {
-        if (netplay.active && netplay.theHostIsMe)
-            netplay.client.local_gamehost.prepareMapCollisionEvent(*this);
-
         if (!centerblock->collide(this, 0,
-            netplay.active ? netplay.theHostIsMe || netplay.allowMapCollisionEvent : true)) {
+            true)) {
             if (iVerticalPlatformCollision == 2 && !centerblock->isHidden())
                 KillPlayerMapHazard(true, KillStyle::Environment, true, iPlatformCollisionPlayerId);
-
-            if (netplay.active && netplay.theHostIsMe)
-                netplay.client.local_gamehost.sendMapCollisionEvent();
 
             return;
         }
@@ -299,16 +286,10 @@ void CPlayer::mapcolldet_moveUpward(short txl, short txc, short txr,
     if (leftblock && !leftblock->isTransparent()) { //then left
         bool useBehavior = alignedBlockX == txl || rightblock == nullptr || rightblock->isTransparent() || rightblock->isHidden();
 
-        if (netplay.active && netplay.theHostIsMe)
-            netplay.client.local_gamehost.prepareMapCollisionEvent(*this);
-
         if (!leftblock->collide(this, 0,
-            netplay.active ? (netplay.theHostIsMe || netplay.allowMapCollisionEvent) && useBehavior : useBehavior)) {
+            useBehavior)) {
             if (iVerticalPlatformCollision == 2 && !leftblock->isHidden())
                 KillPlayerMapHazard(true, KillStyle::Environment, true, iPlatformCollisionPlayerId);
-
-            if (netplay.active && netplay.theHostIsMe)
-                netplay.client.local_gamehost.sendMapCollisionEvent();
 
             return;
         }
@@ -317,16 +298,10 @@ void CPlayer::mapcolldet_moveUpward(short txl, short txc, short txr,
     if (rightblock && !rightblock->isTransparent()) { //then right
         bool useBehavior = alignedBlockX == txr || leftblock == nullptr || leftblock->isTransparent() || leftblock->isHidden();
 
-        if (netplay.active && netplay.theHostIsMe)
-            netplay.client.local_gamehost.prepareMapCollisionEvent(*this);
-
         if (!rightblock->collide(this, 0,
-            netplay.active ? (netplay.theHostIsMe || netplay.allowMapCollisionEvent) && useBehavior : useBehavior)) {
+            useBehavior)) {
             if (iVerticalPlatformCollision == 2 && !rightblock->isHidden())
                 KillPlayerMapHazard(true, KillStyle::Environment, true, iPlatformCollisionPlayerId);
-
-            if (netplay.active && netplay.theHostIsMe)
-                netplay.client.local_gamehost.sendMapCollisionEvent();
 
             return;
         }
@@ -389,16 +364,10 @@ void CPlayer::mapcolldet_moveDownward(short txl, short txc, short txr,
 
     if (fLeftBlockSolid || fRightBlockSolid) {
         bool collisionresult = true;
-        if (netplay.active && netplay.theHostIsMe)
-            netplay.client.local_gamehost.prepareMapCollisionEvent(*this);
-
         if (fLeftBlockSolid) { //collide with left block
             bool useBehavior = alignedBlockX == txl || rightblock == nullptr || rightblock->isTransparent() || rightblock->isHidden();
             collisionresult &= leftblock->collide(this, 2,
-                netplay.active ? (netplay.theHostIsMe || netplay.allowMapCollisionEvent) && useBehavior : useBehavior);
-
-            if (netplay.active && netplay.theHostIsMe && collisionresult)
-                netplay.client.local_gamehost.sendMapCollisionEvent();
+                useBehavior);
 
             //If player was bumped and killed then return
             if (state != PlayerState::Ready)
@@ -408,10 +377,7 @@ void CPlayer::mapcolldet_moveDownward(short txl, short txc, short txr,
         if (fRightBlockSolid) { //then right
             bool useBehavior = alignedBlockX == txr || leftblock == nullptr || leftblock->isTransparent() || leftblock->isHidden();
             collisionresult &= rightblock->collide(this, 2,
-                netplay.active ? (netplay.theHostIsMe || netplay.allowMapCollisionEvent) && useBehavior : useBehavior);
-
-            if (netplay.active && netplay.theHostIsMe && collisionresult)
-                netplay.client.local_gamehost.sendMapCollisionEvent();
+                useBehavior);
 
             //If player was bumped and killed then return
             if (state != PlayerState::Ready)

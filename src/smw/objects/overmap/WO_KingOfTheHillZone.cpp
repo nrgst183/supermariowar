@@ -144,8 +144,8 @@ void OMO_KingOfTheHillZone::placeArea()
     multiplier = 1;
     multipliertimer = 0;
 
-    short x;
-    short y;
+    short x = 0;
+    short y = 0;
 
     for (short iLoop = 0; iLoop < 64; iLoop++) {
         x = static_cast<short>(RANDOM_INT(MAPWIDTH - size + 1));

@@ -216,7 +216,8 @@ void CheckSecret(short id)
     if (!game_values.secretsenabled)
         return;
 
-    const Vec2s randomPos(RANDOM_INT(App::screenWidth), RANDOM_INT(App::screenHeight));
+    // Brace initialization evaluates left to right, so every peer draws x before y
+    const Vec2s randomPos{static_cast<short>(RANDOM_INT(App::screenWidth)), static_cast<short>(RANDOM_INT(App::screenHeight))};
 
     if (id == 0 && !game_values.unlocksecretunlocked[0]) {
         short iCountTeams = 0;

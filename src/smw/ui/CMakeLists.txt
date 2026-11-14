@@ -3,18 +3,16 @@ target_sources(smw PRIVATE
     MI_AnnouncerField.h
     MI_BonusWheel.cpp
     MI_BonusWheel.h
-    MI_ChatMessageBox.cpp
-    MI_ChatMessageBox.h
     MI_FrenzyModeOptions.cpp
     MI_FrenzyModeOptions.h
     MI_InputControlContainer.cpp
     MI_InputControlContainer.h
+    MI_LobbyWidgets.cpp
+    MI_LobbyWidgets.h
     MI_MapBrowser.cpp
     MI_MapBrowser.h
     MI_MapFilterScroll.cpp
     MI_MapFilterScroll.h
-    MI_NetRoomTeamSelect.cpp
-    MI_NetRoomTeamSelect.h
     MI_PacksField.cpp
     MI_PacksField.h
     MI_PlayerSelect.cpp
@@ -27,8 +25,6 @@ target_sources(smw PRIVATE
     MI_PowerupSlider.h
     MI_StoredPowerupResetButton.cpp
     MI_StoredPowerupResetButton.h
-    MI_StringScroll.cpp
-    MI_StringScroll.h
     MI_TeamSelect.cpp
     MI_TeamSelect.h
     MI_TournamentScoreboard.cpp
@@ -39,6 +35,4 @@ target_sources(smw PRIVATE
     MI_World.h
     MI_WorldPreviewDisplay.cpp
     MI_WorldPreviewDisplay.h
-    NetworkListScroll.cpp
-    NetworkListScroll.h
 )

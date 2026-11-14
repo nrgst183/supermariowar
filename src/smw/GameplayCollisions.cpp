@@ -8,7 +8,6 @@
 #include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "ObjectContainer.h"
@@ -137,9 +136,6 @@ void handleP2PCollisions()
                 assert(player2);
                 if (player2->state > PlayerState::Dead) {
                     if (coldec_player2player(player1, player2)) {
-                        if (netplay.active)
-                            netplay.client.local_gamehost.sendP2PCollisionEvent(*player1, *player2);
-
                         player1->collidesWith(player2);
 
                         //if player was killed by another player, continue with next player for collision detection

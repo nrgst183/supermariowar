@@ -7,7 +7,9 @@
 #include "objectgame.h"
 #include "PlayerKillStyles.h"
 #include "PlayerKillTypes.h"
+#include "RenderInterpolation.h"
 #include "Score.h"
+#include "SimArena.h"
 
 #include "player_components/PlayerAwardEffects.h"
 #include "player_components/PlayerBurnupTimer.h"
@@ -19,6 +21,7 @@
 #include "player_components/PlayerJail.h"
 #include "player_components/PlayerKuriboShoe.h"
 #include "player_components/PlayerOutOfArenaTimer.h"
+#include "player_components/PlayerRenderState.h"
 #include "player_components/PlayerSecretCode.h"
 #include "player_components/PlayerShield.h"
 #include "player_components/PlayerSpinStatus.h"
@@ -40,15 +43,9 @@ using SpriteStrip = std::array<gfxSprite, PGFX_LAST>;
 // Every PGFX_[action]_L sprite state has this bit set, every PGFX_[action]_R has it cleared
 inline constexpr int PGFX_FACING_LEFT_BIT = 0x1;
 
-namespace NetPkgs {
-    struct MapCollision;
-    struct P2PCollision;
-}
-
 class CObject;
 class MO_CarriedObject;
 class MovingPlatform;
-class Spotlight;
 struct Warp;
 
 enum class PlayerState : unsigned char {
@@ -84,10 +81,15 @@ enum class PlayerDeathStyle : unsigned char {
     Shatter,
 };
 
+namespace rollback { struct PeerChecksumAccess; }
+
 //the player class - a lot of optimization can be done here
 //(especially the collision detection stuff in collision_detection_map())
 // TODO: check if this could be a child of CObject
-class CPlayer
+//
+// Players are simulation state: they live in the simulation arena (see
+// SimArena.h).
+class CPlayer : public sim::ArenaAllocated
 {
 public:
     CPlayer(short iGlobalID, short iLocalID,
@@ -144,7 +146,14 @@ public:
     /* Actions */
 
     void updateswap();
+    void updateTail();
+    void updateSwapAnimation();
     void move();
+
+    // Render-only (smooth motion, see RenderInterpolation.h); the simulation never reads these
+    RenderPosition renderPosition() const { return {fx, fy, ix, iy}; }
+    void setRenderPosition(const RenderPosition& pos) { fx = pos.fx; fy = pos.fy; ix = pos.ix; iy = pos.iy; }
+    RenderPrevious renderPrevious;
 
     void CommitAction();
     bool bouncejump();
@@ -162,7 +171,7 @@ public:
     void DeathAwards();
     void AddKillerAward(CPlayer* killed, KillStyle style);
     void AddKillsInRowInAirAward();
-    SpriteStrip* GetScoreboardSprite() { return pScoreboardSprite; }
+    SpriteStrip* GetScoreboardSprite() { return playerRenderState(*this).scoreboardSprite; }
 
     /* Map elements */
 
@@ -297,7 +306,6 @@ private:
 		float fNewSwapX, fNewSwapY; //For moving players around during player swap effect
 		float fOldSwapX, fOldSwapY;
 		short iSrcOffsetX;
-		SpriteStrip* pScoreboardSprite;
 
 		short iNewPowerupX, iNewPowerupY;  //For moving powerups around during player swap effect
 		short iOldPowerupX, iOldPowerupY;
@@ -324,7 +332,6 @@ private:
 		short hammertimer;		//Only allow the player to throw powerful hammers so fast
 
 		short frictionslidetimer;  //this controls how much friction smoke is generated when sliding
-		short bobombsmoketimer;   //timer for the bobomb smoke animation
 		short rainsteptimer;
 
 		CPlayerAI * pPlayerAI;
@@ -400,10 +407,6 @@ private:
 
 		short iSuicideCreditPlayerID;
 		short iSuicideCreditTimer;
-
-		Spotlight * sSpotlight;
-
-		bool net_waitingForPowerupTrigger;
 
 		void TransferTag(CPlayer * o2);
 		void TransferShyGuy(CPlayer * o2);
@@ -522,11 +525,6 @@ private:
 		friend class CPlayerAI;
 		friend class CSimpleAI;
 
-		friend class NetClient;
-		friend class NetGameHost;
-		friend struct Net_PlayerData;
-		friend struct NetPkgs::MapCollision;
-		friend struct NetPkgs::P2PCollision;
 
 		friend class GameplayState;
 
@@ -545,6 +543,8 @@ private:
 		friend class PlayerWarpStatus;
 		friend class PlayerWings;
 		friend class PlayerInvincibility;
+
+		friend struct rollback::PeerChecksumAccess;
 };
 
 // Owning list of the players of the current match. Access is non-owning:
@@ -560,7 +560,7 @@ public:
         using reference = CPlayer*;
 
         const_iterator() = default;
-        explicit const_iterator(std::vector<std::unique_ptr<CPlayer>>::const_iterator it) : m_it(it) {}
+        explicit const_iterator(sim::vector<std::unique_ptr<CPlayer>>::const_iterator it) : m_it(it) {}
 
         CPlayer* operator*() const { return m_it->get(); }
         const_iterator& operator++() { ++m_it; return *this; }
@@ -568,7 +568,7 @@ public:
         bool operator==(const const_iterator&) const = default;
 
     private:
-        std::vector<std::unique_ptr<CPlayer>>::const_iterator m_it;
+        sim::vector<std::unique_ptr<CPlayer>>::const_iterator m_it;
     };
 
     PlayerList() = default;
@@ -604,7 +604,7 @@ public:
     }
 
 private:
-    std::vector<std::unique_ptr<CPlayer>> m_players;
+    sim::vector<std::unique_ptr<CPlayer>> m_players;   // the buffer lives in the simulation arena
 };
 
 // Defined in smw/main.cpp

@@ -41,6 +41,7 @@ MapListNode::MapListNode(std::string fullName)
 MapList::MapList(bool fWorldEditor)
 {
     addMapsFrom(convertPath("maps/"), maps);
+    addMapsFrom(convertPath("maps/net/"), maps);    //downloaded in online lobbies
 
 #ifdef _DEBUG
     addMapsFrom(convertPath("maps/test/"), maps);

@@ -2,7 +2,6 @@
 
 #include "MovingObject.h"
 
-class Spotlight;
 
 
 class MO_Hammer : public IO_MovingObject {
@@ -18,5 +17,4 @@ public:
 private:
     short ttl;
     bool fSuper;
-    Spotlight* sSpotlight;
 };

@@ -60,10 +60,16 @@ void CGM_Survival::think()
 
             //TODO: Replace all these magic constants with proportional values
             if (0 == iSelectedEnemy) {
-                g_sim.objectcontainer[2].add(new OMO_Thwomp(&rm->spr_thwomp, static_cast<short>(RANDOM_INT(App::screenWidth * 0.92f)), static_cast<float>(game_values.gamemodesettings.survival.speed) / 2.0f + static_cast<float>(RANDOM_INT(20))/10.0f));
+                // Draw random numbers in separate statements: argument evaluation order is
+                // unspecified in C++, and every peer must draw them in the same order
+                const short thwompX = static_cast<short>(RANDOM_INT(App::screenWidth * 0.92f));
+                const float thwompVel = static_cast<float>(game_values.gamemodesettings.survival.speed) / 2.0f + static_cast<float>(RANDOM_INT(20))/10.0f;
+                g_sim.objectcontainer[2].add(new OMO_Thwomp(&rm->spr_thwomp, thwompX, thwompVel));
                 timer = static_cast<short>(RANDOM_INT(21) - 10 + rate);
             } else if (1 == iSelectedEnemy) {
-                g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {static_cast<short>(RANDOM_INT(App::screenWidth * 0.95f )), App::screenHeight}, -(float(RANDOM_INT(9)) / 2.0f) - 8.0f, -1, -1, -1, false));
+                const short podoboX = static_cast<short>(RANDOM_INT(App::screenWidth * 0.95f));  // see above: draw order
+                const float podoboVelY = -(float(RANDOM_INT(9)) / 2.0f) - 8.0f;
+                g_sim.objectcontainer[2].add(new MO_Podobo(&rm->spr_podobo, {podoboX, App::screenHeight}, podoboVelY, -1, -1, -1, false));
                 timer = static_cast<short>(RANDOM_INT(21) - 10 + rate - 20);
             } else {
                 float dSpeed = (static_cast<float>(RANDOM_INT(21) + 20)) / 10.0f;

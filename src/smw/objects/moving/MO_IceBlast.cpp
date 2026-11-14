@@ -30,7 +30,6 @@ MO_IceBlast::MO_IceBlast(gfxSprite* nspr, Vec2s pos, float fVelyX, short iGlobal
 
     fObjectCollidesWithMap = false;
 
-    sSpotlight = nullptr;
 }
 
 void MO_IceBlast::update()
@@ -54,13 +53,7 @@ void MO_IceBlast::update()
     if (--ttl <= 0) {
         removeifprojectile(this, false, true);
     } else if (game_values.spotlights) {
-        if (!sSpotlight) {
-            sSpotlight = spotlightManager.AddSpotlight(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
-        }
-
-        if (sSpotlight) {
-            sSpotlight->UpdatePosition(ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1));
-        }
+        spotlightManager.track(this, iNetworkID, ix - collisionOffsetX + (iw >> 1), iy - collisionOffsetY + (ih >> 1), 3);
     }
 }
 

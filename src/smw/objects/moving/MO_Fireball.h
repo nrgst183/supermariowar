@@ -2,7 +2,6 @@
 
 #include "MovingObject.h"
 
-class Spotlight;
 
 
 class MO_Fireball : public IO_MovingObject {
@@ -17,5 +16,4 @@ public:
 
 private:
     short ttl;
-    Spotlight* sSpotlight;
 };

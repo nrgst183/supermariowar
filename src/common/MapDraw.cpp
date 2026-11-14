@@ -347,7 +347,7 @@ void CMap::drawPlatforms(short iLayer)
     }
 
     if (iLayer == 2) {
-        std::list<MovingPlatform*>::iterator iterateTemps = tempPlatforms.begin(), limTemps = tempPlatforms.end();
+        auto iterateTemps = tempPlatforms.begin(), limTemps = tempPlatforms.end();
         while (iterateTemps != limTemps) {
             (*iterateTemps)->draw();
             iterateTemps++;

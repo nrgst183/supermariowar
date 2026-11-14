@@ -1,18 +1,27 @@
 #pragma once
 
+#include "input.h"
 #include "ObjectContainer.h"
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "Score.h"
 
 #include <array>
+#include <cstdint>
 
 
 // The state of the gameplay simulation of the current match, in one place.
 //
 // The goal is that everything a frame of gameplay reads and writes, apart from
-// loaded resources and settings, lives here, so that a later netcode pass can
-// snapshot and restore it (rollback) or send it over the network.
+// loaded resources and settings, lives here, so that the netcode can snapshot
+// and restore it (rollback) or send it over the network.
+//
+// ROLLBACK: the containers here allocate from the simulation arena
+// (common/SimArena.h), like the players and objects they own, so that
+// rollback::saveState() (smw/rollback/Snapshot.h) can copy this struct byte
+// for byte together with the arena. The state that still lives elsewhere and
+// that a snapshot also captures (game_values runtime fields, g_map runtime
+// state, the active game mode, the object id counter) is listed there.
 //
 // WHAT LIVES HERE
 //  - players:          the players of the match (owned)
@@ -25,6 +34,17 @@
 //  - respawnCount:     respawn delay of each player (CPlayer points into it)
 //  - countdown*:       the "3, 2, 1, Go" countdown that holds the match back
 //  - windTimer, nextWind: wind changes (wind pushes players)
+//  - playerKeys:       the key state each player reads (CPlayer::playerKeys
+//                      points here). Human players get it from the tick's
+//                      InputFrame, CPU players from their AI, which keeps
+//                      keys held across ticks.
+//  - previousInput:    each player's InputFrame byte of the previous tick,
+//                      to derive "just pressed"
+//  - tick:             number of ticks simulated in this match
+//  - gameoverTick:     the tick at which the game mode declared the match
+//                      over (-1 while it isn't): a deterministic "time since
+//                      game over" for decisions every peer must make at the
+//                      same frame (the online match end, see rollback/NetGame.h)
 //
 // WHAT DELIBERATELY DOES NOT LIVE HERE (yet)
 //  - Resources and settings: rm, the file/map/skin/music lists, the tileset
@@ -45,7 +65,7 @@
 //  - Cosmetic state: eyecandy, spotlightManager, the screen shake/spin render
 //    offsets (x_shake, y_shake), the scoreboard's winning-player highlight,
 //    respawn egg animations, and the cosmetic random number generator.
-//  - Network state (netplay), input devices and the menu state.
+//  - Input devices and the menu state.
 struct SimulationState {
     SimulationState() = default;
     SimulationState(const SimulationState&) = delete;
@@ -70,6 +90,12 @@ struct SimulationState {
 
     short windTimer = 0;
     float nextWind = 0.0f;
+
+    COutputControl playerKeys[4] {};
+    uint8_t previousInput[4] {};
+
+    int tick = 0;
+    int gameoverTick = -1;
 };
 
 // Defined in smw/GSGameplay.cpp and separately in the editors

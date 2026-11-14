@@ -8,13 +8,13 @@
 #include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "ObjectContainer.h"
 #include "objecthazard.h"
 #include "player.h"
 #include "RandomNumberGenerator.h"
+#include "RenderFrame.h"
 #include "ResourceManager.h"
 #include "Score.h"
 #include "sfx.h"
@@ -127,7 +127,7 @@ void GameplayState::drawScoreboard(short iScoreTextOffset[4])
 
                 //If player is respawning, draw an animated egg counter
                 if (g_sim.respawnCount[globalID] > 0 && !game_values.gamemode->gameover) {
-                    if (++respawnanimationtimer[globalID] > 8) {
+                    if (render::advancesAnimations() && ++respawnanimationtimer[globalID] > 8) {
                         respawnanimationtimer[globalID] = 0;
                         respawnanimationframe[globalID] += 32;
 

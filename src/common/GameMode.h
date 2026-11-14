@@ -45,8 +45,8 @@ class CGameMode
 		void displayplayertext();
 		void playwarningsound();
 
-		short winningteam;
-		bool gameover;
+		short winningteam = -1;
+		bool gameover = false;
 
     GameModeType getgamemode() {
         return gamemode;
@@ -63,8 +63,8 @@ class CGameMode
         return modeOptions;
     }
 
-		bool playedwarningsound;
-		short goal;
+		bool playedwarningsound = false;
+		short goal = 0;
 
 		short GetClosestGoal(short iGoal);
     bool GetReverseScoring() {
@@ -85,7 +85,7 @@ class CGameMode
 		CPlayer * GetHighestScorePlayer(bool fGetHighest);
 		short GetScoreRankedPlayerList(CPlayer * players[4], bool fGetHighest);
 
-		bool fReverseScoring;
+		bool fReverseScoring = false;
 };
 
 void RemovePlayersButTeam(short teamid);

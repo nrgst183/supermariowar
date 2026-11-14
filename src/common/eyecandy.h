@@ -2,6 +2,7 @@
 
 #include "gfx.h"
 #include "GlobalConstants.h"
+#include "Resimulation.h"
 
 #include <array>
 #include <memory>
@@ -365,11 +366,19 @@ public:
 
     template <typename T, typename... Args>
     void emplace(Args&&... args) {
+        // Eyecandy is cosmetic: a re-simulated tick doesn't spawn it again
+        if (sim::isResimulating())
+            return;
+
         auto ptr = std::make_unique<T>(std::forward<Args>(args)...);
         eyecandies.emplace_back(std::move(ptr));
     }
 
     void update() {
+        // Already advanced when the tick was first simulated
+        if (sim::isResimulating())
+            return;
+
         for (auto& ec : eyecandies)
             ec->update();
     }
@@ -400,6 +409,10 @@ public:
         return iState >= 3;
     }
 
+    // Who the spotlight follows (see SpotlightManager::track), not dereferenced
+    const void* owner = nullptr;
+    int ownerId = 0;
+
 private:
     short ix, iy;
     short iEndSize;
@@ -415,9 +428,17 @@ private:
     SDL_Rect rSrc;
 };
 
+// Spotlights are cosmetic, so the simulation's objects don't point at them:
+// rolling back the simulation would leave such pointers dangling. Instead a
+// spotlight is looked up by its owner (an object's address plus an id that
+// tells apart objects reusing the same address, e.g. the network id).
 class SpotlightManager {
 public:
-    Spotlight* AddSpotlight(short ix, short iy, short iSize);
+    // Creates the owner's spotlight of size `iSize` if it has none, then moves
+    // it to (ix, iy). A spotlight that isn't moved in a tick fades out.
+    void track(const void* owner, int ownerId, short ix, short iy, short iSize);
+    // Lets the owner's spotlight fade out; a later track() creates a new one
+    void release(const void* owner, int ownerId);
     void DrawSpotlights();
     void ClearSpotlights();
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "math/Vec2.h"
+#include "RenderInterpolation.h"
+#include "SimArena.h"
 
 #include <array>
 
@@ -32,8 +34,9 @@ enum ObjectType {
 float CapFallingVelocity(float vel);
 float CapSideVelocity(float vel);
 
-//object base class
-class CObject {
+//object base class. Objects are simulation state: they live in the
+//simulation arena (see SimArena.h).
+class CObject : public sim::ArenaAllocated {
 public:
     CObject(gfxSprite* nspr, Vec2s pos);
     virtual ~CObject() = default;
@@ -79,10 +82,20 @@ public:
     bool isDead() const { return dead; }
     bool GetWrap() const;
 
+    // Deterministic per-match object id (the AI uses it to remember objects).
+    // Ids restart at every match, so all peers assign the same ids.
     int networkId() const { return iNetworkID; }
+    static void resetNetworkIds() { s_nextNetworkId = 0; }
+    static int nextNetworkId() { return s_nextNetworkId; }
+    static void setNextNetworkId(int id) { s_nextNetworkId = id; }
 
     /// Returns the blocks touching each of the four corners,
     std::array<IO_Block*, 4> GetCollisionBlocks() const;
+
+    // Render-only (smooth motion, see RenderInterpolation.h); the simulation never reads these
+    RenderPosition renderPosition() const { return {fx, fy, ix, iy}; }
+    void setRenderPosition(const RenderPosition& pos) { fx = pos.fx; fy = pos.fy; ix = pos.ix; iy = pos.iy; }
+    RenderPrevious renderPrevious;
 
 protected:
     ObjectType objectType = object_none;
@@ -101,5 +114,8 @@ protected:
     short state = 0;
     bool dead = false;
 
-    int iNetworkID;  // TODO: remove, unused
+    int iNetworkID = s_nextNetworkId++;
+
+private:
+    inline static int s_nextNetworkId = 0;
 };

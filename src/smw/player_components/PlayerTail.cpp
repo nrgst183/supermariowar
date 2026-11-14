@@ -50,8 +50,9 @@ void PlayerTail::slowDescent(CPlayer& player) {
     }
 }
 
-void PlayerTail::draw(CPlayer& player) {
-    short iOffsetY = 0;
+// Advances the tail once per tick. This used to run inside draw(), so it is
+// still called only when (and where) the player's tail used to be drawn.
+void PlayerTail::update(CPlayer& player) {
     if (iTailState == TAIL_SHAKE) {
         if (++iTailTimer >= 4) {
             iTailTimer = 0;
@@ -65,7 +66,6 @@ void PlayerTail::draw(CPlayer& player) {
             }
         }
     } else if (iTailState == TAIL_SPIN_AND_SHAKE) {
-        iOffsetY = 52;
         if (++iTailTimer >= 4) {
             iTailTimer = 0;
             iTailFrame += 22;
@@ -79,8 +79,7 @@ void PlayerTail::draw(CPlayer& player) {
         }
     }
 
-    //Draw tail will be called by the chicken if he is allowed to glide
-    //but we don't want to draw the actual tail for the chicken
+    //Idle tail animation (the gliding chicken has no visible tail)
     if (player.powerup == 7) {
         if (iTailState == TAIL_NOT_IN_USE) {
             if (++iTailTimer >= 4) {
@@ -100,7 +99,15 @@ void PlayerTail::draw(CPlayer& player) {
                 }
             }
         }
+    }
+}
 
+void PlayerTail::draw(const CPlayer& player) const {
+    const short iOffsetY = iTailState == TAIL_SPIN_AND_SHAKE ? 52 : 0;
+
+    //Draw tail will be called by the chicken if he is allowed to glide
+    //but we don't want to draw the actual tail for the chicken
+    if (player.powerup == 7) {
         bool fPlayerFacingRight = !game_values.reversewalk;
         if (iTailState == TAIL_SPIN_AND_SHAKE) {
             if (player.spin.isReverseWalking())

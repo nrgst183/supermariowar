@@ -6,11 +6,11 @@
 #include "GSGameplay.h"
 #include "map.h"
 #include "movingplatform.h"
-#include "net.h"
 #include "ObjectContainer.h"
 #include "objectgame.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "Resimulation.h"
 #include "SimulationState.h"
 #include "gamemodes/Chicken.h"
 #include "gamemodes/ShyGuyTag.h"
@@ -26,6 +26,7 @@
 #include "objects/moving/MO_Hammer.h"
 #include "objects/moving/MO_IceBlast.h"
 #include "objects/moving/MO_Podobo.h"
+#include "rollback/MatchConfig.h"
 
 #include <cassert>
 #include <cmath>
@@ -81,26 +82,15 @@ CPlayer::CPlayer(short iGlobalID, short iLocalID, short iTeamID, short iSubTeamI
     , spawntext(20)  // set it to 20 so there is an immediate text spawned upon winning
     , iSuicideCreditPlayerID(-1)
     , iSuicideCreditTimer(0)
-    , net_waitingForPowerupTrigger(false)
 {
     //AI stuff
     if (pPlayerAI)
         pPlayerAI->SetPlayer(this);
 
-    if (netplay.active) {
-        if (iGlobalID == netplay.remotePlayerNumber) {
-            playerKeys = &game_values.playerInput.outputControls[0];
-            printf("[net] Player %d reads local input.\n", iGlobalID);
-        } else {
-            playerKeys = &netplay.netPlayerInput.outputControls[iGlobalID];
-            printf("[net] Player %d reads network input.\n", iGlobalID);
-        }
-    }
-    else {
-        playerKeys = &game_values.playerInput.outputControls[globalID];
-    }
+    // The key state is simulation state, fed by the tick's InputFrame (or the AI)
+    playerKeys = &g_sim.playerKeys[globalID];
 
-    playerDevice = game_values.playerInput.inputControls[globalID]->iDevice;
+    playerDevice = rollback::simulationPlayerDevice(globalID);    //from the match config online
     sprites = &nsprites;
 
     //Do this so we have a valid x,y to say the player is so other items that init with the player will get valid positions
@@ -257,11 +247,14 @@ void CPlayer::die(PlayerDeathStyle deathStyle, bool fTeamRemoved, bool fKillCarr
 
     //If the game mode didn't say to remove the team from the game, then respawn the player
     if (!fTeamRemoved) {
-        if (game_values.screencrunch && !game_values.spinscreen)
-            y_shake += CRUNCHAMOUNT;
+        //Screen crunch (cosmetic)
+        if (!sim::isResimulating()) {
+            if (game_values.screencrunch && !game_values.spinscreen)
+                y_shake += CRUNCHAMOUNT;
 
-        if (y_shake > CRUNCHMAX)
-            y_shake = CRUNCHMAX;
+            if (y_shake > CRUNCHMAX)
+                y_shake = CRUNCHMAX;
+        }
 
         SetupNewPlayer();
     }
@@ -284,7 +277,7 @@ void CPlayer::SetKuriboShoe(KuriboShoeType type)
 
 void CPlayer::SetupNewPlayer()
 {
-    pScoreboardSprite = sprites;
+    playerRenderState(*this).scoreboardSprite = sprites;
     action = PlayerAction::None;
 
     velx = 0.0f;
@@ -316,12 +309,11 @@ void CPlayer::SetupNewPlayer()
     StripPowerups();
     ClearPowerupStates();
 
-    sSpotlight = nullptr;
 
-    cape.reset();
+    cape.reset(*this);
 
     frictionslidetimer = 0;
-    bobombsmoketimer = 0;
+    playerRenderState(*this).bobombSmokeTimer = 0;
     rainsteptimer = 0;
 
     spawntimer = 0;

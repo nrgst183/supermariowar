@@ -8,7 +8,6 @@
 #include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
-#include "net.h"
 #include "map.h"
 #include "MapList.h"
 #include "ObjectContainer.h"
@@ -20,6 +19,7 @@
 #include "sfx.h"
 #include "SimulationState.h"
 #include "WorldTourStop.h"
+#include "rollback/NetGame.h"
 #include "gamemodes/Chicken.h"
 #include "gamemodes/MiniBoss.h"
 #include "gamemodes/Tag.h"
@@ -96,7 +96,14 @@ void drawExitPauseDialog()
 
     if (game_values.flags.exitinggame) {
         rm->spr_dialog.draw(App::screenWidth * 0.35f, App::screenHeight*0.37f);
-        rm->menu_font_large.drawCentered(App::screenWidth * 0.5f, App::screenHeight*0.46f - (rm->menu_font_large.getHeight() >> 1), "Exit Game");
+        if (rollback::NetGame::instance().inMatch()) {
+            //Leaving disconnects us from the others: the match ends for everyone
+            const int titleY = static_cast<int>(App::screenHeight*0.46f) - (rm->menu_font_large.getHeight() >> 1);
+            rm->menu_font_large.drawCentered(App::screenWidth / 2, titleY - 14, "Leave online");
+            rm->menu_font_large.drawCentered(App::screenWidth / 2, titleY + 6, "match?");
+        } else {
+            rm->menu_font_large.drawCentered(App::screenWidth * 0.5f, App::screenHeight*0.46f - (rm->menu_font_large.getHeight() >> 1), "Exit Game");
+        }
 
         rm->spr_dialogbutton.draw(App::screenWidth * 0.37f, App::screenHeight*0.52f, {0, (game_values.flags.exityes ? 34 : 0), 80, 34});
         rm->spr_dialogbutton.draw(App::screenWidth * 0.51f, App::screenHeight*0.52f, {0, (game_values.flags.exityes ? 0 : 34), 80, 34});
@@ -108,7 +115,8 @@ void drawExitPauseDialog()
 
 bool IsPauseAllowed()
 {
-    return !game_values.flags.noexit;
+    //Online, the match can't wait for one player
+    return !game_values.flags.noexit && !rollback::NetGame::instance().inMatch();
 }
 
 bool IsExitAllowed()
@@ -126,16 +134,8 @@ bool IsExitAllowed()
 
 bool updateExitPauseDialog(short iCountDownState) // true on exit
 {
+    //The world map's force exit timer that used to run here is simulation (see simulateTick)
     if (game_values.screenfade == 0 && iCountDownState <= COUNTDOWN_START_INDEX) {
-        //If the cancel button is pressed
-        if (game_values.flags.forceexittimer > 0) {
-            if (--game_values.flags.forceexittimer <= 0) {
-                game_values.appstate = AppState::EndGame;
-                game_values.screenfade = 8;
-                game_values.screenfadespeed = 8;
-            }
-        }
-
         for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
             COutputControl * playerKeys = &game_values.playerInput.outputControls[iPlayer];
 
@@ -145,9 +145,6 @@ bool updateExitPauseDialog(short iCountDownState) // true on exit
                     game_values.flags.pausegame = !game_values.flags.pausegame;
 
                     if (game_values.flags.pausegame) {
-                        rm->menu_shade.setalpha(App::menuTransparency   );
-                        rm->menu_shade.draw(0, 0);
-
                         //Stop the pwings sound if it is on
                         if (rm->sfx_flyingsound.isPlaying())
                             rm->sfx_flyingsound.stop();
@@ -174,8 +171,6 @@ bool updateExitPauseDialog(short iCountDownState) // true on exit
                     return true;
                 } else {
                     if (!game_values.flags.pausegame && !game_values.flags.exitinggame) {
-                        rm->menu_shade.setalpha(App::menuTransparency   );
-                        rm->menu_shade.draw(0, 0);
                         game_values.flags.exitinggame = true;
                         //ifsoundonpause(rm->sfx_invinciblemusic);
                         //ifsoundonpause(rm->sfx_slowdownmusic);
