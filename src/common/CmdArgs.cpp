@@ -49,6 +49,7 @@ void print_help(const char* title, const char* version)
     printf("      --at-matches <N>    Quit after N matches (tour/world: stages), default 1\n");
     printf("      --at-start <N>      Index of the first match in the mode/map cycle\n");
     printf("      --at-seed <N>       Seed the random number generators (reproducible run)\n");
+    printf("      --at-cpu-level <N>  CPU difficulty 0-4 (default: the configured one)\n");
     printf("      --at-realtime <N>   Run at normal speed and print the measured tick and render\n"
            "                          rates, with frame rate 1: VSync, 2: Uncapped, 3: 62.5 FPS\n");
     printf("      --at-resim <0|1>    1: run every gameplay tick as a re-simulation (sounds,\n"
@@ -137,6 +138,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-matches") at.matches = atoi(val.c_str());
             else if (arg == "--at-start") at.start = atoi(val.c_str());
             else if (arg == "--at-seed") at.seed = atoi(val.c_str());
+            else if (arg == "--at-cpu-level") at.cpuLevel = atoi(val.c_str());
             else if (arg == "--at-resim") at.resim = atoi(val.c_str()) != 0;
             else if (arg == "--at-realtime") at.realtime = atoi(val.c_str());
             else if (arg == "--at-humans") at.humans = atoi(val.c_str());

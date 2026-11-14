@@ -459,6 +459,8 @@ void main_game()
         // Debug builds turn suicide kills off by default (see GameValues.cpp);
         // use the release value so Debug and Release test runs are comparable
         game_values.suicidetime = 310;
+        if (cmd::g_autotest.cpuLevel >= 0 && cmd::g_autotest.cpuLevel <= 4)
+            game_values.cpudifficulty = static_cast<short>(cmd::g_autotest.cpuLevel);
     }
 
 

@@ -19,6 +19,7 @@ struct AutoTestArgs {
     int matches = 1;         // quit after this many matches (Tour/World: stages)
     int start = 0;           // index of the first match in the mode/map cycle
     int seed = 0;            // RNG seed for reproducible runs; 0 = time based
+    int cpuLevel = -1;       // CPU difficulty 0-4; -1 = keep the configured one
     bool resim = false;      // run every gameplay tick as a re-simulation (side effects suppressed)
     int realtime = 0;        // 0: unthrottled; 1/2/3: normal pacing with the VSync/Uncapped/62.5 FPS frame
                              // rate, printing the measured tick and render rates
