@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -178,7 +179,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--net-port") net.port = atoi(val.c_str());
             else if (arg == "--net-name") net.name = val;
             else if (arg == "--net-skin") net.skin = val;
-            else if (arg == "--net-slow-map") net.slowMap = std::max(1, atoi(val.c_str()));
+            else if (arg == "--net-slow-map") net.slowMap = (std::max)(1, atoi(val.c_str()));
             else if (arg == "--net-delay") net.delay = atoi(val.c_str());
             else if (arg == "--net-checksum") net.checksumInterval = atoi(val.c_str());
             else if (arg == "--net-stats") net.statsInterval = atoi(val.c_str());
