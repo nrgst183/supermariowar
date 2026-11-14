@@ -7,6 +7,8 @@
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
 #include "ui/MI_LobbyWidgets.h"
+#include "ui/MI_SelectField.h"
+#include "GameModeType.h"
 #include "ui/MI_Text.h"
 
 #include <cctype>
@@ -23,33 +25,28 @@ rollback::NetLobby* lobbyOrNull()
 } // namespace
 
 
-namespace {
-// The layout of the lobby when nothing asks for another one (--at-lobby-style)
-constexpr LobbyStyle DEFAULT_STYLE = LobbyStyle::Stage;
-} // namespace
-
-
 UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     : UI_Menu()
 {
-    const int wanted = cmd::g_autotest.lobbyStyle;
-    m_style = wanted >= 0 && wanted < LOBBY_STYLE_COUNT ? static_cast<LobbyStyle>(wanted) : DEFAULT_STYLE;
-    const LobbyLayout layout = lobbyLayout(m_style);
+    const LobbyLayout layout = lobbyLayout();
 
-    miScene = new MI_LobbyScene(m_style);
-    miMap = new MI_LobbyMap(layout.mapFrame, layout.map, m_style);
+    miScene = new MI_LobbyScene();
+    miMap = new MI_LobbyMap(layout.mapFrame, layout.map);
+    miMode = new MI_LobbyField(layout.field[0], layout.fieldIndent, "Mode");
+    miGoal = new MI_LobbyField(layout.field[1], layout.fieldIndent, "Goal");
+    miMapName = new MI_LobbyField(layout.field[2], layout.fieldIndent, "Map");
 
     // The four players of the next match
     for (int i = 0; i < SLOTS; i++)
-        miCard[i] = new MI_LobbyCard(layout.card[i], i, m_style);
+        miCard[i] = new MI_LobbyCard(layout.card[i], i);
 
     // The settings that are rarely touched
-    miLocalPlayers = new MI_LobbyChip(layout.chip[0], "Players", MI_LobbyChip::Icon::Players);
+    miLocalPlayers = new MI_SelectField<short>(&rm->spr_selectfield, layout.players.x, layout.players.y, "Players", layout.players.w, 100);
     miLocalPlayers->add("1", 1);
     miLocalPlayers->add("2", 2);
     miLocalPlayers->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
 
-    miInputDelay = new MI_LobbyChip(layout.chip[1], "Delay", MI_LobbyChip::Icon::Delay);
+    miInputDelay = new MI_SelectField<short>(&rm->spr_selectfield, layout.delay.x, layout.delay.y, "Delay", layout.delay.w, 100);
     miInputDelay->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
     RebuildDelayItems(2);
 
@@ -60,8 +57,7 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     miStartButton = new MI_LobbyButton(&rm->spr_selectfield, layout.buttonX[0], y, "Start match", w, true);
     miStartButton->SetCode(MENU_CODE_ONLINE_START);
     //Shown instead of the start button while the match can't start (it can't be selected)
-    miStartDisabled = new MI_LobbyButton(&rm->spr_selectfield, layout.buttonX[0], y, "Start match", w, false);
-    miStartDisabled->SetDimmed(true);
+    miStartDisabled = new MI_LobbyButton(&rm->spr_selectfielddisabled, layout.buttonX[0], y, "Start match", w, true);
     miSettingsButton = new MI_LobbyButton(&rm->spr_selectfield, layout.buttonX[1], y, "Match settings", w, false);
     miSettingsButton->SetCode(MENU_CODE_ONLINE_MATCH_SETTINGS);
     miLeaveButton = new MI_LobbyButton(&rm->spr_selectfield, layout.buttonX[2], y, "Leave", w, false);
@@ -82,13 +78,16 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
 
     AddNonControl(miScene);
     AddNonControl(miMap);
+    AddNonControl(miMode);
+    AddNonControl(miGoal);
+    AddNonControl(miMapName);
     AddNonControl(miStartDisabled);
 
     // Navigation. The Stage layout has the cards side by side, the Cards layout in a column; below them
     // the settings, then the buttons: ready (joiners) or start (the host, when it can start) | match
     // settings | leave. Hidden controls are skipped by following their neighbors, so the "down" chain
     // runs ready, start, settings. Leave is reached from everywhere by the cancel button.
-    const bool stage = m_style == LobbyStyle::Stage;
+    const bool stage = false;
     for (int i = 0; i < SLOTS; i++) {
         UI_Control* up = i == 0 ? nullptr : miCard[i - 1];
         UI_Control* down = i == SLOTS - 1 ? static_cast<UI_Control*>(miLocalPlayers) : miCard[i + 1];
@@ -192,6 +191,9 @@ void UI_OnlineLobbyMenu::ApplyLayout(bool host, bool joining)
 
     miScene->SetJoining(joining);
     miMap->setVisible(!joining);
+    miMode->setVisible(!joining);
+    miGoal->setVisible(!joining);
+    miMapName->setVisible(!joining);
     for (int i = 0; i < SLOTS; i++)
         miCard[i]->setVisible(!joining);
     miLocalPlayers->setVisible(!joining);
@@ -210,6 +212,18 @@ void UI_OnlineLobbyMenu::ApplyLayout(bool host, bool joining)
 }
 
 namespace {
+int modeIconIndexFor(int modeId)
+{
+    if (modeId >= 0 && modeId < GAMEMODE_LAST)
+        return modeId;
+    switch (modeId) {
+        case game_mode_pipe_minigame: return 25;
+        case game_mode_boss_minigame: return 23;
+        case game_mode_boxes_minigame: return 27;
+        default: return -1;
+    }
+}
+
 std::string capitalized(std::string text)
 {
     if (!text.empty())
@@ -275,6 +289,16 @@ void UI_OnlineLobbyMenu::Sync()
             miMap->LoadCurrentMap();
     }
     miMap->SetAvailable(m_previewValid && !joining);
+    {
+        const std::string goalName = lobby->goalName().empty() ? "Goal" : lobby->goalName();
+        miMode->SetValue(lobby->modeName().empty() ? "-" : lobby->modeName(), modeIconIndexFor(lobby->modeId()));
+        miGoal->SetLabel(goalName);
+        miGoal->SetValue(lobby->goal() > 0 ? std::to_string(lobby->goal()) : "-");
+        std::string shown = mapName.empty() ? "-" : minigame ? "Minigame" : mapName;
+        if (transferring && !joining)
+            shown = std::format("{} {}%", transfer.sending ? "Uploading" : "Downloading", transfer.bytesDone * 100ull / transfer.bytesTotal);
+        miMapName->SetValue(shown);
+    }
     if (mapName.empty())
         miMap->SetText("No map selected yet");
     else if (minigame)

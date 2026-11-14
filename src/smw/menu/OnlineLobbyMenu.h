@@ -8,11 +8,11 @@ class MI_Button;
 class MI_Image;
 class MI_LobbyButton;
 class MI_LobbyCard;
-class MI_LobbyChip;
+class MI_LobbyField;
 class MI_LobbyMap;
 class MI_LobbyScene;
 class MI_Text;
-enum class LobbyStyle : int;
+template<typename T> class MI_SelectField;
 
 /*
     The online lobby, built from the pieces of the original menus: the map the host has selected with a
@@ -21,8 +21,7 @@ enum class LobbyStyle : int;
     It shows the state of rollback::NetGame::instance().lobby() and sends the player's changes to it
     (see rollback/NetLobby.h).
 
-    There are two layouts (LobbyStyle, MI_LobbyWidgets.h); the default one is chosen in the constructor,
-    `--autotest --at-lobby-style N` picks another one (for the screenshots of scripts/menu-screenshots.sh).
+    It is built only from the art and widgets of the original menus (see MI_LobbyWidgets.h).
 */
 class UI_OnlineLobbyMenu : public UI_Menu {
 public:
@@ -61,8 +60,11 @@ private:
     MI_LobbyScene* miScene = nullptr;
     MI_LobbyMap* miMap = nullptr;
     MI_LobbyCard* miCard[SLOTS] {};
-    MI_LobbyChip* miLocalPlayers = nullptr;
-    MI_LobbyChip* miInputDelay = nullptr;
+    MI_LobbyField* miMode = nullptr;
+    MI_LobbyField* miGoal = nullptr;
+    MI_LobbyField* miMapName = nullptr;
+    MI_SelectField<short>* miLocalPlayers = nullptr;
+    MI_SelectField<short>* miInputDelay = nullptr;
     MI_Button* miReadyButton = nullptr;      // joiners
     MI_Button* miLeaveJoiner = nullptr;
     MI_Button* miSettingsButton = nullptr;   // the host
@@ -76,7 +78,6 @@ private:
     MI_Button* miDialogYes = nullptr;
     MI_Button* miDialogNo = nullptr;
 
-    LobbyStyle m_style;
     Dialog m_dialog = Dialog::None;
     int m_kickPeer = -1;
     std::string m_notice;

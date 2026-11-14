@@ -79,7 +79,6 @@ smw --net-join 192.168.1.20:7300          # join
 | `--net-sim-latency MS` | simulated one-way delay added to every packet sent |
 | `--net-sim-jitter MS` | simulated +- variation of that delay |
 | `--net-sim-loss PCT` | simulated loss of the unreliable packets |
-| `--at-lobby-style N` | with `--at-match shots`, the lobby layout to show (0: team stage, 1: polished cards) |
 | `--at-shot-every N`, `--at-shot-dir DIR` | with rendering on, save a PNG of the screen every N drawn frames of an online match (to review the overlays) |
 
 Builds configured with `-DNO_NETWORK=ON` (the web build) leave out the network code.
@@ -134,7 +133,7 @@ smw --datadir data --autotest --at-synctest 8 --at-match single --at-frames 3000
 
 `--at-peersum N` prints a cross-machine state checksum every N frames (`peersum:` lines), to compare runs of different builds or compilers.
 
-**Screenshots of the lobby.** `scripts/menu-screenshots.sh OUTDIR build` walks through the online menus and the lobby with a host and a joiner (the joiner lacks the host's map and skin, so both are downloaded) and saves PNGs; `STYLE=1 scripts/menu-screenshots.sh ...` shows the other lobby layout.
+**Screenshots of the lobby.** `scripts/menu-screenshots.sh OUTDIR build` walks through the online menus and the lobby with a host and a joiner (the joiner lacks the host's map and skin, so both are downloaded) and saves PNGs.
 
 **Netplay test.** `scripts/netplay-test.sh` starts real game processes on `127.0.0.1` that play online matches against each other with seeded random input (`--autotest --at-humans`), under simulated network conditions, and checks that every peer finished every match and that the checksums of all confirmed frames (`netsum:` lines) are identical. It prints rollbacks, stalls and CPU use per run.
 

@@ -56,8 +56,7 @@ void print_help(const char* title, const char* version)
            "                          eyecandy and other side effects suppressed); the\n"
            "                          results must match a normal run\n");
     printf("      --at-shots <DIR>    --at-match shots: save screenshots of the main, online and lobby menus\n"
-           "                          to DIR (with --at-role host|join|orig, --at-addr IP[:PORT], --at-nick NAME)\n"
-           "      --at-lobby-style <N> The online lobby layout (0: team stage, 1: polished cards)\n");
+           "                          to DIR (with --at-role host|join|orig, --at-addr IP[:PORT], --at-nick NAME)\n");
     printf("      --at-norender <0|1> 1: don't draw or present frames (faster headless runs,\n"
            "                          e.g. under valgrind); the simulation is unaffected\n");
     printf("      --at-humans <N>     The first N players are \"human\" players, driven by\n"
@@ -149,7 +148,6 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-shot-dir") at.shotDir = val;
             else if (arg == "--at-shots") at.shotsDir = val;
             else if (arg == "--at-role") at.shotsRole = val;
-            else if (arg == "--at-lobby-style") at.lobbyStyle = atoi(val.c_str());
             else if (arg == "--at-addr") at.shotsAddr = val;
             else if (arg == "--at-nick") at.shotsName = val;
             else if (arg == "--at-shotmap") at.shotsMap = atoi(val.c_str());

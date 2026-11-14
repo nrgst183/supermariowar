@@ -34,7 +34,6 @@ struct AutoTestArgs {
     std::string shotsRole = "host";  // --at-role host|join: host a lobby, or join --at-addr
     std::string shotsAddr;   // --at-addr IP[:PORT]: the lobby to join
     std::string shotsName;   // --at-nick NAME: the nickname to enter in the online menu
-    int lobbyStyle = -1;     // --at-lobby-style N: the online lobby layout to show (-1: the default)
     int shotsMap = 0;        // --at-shotmap N: host: pick the N-th map of the list (to be downloaded by joiners without it)
 };
 
