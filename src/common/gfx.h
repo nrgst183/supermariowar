@@ -38,6 +38,9 @@ using SpriteStrip = std::array<gfxSprite, PGFX_LAST>;
 bool gfx_init(int w, int h, bool fullscreen);
 void gfx_changefullscreen(bool fullscreen);
 bool gfx_isfullscreen();
+// Mouse coordinates: from the window's pixels to the screen's (640x480, at any window size)
+void gfx_eventtoscreen(SDL_Event* event);
+SDL_MouseButtonFlags gfx_mousestate(float* x, float* y);
 void gfx_flipscreen();
 /// Turns VSync on or off; returns true if the renderer now does what was asked
 bool gfx_setvsync(bool enabled);

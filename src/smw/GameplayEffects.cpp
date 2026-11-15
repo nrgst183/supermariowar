@@ -1,3 +1,4 @@
+#include "rollback/Replay.h"
 #include "GSGameplay.h"
 
 #include "CmdArgs.h"
@@ -379,9 +380,11 @@ void playMusic()
 
     //If no background music is playing, then play some
     if (!rm->backgroundmusic[0].isPlaying() && !rm->sfx_invinciblemusic.isPlaying() && !rm->sfx_timewarning.isPlaying() && !game_values.gamemode->gameover) {
-        if (game_values.playnextmusic) {
+        //(a replay plays the songs it recorded: replay::syncMusic)
+        if (game_values.playnextmusic && !replay::playing()) {
             musiclist->setNextMusic(static_cast<MusicCategory>(g_map->musicCategoryID), maplist->currentShortmapname(), g_map->szBackgroundFile);
             rm->backgroundmusic[0] = sfxMusic(musiclist->currentMusic());
+            replay::noteMusic();
         }
 
         rm->backgroundmusic[0].play(game_values.playnextmusic, false);
@@ -392,9 +395,13 @@ void PlayNextMusicTrack()
 {
     if (game_values.gamemode->gameover || game_values.flags.playinvinciblesound || rm->sfx_timewarning.isPlaying())
         return;
+    //(a replay plays the songs it recorded: replay::syncMusic)
+    if (replay::playing())
+        return;
 
     rm->backgroundmusic[0].stop();
     musiclist->setNextMusic(static_cast<MusicCategory>(g_map->musicCategoryID), maplist->currentShortmapname(), g_map->szBackgroundFile);
     rm->backgroundmusic[0] = sfxMusic(musiclist->currentMusic());
     rm->backgroundmusic[0].play(game_values.playnextmusic, false);
+    replay::noteMusic();
 }

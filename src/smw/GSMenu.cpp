@@ -366,6 +366,7 @@ void MenuState::update()
     //handle messages
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        gfx_eventtoscreen(&event);    //(the mouse in the screen's pixels at any window size)
         switch (event.type) {
         case SDL_EVENT_QUIT:
             Exit();

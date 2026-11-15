@@ -25,11 +25,18 @@
 // changed or deleted (the copy goes to the map download folder, like a map that
 // a lobby sent).
 //
+// The players' skin files are stored too (a replay shows the same players on
+// another computer: a skin that isn't there goes to the skin download folder),
+// and the music: the song the match started with and every change of song
+// (by tick), since a match picks its songs at random.
+//
 // File (little-endian): "SMWREPLAY" + u8 0, u16 version, u64 simulation data
 // hash, i64 start time (unix), u32 + config bytes (MatchConfig::serialize),
 // 4 x (str skin path, str player name), str map name, u32 + map bytes,
 // u32 tick count, u32 runs + runs of (u16 length, 4 input bytes, u8 CPU mask),
-// u32 checksums + (u32 tick, u64 checksum); str = u16 length + bytes
+// u32 checksums + (u32 tick, u64 checksum); version 2 and on: 4 x (u32 + skin
+// file bytes), u32 songs + (u32 tick, str song: relative to the data folder
+// when it's in it); str = u16 length + bytes. Version 1 replays still play.
 namespace replay {
 
 struct TickRecord {
@@ -40,7 +47,7 @@ struct TickRecord {
 };
 
 struct Replay {
-    static constexpr uint16_t VERSION = 1;
+    static constexpr uint16_t VERSION = 2;
 
     uint64_t dataHash = 0;
     int64_t startTime = 0;
@@ -51,6 +58,8 @@ struct Replay {
     std::vector<uint8_t> map;
     std::vector<TickRecord> ticks;
     std::map<uint32_t, uint64_t> checksums;    // after tick N (g_sim.tick == N)
+    std::array<std::vector<uint8_t>, INPUT_MAX_PLAYERS> skinFiles;    // (version 2)
+    std::vector<std::pair<uint32_t, std::string>> music;              // (version 2) from tick N on, this song
 
     std::vector<uint8_t> serialize() const;
     bool deserialize(const std::vector<uint8_t>& bytes);
@@ -77,6 +86,8 @@ bool recording();
 void recordTick(const InputFrame& input);
 // After a tick (not online: there the confirmed checksums come in)
 void afterTick();
+// The match's song changed (any song the game picks for it, at random or the next one)
+void noteMusic();
 // Online: a confirmed checksum (after tick `frame`)
 void recordChecksum(int frame, uint64_t sum);
 // The match is over: writes the replay (the ticks up to the current one).
@@ -94,6 +105,8 @@ bool playing();
 bool nextTick(InputFrame& input, uint8_t& cpuMask);
 // After a tick: compares the state with the recorded checksum
 void checkTick();
+// The recorded song of the current tick plays (after a start, a step, a jump)
+void syncMusic();
 
 // ---- the theater (GameplayTheater.cpp): moving around in a replay
 //

@@ -12,6 +12,7 @@
 #include "ResourceManager.h"
 #include "SeriesState.h"
 #include "SimulationState.h"
+#include "SkinTransfer.h"
 #include "StateChecksum.h"
 #include "Snapshot.h"
 #include "eyecandy.h"
@@ -31,6 +32,7 @@ extern CGameValues game_values;
 extern MapList* maplist;
 extern SkinList* skinlist;
 extern CResourceManager* rm;
+extern MusicList* musiclist;
 
 namespace replay {
 namespace {
@@ -121,6 +123,23 @@ std::string skinPathOf(int slot)
     return {};
 }
 
+// A song as the replay keeps it: relative to the data folder if it's in it (the
+// same song on another computer), else its full path
+std::string songRef(const std::filesystem::path& song)
+{
+    const std::string path = song.generic_string();
+    const std::string root = std::filesystem::path(convertPath("")).generic_string();
+    if (!root.empty() && path.size() > root.size() && path.compare(0, root.size(), root) == 0)
+        return path.substr(root.size());
+    return path;
+}
+
+std::filesystem::path songPath(const std::string& ref)
+{
+    const std::filesystem::path path(ref);
+    return path.is_absolute() ? path : std::filesystem::path(convertPath(ref));
+}
+
 void startRecording(Replay&& replay, bool online)
 {
     g_rec = Recording();
@@ -129,6 +148,16 @@ void startRecording(Replay&& replay, bool online)
     g_rec.replay.startTime = static_cast<int64_t>(std::time(nullptr));
     g_rec.online = online;
     g_rec.active = !g_rec.replay.config.empty();
+
+    //The skins go in the replay
+    for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
+        const std::string& skin = g_rec.replay.skins[static_cast<size_t>(k)];
+        if (skin.empty() || !readFile(skin, g_rec.replay.skinFiles[static_cast<size_t>(k)], rollback::SKIN_MAX_BYTES))
+            g_rec.replay.skinFiles[static_cast<size_t>(k)].clear();
+    }
+    //And the song the match starts with (more come with noteMusic)
+    if (game_values.music && musiclist && musiclist->count() > 0)
+        g_rec.replay.music.emplace_back(0, songRef(musiclist->currentMusic()));
 
     //The map goes in the replay
     rollback::MatchConfig config;
@@ -192,6 +221,7 @@ struct Playback {
     //The theater
     std::vector<std::pair<int, std::unique_ptr<rollback::Snapshot>>> keyframes;
     std::vector<Marker> markers;
+    std::string musicNow;    // the recorded song playing ("": none yet)
 };
 Playback g_play;
 bool g_returnedFromReplay = false;
@@ -370,6 +400,14 @@ std::vector<uint8_t> Replay::serialize() const
         w.u32(tick);
         w.u64(sum);
     }
+    //(version 2)
+    for (const std::vector<uint8_t>& skin : skinFiles)
+        w.bytes(skin);
+    w.u32(static_cast<uint32_t>(music.size()));
+    for (const auto& [tick, song] : music) {
+        w.u32(tick);
+        w.str(song);
+    }
     return std::move(w.out);
 }
 
@@ -379,7 +417,8 @@ bool Replay::deserialize(const std::vector<uint8_t>& bytes)
     if (bytes.size() < sizeof(MAGIC) || std::memcmp(bytes.data(), MAGIC, sizeof(MAGIC)) != 0)
         return false;
     Reader r {bytes, sizeof(MAGIC)};
-    if (r.u16() != VERSION)
+    const uint16_t version = r.u16();
+    if (version < 1 || version > VERSION)
         return false;
     dataHash = r.u64();
     startTime = static_cast<int64_t>(r.u64());
@@ -409,6 +448,17 @@ bool Replay::deserialize(const std::vector<uint8_t>& bytes)
     for (uint32_t k = 0; k < sums && r.ok; k++) {
         const uint32_t tick = r.u32();
         checksums[tick] = r.u64();
+    }
+    if (version >= 2) {
+        for (std::vector<uint8_t>& skin : skinFiles)
+            skin = r.bytes(rollback::SKIN_MAX_BYTES);
+        const uint32_t songs = r.u32();
+        if (songs > 100'000u)
+            return false;
+        for (uint32_t k = 0; k < songs && r.ok; k++) {
+            const uint32_t tick = r.u32();
+            music.emplace_back(tick, r.str());
+        }
     }
     return r.ok && ticks.size() == tickCount;
 }
@@ -477,6 +527,20 @@ void beginOnline(const std::vector<uint8_t>& config, const std::array<std::strin
     replay.names = names;
     replay.skins = skins;
     startRecording(std::move(replay), true);
+}
+
+void noteMusic()
+{
+    if (!g_rec.active || !musiclist || musiclist->count() == 0)
+        return;
+    const std::string song = songRef(musiclist->currentMusic());
+    //(the match's own ticks: at its start, the tick counter can still be the last match's)
+    const uint32_t tick = static_cast<uint32_t>(g_rec.replay.ticks.size());
+    auto& music = g_rec.replay.music;
+    if (!music.empty() && music.back().first == tick)
+        music.back().second = song;    //(picked again before the tick: the last one)
+    else if (music.empty() || music.back().second != song)
+        music.emplace_back(tick, song);
 }
 
 bool recording()
@@ -598,15 +662,65 @@ bool startPlayback(const std::string& file, std::string& error)
     g_play.active = true;
     g_play.status.total = static_cast<int>(g_play.replay.ticks.size());
 
+    //The skins: the file here if it is the same skin, else the replay's copy
+    //(saved with the downloaded skins), else one of the same name
     std::array<std::string, INPUT_MAX_PLAYERS> skins;
-    for (int k = 0; k < INPUT_MAX_PLAYERS; k++)
-        skins[static_cast<size_t>(k)] = findSkin(g_play.replay.skins[static_cast<size_t>(k)]);
+    for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
+        const std::string& recorded = g_play.replay.skins[static_cast<size_t>(k)];
+        const std::vector<uint8_t>& stored = g_play.replay.skinFiles[static_cast<size_t>(k)];
+        std::string skin = findSkin(recorded);
+        if (!stored.empty()) {
+            const uint64_t hash = rollback::net::fnv1a64(stored.data(), stored.size());
+            std::vector<uint8_t> here;
+            if (skin.empty() || !readFile(skin, here, rollback::SKIN_MAX_BYTES) || rollback::net::fnv1a64(here.data(), here.size()) != hash) {
+                const std::string name = std::filesystem::path(recorded).stem().string();
+                std::string saved;
+                std::string saveError;
+                for (const std::string& dir : rollback::skinDownloadDirs()) {
+                    if (rollback::saveDownloadedSkin(dir, name.empty() ? "replay" : name, stored, hash, saved, saveError))
+                        break;
+                    saved.clear();
+                }
+                if (!saved.empty())
+                    skin = saved;
+                else
+                    printf("replay: can't use the skin of player %d: %s\n", k + 1, saveError.c_str());
+            }
+        }
+        skins[static_cast<size_t>(k)] = skin;
+    }
     rollback::setMatchSkinOverride(&skins);
 
     printf("replay: playing %s (%d ticks)\n", file.c_str(), g_play.status.total);
     rollback::startConfiguredMatch(config);
     prepareTimeline();
+    syncMusic();
     return true;
+}
+
+void syncMusic()
+{
+    if (!g_play.active || !game_values.music || g_play.replay.music.empty())
+        return;
+    //The last change of song at or before this tick (before the first: the first)
+    const auto& music = g_play.replay.music;
+    auto it = std::upper_bound(music.begin(), music.end(), static_cast<uint32_t>(std::max(0, g_sim.tick)),
+        [](uint32_t tick, const auto& change) { return tick < change.first; });
+    const std::string& song = it == music.begin() ? music.front().second : std::prev(it)->second;
+    if (song == g_play.musicNow)
+        return;
+    g_play.musicNow = song;
+    const std::filesystem::path path = songPath(song);
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(path, ec)) {
+        printf("replay: the song %s isn't here; another one plays\n", song.c_str());
+        return;
+    }
+    rm->backgroundmusic[0].stop();
+    rm->backgroundmusic[0] = sfxMusic(path);
+    //(after the invincibility or time warning music, if that's playing)
+    if (!rm->sfx_invinciblemusic.isPlaying() && !rm->sfx_timewarning.isPlaying())
+        rm->backgroundmusic[0].play(game_values.playnextmusic, false);
 }
 
 bool playing()

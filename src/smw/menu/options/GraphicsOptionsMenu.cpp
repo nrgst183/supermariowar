@@ -13,6 +13,15 @@
 UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     : UI_Menu()
 {
+    //The colors of the theater's and the editors' panels
+    miOverlayColorsField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 80, "Overlay Colors", 500, 220);
+    miOverlayColorsField->add("Night", 0);
+    miOverlayColorsField->add("Pipe", 1);
+    miOverlayColorsField->add("Castle", 2);
+    miOverlayColorsField->add("SMB3", 3);
+    miOverlayColorsField->setOutputPtr(&game_values.overlaycolors);
+    miOverlayColorsField->setCurrentValue(game_values.overlaycolors);
+
     miTopLayerField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 120, "Draw Top Layer", 500, 220);
     miTopLayerField->add("Background", false);
     miTopLayerField->add("Foreground", true);
@@ -64,7 +73,8 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miGraphicsOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miGraphicsOptionsMenuHeaderText = new MI_HeaderText("Graphics Options Menu", 320, 5);
 
-    AddControl(miTopLayerField, miGraphicsOptionsMenuBackButton, miFrameRateField, nullptr, miGraphicsOptionsMenuBackButton);
+    AddControl(miOverlayColorsField, miGraphicsOptionsMenuBackButton, miTopLayerField, nullptr, miGraphicsOptionsMenuBackButton);
+    AddControl(miTopLayerField, miOverlayColorsField, miFrameRateField, nullptr, miGraphicsOptionsMenuBackButton);
 
     AddControl(miFrameRateField, miTopLayerField, miSmoothMotionField, nullptr, miGraphicsOptionsMenuBackButton);
     AddControl(miSmoothMotionField, miFrameRateField, miFullscreenField, nullptr, miGraphicsOptionsMenuBackButton);
@@ -74,12 +84,12 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     AddControl(miWorldGraphicsPackField, miMenuGraphicsPackField, miGameGraphicsPackField, nullptr, miGraphicsOptionsMenuBackButton);
     AddControl(miGameGraphicsPackField, miWorldGraphicsPackField, miNetStatsField, nullptr, miGraphicsOptionsMenuBackButton);
     AddControl(miNetStatsField, miGameGraphicsPackField, miGraphicsOptionsMenuBackButton, nullptr, miGraphicsOptionsMenuBackButton);
-    AddControl(miGraphicsOptionsMenuBackButton, miNetStatsField, miTopLayerField, miNetStatsField, nullptr);
+    AddControl(miGraphicsOptionsMenuBackButton, miNetStatsField, miOverlayColorsField, miNetStatsField, nullptr);
 
     AddNonControl(miGraphicsOptionsMenuLeftHeaderBar);
     AddNonControl(miGraphicsOptionsMenuRightHeaderBar);
     AddNonControl(miGraphicsOptionsMenuHeaderText);
 
-    setInitialFocus(miTopLayerField);
+    setInitialFocus(miOverlayColorsField);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

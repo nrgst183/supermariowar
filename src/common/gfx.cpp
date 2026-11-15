@@ -176,6 +176,25 @@ void gfx_changefullscreen(bool fullscreen) {
     gfx.changeFullScreen(fullscreen);
 }
 
+void gfx_eventtoscreen(SDL_Event* event)
+{
+    if (event)
+        gfx.eventToScreen(*event);
+}
+
+SDL_MouseButtonFlags gfx_mousestate(float* x, float* y)
+{
+    float mx = 0;
+    float my = 0;
+    const SDL_MouseButtonFlags buttons = SDL_GetMouseState(&mx, &my);
+    gfx.windowToScreen(mx, my);
+    if (x)
+        *x = mx;
+    if (y)
+        *y = my;
+    return buttons;
+}
+
 bool gfx_isfullscreen() {
     return gfx.isFullScreen();
 }

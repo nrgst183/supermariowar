@@ -483,6 +483,7 @@ void GameplayState::handleInput()
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        gfx_eventtoscreen(&event);    //(the mouse in the screen's pixels at any window size)
         switch (event.type) {
         case SDL_EVENT_QUIT: {
             CleanUp();
@@ -662,6 +663,7 @@ void start_gameplay()
         musiclist->setRandomMusic(static_cast<MusicCategory>(g_map->musicCategoryID), "", "");
         rm->backgroundmusic[0] = sfxMusic(musiclist->currentMusic());
         rm->backgroundmusic[0].play(game_values.playnextmusic, false);
+        replay::noteMusic();
     }
 }
 
@@ -997,7 +999,8 @@ void GameplayState::render(float alpha)
     }
 
     //Smooth motion: draw between the previous and the latest tick (not while paused)
-    const bool smooth = game_values.smoothmotion && lastUpdateTicked && alpha < 1.0f;
+    //(the theater: at every speed, see theaterAlpha)
+    const bool smooth = game_values.smoothmotion && (replay::playing() ? theaterAlpha(alpha) : lastUpdateTicked && alpha < 1.0f);
     if (smooth)
         interpolator.apply(alpha);
 

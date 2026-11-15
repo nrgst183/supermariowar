@@ -297,8 +297,8 @@ constexpr SDL_Color FACE_LIGHT[] = {{152, 240, 120, 255}, {255, 152, 136, 255}, 
 constexpr SDL_Color FACE_DARK[] = {{16, 104, 16, 255}, {136, 16, 16, 255}, {16, 48, 144, 255}, {168, 104, 0, 255}};
 constexpr const char* FACE_LETTER[] = {"A", "B", "X", "Y"};
 
-constexpr SDL_Color PAD_BODY {52, 52, 64, 255};       // the Xbox's dark buttons
-constexpr SDL_Color PAD_LIGHT {96, 96, 112, 255};
+constexpr SDL_Color PAD_BODY {92, 96, 116, 255};      // the Xbox's gray buttons
+constexpr SDL_Color PAD_LIGHT {164, 168, 188, 255};
 constexpr SDL_Color SILVER {184, 188, 200, 255};      // the original's triggers and START / BACK
 constexpr SDL_Color SILVER_LIGHT {232, 236, 244, 255};
 constexpr SDL_Color SILVER_DARK {112, 116, 128, 255};
@@ -325,18 +325,19 @@ int faceButton(int x, int y, int i, bool draw)
         tinyText(x + 6, y + 4, FACE_LETTER[i], FACE_DARK[i]);
         tinyText(x + 5, y + 3, FACE_LETTER[i], WHITE);
     } else {
-        //A dark button with a rim and the letter in its color
+        //A flat button in its color, a white letter
         art(x, y, {
             "..####..",
-            ".#rrrr#.",
-            "#rbbbbr#",
-            "#rbbbbr#",
-            "#rbbbbr#",
-            "#rbbbbr#",
-            ".#rrrr#.",
+            ".#bbbb#.",
+            "#bbbbbb#",
+            "#bbbbbb#",
+            "#bbbbbb#",
+            "#bbbbbb#",
+            ".#dddd#.",
             "..####..",
-        }, {{'#', BLACK}, {'r', FACE_DARK[i]}, {'b', PAD_BODY}});
-        tinyText(x + 5, y + 3, FACE_LETTER[i], FACE[i]);
+        }, {{'#', BLACK}, {'b', FACE[i]}, {'d', FACE_DARK[i]}});
+        tinyText(x + 6, y + 4, FACE_LETTER[i], FACE_DARK[i]);
+        tinyText(x + 5, y + 3, FACE_LETTER[i], WHITE);
     }
     return 17;
 }
@@ -363,7 +364,8 @@ int bumper(int x, int y, bool right, bool draw)
             "#bbbbbbbbbbbb#",
             "#dddddddddddd#",
             "##############",
-        }, {{'#', BLACK}, {'l', PAD_LIGHT}, {'b', PAD_BODY}, {'d', {30, 30, 38, 255}}});
+        }, {{'#', BLACK}, {'l', PAD_LIGHT}, {'b', PAD_BODY}, {'d', {60, 62, 78, 255}}});
+        tinyText(x + 8, y + 4, right ? "RB" : "LB", BLACK);
         tinyText(x + 7, y + 3, right ? "RB" : "LB", WHITE);
     }
     return 29;
@@ -383,12 +385,14 @@ int trigger(int x, int y, bool right, bool draw)
             "#bbbbbbbb#",
             "#bbbbbbbd#",
             ".########.",
-        }, {{'#', BLACK}, {'l', original ? SILVER_LIGHT : PAD_LIGHT}, {'b', original ? SILVER : SDL_Color {74, 74, 88, 255}},
-            {'d', original ? SILVER_DARK : PAD_BODY}});
-        if (original)
+        }, {{'#', BLACK}, {'l', original ? SILVER_LIGHT : PAD_LIGHT}, {'b', original ? SILVER : PAD_BODY},
+            {'d', original ? SILVER_DARK : SDL_Color {60, 62, 78, 255}}});
+        if (original) {
             tinyText(x + 7, y + 3, right ? "R" : "L", {24, 24, 32, 255});
-        else
+        } else {
+            tinyText(x + 4, y + 4, right ? "RT" : "LT", BLACK);
             tinyText(x + 3, y + 3, right ? "RT" : "LT", WHITE);
+        }
     }
     return 21;
 }

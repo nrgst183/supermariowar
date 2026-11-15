@@ -148,6 +148,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-ai-bench") at.aiBench = atoi(val.c_str()) != 0;
             else if (arg == "--at-replay-seeks") at.replaySeeks = atoi(val.c_str());
             else if (arg == "--at-prompts") at.prompts = atoi(val.c_str());
+            else if (arg == "--at-colors") at.colors = atoi(val.c_str());
             else if (arg == "--at-shot-ticks") at.shotTicks = atoi(val.c_str()) != 0;
             else if (arg == "--at-resim") at.resim = atoi(val.c_str()) != 0;
             else if (arg == "--at-realtime") at.realtime = atoi(val.c_str());

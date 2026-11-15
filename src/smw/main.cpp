@@ -430,6 +430,8 @@ void main_game()
     game_values.ReadConfig();
     if (cmd::g_autotest.enabled && cmd::g_autotest.prompts >= 0)
         game_values.buttonprompts = static_cast<short>(cmd::g_autotest.prompts);
+    if (cmd::g_autotest.enabled && cmd::g_autotest.colors >= 0)
+        game_values.overlaycolors = static_cast<short>(cmd::g_autotest.colors);
 
     // Online, every peer must run at the normal speed: pace --autotest runs
     if (cmd::g_net.enabled() && cmd::g_autotest.enabled && cmd::g_autotest.realtime == 0)

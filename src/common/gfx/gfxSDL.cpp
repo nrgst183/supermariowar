@@ -207,3 +207,19 @@ void GraphicsSDL::takeScreenshot() const
 
     printf("[gfx] Screenshot saved to file: %s\n", path.c_str());
 }
+
+void GraphicsSDL::eventToScreen(SDL_Event& event) const
+{
+    if (sdl_renderer)
+        SDL_ConvertEventToRenderCoordinates(sdl_renderer, &event);
+}
+
+void GraphicsSDL::windowToScreen(float& x, float& y) const
+{
+    float rx = x;
+    float ry = y;
+    if (sdl_renderer && SDL_RenderCoordinatesFromWindow(sdl_renderer, x, y, &rx, &ry)) {
+        x = rx;
+        y = ry;
+    }
+}

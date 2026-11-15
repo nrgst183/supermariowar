@@ -706,10 +706,10 @@ void fill(int x, int y, int w, int h, SDL_Color c)
     SDL_FillSurfaceRect(screen, &rect, SDL_MapSurfaceRGB(screen, c.r, c.g, c.b));
 }
 
-// The game's green dialog around an area
+// A panel around an area
 void frameBox(int x, int y, int w, int h)
 {
-    theme::dialog(x - 10, y - 10, w + 26, h + 26);
+    theme::panel(x - 10, y - 10, w + 26, h + 26);
 }
 
 void drawArrow(float fx, float fy, SDL_Color color, const std::string& label)
@@ -906,7 +906,7 @@ void drawHints()
     for (const auto& [pad, key, label] : items)
         w += prompts::promptWidth(pad, key, label) + gap;
     const int x = (SCREEN_W - w) / 2;
-    theme::block(x - 4, y - 4, w + 8, 24, theme::Tone::Dark);
+    theme::strip(x - 6, y - 6, w + 12, 28);
     int ix = x + 4;
     for (const auto& [pad, key, label] : items)
         ix += prompts::drawPrompt(ix, y, pad, key, label) + gap;
@@ -927,7 +927,7 @@ void drawSession()
         int hintsTop = 0;
         const int bottom = hintsShown(&hintsTop) && hintsTop > SCREEN_H / 2 ? hintsTop - 6 : SCREEN_H;
         const int y = bottom - h;
-        theme::dialog(x, y, w, h);
+        theme::panel(x, y, w, h);
         theme::font().draw(x + 14, y + 10, "Editing together");
         int py = y + 30;
         for (const coedit::Person& p : people) {
@@ -1177,13 +1177,14 @@ void begin(Editor editor)
     s.cursorWasVisible = SDL_CursorVisible();
     float mx = 0;
     float my = 0;
-    SDL_GetMouseState(&mx, &my);
+    gfx_mousestate(&mx, &my);
     s.cx = std::clamp(mx, 0.0f, SCREEN_W - 1.0f);
     s.cy = std::clamp(my, 0.0f, SCREEN_H - 1.0f);
 }
 
 void end()
 {
+    SDL_CaptureMouse(false);
     coedit::detach();
     s.controllers.close();
     if (s.frame)
@@ -1195,8 +1196,12 @@ void end()
 
 bool pollEvent(SDL_Event* event)
 {
-    if (!s.active)
-        return SDL_PollEvent(event);
+    if (!s.active) {
+        if (!SDL_PollEvent(event))
+            return false;
+        gfx_eventtoscreen(event);
+        return true;
+    }
     if (s.cycleStart) {
         s.cycleStart = false;
         update();
@@ -1212,6 +1217,20 @@ bool pollEvent(SDL_Event* event)
         }
         if (!SDL_PollEvent(event))
             break;
+        //The mouse in the screen's pixels (the window may be any size, or fullscreen), on the screen
+        gfx_eventtoscreen(event);
+        if (event->type == SDL_EVENT_MOUSE_MOTION) {
+            event->motion.x = std::clamp(event->motion.x, 0.0f, SCREEN_W - 1.0f);
+            event->motion.y = std::clamp(event->motion.y, 0.0f, SCREEN_H - 1.0f);
+        } else if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+            event->button.x = std::clamp(event->button.x, 0.0f, SCREEN_W - 1.0f);
+            event->button.y = std::clamp(event->button.y, 0.0f, SCREEN_H - 1.0f);
+            //(painting keeps going when the mouse leaves the window while held)
+            if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+                SDL_CaptureMouse(true);
+            else if (gfx_mousestate(nullptr, nullptr) == 0)
+                SDL_CaptureMouse(false);
+        }
         prompts::note(*event);
         //The action menu has the keyboard and the mouse while it is open
         if (s.overlay == Overlay::Actions && (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP ||
@@ -1312,7 +1331,7 @@ SDL_MouseButtonFlags mouseState(float* x, float* y)
 {
     float mx = 0;
     float my = 0;
-    SDL_MouseButtonFlags buttons = SDL_GetMouseState(&mx, &my);
+    SDL_MouseButtonFlags buttons = gfx_mousestate(&mx, &my);
     if (s.active) {
         for (const Pointer& p : s.pointers)
             buttons |= p.buttons;

@@ -63,6 +63,7 @@ class GameplayState : public GameState
         void drawReplayOverlay();
         void theaterEvent(const union SDL_Event& event);
         void resetTheater();
+        bool theaterAlpha(float& alpha) const;
         void autoTestDecideSeriesMatch();
         bool updateMatchTransition();
 

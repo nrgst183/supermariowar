@@ -1,6 +1,7 @@
 #include "SmwTheme.h"
 
 #include "gfx.h"
+#include "GameValues.h"
 #include "Game.h"
 #include "ResourceManager.h"
 #include "ui/InputPrompts.h"
@@ -96,12 +97,110 @@ void block(int x, int y, int w, int h, Tone tone)
     fill(x + 2, y + 2, 2, h - 4 - darker - 2, p.light);
 }
 
+const Scheme& scheme()
+{
+    static const Scheme schemes[] = {
+        //Night: dark blue in SMB3's status bar frame (a white line between black ones)
+        {{22, 26, 58, 255}, {34, 40, 86, 255}, {10, 12, 30, 255}, {255, 255, 255, 255}, {255, 255, 255, 255}, {189, 189, 188, 255},
+            {255, 255, 255, 255}, false, true, {56, 72, 140, 255}},
+        //Pipe: the game's green dialog
+        {{57, 154, 0, 255}, {48, 140, 0, 255}, {9, 60, 0, 255}, {107, 203, 0, 255}, {148, 243, 0, 255}, {16, 113, 0, 255},
+            {255, 255, 255, 255}, true, false, {}},
+        //Castle: dark stone, a riveted brick red rim
+        {{40, 34, 40, 255}, {56, 48, 54, 255}, {20, 16, 20, 255}, {192, 56, 40, 255}, {248, 128, 96, 255}, {112, 24, 16, 255},
+            {208, 208, 216, 255}, false, false, {}},
+        //SMB3: the status bar's own blue
+        {{0, 95, 177, 255}, {8, 108, 196, 255}, {0, 48, 104, 255}, {255, 255, 255, 255}, {255, 255, 255, 255}, {189, 189, 188, 255},
+            {255, 255, 255, 255}, false, true, {42, 154, 240, 255}},
+    };
+    return schemes[std::clamp<int>(game_values.overlaycolors, 0, 3)];
+}
+
+namespace {
+
+// A box with its corners cut (by `cut` pixels)
+void rounded(int x, int y, int w, int h, int cut, SDL_Color c)
+{
+    if (w <= 0 || h <= 0)
+        return;
+    fill(x + cut, y, w - 2 * cut, h, c);
+    fill(x, y + cut, w, h - 2 * cut, c);
+}
+
+// The frame and the body inside x, y, w, h; returns nothing, draws everything
+void framed(int x, int y, int w, int h, bool rivets)
+{
+    const Scheme& c = scheme();
+    if (c.thinRim) {
+        //SMB3: black, white, black, the light edge, the body (rounded)
+        rounded(x, y, w, h, 4, BLACK);
+        rounded(x + 2, y + 2, w - 4, h - 4, 4, c.rim);
+        fill(x + 4, y + h - 4, w - 8, 2, c.rimDark);
+        rounded(x + 4, y + 4, w - 8, h - 8, 2, BLACK);
+        rounded(x + 6, y + 6, w - 12, h - 12, 2, c.edge);
+        fill(x + 8, y + 8, w - 16, h - 16, c.body);
+        return;
+    }
+    //A wide rim, lit at the top and the left, rivets in its corners
+    rounded(x, y, w, h, 2, BLACK);
+    fill(x + 2, y + 2, w - 4, h - 4, c.rim);
+    fill(x + 2, y + 2, w - 4, 2, c.rimLight);
+    fill(x + 2, y + 2, 2, h - 4, c.rimLight);
+    fill(x + 2, y + h - 4, w - 4, 2, c.rimDark);
+    fill(x + w - 4, y + 4, 2, h - 6, c.rimDark);
+    fill(x + 6, y + 6, w - 12, h - 12, BLACK);
+    fill(x + 8, y + 8, w - 16, h - 16, c.body);
+    if (rivets) {
+        for (int rx : {x + 2, x + w - 6}) {
+            for (int ry : {y + 2, y + h - 6}) {
+                fill(rx, ry, 4, 4, BLACK);
+                fill(rx, ry, 2, 2, c.rivet);
+            }
+        }
+    }
+}
+
+} // namespace
+
+void panel(int x, int y, int w, int h)
+{
+    const Scheme& c = scheme();
+    if (c.sprite) {
+        dialog(x, y, w, h);
+        return;
+    }
+    //(the same place as the dialog sprite's box)
+    const int bx = x + 6;
+    const int by = y + 6;
+    const int bw = w - 12;
+    const int bh = h - 12;
+    if (bw < 16 || bh < 16)
+        return;
+    rounded(bx + 6, by + 6, bw, bh, 4, BLACK);    //the shadow
+    framed(bx, by, bw, bh, true);
+}
+
+void strip(int x, int y, int w, int h)
+{
+    const Scheme& c = scheme();
+    if (c.thinRim) {
+        framed(x, y, w, h, false);
+        return;
+    }
+    rounded(x, y, w, h, 2, BLACK);
+    fill(x + 2, y + 2, w - 4, h - 4, c.rim);
+    fill(x + 2, y + 2, w - 4, 2, c.rimLight);
+    fill(x + 4, y + 4, w - 8, h - 8, BLACK);
+    fill(x + 6, y + 6, w - 12, h - 12, c.body);
+}
+
 void inset(int x, int y, int w, int h)
 {
+    const Scheme& c = scheme();
     fill(x + 2, y, w - 4, h, BLACK);
     fill(x, y + 2, w, h - 4, BLACK);
-    fill(x + 2, y + 2, w - 4, h - 4, {9, 60, 0, 255});
-    fill(x + 2, y + h - 4, w - 4, 2, {16, 113, 0, 255});
+    fill(x + 2, y + 2, w - 4, h - 4, c.well);
+    fill(x + 2, y + h - 4, w - 4, 2, c.stripe);
 }
 
 void dialog(int x, int y, int w, int h)
@@ -192,13 +291,13 @@ void tooltip(int cx, int y, const std::string& text)
     const int w = font().getWidth(text) + 14;
     const int h = 20;
     const int x = std::clamp(cx - w / 2, 2, App::screenWidth - w - 2);
-    block(x, y - h - 6, w, h, Tone::Dark);
+    strip(x, y - h - 10, w, h + 4);
     //(a point under it)
     const int px = std::clamp(cx, x + 8, x + w - 8);
     fill(px - 4, y - 8, 8, 2, BLACK);
     fill(px - 2, y - 6, 4, 2, BLACK);
-    fill(px - 2, y - 8, 4, 2, palette(Tone::Dark).darker);
-    font().draw(x + 7, y - h - 4, text);
+    fill(px - 2, y - 8, 4, 2, scheme().rim);
+    font().draw(x + 7, y - h - 6, text);
 }
 
 void heading(int x, int y, int w, const std::string& text)

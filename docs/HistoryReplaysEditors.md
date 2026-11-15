@@ -18,16 +18,24 @@ selected match's details below. Select plays its replay.
 The simulation is deterministic (rollback netplay depends on it), so a replay is the
 match config (settings, players, map, RNG seed) plus every tick's input, a few KB per
 minute (`src/smw/rollback/Replay.h`). The map file is stored too: a replay still plays
-after the map was changed or deleted. Every 60 ticks a state checksum is stored; if a
-replay plays differently (another game version) the theater says so.
+after the map was changed or deleted. So are the players' skin files (a skin that isn't
+on this computer, or is a different file here, goes to the downloaded skins) and the
+music: the song the match started with and every change of song, by tick, since a match
+picks its songs at random; the theater plays the same songs at the same moments, also
+after a jump. Every 60 ticks a state checksum is stored; if a replay plays differently
+(another game version) the theater says so. Replays from before the skins and songs were
+stored still play, with the skins found by name and random songs.
 
 `smw --replay FILE` plays one at startup (with `--autotest`: then quits).
 
 ## The theater
 
 Replays play in the theater (`src/smw/GameplayTheater.cpp`), modelled on Halo 3's. Its dock
-along the bottom is the game's green dialog: the timeline is a pipe (green as far as the
-replay has played, a coin for the playhead, flags in the scoring team's color, a checkered
+along the bottom is a riveted panel (Graphics > Overlay Colors: Night, the default, dark blue
+in SMB3's white status bar frame; Pipe, the game's green dialog; Castle; SMB3, the status
+bar's own blue; the editors' panels use the same
+colors, see `src/smw/ui/SmwTheme.h`): the timeline is a pipe (green as far as the
+replay has played, a dot sunk into the pipe for the playhead, flags in the scoring team's color, a checkered
 flag at the end of the match) with the buttons under it. Each button shows the controller
 button or the key that does the same, for the device used last; any connected controller
 works.
@@ -115,7 +123,8 @@ The others may Save As a copy of their own.
 - `--autotest --at-match shots --at-role history|theater|editors|controls --at-shots DIR`:
   screenshots of the history screen, the theater, both editors driven by a scripted
   controller (followed by a match, to check that the game came back intact), and the
-  controls menu; `--at-prompts 1|2` draws the Xbox or the original Xbox buttons
+  controls menu; `--at-prompts 1|2` draws the Xbox or the original Xbox buttons, `--at-colors 0-3` picks the
+  overlay colors
 - `--at-role cohost` and `--at-role cojoin --at-addr 127.0.0.1` (`--at-shotmap 1`: the
   world editor): two or more games edit together with scripted controllers, at the same
   time and on the same cells; each prints a hash of its document (`cotest:`), which must

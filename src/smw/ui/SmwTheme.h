@@ -31,6 +31,23 @@ void block(int x, int y, int w, int h, Tone tone);
 void inset(int x, int y, int w, int h);
 // The game's green dialog (the rivets in its corners, a shadow at the right and bottom)
 void dialog(int x, int y, int w, int h);
+
+// The overlays' colors (the "Overlay Colors" option): a dark body for the
+// text, a riveted rim around it
+struct Scheme {
+    SDL_Color body, stripe, well;          // the inside, every other row, sunk boxes
+    SDL_Color rim, rimLight, rimDark;      // the frame
+    SDL_Color rivet;                       // the rivets (and the timeline's dot)
+    bool sprite;                           // the game's own dialog (Pipe)
+    bool thinRim;                          // SMB3's status bar: a thin white line, a light inner edge, no rivets
+    SDL_Color edge;                        // (that inner edge)
+};
+const Scheme& scheme();
+// A panel in those colors, laid out like dialog(): the frame 6 pixels in from the
+// top left, a shadow in the last 6 at the right and the bottom
+void panel(int x, int y, int w, int h);
+// A small framed bar in those colors (no rivets, no shadow)
+void strip(int x, int y, int w, int h);
 // A pipe lying down, 16 high, with its lips at both ends
 void pipe(int x, int y, int w, bool green);
 void pipeLip(int x, int y, bool green);    // 8 wide, 20 high (y - 2 to y + 18)

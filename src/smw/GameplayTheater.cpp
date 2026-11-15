@@ -96,6 +96,8 @@ struct Theater {
     bool paused = false;
     int speed = NORMAL_SPEED;
     float carry = 0;           // fractions of a tick (slow speeds)
+    float speedNow = 0;        // the ticks per update of the latest update (0: paused)
+    int smoothTick = -1;       // the tick the smooth motion's previous positions lead to (-1: none, after a jump)
     int uiFrames = UI_SHOW_FRAMES;
     bool hidden = false;
     bool help = false;
@@ -122,6 +124,13 @@ struct Theater {
     bool leave = false;
 };
 Theater g_theater;
+
+// Every jump: the smooth motion starts again from the next tick
+void seekTo(int tick)
+{
+    g_theater.smoothTick = -1;
+    replay::seek(tick);
+}
 std::string g_theaterShot;    // --at-role theater: a screenshot of this frame
 
 // The colors of the players' color ids (red, green, yellow, blue)
@@ -313,6 +322,32 @@ void drawIcon(Control c, int x, int y)
     }
 }
 
+// The playhead: a round socket sunk into the pipe, a gold dot in it (20x20, in doubled pixels)
+void drawPlayhead(int cx, int cy, bool held)
+{
+    const theme::Scheme& c = theme::scheme();
+    const SDL_Color dot = held ? GOLD_LIGHT : GOLD;    //(gold, like a coin)
+    for (int row = 0; row < 10; row++) {
+        for (int col = 0; col < 10; col++) {
+            const float dx = col - 4.5f;
+            const float dy = row - 4.5f;
+            const float r = std::sqrt(dx * dx + dy * dy);
+            SDL_Color color;
+            if (r > 5.0f)
+                continue;
+            if (r > 4.1f)
+                color = BLACK;                                          //the edge
+            else if (r > 3.6f)
+                color = dx + dy < 0 ? theme::shade(c.well, 60) : c.rimLight;    //the lip: shaded at the top left, lit at the bottom right
+            else if (r > 3.0f)
+                color = c.well;                                         //the hollow
+            else
+                color = (dx < -0.5f && dy < -0.5f && r > 1.2f) ? GOLD_LIGHT : (dx > 0.5f && dy > 0.5f && r > 1.8f ? SDL_Color {200, 136, 0, 255} : dot);    //the dot: a shine, a shade
+            prompts::fill(cx - 10 + col * 2, cy - 10 + row * 2, 2, 2, color);
+        }
+    }
+}
+
 void drawButton(Control c, const SDL_Rect& r, bool hover, bool active)
 {
     const Theater& th = g_theater;
@@ -332,7 +367,7 @@ void drawHelp()
     const int h = 336;
     const int x = (App::screenWidth - w) / 2;
     const int y = 40;
-    theme::dialog(x, y, w, h);
+    theme::panel(x, y, w, h);
     theme::bigFont().drawCentered(App::screenWidth / 2, y + 12, "Theater");
     const int padX = x + 272;
     const int keyX = x + 394;
@@ -360,12 +395,12 @@ void drawHelp()
     bool odd = false;
     for (const Row& row : rows) {
         if (odd)
-            prompts::fill(x + 14, ry - 2, w - 34, 22, {48, 140, 0, 255});
+            prompts::fill(x + 14, ry - 2, w - 34, 22, theme::scheme().stripe);
         odd = !odd;
         if (row.icon != CONTROL_COUNT)
             drawIcon(row.icon, x + 20, ry + 1);
         else if (row.pads.empty())
-            theme::coin(x + 20, ry + 1);
+            drawPlayhead(x + 28, ry + 9, false);
         theme::font().draw(x + 44, ry + 1, row.what);
         int px = padX;
         for (Pad p : row.pads)
@@ -429,9 +464,9 @@ void GameplayState::theaterEvent(const SDL_Event& event)
             else if (key == SDLK_ESCAPE || key == SDLK_BACKSPACE)
                 th.leave = true;
             else if (key == SDLK_HOME)
-                replay::seek(0);
+                seekTo(0);
             else if (key == SDLK_END)
-                replay::seek(replay::playbackStatus().total);
+                seekTo(replay::playbackStatus().total);
             break;
         }
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
@@ -447,7 +482,7 @@ void GameplayState::theaterEvent(const SDL_Event& event)
             if (event.button.button == SDL_BUTTON_LEFT && y >= TRACK_Y - 10 && y < TRACK_Y + TRACK_H + 6 && x >= TRACK_X - 8 &&
                     x < TRACK_X + TRACK_W + 8) {
                 th.dragging = true;
-                replay::seek(tickAt(x));
+                seekTo(tickAt(x));
                 lastUpdateTicked = false;
                 break;
             }
@@ -473,7 +508,7 @@ void GameplayState::theaterEvent(const SDL_Event& event)
             th.mouseX = event.motion.x;
             th.mouseY = event.motion.y;
             if (th.dragging && (event.motion.state & SDL_BUTTON_LMASK)) {
-                replay::seek(tickAt(event.motion.x));
+                seekTo(tickAt(event.motion.x));
                 lastUpdateTicked = false;
             }
             showUi();
@@ -545,7 +580,7 @@ void GameplayState::updateReplay()
     const replay::PlaybackStatus& status = replay::playbackStatus();
     if (th.playPause) {
         if (status.finished) {
-            replay::seek(0);    //(from the start again)
+            seekTo(0);    //(from the start again)
             th.paused = false;
         } else {
             th.paused = !th.paused;
@@ -577,7 +612,7 @@ void GameplayState::updateReplay()
     const bool forward = repeat(th.holdForward, padForward) || th.skip > 0;
     if (back || forward) {
         const int amount = th.paused ? 1 : SKIP_TICKS;
-        replay::seek(g_sim.tick + (forward ? amount : -amount));
+        seekTo(g_sim.tick + (forward ? amount : -amount));
         showUi();
     }
 
@@ -585,15 +620,17 @@ void GameplayState::updateReplay()
     const float rewind = std::max(th.pad.lt, shift && keys[SDL_SCANCODE_LEFT] ? 1.0f : 0.0f);
     const float fastForward = std::max(th.pad.rt, shift && keys[SDL_SCANCODE_RIGHT] ? 1.0f : 0.0f);
     if (rewind > 0.05f) {
-        replay::seek(g_sim.tick - static_cast<int>(2 + 6 * rewind));
+        seekTo(g_sim.tick - static_cast<int>(2 + 6 * rewind));
         lastUpdateTicked = false;
         showUi();
     }
 
     //Play
+    th.speedNow = 0;
     if (!th.paused && !status.finished && rewind <= 0.05f) {
         const float speed = fastForward > 0.05f ? std::max(SPEEDS[static_cast<size_t>(th.speed)], 2.0f + 6.0f * fastForward)
                                                 : SPEEDS[static_cast<size_t>(th.speed)];
+        th.speedNow = speed;
         th.carry += speed;
         int ticks = static_cast<int>(th.carry);
         th.carry -= static_cast<float>(ticks);
@@ -601,11 +638,15 @@ void GameplayState::updateReplay()
             if (!replay::step())
                 break;
             lastUpdateTicked = true;
+            th.smoothTick = g_sim.tick;
             //A fade to the end of the match: the transition comes first
             if (game_values.screenfade == 255)
                 break;
         }
     }
+
+    //The song recorded for this moment (after playing on, or a jump)
+    replay::syncMusic();
 
     //--at-role theater (screenshots): follow, pause, the help, jump near the end
     if (cmd::g_autotest.enabled && cmd::g_autotest.kind == cmd::AutoTestArgs::Kind::Shots && cmd::g_autotest.shotsRole == "theater") {
@@ -615,7 +656,7 @@ void GameplayState::updateReplay()
         if (demo == 140) { th.paused = true; prompts::setLastDevice(prompts::Device::Controller); }
         if (demo == 155) th.help = true;
         if (demo == 165) { th.help = false; prompts::setLastDevice(prompts::Device::Keyboard); }
-        if (demo == 180) { replay::seek(status.total - 90); th.paused = false; th.speed = 3; showUi(); }
+        if (demo == 180) { seekTo(status.total - 90); th.paused = false; th.speed = 3; showUi(); }
         g_theaterShot = demo == 100 ? "t1_playing_following" : demo == 150 ? "t2_paused_controller" : demo == 160 ? "t4_help" :
                         demo == 170 ? "t5_paused_keyboard" : "";
     }
@@ -629,7 +670,7 @@ void GameplayState::updateReplay()
             rng = rng * 1664525u + 1013904223u;
             const int target = static_cast<int>((rng >> 8) % static_cast<uint32_t>(std::max(1, replay::playbackStatus().total)));
             printf("replay: seek from %d to %d\n", g_sim.tick, target);
-            replay::seek(target);
+            seekTo(target);
             seeks++;
         }
     }
@@ -654,6 +695,20 @@ void GameplayState::updateReplay()
         }
     }
     playMusic();
+}
+
+// Smooth motion in the theater, at every speed: how far between the previous
+// tick and the latest one to draw. At 1/4x a tick comes every 4th update, so
+// the way there is the fraction of a tick played since (carry), plus the time
+// since the update at this speed; and as at full speed it doesn't depend on
+// the frame rate. False: draw the latest tick as it is (paused, just jumped).
+bool GameplayState::theaterAlpha(float& alpha) const
+{
+    const Theater& th = g_theater;
+    if (th.smoothTick != g_sim.tick || th.speedNow <= 0)
+        return false;
+    alpha = std::clamp(th.carry + alpha * std::min(th.speedNow, 1.0f), 0.0f, 1.0f);
+    return alpha < 1.0f;
 }
 
 void GameplayState::leaveReplay()
@@ -682,9 +737,10 @@ void GameplayState::drawReplayOverlay()
         for (const CPlayer* player : g_sim.players) {
             if (player->getGlobalID() != th.follow)
                 continue;
-            const int cx = player->leftX() + 16;
+            //(with the screen's shake, like the player under it)
+            const int cx = player->leftX() + 16 + x_shake;
             const SDL_Color c = slotColor(th.follow);
-            const int ay = std::max(22, player->topY() - 14);
+            const int ay = std::max(22, player->topY() - 14) + y_shake;
             prompts::art(cx - 8, ay, {
                 "########",
                 "#cccccc#",
@@ -692,26 +748,34 @@ void GameplayState::drawReplayOverlay()
                 "..#cc#..",
                 "...##...",
             }, {{'#', BLACK}, {'c', c}, {'C', theme::shade(c, 150)}});
-            theme::font().drawCentered(cx, std::max(0, ay - 18), followName(th.follow));
+            theme::font().drawCentered(cx - x_shake, std::max(0, ay - 18) - y_shake, followName(th.follow));
         }
     }
+
+    //The theater stays still when the game's screen shakes (a POW block, a thwomp...)
+    struct NoShake {
+        short x = x_shake;
+        short y = y_shake;
+        NoShake() { x_shake = y_shake = 0; }
+        ~NoShake() { x_shake = x; y_shake = y; }
+    } noShake;
 
     if (!barShown()) {
         //Just a reminder
         const int w = prompts::promptWidth(Pad::Back, "F1", "Replay") + 14;
-        theme::block(App::screenWidth - w - 4, App::screenHeight - 28, w, 24, theme::Tone::Dark);
+        theme::strip(App::screenWidth - w - 4, App::screenHeight - 30, w, 28);
         prompts::drawPrompt(App::screenWidth - w + 3, App::screenHeight - 24, Pad::Back, "F1", "Replay");
         if (th.help)
             drawHelp();
         return;
     }
 
-    //The dock: the game's green dialog along the bottom (its edges off the screen)
-    theme::dialog(-6, DOCK_Y, App::screenWidth + 12, App::screenHeight - DOCK_Y + 20);
+    //The dock: a panel along the bottom (its edges off the screen)
+    theme::panel(-6, DOCK_Y, App::screenWidth + 12, App::screenHeight - DOCK_Y + 20);
 
     //The timeline: a pipe, green as far as the replay is; the score changes
     //are flags in the scoring team's color, the end a checkered flag; the
-    //playhead a coin
+    //playhead a dot sunk into the pipe
     const int total = std::max(1, status.total);
     const int done = TRACK_W * std::clamp(g_sim.tick, 0, total) / total;
     theme::pipe(TRACK_X, TRACK_Y, done, true);
@@ -733,7 +797,7 @@ void GameplayState::drawReplayOverlay()
         else
             prompts::fill(mx, TRACK_Y - 4, 2, 4, teamColor(m.team));
     }
-    theme::coin(TRACK_X + done - 8, TRACK_Y);
+    drawPlayhead(TRACK_X + done, TRACK_Y + 8, th.dragging);
     theme::font().drawRightJustified(TRACK_X - 14, TRACK_Y, history::formatDuration(g_sim.tick));
     theme::font().draw(TRACK_X + TRACK_W + 14, TRACK_Y, history::formatDuration(status.total));
 
@@ -767,14 +831,14 @@ void GameplayState::drawReplayOverlay()
         const int w = stateW + theme::font().getWidth(title) + theme::font().getWidth(when) + 86;
         const int x = (App::screenWidth - w) / 2;
         const int y = DOCK_Y - 28;
-        theme::block(x, y, w, 26, theme::Tone::Gray);
-        theme::block(x + 4, y + 4, stateW, 18, finished ? theme::Tone::Gold : theme::Tone::Red);
+        theme::strip(x, y - 2, w, 30);
+        theme::block(x + 6, y + 4, stateW, 18, finished ? theme::Tone::Gold : theme::Tone::Red);
         if (finished)
-            theme::modeIcon(x + 7, y + 5, 13);
+            theme::modeIcon(x + 9, y + 5, 13);
         else
-            prompts::art(x + 9, y + 7, {"##.##", "##.##", "##.##", "##.##", "##.##", "##.##"}, {{'#', WHITE}});
-        theme::font().draw(x + 28, y + 4, state);
-        const int tx = x + 4 + stateW + 10;
+            prompts::art(x + 11, y + 7, {"##.##", "##.##", "##.##", "##.##", "##.##", "##.##"}, {{'#', WHITE}});
+        theme::font().draw(x + 30, y + 4, state);
+        const int tx = x + 6 + stateW + 10;
         const short modeIndex = game_values.gamemode ? GetModeIconIndexFromMode(game_values.gamemode->gamemode) : -1;
         if (modeIndex >= 0)
             theme::modeIcon(tx, y + 5, modeIndex);
@@ -790,7 +854,7 @@ void GameplayState::drawReplayOverlay()
         const int panelW = 6 * 18 + 30 + theme::font().getWidth(followName(th.follow));
         const int panelX = App::screenWidth - panelW - 4;
         const int panelY = DOCK_Y - (titled ? 58 : 28);
-        theme::block(panelX, panelY, panelW, 26, theme::Tone::Dark);
+        theme::strip(panelX, panelY - 2, panelW, 30);
         iconCamera(panelX + 6, panelY + 5, slotColor(th.follow));
         theme::font().draw(panelX + 26, panelY + 4, followName(th.follow));
         int x = panelX + panelW - 6 * 18 - 4;

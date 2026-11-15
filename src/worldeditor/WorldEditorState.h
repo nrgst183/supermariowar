@@ -69,6 +69,18 @@
 #define SDL_GetModState() ::editors::input::modState()
 #define SDL_GetMouseState(x, y) ::editors::input::mouseState(x, y)
 #define gfx_flipscreen() ::editors::input::flip()
+#else
+// The standalone editor: the mouse in the screen's 640x480, at any window size
+#include "gfx.h"
+static inline bool editorPollEvent(SDL_Event* event)
+{
+    if (!SDL_PollEvent(event))
+        return false;
+    gfx_eventtoscreen(event);
+    return true;
+}
+#define SDL_PollEvent(e) editorPollEvent(e)
+#define SDL_GetMouseState(x, y) gfx_mousestate(x, y)
 #endif
 
 #ifdef SMW_EMBEDDED_EDITOR

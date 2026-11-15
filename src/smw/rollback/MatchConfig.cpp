@@ -1,4 +1,5 @@
 #include "MatchConfig.h"
+#include "Replay.h"
 
 #include "ConfigNames.h"
 #include "GameMode.h"
@@ -640,6 +641,7 @@ void startConfiguredMatch(const MatchConfig& config)
         musiclist->setRandomMusic(static_cast<MusicCategory>(g_map->musicCategoryID), stripPathAndExtension(path), g_map->szBackgroundFile);
         rm->backgroundmusic[0] = sfxMusic(musiclist->currentMusic());
         rm->backgroundmusic[0].play(game_values.playnextmusic, false);
+        replay::noteMusic();
     }
 
     game_values.appstate = AppState::Game;
