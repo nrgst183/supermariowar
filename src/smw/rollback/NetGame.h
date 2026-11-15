@@ -68,6 +68,9 @@ public:
     bool isHost() const;
     // The lobby (null if none was opened)
     NetLobby* lobby() { return m_lobby.get(); }
+    // The host's router (UPnP, PortMapping.h): one line for the lobby screen ("" when nothing to
+    // say); `good` tells whether friends can likely reach us
+    std::string routerNote(bool& good) const;
     const NetLobby* lobby() const { return m_lobby.get(); }
     // Host: starts a match with the mode, map and settings the menus have
     // selected and the lobby's slots. It starts by itself once every peer

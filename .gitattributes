@@ -3,3 +3,5 @@
 
 # Windows batch files need CRLF line endings to run reliably
 *.bat text eol=crlf
+# Shell scripts run on Linux (CI): LF
+*.sh text eol=lf

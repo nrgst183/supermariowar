@@ -28,6 +28,8 @@ add_library(SmwRollbackNet STATIC
     NetProtocol.h
     NetSeries.cpp
     NetSeries.h
+    PortMapping.h
+    PortMappingParse.cpp
     RollbackSession.cpp
     RollbackSession.h
     SkinTransfer.cpp
@@ -41,6 +43,7 @@ if(NOT NO_NETWORK)
     target_sources(SmwRollbackNet PRIVATE
         EnetTransport.cpp
         EnetTransport.h
+        PortMapping.cpp
     )
     target_link_libraries(SmwRollbackNet PUBLIC enet)
     if (WIN32)

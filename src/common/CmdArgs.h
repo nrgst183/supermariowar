@@ -60,6 +60,7 @@ struct NetArgs {
     int statsInterval = 300;   // --net-stats N: print statistics every N frames (0: off)
     int timeoutMs = 5000;      // --net-timeout MS: a silent peer is gone after this long
     int quitAt = 0;            // --net-quit-at F: leave the match at frame F (disconnect test)
+    int upnp = -1;             // --net-upnp 0|1: ask the router to forward the host's port (-1: yes, except with --autotest)
     // Network condition simulator (testing only)
     int simLatencyMs = 0;      // --net-sim-latency MS: added one-way delay of every packet sent
     int simJitterMs = 0;       // --net-sim-jitter MS: +- random variation of that delay

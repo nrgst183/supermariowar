@@ -22,9 +22,13 @@ All players must run the **same version of the game**: the connection is refused
 ### Port forwarding and firewalls
 
 - **On a LAN** (same router or switch) nothing is needed: join the host's local address.
-- **Over the internet**, the host must make the port reachable: forward **UDP 7300** (or the port the host chose) on the router to the host's computer, and allow it in the firewall. Joiners need no forwarding. Tell the joiners the host's public IP address.
-- With several players, the joiners also connect to *each other* directly (a full mesh), so every joiner must be able to reach the other joiners. Ordinary home routers allow this, because the joiners connect outwards.
-- There is no NAT traversal or relay yet. If joining times out, the port is most likely not reachable.
+- **Over the internet**, the host's port has to be reachable. When you host, the game asks your router to forward it by itself (**UPnP**, which most home routers have on). Until a friend joins, the lobby's status line says how it went:
+  - **"Friends join at 203.0.113.5:7300"**: done; give your friends that address.
+  - **"Couldn't open port 7300: forward UDP 7300"**: no router answered (UPnP is off, or there is none), or it refused (the game's log says why, `upnp:` lines). Forward **UDP 7300** (or the port you chose) on the router to your computer by hand, and allow it in the firewall.
+  - **"Port 7300 opened; your ISP's NAT may block it"**: the router's own internet address is private (carrier-grade NAT, common on mobile and some fibre connections), so the forward doesn't reach the internet. Then a forward by hand doesn't help either: use a VPN such as a virtual LAN (ZeroTier, Tailscale, Radmin VPN), or let a friend host.
+  The forward is removed when the lobby closes. `--net-upnp 0` turns this off.
+- Joiners need no forwarding. With several players, the joiners also connect to *each other* directly (a full mesh), so every joiner must be able to reach the other joiners. Ordinary home routers allow this, because the joiners connect outwards.
+- There is no relay server: if joining times out, the host's port is most likely not reachable.
 
 ### Tournaments, tours and worlds
 
@@ -78,6 +82,7 @@ smw --net-join 192.168.1.20:7300          # join
 | `--net-slow-map N` | the host sends one map chunk per N frames (to catch the transfer in screenshots) |
 | `--net-timeout MS` | a peer that sends nothing for this long is gone (default 5000) |
 | `--net-quit-at F` | leave the match at frame F (disconnect tests) |
+| `--net-upnp 0\|1` | ask the router to forward the host's port (default: yes, except with `--autotest`) |
 | `--net-sim-latency MS` | simulated one-way delay added to every packet sent |
 | `--net-sim-jitter MS` | simulated +- variation of that delay |
 | `--net-sim-loss PCT` | simulated loss of the unreliable packets |
@@ -99,6 +104,7 @@ The code is in `src/smw/rollback/`, bottom to top:
 - **NetLobby** (`NetLobby.h`). A persistent session: peers, names, slots, ready flags, the input delay, the map transfer, and the messages that set up and abort a match. The header starts with the *menu contract*: what the menus and overlays may call.
 - **NetGame** (`NetGame.h`). Owns the lobby and the running session and connects them to the game: it captures the host's match setup (`MatchConfig`), starts the match on every peer at the same frame, saves and loads snapshots for the session, and returns to the lobby afterwards. `GameplayState::updateNetplay` calls `NetGame::advance` once per frame.
 - **Series** (`NetSeries.h`, `NetGameSeries.cpp`, `SeriesState.h`, and the menus' part `MenuOnlineSeries.cpp`). Tournament, tour and world: the matches are ordinary online matches, and between them the host is the authority: it sends the start of the series, which screen it shows, the bonus wheel's stop; the world map is a lockstep of the players' menu keys, relayed by the host. The next match's config carries the host's series state, which every peer compares with its own (`modesum:` lines).
+- **Port mapping** (`PortMapping.h`). When hosting, a background thread asks the router to forward the port with UPnP (SSDP search, the router's description, `AddPortMapping`/`GetExternalIPAddress`/`DeletePortMapping` over SOAP), over ENet's sockets. `NetGame::routerNote()` turns its status into the lobby's line. Tested against a fake router; the parsing has unit tests (`tests/rollback/test_PortMapping.cpp`).
 - **Overlays** (`NetOverlay.cpp`) draw the waiting box, the network stats and the "disconnected - CPU takes over" line from `NetGame`'s read-only queries (`waitInfo`, `peerPingMs`, `inputDelay`, `matchStats`, `dropNotice`).
 
 ### Lost peers
@@ -127,6 +133,8 @@ Why the CPU and not an idle player or removing the player: an idle player is a f
 - Debug keys and other local-only changes of the simulation are disabled in online matches.
 
 ### Testing
+
+**CI.** `scripts/ci-checks.sh [BUILD_DIR]` runs the checks below that need the real game: the sync test in all 22 modes, replays with random jumps, and `scripts/netplay-test.sh` (2 and 3 peers, with and without lag and loss, then the disconnect tests), in about three minutes. GitHub Actions runs it on every push (`.github/workflows/checks.yml`, the "Checks" job), and a release waits for it.
 
 **Sync test.** It runs without a network and finds violations of the rules above: every tick it rolls back up to N ticks, re-simulates them and checks that the state is identical.
 

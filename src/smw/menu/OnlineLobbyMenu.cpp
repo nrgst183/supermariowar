@@ -332,6 +332,18 @@ void UI_OnlineLobbyMenu::Sync()
             tone = ready ? Tone::Good : Tone::Info;
         }
     }
+    //The host alone in the lobby: whether friends can reach it (the router's port, UPnP)
+    if (host && inLobby && (status.empty() || tone != Tone::Error)) {
+        bool anyone = false;
+        for (int p = 1; p < rollback::net::MAX_PEERS; p++)
+            anyone |= lobby->peer(p).present;
+        bool good = false;
+        const std::string router = rollback::NetGame::instance().routerNote(good);
+        if (!anyone && !router.empty()) {
+            status = router;
+            tone = good ? Tone::Good : Tone::Warn;
+        }
+    }
     m_statusLine = status;
 
     std::string hint;

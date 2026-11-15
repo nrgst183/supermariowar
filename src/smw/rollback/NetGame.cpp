@@ -1,4 +1,5 @@
 #include "NetGame.h"
+#include "PortMapping.h"
 #include "Replay.h"
 
 #include "CmdArgs.h"
@@ -147,9 +148,39 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
     }
     if (asHost && args.delay >= 0)
         m_lobby->setInputDelay(args.delay);
+    //Friends join without a port forwarded by hand where the router lets us open it (UPnP)
+    if (asHost && (args.upnp > 0 || (args.upnp < 0 && !cmd::g_autotest.enabled)))
+        upnp::openPort(port);
     m_wasClosed = false;
     m_lastMatchError.clear();
     return true;
+#endif
+}
+
+std::string NetGame::routerNote(bool& good) const
+{
+    good = false;
+#ifdef NETWORK_DISABLED
+    return {};
+#else
+    if (!m_lobby || !isHost())
+        return {};
+    const upnp::Status st = upnp::status();
+    const std::string port = std::to_string(st.port);
+    switch (st.state) {
+        case upnp::State::Working:
+            return "Opening port " + port + " on your router...";
+        case upnp::State::Open:
+            if (st.behindAnotherNat)
+                return "Port " + port + " opened; your ISP's NAT may block it";
+            good = true;
+            return st.publicAddress.empty() ? "Router port " + port + " opened" : "Friends join at " + st.publicAddress + ":" + port;
+        case upnp::State::Failed:
+            //(why: in the log)
+            return "Couldn't open port " + port + ": forward UDP " + port;
+        default:
+            return {};
+    }
 #endif
 }
 
@@ -203,6 +234,9 @@ void NetGame::leave()
 
 void NetGame::shutdown()
 {
+#ifndef NETWORK_DISABLED
+    upnp::closePort();
+#endif
     if (m_transport)
         m_transport->close(500);
     m_inMatch = false;

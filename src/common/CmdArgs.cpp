@@ -85,6 +85,8 @@ void print_help(const char* title, const char* version)
     printf("      --net-stats <N>     Print \"netstats:\" lines every N frames (default 300, 0 off)\n");
     printf("      --net-timeout <MS>  A peer that sends nothing for this long is gone (5000)\n");
     printf("      --net-quit-at <F>   Leave the match at frame F (disconnect test)\n");
+    printf("      --net-upnp <0|1>    Ask the router to forward the host's port with UPnP\n"
+           "                          (default: yes, except with --autotest)\n");
     printf("  --replay <FILE>         Play a replay (from the replays folder, or a path);\n");
     printf("                          with --autotest, quit when it ends\n");
     printf("      --net-sim-latency <MS> Simulated one-way latency of every packet sent\n");
@@ -197,6 +199,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--net-stats") net.statsInterval = atoi(val.c_str());
             else if (arg == "--net-timeout") net.timeoutMs = atoi(val.c_str());
             else if (arg == "--net-quit-at") net.quitAt = atoi(val.c_str());
+            else if (arg == "--net-upnp") net.upnp = atoi(val.c_str());
             else if (arg == "--net-sim-latency") net.simLatencyMs = atoi(val.c_str());
             else if (arg == "--net-sim-jitter") net.simJitterMs = atoi(val.c_str());
             else if (arg == "--net-sim-loss") net.simLossPercent = static_cast<float>(atof(val.c_str()));

@@ -839,7 +839,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
 
     if (at.shotsRole == "host") {
         switch (step) {
-            case 2:
+            case 2: {
                 if (t == 1)
                     return MENU_CODE_ONLINE_HOST;
                 if (mCurrentMenu == mOnlineMenu.get() && t > 20) {
@@ -848,11 +848,18 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                     t = 0;
                     return MENU_CODE_NONE;
                 }
-                if (lobby && lobby->phase() == Phase::Lobby && t > 20) {
+                //(once the router has answered, if UPnP is on: the line says how friends join)
+                bool routerAnswered = true;
+                if (lobby) {
+                    bool good = false;
+                    routerAnswered = rollback::NetGame::instance().routerNote(good).rfind("Opening", 0) != 0 || t > 5000;
+                }
+                if (lobby && lobby->phase() == Phase::Lobby && t > 20 && routerAnswered) {
                     shot("03_team_host_alone");
                     next();
                 }
                 return MENU_CODE_NONE;
+            }
 
             case 3:    //a joiner and a CPU player
                 if (lobby && lobby->peer(1).present && lobby->pingsMeasured() && lobby->peer(1).localPlayers == 2 && t > 30) {
