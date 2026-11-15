@@ -8,6 +8,18 @@
 #include "SimArena.h"
 
 class CObject;
+
+// AI comparisons in autotests (not simulation state): kills, deaths and self-deaths per player
+namespace aibench {
+extern int kills[4];
+extern int deaths[4];
+extern int selfDeaths[4];
+extern int styleKills[32];
+extern int navTried[3];     // path moves: jump, drop, walk
+extern int navReached[3];
+void reset();
+void print();
+}
 class CPlayer;
 struct COutputControl;
 
@@ -83,12 +95,27 @@ public:
     void DistanceToObject(CObject * object, CObject ** target, int * nearest, bool * wrap);
     void DistanceToObjectCenter(CObject * object, CObject ** target, int * nearest, bool * wrap);
     void DistanceToPlayer(CPlayer * player, CPlayer ** target, int * nearest, bool * wrap);
+    void AimWeapon(COutputControl * playerKeys, short actionType);
+    void FightPlayer(COutputControl * playerKeys, CPlayer * player, bool wrap);
+    // Follow the path toward (x,y) (see AINav.h); false when there is no path (the caller decides then)
+    bool NavigateTo(COutputControl * playerKeys, int x, int y);
+    bool NeedsPath(int x, int y) const;
 
 protected:
+    bool improved() const;
+    bool improvedFighting() const;
+
     CPlayer * pPlayer = nullptr;
 
 private:
     short iFallDanger = 0;
+    // The path move in progress (AINav): kept while we're in the air
+    short navCol = -1;
+    short navRow = -1;
+    short navMove = 0;
+    short navLastCol = -1;    // where we stood when we chose that move
+    short navLastRow = -1;
+    bool navActive = false;   // this think followed a path
     NearestObjects nearestObjects;
 
     sim::map<int, AttentionObject*> attentionObjects;

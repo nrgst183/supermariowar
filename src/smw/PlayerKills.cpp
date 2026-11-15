@@ -1,3 +1,5 @@
+#include "CmdArgs.h"
+#include "ai.h"
 #include "player.h"
 
 #include "eyecandy.h"
@@ -104,8 +106,13 @@ PlayerKillType CPlayer::KilledPlayer(CPlayer * killed, PlayerDeathStyle deathsty
             ifSoundOnPlay(rm->sfx_breakblock);
     }
 
-    if (PlayerKillType::Normal == iKillType || (fForce && PlayerKillType::NonKill == iKillType))
+    if (PlayerKillType::Normal == iKillType || (fForce && PlayerKillType::NonKill == iKillType)) {
+        if (cmd::g_autotest.aiBench && killer->globalID >= 0 && killer->globalID < 4)
+            aibench::kills[killer->globalID]++, aibench::styleKills[static_cast<int>(style) & 31]++;
+        if (cmd::g_autotest.aiBench && killed->globalID >= 0 && killed->globalID < 4)
+            aibench::selfDeaths[killed->globalID]--;   // killed by a player: not a death of its own doing
         killed->die(deathstyle, false, fKillCarriedItem);
+    }
 
     return iKillType;
 }

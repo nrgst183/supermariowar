@@ -1,5 +1,8 @@
 #include "ai.h"
 
+#include "AINav.h"
+#include "CmdArgs.h"
+
 #include "GameValues.h"
 #include "input.h"
 #include "map.h"
@@ -71,10 +74,80 @@
 #include "objects/powerup/PU_TreasureChestBonus.h"
 
 #include <memory>
+#include <cstdio>
 #include <cstdlib> // abs()
 
 // see docs/development/HowAIWorks.txt for more information
 
+namespace aibench {
+int kills[4] = {};
+int deaths[4] = {};
+int selfDeaths[4] = {};
+int styleKills[32] = {};
+int navTried[3] = {};
+int navReached[3] = {};
+
+void reset()
+{
+    for (int k = 0; k < 4; k++)
+        kills[k] = deaths[k] = selfDeaths[k] = 0;
+}
+
+void print()
+{
+    for (int g = 0; g < 4; g++) {
+        const CPlayer* p = GetPlayerFromGlobalID(g);
+        const int team = p ? p->getTeamID() : -1;
+        printf("aibench: player %d %s team %d kills %d deaths %d self %d score %d winner %d\n", g,
+            (cmd::g_autotest.aiLegacyMask & (1 << g)) ? "old" : "new", team, kills[g], deaths[g], selfDeaths[g],
+            team >= 0 ? g_sim.score[team].score : -1, team >= 0 && game_values.gamemode->winningteam == team ? 1 : 0);
+    }
+    printf("aibench: nav jump %d/%d drop %d/%d walk %d/%d\n", navReached[0], navTried[0], navReached[1], navTried[1], navReached[2], navTried[2]);
+    for (int k = 0; k < 3; k++)
+        navTried[k] = navReached[k] = 0;
+    printf("aibench: styles");
+    for (int k = 0; k < 32; k++) {
+        if (styleKills[k])
+            printf(" %d:%d", k, styleKills[k]);
+        styleKills[k] = 0;
+    }
+    printf("\n");
+    reset();
+}
+}
+
+// The improved behaviour is on unless an AI comparison asked for the original logic for this player
+bool CPlayerAI::improved() const
+{
+    return !(cmd::g_autotest.aiLegacyMask & (1 << pPlayer->globalID));
+}
+
+// The stomp fighting and path following help in the modes that are about knocking out the
+// others or getting somewhere; in the item modes (coins, eggs, flags, stars...) they made the
+// CPU worse in AI comparisons, so those keep the original behaviour.
+bool CPlayerAI::improvedFighting() const
+{
+    if (!improved())
+        return false;
+    switch (game_values.gamemode->gamemode) {
+        case game_mode_classic:
+        case game_mode_frag:
+        case game_mode_timelimit:
+        case game_mode_jail:
+        case game_mode_chicken:
+        case game_mode_tag:
+        case game_mode_koth:
+        case game_mode_race:
+        case game_mode_owned:
+        case game_mode_frenzy:
+        case game_mode_survival:
+        case game_mode_chase:
+        case game_mode_shyguytag:
+            return true;
+        default:
+            return false;
+    }
+}
 
 CPlayerAI::CPlayerAI()
 {
@@ -124,6 +197,18 @@ void CPlayerAI::Init()
     }
 }
 
+// Tuned with AI comparisons (--at-ai-old/--at-ai-bench)
+namespace {
+constexpr int SIDE_OFFSET = 96;   // climb to this far beside an opponent above us
+constexpr int NEAR_ABOVE = 120;   // an opponent above us closer than this: dodge, don't climb
+constexpr float LEAD_FRAMES = 6.0f;   // aim where the opponent will be this many frames from now
+constexpr int SAME_LEVEL_JUMP = 120;  // jump at an opponent on our level this close
+constexpr int UNDER_FEET = 56;        // keep this far out from under an opponent above us
+constexpr int HOP_RANGE = 120;        // hop toward an opponent below us this close
+constexpr int WAIT_RANGE = 140;       // an opponent jumping this close: wait for them to come down
+constexpr float AIR_BRAKE_FRAMES = 6.0f;  // steering in the air allows for this much drift
+}
+
 void CPlayerAI::Think(COutputControl * playerKeys)
 {
     short iDecisionPercentage[5] = {25, 35, 50, 75, 100};
@@ -143,6 +228,8 @@ void CPlayerAI::Think(COutputControl * playerKeys)
 
     if (pPlayer->isdead() || pPlayer->isspawning())
         return;
+
+    navActive = false;
 
     auto* gmChicken = dynamic_cast<CGM_Chicken*>(game_values.gamemode);
     auto* gmTag = dynamic_cast<CGM_Tag*>(game_values.gamemode);
@@ -265,8 +352,30 @@ void CPlayerAI::Think(COutputControl * playerKeys)
                 moveAway = &playerKeys->game_left.fDown;
             }
 
+            const bool plainFight = !carriedItem && !(gmTag && (gmTag->tagged() == player || gmTag->tagged() == pPlayer)) &&
+                !(gmChicken && gmChicken->chicken() == pPlayer) && !player->isInvincible() && !player->shyguy && !player->bobomb &&
+                !pPlayer->isInvincible() && !pPlayer->shyguy && !pPlayer->bobomb;
+
             //Move player relative to opponent when we are playing star mode and we are holding a star
-            if (game_values.gamemode->gamemode == game_mode_star) {
+            if (improvedFighting() && plainFight) {
+                // Climb up beside an opponent above us, never right under their feet
+                int ox = player->ix + PW / 2;
+                int odx = ox - (ix + PW / 2);
+                if (odx > App::screenWidth / 2)
+                    odx -= App::screenWidth;
+                else if (odx < -App::screenWidth / 2)
+                    odx += App::screenWidth;
+                const bool above = player->iy < iy - 40;
+                if (above)
+                    ox += odx > 0 ? -SIDE_OFFSET : SIDE_OFFSET;
+                const bool usePath = (pPlayer->inair ? navMove != 0 : true) && NeedsPath(ox, player->iy + PH / 2) && !(above && odx > -NEAR_ABOVE && odx < NEAR_ABOVE);
+                const bool midMove = pPlayer->inair && navMove != 0;   // finish a path move we've started
+                if (!(usePath || midMove) || !NavigateTo(playerKeys, ox, player->iy + PH - 1)) {
+                    if (!pPlayer->inair)
+                        navMove = 0;
+                    FightPlayer(playerKeys, player, nearestObjects.playerwrap);
+                }
+            } else if (game_values.gamemode->gamemode == game_mode_star) {
                 if (carriedItem && carriedItem->getMovingObjectType() == movingobject_star) {
                     if ((static_cast<CO_Star*>(carriedItem))->getType() == 1)
                         *moveAway = true;
@@ -315,7 +424,9 @@ void CPlayerAI::Think(COutputControl * playerKeys)
             }
 
 
-            if (player->iy <= iy &&					//jump if player is higher or at the same level and
+            if (improvedFighting() && plainFight) {
+                //FightPlayer() did the jumping
+            } else if (player->iy <= iy &&					//jump if player is higher or at the same level and
                     player->ix - ix < 45 &&				//player is very near
                     player->ix - ix > -45) {
                 //or if player is high
@@ -341,8 +452,12 @@ void CPlayerAI::Think(COutputControl * playerKeys)
             }
         } else if (actionType == 1) { //Go for goal
             CObject * goal = nearestObjects.goal;
+            const int goalX = goal->x() + goal->w() / 2;
+            const int goalY = goal->y() + goal->h() / 2;
 
-            if ((goal->x() > ix && nearestObjects.goalwrap) || (goal->x() < ix && !nearestObjects.goalwrap))
+            if (improvedFighting() && (NeedsPath(goalX, goalY) || (pPlayer->inair && navMove != 0)) && NavigateTo(playerKeys, goalX, goalY)) {
+                //Following the path to it
+            } else if ((goal->x() > ix && nearestObjects.goalwrap) || (goal->x() < ix && !nearestObjects.goalwrap))
                 playerKeys->game_left.fDown = true;
             else
                 playerKeys->game_right.fDown = true;
@@ -455,8 +570,11 @@ void CPlayerAI::Think(COutputControl * playerKeys)
         }
     }
 
+    if (improved())
+        AimWeapon(playerKeys, actionType);
+
     //Jump if trying to move left/right and x velocity is zero
-    if ((playerKeys->game_left.fDown || playerKeys->game_right.fDown) && pPlayer->velx == 0.0f)
+    if (!navActive && (playerKeys->game_left.fDown || playerKeys->game_right.fDown) && pPlayer->velx == 0.0f)
         playerKeys->game_jump.fDown = true;
 
     //Pick up throwable blocks from below
@@ -692,6 +810,228 @@ ExitDeathCheck:
             playerKeys->game_powerup.fDown = true;
         }
     }
+}
+
+// The simple "move toward it and jump when close" approach works when the target is about
+// level with us; for targets well above us, or below and to the side, we follow a path.
+bool CPlayerAI::NeedsPath(int x, int y) const
+{
+    int dx = x - (pPlayer->ix + PW / 2);
+    if (dx > App::screenWidth / 2)
+        dx -= App::screenWidth;
+    else if (dx < -App::screenWidth / 2)
+        dx += App::screenWidth;
+    const int dy = y - (pPlayer->iy + PH / 2);
+    return dy < -40 || (dy > 48 && (dx < -48 || dx > 48));
+}
+
+bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
+{
+    bool& left = playerKeys->game_left.fDown;
+    bool& right = playerKeys->game_right.fDown;
+    const int px = pPlayer->ix;
+
+    auto steerTo = [&](int col) {
+        // Toward the middle of the column, the short way around the screen; in the air we
+        // keep moving the way we're going for a while, so aim with where that takes us
+        const int ahead = pPlayer->inair ? static_cast<int>(pPlayer->velx * AIR_BRAKE_FRAMES) : 0;
+        int d = col * TILESIZE + (TILESIZE - PW) / 2 - px - ahead;
+        if (d > App::screenWidth / 2)
+            d -= App::screenWidth;
+        else if (d < -App::screenWidth / 2)
+            d += App::screenWidth;
+        if (d < -3)
+            left = true;
+        else if (d > 3)
+            right = true;
+    };
+
+    if (pPlayer->inair) {
+        if (navMove == 0)
+            return false;
+        navActive = true;
+        if (navMove == static_cast<short>(ainav::Move::Jump)) {
+            // Rise straight up until our feet are above the floor we're jumping onto, then steer
+            const int floorTop = (navRow + 1) * TILESIZE;
+            if (pPlayer->vely < 0.0f)
+                playerKeys->game_jump.fDown = true;
+            if (pPlayer->iy + PH <= floorTop + 4 || navRow * TILESIZE >= pPlayer->iy)
+                steerTo(navCol);
+        } else {
+            steerTo(navCol);
+        }
+        return true;
+    }
+
+    int col, row;
+    if (!ainav::PlayerSpot(pPlayer->ix, pPlayer->iy, col, row))
+        return false;
+    if (cmd::g_autotest.aiBench && navMove != 0 && !(col == navLastCol && row == navLastRow)) {
+        // We were following a move and have landed: did we get where it leads?
+        const int k = navMove == static_cast<short>(ainav::Move::Jump) ? 0 : navMove == static_cast<short>(ainav::Move::Drop) ? 1 : 2;
+        aibench::navTried[k]++;
+        if (col == navCol && row == navRow)
+            aibench::navReached[k]++;
+    }
+    const ainav::Step step = ainav::NextStep(col, row, x, y);
+    if (step.move == ainav::Move::None) {
+        navMove = 0;
+        return false;
+    }
+
+    navActive = true;
+    navLastCol = static_cast<short>(col);
+    navLastRow = static_cast<short>(row);
+    navCol = static_cast<short>(step.toCol);
+    navRow = static_cast<short>(step.toRow);
+    navMove = static_cast<short>(step.move);
+
+    switch (step.move) {
+        case ainav::Move::Walk:
+            if (step.dir < 0)
+                left = true;
+            else if (step.dir > 0)
+                right = true;
+            break;
+        case ainav::Move::Drop:
+            // Falling through needs a fresh press of down
+            playerKeys->game_down.fDown = !pPlayer->lockfall;
+            break;
+        case ainav::Move::Jump: {
+            // Jumping needs a fresh press of jump; line up under the gap for straight-up jumps
+            int d = col * TILESIZE + (TILESIZE - PW) / 2 - px;
+            if (step.dir == 0 && (d < -6 || d > 6)) {
+                steerTo(col);
+            } else {
+                playerKeys->game_jump.fDown = !pPlayer->lockjump;
+                if (step.toRow >= row && step.dir != 0) {
+                    // Across a gap: run for it
+                    if (step.dir < 0)
+                        left = true;
+                    else
+                        right = true;
+                }
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    return true;
+}
+
+// Stomp an opponent and avoid being stomped (both just need the higher feet when the players meet).
+// We aim where the opponent will be in a few frames, get above opponents next to us by jumping,
+// steer onto opponents below us while we fall, and stay out from under opponents above us.
+void CPlayerAI::FightPlayer(COutputControl * playerKeys, CPlayer * player, bool wrap)
+{
+    // Horizontal distance, the short way around the screen
+    int dx = player->ix - pPlayer->ix;
+    if (wrap)
+        dx += dx > 0 ? -App::screenWidth : App::screenWidth;
+    const int lead = static_cast<int>(player->velx * LEAD_FRAMES);    // where the opponent will be in ~6 frames
+    const int aimDx = dx + lead;
+    const int dy = player->iy - pPlayer->iy;                   // > 0: the opponent is lower
+
+    bool& left = playerKeys->game_left.fDown;
+    bool& right = playerKeys->game_right.fDown;
+    auto toward = [&](int d) { if (d < 0) left = true; else if (d > 0) right = true; };
+    auto away = [&](int d) { if (d < 0) right = true; else left = true; };
+
+    if (dy < -12) {
+        // The opponent is above us
+        if (abs(dx) < UNDER_FEET && player->vely >= 0.0f) {
+            away(dx);                                          // don't stand under falling feet
+        } else if (abs(dx) < WAIT_RANGE && dy > -100 && !pPlayer->inair && player->vely < 0.0f) {
+            away(dx);                                          // they're jumping right next to us: wait it out
+        } else {
+            toward(aimDx);
+            // Climb toward them when they're not over us
+            if (abs(dx) >= UNDER_FEET && !pPlayer->inair && dy > -150)
+                playerKeys->game_jump.fDown = true;
+        }
+        // Keep jumping up if we're already above their feet level on the way up
+        if (pPlayer->inair && pPlayer->vely < 0.0f && abs(dx) >= 56)
+            playerKeys->game_jump.fDown = true;
+    } else if (dy > 12) {
+        // The opponent is below us: get over them and come down
+        if (pPlayer->inair) {
+            if (abs(aimDx) > 4)
+                toward(aimDx);
+        } else {
+            toward(aimDx);
+            if (abs(aimDx) < 24)
+                playerKeys->game_down.fDown = true;           // drop through a platform onto them
+            else if (abs(dx) < HOP_RANGE)
+                playerKeys->game_jump.fDown = true;           // hop so we come down on them, not walk into them
+        }
+    } else {
+        // Same level: jump to get above them, then come down on them
+        toward(aimDx);
+        if (!pPlayer->inair && abs(dx) < SAME_LEVEL_JUMP)
+            playerKeys->game_jump.fDown = true;
+        else if (pPlayer->inair && pPlayer->vely < 0.0f)
+            playerKeys->game_jump.fDown = true;               // full height
+    }
+}
+
+// Fire the held weapon when an opponent is in its line of fire, instead of at random moments.
+// The weapon fires on the press of the turbo button (CPlayer::useSpecialPowerup), so it is
+// released for one frame before a shot.
+void CPlayerAI::AimWeapon(COutputControl * playerKeys, short actionType)
+{
+    const short powerup = pPlayer->powerup;
+    if (pPlayer->bobomb || pPlayer->carriedItem || powerup < 1 || powerup > 7)
+        return;
+
+    const int px = pPlayer->ix + PW / 2;
+    const int py = pPlayer->iy + PH / 2;
+    const bool facingRight = pPlayer->isFacingRight();
+
+    bool aligned = false;
+    for (CPlayer* other : g_sim.players) {
+        if (!other || other == pPlayer || !other->isready() || other->getTeamID() == pPlayer->getTeamID() || other->isInvincible())
+            continue;
+
+        int dx = other->ix + PW / 2 - px;
+        if (dx > App::screenWidth / 2)
+            dx -= App::screenWidth;
+        else if (dx < -App::screenWidth / 2)
+            dx += App::screenWidth;
+        const int dy = other->iy + PH / 2 - py;   // > 0: the opponent is lower
+        const int adx = abs(dx);
+        const bool inFront = dx == 0 || (dx > 0) == facingRight;
+
+        switch (powerup) {
+            case 1: // fireballs roll along the floor: same level or a little lower
+                aligned = inFront && adx < 260 && dy > -20 && dy < 48;
+                break;
+            case 5: // ice blast flies straight
+                aligned = inFront && adx < 300 && dy > -24 && dy < 24;
+                break;
+            case 4: // boomerang flies straight and comes back
+                aligned = inFront && adx < 320 && dy > -28 && dy < 28;
+                break;
+            case 2: // hammers arc up and forward
+                aligned = inFront && adx > 16 && adx < 180 && dy > -120 && dy < 40;
+                break;
+            case 6: // bombs are thrown in a short arc
+                aligned = inFront && adx > 24 && adx < 170 && dy > -60 && dy < 60;
+                break;
+            case 3: // cape and tail spin hit right next to us
+            case 7:
+                aligned = adx < 44 && dy > -30 && dy < 30;
+                break;
+        }
+        if (aligned)
+            break;
+    }
+
+    // Turbo is also the run button: keep running while we hold fire
+    if (aligned)
+        playerKeys->game_turbo.fDown = !pPlayer->lockfire;
+    else if (actionType != 2)
+        playerKeys->game_turbo.fDown = true;
 }
 
 /**************************************************

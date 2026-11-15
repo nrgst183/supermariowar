@@ -2,6 +2,7 @@ add_executable(smw WIN32
 	main.cpp
 
 	ai.cpp
+	AINav.cpp
 	AIObjects.cpp
 	ai.h
 	FPSLimiter.cpp

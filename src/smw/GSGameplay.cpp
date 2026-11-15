@@ -1,6 +1,7 @@
 #include "GSGameplay.h"
 
 #include "CmdArgs.h"
+#include "ai.h"
 #include "eyecandy.h"
 #include "FileList.h"
 #include "GameMode.h"
@@ -784,6 +785,9 @@ bool GameplayState::updateAutoTest()
 
     if (game_values.gamemode->gameover && (game_values.matchtype == MatchType::Tour || game_values.matchtype == MatchType::Tournament))
         UpdateScoreBoard();
+
+    if (cmd::g_autotest.aiBench)
+        aibench::print();
 
     CleanUp();
     game_values.flags.exitinggame = false;

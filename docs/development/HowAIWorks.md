@@ -246,3 +246,36 @@ Issues With The Current AI
 2. If a bot is holding something(Not a ztar/shine/egg) in ztar, or yoshi's egg mode, they can't pick up the ztar/shine/egg.
 3. Bots can't pick up throwable blocks that they are standing on.
 
+
+Improvements (2026)
+-------------------
+`CPlayerAI` gained three behaviours on top of the original logic:
+
+1. **Aiming** (`AimWeapon()`, every mode): a held fireball, hammer, boomerang, ice wand or bomb
+   is fired when an opponent is in its line of fire, and the cape or tail spins when one is right
+   next to us. Before, the CPU let go of turbo on random frames. A weapon fires on the press of
+   turbo, so the CPU lets go for one turn before a shot.
+2. **Stomp fighting** (`FightPlayer()`): the CPU aims where the opponent will be a few frames
+   ahead, jumps to get above opponents on its level, steers onto opponents below it while falling
+   and stays out from under opponents above it.
+3. **Paths** (`AINav.h`/`AINav.cpp`, `NavigateTo()`): a graph of the spots a player can stand on,
+   linked by walks, falls, drops through platforms and jumps, rebuilt when the map's tiles or
+   blocks change. For a target well above us (or below and to the side), the CPU follows the
+   shortest path, and climbs to a spot beside an opponent rather than under it. While in the air
+   it finishes the move it started and steers with its drift taken into account.
+
+2 and 3 are on in the modes about knocking out the others or getting somewhere (classic, frag,
+time limit, jail, chicken, tag, king of the hill, race, owned, frenzy, survival, phanto, shyguy
+tag). In the item modes (coins, eggs, flags, stars, domination, greed, health, collection,
+stomp) they made the CPU worse in the comparisons below, so those modes keep the original
+fighting. The CPU still thinks on every 4th frame, and the path search is a small Dijkstra
+(at most 300 spots), so the cost stays low. Everything is derived from simulation state and
+the map, so it is deterministic and safe for online play and rollback.
+
+Comparing AI versions: `--at-ai-old MASK` keeps the original logic for the players whose bit
+is set, and `--at-ai-bench 1` prints kills, deaths and score per player after each match:
+
+```
+smw --autotest --at-match single --at-players 4 --at-humans 0 --at-mode 0 --at-cpu-level 4 \
+    --at-frames 3600 --at-matches 10 --at-seed 1 --at-norender 1 --at-ai-bench 1 --at-ai-old 10
+```

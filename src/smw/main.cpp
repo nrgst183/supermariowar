@@ -125,13 +125,13 @@ T* createGameMode()
     return view;
 }
 
-// --at-shot-every: a PNG of the screen every N drawn frames of an online match
-// (for reviewing the overlays; the files are numbered)
+// --at-shot-every: a PNG of the screen every N drawn frames of a match
+// (for reviewing overlays and CPU behaviour; the files are numbered)
 void autoScreenshot()
 {
     static int drawn = 0;
     static int saved = 0;
-    if (cmd::g_autotest.shotEvery <= 0 || cmd::g_autotest.shotDir.empty() || !rollback::NetGame::instance().inMatch())
+    if (cmd::g_autotest.shotEvery <= 0 || cmd::g_autotest.shotDir.empty() || game_values.appstate != AppState::Game)
         return;
     if (++drawn % cmd::g_autotest.shotEvery != 0)
         return;

@@ -20,6 +20,8 @@ struct AutoTestArgs {
     int start = 0;           // index of the first match in the mode/map cycle
     int seed = 0;            // RNG seed for reproducible runs; 0 = time based
     int cpuLevel = -1;       // CPU difficulty 0-4; -1 = keep the configured one
+    int aiLegacyMask = 0;    // bit k: player k uses the original CPU logic (for comparing AI versions)
+    bool aiBench = false;    // print kills/deaths per player at the end of each match
     bool resim = false;      // run every gameplay tick as a re-simulation (side effects suppressed)
     int realtime = 0;        // 0: unthrottled; 1/2/3: normal pacing with the VSync/Uncapped/62.5 FPS frame
                              // rate, printing the measured tick and render rates
