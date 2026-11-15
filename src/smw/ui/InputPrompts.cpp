@@ -569,6 +569,70 @@ int promptWidth(Pad pad, const std::string& key, const std::string& label)
     return label.empty() ? w : w + 3 + textWidth(label);
 }
 
+// ---- the menus' keys
+
+std::string menuKey(MenuKey key)
+{
+    const SDL_Keycode code = game_values.inputConfiguration[0][0].inputGameControls[1].keys[static_cast<int>(key)];
+    if (code == SDLK_UNKNOWN)
+        return {};
+    if (code >= 323 && code <= 340)    //(the mouse: MOUSE_UP and on)
+        return "Mouse";
+    std::string name = SDL_GetKeyName(code);
+    static const std::pair<const char*, const char*> shorter[] = {{"Return", "Enter"}, {"Escape", "Esc"}, {"Backspace", "Bksp"},
+        {"Left Shift", "Shift"}, {"Right Shift", "RShift"}, {"Left Ctrl", "Ctrl"}, {"Right Ctrl", "RCtrl"}, {"Left Alt", "Alt"},
+        {"Right Alt", "AltGr"}, {"Keypad Enter", "Enter"}, {"PageUp", "PgUp"}, {"PageDown", "PgDn"}};
+    for (const auto& [from, to] : shorter) {
+        if (name == from)
+            return to;
+    }
+    return name;
+}
+
+int promptsWidth(const std::vector<Prompt>& row, int gap)
+{
+    int w = 0;
+    for (const Prompt& p : row) {
+        int item = 0;
+        if (g_last == Device::Controller) {
+            for (Pad pad : p.pads)
+                item += padWidth(pad) + 2;
+        } else {
+            for (const std::string& key : p.keys) {
+                if (!key.empty())
+                    item += promptWidth(Pad::A, key, "") + 2;
+            }
+        }
+        if (!p.label.empty())
+            item += 1 + textWidth(p.label);
+        w += item + gap;
+    }
+    return std::max(0, w - gap);
+}
+
+int drawPrompts(int cx, int y, const std::vector<Prompt>& row, int gap)
+{
+    const int w = promptsWidth(row, gap);
+    int x = cx - w / 2;
+    for (const Prompt& p : row) {
+        if (g_last == Device::Controller) {
+            for (Pad pad : p.pads)
+                x += drawPad(x, y, pad) + 2;
+        } else {
+            for (const std::string& key : p.keys) {
+                if (!key.empty())
+                    x += drawPrompt(x, y, Pad::A, key, "") + 2;
+            }
+        }
+        if (!p.label.empty()) {
+            text(x + 1, y + 1, p.label);
+            x += 1 + textWidth(p.label);
+        }
+        x += gap;
+    }
+    return w;
+}
+
 // ---- the controllers
 
 void Gamepads::open()

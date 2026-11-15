@@ -5,6 +5,7 @@
 #include "GameValues.h"
 #include "MapList.h"
 #include "MatchConfig.h"
+#include "NetGame.h"
 #include "NetLobby.h"
 #include "NetProtocol.h"
 #include "path.h"
@@ -112,6 +113,9 @@ struct Recording {
     bool active = false;
     bool online = false;
     Replay replay;
+    //Online: the pings seen in each window, to average
+    std::vector<std::array<uint32_t, INPUT_MAX_PLAYERS>> pingSum;
+    std::vector<std::array<uint16_t, INPUT_MAX_PLAYERS>> pingCount;
 };
 Recording g_rec;
 
@@ -408,6 +412,12 @@ std::vector<uint8_t> Replay::serialize() const
         w.u32(tick);
         w.str(song);
     }
+    //(version 3)
+    w.u32(static_cast<uint32_t>(pings.size()));
+    for (const auto& window : pings) {
+        for (uint16_t ping : window)
+            w.u16(ping);
+    }
     return std::move(w.out);
 }
 
@@ -458,6 +468,17 @@ bool Replay::deserialize(const std::vector<uint8_t>& bytes)
         for (uint32_t k = 0; k < songs && r.ok; k++) {
             const uint32_t tick = r.u32();
             music.emplace_back(tick, r.str());
+        }
+    }
+    if (version >= 3) {
+        const uint32_t windows = r.u32();
+        if (windows > 5'000'000u)
+            return false;
+        for (uint32_t k = 0; k < windows && r.ok; k++) {
+            std::array<uint16_t, INPUT_MAX_PLAYERS> window;
+            for (uint16_t& ping : window)
+                ping = r.u16();
+            pings.push_back(window);
         }
     }
     return r.ok && ticks.size() == tickCount;
@@ -560,6 +581,27 @@ void recordTick(const InputFrame& input)
     while (ticks.size() < tick)
         ticks.push_back(ticks.empty() ? TickRecord() : ticks.back());
     ticks.push_back(TickRecord {input, g_sim.cpuTakeover});
+
+    //Online: the other players' pings, for the replay's ping bars
+    const rollback::NetGame& net = rollback::NetGame::instance();
+    const rollback::NetLobby* lobby = net.lobby();
+    if (!g_rec.online || !lobby)
+        return;
+    const size_t window = tick / static_cast<size_t>(Replay::PING_WINDOW);
+    if (g_rec.pingSum.size() <= window) {
+        g_rec.pingSum.resize(window + 1, {});
+        g_rec.pingCount.resize(window + 1, {});
+    }
+    for (int s = 0; s < INPUT_MAX_PLAYERS; s++) {
+        const rollback::LobbySlot& slot = lobby->slot(s);
+        if (slot.kind != rollback::SlotKind::Human || slot.peer == net.localPeer() || slot.peer < 0 || !lobby->peer(slot.peer).present)
+            continue;
+        const int ping = net.peerPingMs(slot.peer);
+        if (ping < 0)
+            continue;
+        g_rec.pingSum[window][static_cast<size_t>(s)] += static_cast<uint32_t>(ping);
+        g_rec.pingCount[window][static_cast<size_t>(s)]++;
+    }
 }
 
 void afterTick()
@@ -587,6 +629,17 @@ std::string finishRecording()
         replay.ticks.resize(ticks);
     for (auto it = replay.checksums.begin(); it != replay.checksums.end();)
         it = it->first > ticks ? replay.checksums.erase(it) : std::next(it);
+    //The pings: an average per window
+    replay.pings.clear();
+    const size_t windows = std::min(g_rec.pingSum.size(), (ticks + Replay::PING_WINDOW - 1) / Replay::PING_WINDOW);
+    for (size_t w = 0; w < windows; w++) {
+        std::array<uint16_t, INPUT_MAX_PLAYERS> average;
+        for (size_t s = 0; s < average.size(); s++) {
+            const uint16_t count = g_rec.pingCount[w][s];
+            average[s] = count ? static_cast<uint16_t>(std::min<uint32_t>(g_rec.pingSum[w][s] / count, 0xfffe)) : Replay::NO_PING;
+        }
+        replay.pings.push_back(average);
+    }
     if (replay.ticks.empty())
         return {};
 
@@ -696,6 +749,15 @@ bool startPlayback(const std::string& file, std::string& error)
     prepareTimeline();
     syncMusic();
     return true;
+}
+
+int pingAt(int slot)
+{
+    if (!g_play.active || slot < 0 || slot >= INPUT_MAX_PLAYERS || g_play.replay.pings.empty())
+        return -1;
+    const size_t window = std::min(static_cast<size_t>(std::max(0, g_sim.tick)) / Replay::PING_WINDOW, g_play.replay.pings.size() - 1);
+    const uint16_t ping = g_play.replay.pings[window][static_cast<size_t>(slot)];
+    return ping == Replay::NO_PING ? -1 : ping;
 }
 
 void syncMusic()

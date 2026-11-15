@@ -68,4 +68,14 @@ void heading(int x, int y, int w, const std::string& text);
 
 SDL_Color shade(SDL_Color c, int percent);    // lighter (> 100) or darker (< 100)
 
+// A connection's quality: four bars (22 x 16) lit by the ping (gray: not known yet)
+void signal(int x, int y, int pingMs);
+// The same, small (15 x 12): for the score panels
+void signalSmall(int x, int y, int pingMs);
+// A status (16 x 16): i, a check, !, an X
+enum class Status { Info, Good, Warn, Error };
+void statusIcon(int x, int y, Status status);
+// Something going on: eight dots round a circle (about 34 across), the bright one going round
+void spinner(int cx, int cy, int tick);
+
 } // namespace theme

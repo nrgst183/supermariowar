@@ -47,6 +47,23 @@ int drawMouse(int x, int y, bool left, bool right);
 int drawPrompt(int x, int y, Pad pad, const std::string& key, const std::string& label);
 int promptWidth(Pad pad, const std::string& key, const std::string& label);
 
+// Player 1's keyboard keys of the menus (the game's Controls), as short names
+// for key caps: 0 up, 1 down, 2 left, 3 right, 4 select, 5 cancel, 6 random,
+// 7 scroll fast ("" if none)
+enum MenuKey { MENU_UP, MENU_DOWN, MENU_LEFT, MENU_RIGHT, MENU_SELECT, MENU_CANCEL, MENU_RANDOM, MENU_SCROLL };
+std::string menuKey(MenuKey key);
+
+// A prompt with several buttons or keys (the up and down of a list, say): the
+// controller's buttons or the keys (whichever was used last), then the label
+struct Prompt {
+    std::vector<Pad> pads;
+    std::vector<std::string> keys;
+    std::string label;
+};
+int promptsWidth(const std::vector<Prompt>& row, int gap);
+// Centered on cx; returns the width
+int drawPrompts(int cx, int y, const std::vector<Prompt>& row, int gap = 14);
+
 // Shapes (on blitdest)
 void fill(int x, int y, int w, int h, SDL_Color c);
 void frame(int x, int y, int w, int h, SDL_Color border, SDL_Color inside);

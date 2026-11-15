@@ -44,6 +44,15 @@ UI_OnlineMenu::UI_OnlineMenu()
 
     miMessage = new MI_WrappedText(320, 342, 580, 3);
 
+    //What the buttons do here (a controller's, or the keys)
+    miPrompts = new MI_PromptRow(282, 440);
+    miPrompts->SetPrompts([]() {
+        using prompts::Pad;
+        using prompts::menuKey;
+        return std::vector<prompts::Prompt> {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"},
+            {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select / type"}, {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}};
+    });
+
     miBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miBackButton->SetCode(MENU_CODE_TO_MAIN_MENU);
 
@@ -64,6 +73,7 @@ UI_OnlineMenu::UI_OnlineMenu()
     AddNonControl(miHostLabel);
     AddNonControl(miJoinLabel);
     AddNonControl(miMessage);
+    AddNonControl(miPrompts);
 
     setInitialFocus(miHostButton);
     SetCancelCode(MENU_CODE_TO_MAIN_MENU);

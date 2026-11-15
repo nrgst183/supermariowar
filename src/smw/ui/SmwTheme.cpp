@@ -7,6 +7,7 @@
 #include "ui/InputPrompts.h"
 
 #include <algorithm>
+#include <vector>
 
 extern CResourceManager* rm;
 
@@ -304,6 +305,76 @@ void heading(int x, int y, int w, const std::string& text)
 {
     block(x, y, w, 18, Tone::Gray);
     font().draw(x + 8, y + 1, text);
+}
+
+void signal(int x, int y, int pingMs)
+{
+    int lit = 0;
+    SDL_Color color {72, 200, 56, 255};
+    if (pingMs >= 0) {
+        lit = pingMs < 60 ? 4 : pingMs < 120 ? 3 : pingMs < 200 ? 2 : 1;
+        if (lit == 2)
+            color = {248, 200, 24, 255};
+        else if (lit == 1)
+            color = {232, 56, 40, 255};
+    }
+    for (int k = 0; k < 4; k++) {
+        const int h = 4 + 4 * k;
+        const int bx = x + k * 6;
+        const int by = y + 16 - h;
+        fill(bx, by, 6, h, BLACK);
+        fill(bx + 2, by + 2, 2, h - 2, k < lit ? color : SDL_Color {150, 150, 160, 255});
+    }
+}
+
+void signalSmall(int x, int y, int pingMs)
+{
+    int lit = 0;
+    SDL_Color color {72, 200, 56, 255};
+    if (pingMs >= 0) {
+        lit = pingMs < 60 ? 4 : pingMs < 120 ? 3 : pingMs < 200 ? 2 : 1;
+        if (lit == 2)
+            color = {248, 200, 24, 255};
+        else if (lit == 1)
+            color = {232, 56, 40, 255};
+    }
+    fill(x + 1, y, 13, 12, BLACK);
+    fill(x, y + 1, 15, 10, BLACK);
+    for (int k = 0; k < 4; k++) {
+        const int h = 2 + 2 * k;
+        fill(x + 2 + k * 3, y + 10 - h, 2, h, k < lit ? color : SDL_Color {90, 90, 104, 255});
+    }
+}
+
+void statusIcon(int x, int y, Status status)
+{
+    SDL_Color c {40, 112, 232, 255};
+    std::vector<const char*> sign = {"........", "...ww...", "........", "...ww...", "...ww...", "...ww...", "...ww...", "........"};
+    if (status == Status::Good) {
+        c = {56, 168, 48, 255};
+        sign = {"........", "......w.", ".....ww.", "w...ww..", "ww.ww...", ".www....", "..w.....", "........"};
+    } else if (status == Status::Warn) {
+        c = {232, 168, 0, 255};
+        sign = {"........", "...ww...", "...ww...", "...ww...", "...ww...", "........", "...ww...", "........"};
+    } else if (status == Status::Error) {
+        c = {216, 40, 32, 255};
+        sign = {"........", ".w....w.", "..w..w..", "...ww...", "...ww...", "..w..w..", ".w....w.", "........"};
+    }
+    prompts::art(x, y, {"..####..", ".#cccc#.", "#cccccc#", "#cccccc#", "#cccccc#", "#cccccc#", ".#cccc#.", "..####.."},
+        {{'#', BLACK}, {'c', c}});
+    prompts::art(x, y, sign, {{'w', {255, 255, 255, 255}}});
+}
+
+void spinner(int cx, int cy, int tick)
+{
+    static const int dots[8][2] = {{0, -14}, {10, -10}, {14, 0}, {10, 10}, {0, 14}, {-10, 10}, {-14, 0}, {-10, -10}};
+    const int lead = (tick / 5) % 8;
+    for (int k = 0; k < 8; k++) {
+        const int age = (lead - k + 8) % 8;
+        const SDL_Color c = age == 0 ? SDL_Color {248, 200, 40, 255} : age < 3 ? SDL_Color {200, 140, 40, 255} : SDL_Color {150, 120, 90, 255};
+        fill(cx + dots[k][0] - 3, cy + dots[k][1] - 3, 6, 6, BLACK);
+        fill(cx + dots[k][0] - 2, cy + dots[k][1] - 2, 4, 4, c);
+    }
 }
 
 } // namespace theme

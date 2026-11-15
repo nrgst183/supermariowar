@@ -36,7 +36,8 @@
 // u32 tick count, u32 runs + runs of (u16 length, 4 input bytes, u8 CPU mask),
 // u32 checksums + (u32 tick, u64 checksum); version 2 and on: 4 x (u32 + skin
 // file bytes), u32 songs + (u32 tick, str song: relative to the data folder
-// when it's in it); str = u16 length + bytes. Version 1 replays still play.
+// when it's in it); version 3 and on: u32 windows + 4 x u16 average ping per
+// window; str = u16 length + bytes. Older replays still play.
 namespace replay {
 
 struct TickRecord {
@@ -47,7 +48,9 @@ struct TickRecord {
 };
 
 struct Replay {
-    static constexpr uint16_t VERSION = 2;
+    static constexpr uint16_t VERSION = 3;
+    static constexpr int PING_WINDOW = 60;    // ticks (about a second)
+    static constexpr uint16_t NO_PING = 0xffff;
 
     uint64_t dataHash = 0;
     int64_t startTime = 0;
@@ -60,6 +63,9 @@ struct Replay {
     std::map<uint32_t, uint64_t> checksums;    // after tick N (g_sim.tick == N)
     std::array<std::vector<uint8_t>, INPUT_MAX_PLAYERS> skinFiles;    // (version 2)
     std::vector<std::pair<uint32_t, std::string>> music;              // (version 2) from tick N on, this song
+    // (version 3) online: each player's average ping (ms) over each PING_WINDOW ticks, as the recording
+    // computer saw it (NO_PING: none, a player on that computer or a CPU)
+    std::vector<std::array<uint16_t, INPUT_MAX_PLAYERS>> pings;
 
     std::vector<uint8_t> serialize() const;
     bool deserialize(const std::vector<uint8_t>& bytes);
@@ -107,6 +113,8 @@ bool nextTick(InputFrame& input, uint8_t& cpuMask);
 void checkTick();
 // The recorded song of the current tick plays (after a start, a step, a jump)
 void syncMusic();
+// An online replay: a player's average ping at the current tick, as recorded (-1: none)
+int pingAt(int slot);
 
 // ---- the theater (GameplayTheater.cpp): moving around in a replay
 //

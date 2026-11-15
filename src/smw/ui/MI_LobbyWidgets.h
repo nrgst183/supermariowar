@@ -4,6 +4,7 @@
 #include "ResourceManager.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_MapPreview.h"
+#include "ui/InputPrompts.h"
 
 #include <functional>
 #include <memory>
@@ -63,6 +64,8 @@ public:
     void SetLeaveDown(std::function<void()> leave) { m_leaveDown = std::move(leave); }
     /// What the local players can do now, for the hint line
     std::string hint() const;
+    /// And the buttons that do it, for the prompts row
+    std::vector<prompts::Prompt> prompts() const;
 
 private:
     struct Info;
@@ -146,6 +149,8 @@ public:
     void SetJoining(bool joining) { m_joining = joining; }
     /// The line "Settings: host only" at the bottom right of the header bar
     void SetSettingsNote(std::string note) { m_note = std::move(note); }
+    /// The buttons row (y 352): the controller's buttons or the keys of what can be done
+    void SetPrompts(std::vector<prompts::Prompt> row) { m_prompts = std::move(row); }
 
 private:
     LobbyRect m_statusRect;
@@ -154,8 +159,26 @@ private:
     std::string m_status;
     std::string m_hint;
     std::string m_note;
+    Tone m_tone = Tone::Info;
+    std::vector<prompts::Prompt> m_prompts;
     bool m_joining = false;
     int m_tick = 0;
+};
+
+
+/// A row of button prompts (centered on x): the controller's buttons or the keys, whichever was used last
+class MI_PromptRow : public UI_Control {
+public:
+    MI_PromptRow(short x, short y)
+        : UI_Control(x, y)
+    {}
+
+    // (asked every frame: the keys can change in the Controls)
+    void SetPrompts(std::function<std::vector<prompts::Prompt>()> row) { m_row = std::move(row); }
+    void Draw() override;
+
+private:
+    std::function<std::vector<prompts::Prompt>()> m_row;
 };
 
 

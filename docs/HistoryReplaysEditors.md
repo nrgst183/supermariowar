@@ -22,7 +22,9 @@ after the map was changed or deleted. So are the players' skin files (a skin tha
 on this computer, or is a different file here, goes to the downloaded skins) and the
 music: the song the match started with and every change of song, by tick, since a match
 picks its songs at random; the theater plays the same songs at the same moments, also
-after a jump. Every 60 ticks a state checksum is stored; if a replay plays differently
+after a jump. An online replay also keeps every other player's ping, averaged over each
+second as the recording computer saw it: the theater shows it as signal bars on their
+score panels, like the match did (Graphics > Ping Bars turns them off, in matches and replays). Every 60 ticks a state checksum is stored; if a replay plays differently
 (another game version) the theater says so. Replays from before the skins and songs were
 stored still play, with the skins found by name and random songs.
 

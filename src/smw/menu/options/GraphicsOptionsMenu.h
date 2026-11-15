@@ -18,6 +18,7 @@ public:
     UI_GraphicsOptionsMenu();
 
 private:
+    MI_SelectField<bool>* miPingBarsField;
     MI_SelectField<short>* miOverlayColorsField;
     MI_SelectField<bool>* miTopLayerField;
     MI_SelectField<short>* miFrameRateField;

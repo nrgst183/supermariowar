@@ -10,6 +10,7 @@
 #include "GameMode.h"
 #include "GameValues.h"
 #include "gfx.h"
+#include "ui/InputPrompts.h"
 #include "GSGameplay.h"
 #include "GameplayStyles.h"
 #include "joystick.h"
@@ -367,6 +368,7 @@ void MenuState::update()
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         gfx_eventtoscreen(&event);    //(the mouse in the screen's pixels at any window size)
+        prompts::note(event);         //(the button prompts: a controller's buttons or the keys)
         switch (event.type) {
         case SDL_EVENT_QUIT:
             Exit();

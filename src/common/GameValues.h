@@ -164,6 +164,7 @@ public:
     bool		toplayer;
     bool		smoothmotion = true;    // draw moving things between ticks (interpolated)
     bool		shownetstats = false;   // online: the network info line (ping, input delay, rollbacks)
+    bool		showpingbars = true;    // online and in online replays: signal bars on the other players' score panels
     short		overlaycolors = 0;      // the theater's and the editors' colors: 0 night, 1 pipe (green), 2 castle, 3 SMB3 (the status bar's blue)
     short		buttonprompts = 0;      // the controller glyphs in the theater and the editors: 0 auto, 1 Xbox, 2 original Xbox
     bool		teamcolors;

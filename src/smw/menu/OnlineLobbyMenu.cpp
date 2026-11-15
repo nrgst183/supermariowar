@@ -336,8 +336,9 @@ void UI_OnlineLobbyMenu::Sync()
 
     std::string hint;
     if (m_dialog == Dialog::None && m_page == Page::Team && !joining) {
+        //(the team box: its keys are in the buttons row, the line says who may change the settings)
         if (m_currentFocus == miTeam)
-            hint = miTeam->hint();
+            hint.clear();
         else if (m_currentFocus == miContinueButton)
             hint = host ? "Choose the match type, game mode and map" : "See what the host has chosen";
         else if (m_currentFocus == miOptionsButton)
@@ -353,6 +354,27 @@ void UI_OnlineLobbyMenu::Sync()
             hint = "Whether the others can also change the mode, goal and map";
     }
     miScene->SetStatus(status, tone, hint);
+
+    // The buttons row: what the controller's buttons (or the keys) do here
+    using prompts::Pad;
+    using prompts::menuKey;
+    const prompts::Prompt choose {{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"};
+    const prompts::Prompt across {{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "choose"};
+    const prompts::Prompt change {{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"};
+    const prompts::Prompt select {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"};
+    auto cancel = [](const char* what) { return prompts::Prompt {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, what}; };
+    std::vector<prompts::Prompt> row;
+    if (joining)
+        row = {};
+    else if (m_dialog != Dialog::None)
+        row = {across, select, cancel("no")};
+    else if (m_page == Page::Team && m_currentFocus == miTeam)
+        row = miTeam->prompts();
+    else if (m_page == Page::Team)
+        row = {across, select, cancel(miTeam->locked() ? "not ready" : "leave")};
+    else
+        row = {choose, change, select, cancel("back")};
+    miScene->SetPrompts(std::move(row));
 }
 
 void UI_OnlineLobbyMenu::ApplyChanges()

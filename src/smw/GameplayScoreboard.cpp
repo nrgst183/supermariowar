@@ -1,3 +1,4 @@
+#include "NetOverlay.h"
 #include "GSGameplay.h"
 
 #include "CmdArgs.h"
@@ -181,6 +182,9 @@ void GameplayState::drawScoreboard(short iScoreTextOffset[4])
                     if (g_iWinningPlayer == i)
                         rm->spr_crown.draw(g_sim.score[i].x + scoreoffsets[k] + 12, g_sim.score[i].y - 4);
                 }
+
+                //Online: their connection (NetOverlay.h), also while they respawn
+                drawPingMeter(globalID, g_sim.score[i].x + scoreoffsets[k], g_sim.score[i].y + 2);
 
                 short storedpowerupid = game_values.gamepowerups[globalID];
 

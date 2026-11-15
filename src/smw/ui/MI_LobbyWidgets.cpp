@@ -7,6 +7,7 @@
 #include "RandomNumberGenerator.h"
 #include "rollback/NetGame.h"
 #include "ui/MI_Image.h"
+#include "ui/SmwTheme.h"
 
 #include <algorithm>
 #include <cctype>
@@ -23,25 +24,6 @@ std::string ellipsize(const gfxFont& font, std::string text, int maxWidth)
     while (!text.empty() && font.getWidth(text + "..") > maxWidth)
         text.pop_back();
     return text + "..";
-}
-
-// The skin of the computer players: the robot, if this game has it
-std::string cpuSkinPath()
-{
-    static bool searched = false;
-    static std::string path;
-    if (!searched) {
-        searched = true;
-        for (size_t i = 0; skinlist && i < skinlist->count(); i++) {
-            std::string name = skinlist->at(i).name;
-            std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            if (name.find("r.o.b") != std::string::npos || name == "rob") {
-                path = skinlist->at(i).path.string();
-                break;
-            }
-        }
-    }
-    return path;
 }
 
 std::string defaultSkinPath()
@@ -65,6 +47,8 @@ void creamFrame(int x, int y)
     rm->menu_dialog.draw(x, y + 254, {0, 464, 336, 16});
     rm->menu_dialog.draw(x + 336, y + 254, {496, 464, 16, 16});
 }
+
+constexpr SDL_Color BLACK {0, 0, 0, 255};
 
 } // namespace
 
@@ -144,6 +128,27 @@ std::string MI_OnlineTeamSelect::hint() const
     if (locked())
         return lobby->isHost() ? "Select Continue to choose the match (Cancel: not ready)" : "Waiting for the host (Cancel: not ready)";
     return "Up/Down: skin  Left/Right: team  Select: ready";
+}
+
+std::vector<prompts::Prompt> MI_OnlineTeamSelect::prompts() const
+{
+    using prompts::Pad;
+    using prompts::menuKey;
+    const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+    if (!lobby || lobby->phase() != rollback::NetLobby::Phase::Lobby)
+        return {};
+    if (locked())
+        return {{{Pad::Down}, {menuKey(prompts::MENU_DOWN)}, "the buttons"}, {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "not ready"}};
+    std::vector<prompts::Prompt> row = {
+        {{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "skin"},
+        {{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "team"},
+        {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "ready"},
+        {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "leave"},
+    };
+    //(the random skin: on a controller, where the row has room)
+    if (prompts::lastDevice() == prompts::Device::Controller)
+        row.insert(row.begin() + 2, prompts::Prompt {{Pad::X}, {}, "random"});
+    return row;
 }
 
 MenuCodeEnum MI_OnlineTeamSelect::Modify(bool modify)
@@ -301,14 +306,15 @@ bool MI_OnlineTeamSelect::gather(int s, Info& info) const
     return true;
 }
 
-// The sprite of the player in a slot (the skin of its owner, the default one while it is downloaded,
-// the robot for computer players); frame 0 stands, 1 runs
+// The sprite of the player in a slot, as it will be in the match (the skin of its owner, the default one
+// while it is downloaded and for computer players); frame 0 stands, 1 runs
 const gfxSprite* MI_OnlineTeamSelect::skinFrame(int slot, const Info& info, int frame)
 {
     if (!info.human && !info.cpu)
         return nullptr;
     const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
-    std::string path = info.human ? lobby->slotSkinPath(slot) : cpuSkinPath();
+    //(the skin the match will load: rollback::loadMatchSkin, the default one for computer players)
+    std::string path = lobby->slotSkinPath(slot);
     if (path.empty())
         path = defaultSkinPath();
     Skin& skin = m_skins[slot];
@@ -358,24 +364,45 @@ void MI_OnlineTeamSelect::Draw()
         }
     }
 
-    // The players' cards: the number, the name, the Ready mushroom and, in the small font, who it is
+    // The players' cards: the number, the name (a crown: the host), the Ready mushroom (not ready yet:
+    // dots going), who it is and the connection; this computer's players in a gold frame
     for (int s = 0; s < 4; s++) {
         if (!have[s])
             continue;
         const Info& i = info[s];
-        rm->spr_player_select_ready.draw(s * 160 + 16, 368, {0, 0, 128, 96});
-        rm->spr_menu_boxed_numbers.draw(s * 160 + 32, 388, {s * 16, i.color * 16, 16, 16});
-        rm->menu_font_small.drawChopRight(s * 160 + 52, 404 - rm->menu_font_small.getHeight(), 80, i.name);
-        // (the empty circle of the sprite is not drawn: a player who is not ready shows nothing)
-        if (i.ready)
-            rm->spr_player_select_ready.draw(s * 160 + 64, 408, {128, i.human ? 32 : 64, 34, 32});
+        const int cardX = s * 160 + 16;
+        if (i.mine) {
+            prompts::fill(cardX - 4, 364, 136, 104, BLACK);
+            prompts::fill(cardX - 2, 366, 132, 100, {248, 200, 40, 255});
+        }
+        rm->spr_player_select_ready.draw(cardX, 368, {0, 0, 128, 96});
+        rm->spr_menu_boxed_numbers.draw(cardX + 16, 388, {s * 16, i.color * 16, 16, 16});
+        const bool host = i.human && lobby->slot(s).peer == 0;
+        const int nameW = host ? 62 : 80;
+        rm->menu_font_small.drawChopRight(cardX + 36, 404 - rm->menu_font_small.getHeight(), nameW, i.name);
+        if (host)
+            theme::crown(cardX + 36 + std::min(nameW, rm->menu_font_small.getWidth(i.name)) + 2, 389);
+        // (the empty circle of the sprite is not drawn: a player who is not ready shows dots)
+        if (i.ready) {
+            rm->spr_player_select_ready.draw(cardX + 48, 408, {128, i.human ? 32 : 64, 34, 32});
+        } else if (i.human) {
+            const int lit = (m_tick / 12) % 4;
+            for (int d = 0; d < 3; d++) {
+                prompts::fill(cardX + 50 + d * 10, 420, 8, 8, BLACK);
+                prompts::fill(cardX + 52 + d * 10, 422, 4, 4, d < lit ? SDL_Color {248, 200, 40, 255} : SDL_Color {150, 150, 160, 255});
+            }
+        }
 
         std::string line = i.role;
-        if (i.human && !i.mine && i.role != "2nd player")
-            line += i.pingMs >= 0 ? std::format(" {}ms", i.pingMs) : std::string(" --ms");
+        const bool showPing = i.human && !i.mine && i.role != "2nd player";
         if (i.downloadingSkin)
             line = "skin...";
-        rm->menu_font_small.drawChopCentered(s * 160 + 80, 441, 112, line);
+        if (showPing) {
+            rm->menu_font_small.drawChopCentered(cardX + 54, 441, 88, line);
+            theme::signal(cardX + 98, 438, i.pingMs);
+        } else {
+            rm->menu_font_small.drawChopCentered(cardX + 64, 441, 112, line);
+        }
     }
 }
 
@@ -465,9 +492,10 @@ MI_LobbyScene::MI_LobbyScene()
     , m_title("Team and Character Selection")
 {}
 
-void MI_LobbyScene::SetStatus(std::string text, Tone, std::string hint)
+void MI_LobbyScene::SetStatus(std::string text, Tone tone, std::string hint)
 {
     m_status = std::move(text);
+    m_tone = tone;
     m_hint = std::move(hint);
 }
 
@@ -481,29 +509,40 @@ void MI_LobbyScene::Draw()
     rm->menu_plain_field.draw(320, 0, {192, 0, 320, 32});
     rm->menu_font_large.drawCentered(320, 5, m_title);
 
+    using prompts::Pad;
     if (m_joining) {
         creamFrame(144, 110);
-        rm->menu_font_large.drawCentered(320, 190, "Connecting...");
-        rm->menu_font_small.drawCentered(320, 230, ellipsize(rm->menu_font_small, m_status, 320));
-        rm->menu_font_small.drawCentered(320, 262, "Cancel to stop");
+        theme::spinner(320, 168, m_tick++);
+        rm->menu_font_large.drawCentered(320, 196, "Connecting...");
+        rm->menu_font_small.drawCentered(320, 232, ellipsize(rm->menu_font_small, m_status, 320));
+        prompts::drawPrompts(320, 262, {{{Pad::B}, {prompts::menuKey(prompts::MENU_CANCEL)}, "stop"}});
         return;
     }
+    ++m_tick;
 
+    // The status bar: what is going on, always (its icon: fine, a warning, a problem)
     const LobbyRect& r = m_statusRect;
     blueBar(r.x, r.y, r.w);
+    theme::statusIcon(r.x + 12, r.y + 8, static_cast<theme::Status>(m_tone));
+    rm->menu_font_large.drawCentered(r.x + r.w / 2 + 10, r.y + 5, ellipsize(rm->menu_font_large, m_status, r.w - 64));
 
-    // The bar says in turn what is going on, what the player can do, and who may change the match settings
-    std::vector<const std::string*> lines;
-    lines.push_back(&m_status);
-    if (!m_hint.empty())
-        lines.push_back(&m_hint);
-    if (!m_note.empty())
-        lines.push_back(&m_note);
-    const int period = 240;
-    const size_t which = lines.size() > 1 ? static_cast<size_t>((m_tick / period) % static_cast<int>(lines.size())) : 0;
-    ++m_tick;
-    // (the status first, and always while it is a problem)
-    rm->menu_font_large.drawCentered(r.x + r.w / 2, r.y + 5, ellipsize(rm->menu_font_large, *lines[which], r.w - 24));
+    // Under it, in the small font: what the selected thing does, else who may change the match settings
+    const std::string& tip = m_hint.empty() ? m_note : m_hint;
+    if (!tip.empty())
+        rm->menu_font_small.drawCentered(320, r.y + r.h + 3, ellipsize(rm->menu_font_small, tip, 600));
+
+    // And over the cards: the buttons of what can be done
+    if (!m_prompts.empty())
+        prompts::drawPrompts(320, 351, m_prompts);
+}
+
+
+// ---- MI_PromptRow
+
+void MI_PromptRow::Draw()
+{
+    if (m_visible && m_row)
+        prompts::drawPrompts(m_pos.x, m_pos.y, m_row());
 }
 
 
