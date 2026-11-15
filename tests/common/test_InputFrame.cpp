@@ -138,3 +138,33 @@ TEST_CASE("ResimulationScope sets and restores the resimulation flag") {
     }
     CHECK_FALSE(sim::isResimulating());
 }
+
+TEST_CASE("A CPU player's byte: holding a key doesn't press it, bits 6-7 do") {
+    COutputControl keys {};
+    // taking hold of turbo and right: held, not pressed
+    const uint8_t run = InputBit::Turbo | InputBit::Right;
+    applyCpuInputByte(run, 0, keys);
+    CHECK(keys.game_turbo.fDown);
+    CHECK(keys.game_right.fDown);
+    CHECK_FALSE(keys.game_turbo.fPressed);
+    CHECK_FALSE(keys.game_right.fPressed);
+
+    // a press while held, and a jump press without holding jump
+    applyCpuInputByte(run | InputBit::TurboPress | InputBit::JumpPress, run, keys);
+    CHECK(keys.game_turbo.fDown);
+    CHECK(keys.game_turbo.fPressed);
+    CHECK(keys.game_jump.fPressed);
+    CHECK_FALSE(keys.game_jump.fDown);
+
+    // pressed lasts one byte; a key the simulation let go of stays up while the bit doesn't change
+    keys.game_turbo.fDown = false;
+    applyCpuInputByte(run, run | InputBit::TurboPress | InputBit::JumpPress, keys);
+    CHECK_FALSE(keys.game_turbo.fPressed);
+    CHECK_FALSE(keys.game_jump.fPressed);
+    CHECK_FALSE(keys.game_turbo.fDown);
+
+    // letting go
+    applyCpuInputByte(InputBit::Right, run, keys);
+    CHECK_FALSE(keys.game_turbo.fDown);
+    CHECK(keys.game_right.fDown);
+}

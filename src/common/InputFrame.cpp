@@ -34,3 +34,16 @@ void applyInputByte(uint8_t current, uint8_t previous, COutputControl& keys)
             keys.keys[k].fDown = down;
     }
 }
+
+void applyCpuInputByte(uint8_t current, uint8_t previous, COutputControl& keys)
+{
+    for (int k = 0; k < InputBit::COUNT; k++) {
+        const bool down = current & (1 << k);
+        const bool wasDown = previous & (1 << k);
+        keys.keys[k].fPressed = false;
+        if (down != wasDown)
+            keys.keys[k].fDown = down;
+    }
+    keys.game_jump.fPressed = current & InputBit::JumpPress;
+    keys.game_turbo.fPressed = current & InputBit::TurboPress;
+}

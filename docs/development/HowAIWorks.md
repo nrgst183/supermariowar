@@ -1,7 +1,13 @@
 Controlling the Player
 ----------------------
 If a player is AI controlled, then the `Think()` method is called once every 4 game frames
-(62 avg. fps / 4 = 15 times/sec)
+(62 avg. fps / 4 = 15 times/sec). It runs outside the simulation, on one machine (online: the
+host), before the tick, and its buttons become the CPU's input bytes, the same as a human's
+(`src/smw/CpuDriver.h`). So `Think()` may only change the keys: the driver puts back anything
+else it changes on the player (`lockfire` becomes a tick without turbo, `throw_star` a wait in
+the AI), and it uses its own random numbers (`aiRandom()`), not the gameplay generator. Only a
+CPU that takes over a human who left an online match, and old replays, run `Think()` inside the
+simulation (`CPlayer::move`).
 The method is called with a reference to the player's `COutputControl` struct, which is what is
 used to send input to the player.  This is the same struct that the gamepad/keyboard fills out.
 Essentially, you are replacing the gamepad.
@@ -296,8 +302,8 @@ time limit, jail, chicken, tag, king of the hill, race, owned, frenzy, survival,
 tag). In the item modes (coins, eggs, flags, stars, domination, greed, health, collection,
 stomp) they made the CPU worse in the comparisons below, so those modes keep the original
 fighting. The CPU still thinks on every 4th frame, and the path search is a small Dijkstra
-(at most 300 spots), so the cost stays low. Everything is derived from simulation state and
-the map, so it is deterministic and safe for online play and rollback.
+(at most 300 spots), so the cost stays low. The AI reads the simulation state and the map; as
+its decisions travel as input, it doesn't have to be deterministic between builds.
 
 Comparing AI versions: `--at-ai-old MASK` keeps the original logic for the players whose bit
 is set, and `--at-ai-bench 1` prints kills, deaths, score, stuck turns, direction reversals and item

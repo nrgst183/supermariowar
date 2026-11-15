@@ -105,8 +105,24 @@ size_t Arena::liveCount() const
     return header().liveCount;
 }
 
+namespace {
+int g_outside = 0;
+}
+
+OutsideScope::OutsideScope()
+{
+    g_outside++;
+}
+
+OutsideScope::~OutsideScope()
+{
+    g_outside--;
+}
+
 void* Arena::allocate(size_t size)
 {
+    if (g_outside > 0)
+        return ::operator new(size);
     Header& h = header();
     const size_t cls = sizeClass(size);
     const size_t blockSize = classSize(cls);

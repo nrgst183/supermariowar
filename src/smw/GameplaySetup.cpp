@@ -1,3 +1,4 @@
+#include "CpuDriver.h"
 #include "GSGameplay.h"
 
 #include "CmdArgs.h"
@@ -262,6 +263,7 @@ void GameplayState::initRunGame()
     //Reset the keys each time we switch from menu to game and back
     game_values.playerInput.ResetKeys();
     resetTickInput();
+    cpudriver::reset();
     g_sim.tick = 0;
     g_sim.gameoverTick = -1;
 

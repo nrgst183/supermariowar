@@ -35,9 +35,10 @@
 //  - countdown*:       the "3, 2, 1, Go" countdown that holds the match back
 //  - windTimer, nextWind: wind changes (wind pushes players)
 //  - playerKeys:       the key state each player reads (CPlayer::playerKeys
-//                      points here). Human players get it from the tick's
-//                      InputFrame, CPU players from their AI, which keeps
-//                      keys held across ticks.
+//                      points here). Players get it from the tick's
+//                      InputFrame, CPU players too (CpuDriver.h); a CPU that
+//                      took over a human (or in an old replay) from its AI,
+//                      which keeps keys held across ticks.
 //  - previousInput:    each player's InputFrame byte of the previous tick,
 //                      to derive "just pressed"
 //  - cpuTakeover:      online, the slots (bit s) whose human player the CPU

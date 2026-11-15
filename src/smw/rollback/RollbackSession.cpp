@@ -242,7 +242,7 @@ FrameResult RollbackSession::advanceFrame(const InputFrame& localInput, uint32_t
         if (m_localReceived == inputFrame) {
             const Peer& local = m_peers[m_config.localPeer];
             for (int i = 0; i < local.slotCount; i++)
-                input(inputFrame, local.slots[i]) = localInput.players[local.slots[i]] & InputBit::MASK;
+                input(inputFrame, local.slots[i]) = localInput.players[local.slots[i]];
             m_localReceived++;
         }
 
@@ -389,7 +389,7 @@ void RollbackSession::receiveInput(int p, const uint8_t* data, size_t size, uint
 
         for (int k = 0; k < peer.slotCount; k++) {
             const int slot = peer.slots[k];
-            const uint8_t value = inputs[i * peer.slotCount + k] & InputBit::MASK;
+            const uint8_t value = inputs[i * peer.slotCount + k];
             input(frame, slot) = value;
             if (frame < m_frame && used(frame, slot) != value && (m_firstWrongFrame < 0 || frame < m_firstWrongFrame))
                 m_firstWrongFrame = frame;
@@ -545,7 +545,7 @@ bool RollbackSession::mergeLostInputs(int p, int known, int count, const uint8_t
     for (int frame = peer.received; frame < known; frame++) {
         for (int k = 0; k < peer.slotCount; k++) {
             const int slot = peer.slots[k];
-            const uint8_t value = inputs[(frame - start) * peer.slotCount + k] & InputBit::MASK;
+            const uint8_t value = inputs[(frame - start) * peer.slotCount + k];
             input(frame, slot) = value;
             if (frame < m_frame && used(frame, slot) != value && (m_firstWrongFrame < 0 || frame < m_firstWrongFrame))
                 m_firstWrongFrame = frame;

@@ -28,6 +28,13 @@ score panels, like the match did (Graphics > Ping Bars turns them off, in matche
 (another game version) the theater says so. Replays from before the skins and songs were
 stored still play, with the skins found by name and random songs.
 
+CPU players are recorded like the humans: their AI runs outside the simulation and its
+buttons are the CPU's input in every tick (`src/smw/CpuDriver.h`). So a replay plays the
+CPUs exactly as they played, also after the AI was changed (the AI no longer decides
+anything inside the replay). Each player's input is stored as runs of equal bytes, so four
+CPUs add about 5 KB per minute. Replays from before this (version 3 and older) still run the
+AI inside the simulation, so they play as recorded only with the AI of their time.
+
 `smw --replay FILE` plays one at startup (with `--autotest`: then quits).
 
 ## The theater

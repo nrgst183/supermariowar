@@ -3,6 +3,7 @@ add_executable(smw WIN32
 
 	ai.cpp
 	AINav.cpp
+	CpuDriver.cpp
 	MatchHistory.cpp
 	GameplayTheater.cpp
 	AIObjects.cpp

@@ -33,11 +33,16 @@
 // File (little-endian): "SMWREPLAY" + u8 0, u16 version, u64 simulation data
 // hash, i64 start time (unix), u32 + config bytes (MatchConfig::serialize),
 // 4 x (str skin path, str player name), str map name, u32 + map bytes,
-// u32 tick count, u32 runs + runs of (u16 length, 4 input bytes, u8 CPU mask),
+// u32 tick count, u32 runs + runs of (u16 length, 4 input bytes, u8 CPU mask)
+// (version 4 and on: for each player, then the CPU mask, u32 runs + runs of
+// (varint length, u8 byte)),
 // u32 checksums + (u32 tick, u64 checksum); version 2 and on: 4 x (u32 + skin
 // file bytes), u32 songs + (u32 tick, str song: relative to the data folder
 // when it's in it); version 3 and on: u32 windows + 4 x u16 average ping per
-// window; str = u16 length + bytes. Older replays still play.
+// window; version 4 and on: the CPU players' bytes are in the ticks, then u32 changes
+// + (u32 tick, u8 slot, u16 keys) of the buttons of CPUs that took over a human; str = u16 length + bytes. Older replays still play.
+struct COutputControl;
+
 namespace replay {
 
 struct TickRecord {
@@ -48,7 +53,7 @@ struct TickRecord {
 };
 
 struct Replay {
-    static constexpr uint16_t VERSION = 3;
+    static constexpr uint16_t VERSION = 4;
     static constexpr int PING_WINDOW = 60;    // ticks (about a second)
     static constexpr uint16_t NO_PING = 0xffff;
 
@@ -66,6 +71,20 @@ struct Replay {
     // (version 3) online: each player's average ping (ms) over each PING_WINDOW ticks, as the recording
     // computer saw it (NO_PING: none, a player on that computer or a CPU)
     std::vector<std::array<uint16_t, INPUT_MAX_PLAYERS>> pings;
+    // The file's version (what the simulation of its time did differently)
+    uint16_t version = VERSION;
+    // (version 4) From version 4 on, CPU players play by input bytes in the ticks like the human
+    // ones (see CpuDriver.h): a replay keeps its CPUs' play when the AI changes. Only a CPU that
+    // took over a human that left an online match thinks inside the simulation; its buttons
+    // after it thought, whenever they changed, are these: what it held (bits 0-7) and had just
+    // pressed (8-15). The playback uses them instead of that AI's own (it still thinks, for its
+    // state and the random numbers).
+    struct CpuKeys {
+        uint32_t tick;
+        uint8_t slot;
+        uint16_t keys;
+    };
+    std::vector<CpuKeys> cpuKeys;
 
     std::vector<uint8_t> serialize() const;
     bool deserialize(const std::vector<uint8_t>& bytes);
@@ -115,6 +134,14 @@ void checkTick();
 void syncMusic();
 // An online replay: a player's average ping at the current tick, as recorded (-1: none)
 int pingAt(int slot);
+
+// CPU players play by input bytes (false only while playing a replay from before version 4,
+// whose CPUs thought inside the simulation)
+bool cpuInputs();
+
+// A CPU player has thought (CPlayer::move): recording, its buttons are kept; playing a replay that
+// has them, they become the recorded ones
+void afterCpuThink(int slot, COutputControl& keys);
 
 // ---- the theater (GameplayTheater.cpp): moving around in a replay
 //

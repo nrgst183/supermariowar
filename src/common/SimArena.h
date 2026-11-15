@@ -82,6 +82,18 @@ private:
     bool m_overflowed = false;
 };
 
+// While one exists, the arena hands out normal heap memory instead (and takes
+// it back: deallocate() frees what isn't in the block): for objects of the
+// simulation's types that live outside it, the CPU players' AI that thinks on
+// one machine (CpuDriver.h). Snapshots never see them.
+class OutsideScope {
+public:
+    OutsideScope();
+    ~OutsideScope();
+    OutsideScope(const OutsideScope&) = delete;
+    OutsideScope& operator=(const OutsideScope&) = delete;
+};
+
 // Base class for types whose objects live in the arena. The class-specific
 // operator new/delete are inherited, and for classes with a virtual destructor
 // the sized delete receives the size of the most derived type.

@@ -196,6 +196,19 @@ void CPlayer::cpu_think()
     pPlayerAI->Think(playerKeys);
 }
 
+void CPlayer::thinkByInput(CPlayerAI& ai, COutputControl& keys, bool& unlockFire)
+{
+    const bool wasLocked = lockfire;
+    const short star = throw_star;
+    ai.SetPlayer(this);
+    ai.Think(&keys);
+    unlockFire = wasLocked && !lockfire;
+    if (throw_star != star)
+        ai.threwStar(g_sim.tick + throw_star);
+    lockfire = wasLocked;
+    throw_star = star;
+}
+
 void CPlayer::die(PlayerDeathStyle deathStyle, bool fTeamRemoved, bool fKillCarriedItem)
 {
     if (cmd::g_autotest.aiBench && state == PlayerState::Ready && !fTeamRemoved && globalID >= 0 && globalID < 4)

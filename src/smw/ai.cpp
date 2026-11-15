@@ -77,6 +77,25 @@
 #include <cstdio>
 #include <cstdlib> // abs()
 
+namespace {
+RandomNumberGenerator* g_aiRandom = nullptr;
+
+RandomNumberGenerator& aiRandom()
+{
+    return g_aiRandom ? *g_aiRandom : RandomNumberGenerator::gameplay();
+}
+}  // namespace
+
+void CPlayerAI::useRandom(RandomNumberGenerator* rng)
+{
+    g_aiRandom = rng;
+}
+
+bool CPlayerAI::canTakeStar() const
+{
+    return pPlayer->throw_star == 0 && g_sim.tick >= starThrowUntil;
+}
+
 // see docs/development/HowAIWorks.txt for more information
 
 namespace aibench {
@@ -235,7 +254,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     //A percentage of the time the cpu will do nothing based on the difficulty level (not in the
     //middle of a running jump: half done, it would only bump its head on the ledge)
     const bool committed = navMove == static_cast<short>(ainav::Move::RunJump) && navActive;
-    if (RandomNumberGenerator::gameplay().getBoolean(100, iDecisionPercentage[game_values.cpudifficulty]) && pPlayer->isready() && !committed)
+    if (aiRandom().getBoolean(100, iDecisionPercentage[game_values.cpudifficulty]) && pPlayer->isready() && !committed)
         return;
 
     playerKeys->game_jump.fDown = false;
@@ -343,7 +362,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
             if (nearestObjects.playerdistance <= 4096 || nearestObjects.stompdistance <= 4096 || nearestObjects.threatdistance <= 4096)
                 playerKeys->game_turbo.fDown = true;
         } else {
-            if (pPlayer->powerup == -1 || !RandomNumberGenerator::gameplay().getBoolean(20))
+            if (pPlayer->powerup == -1 || !aiRandom().getBoolean(20))
                 playerKeys->game_turbo.fDown = true;
 
             if (carriedItem) {
@@ -446,7 +465,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
                 playerKeys->game_jump.fDown = true;
             } else if (player->iy > iy &&			//try to down jump if player is below us
                        player->ix - ix < 45 &&
-                       player->ix - ix > -45 && RandomNumberGenerator::gameplay().getBoolean()) {
+                       player->ix - ix > -45 && aiRandom().getBoolean()) {
                 //or if player is high
                 if (!pPlayer->inair) playerKeys->game_down.fDown = true;
 
@@ -514,7 +533,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
 
             if (dynamic_cast<CO_Egg*>(goal))
                 playerKeys->game_turbo.fDown = true;
-            else if (dynamic_cast<CO_Star*>(goal) && pPlayer->throw_star == 0)
+            else if (dynamic_cast<CO_Star*>(goal) && canTakeStar())
                 playerKeys->game_turbo.fDown = true;
             else if (dynamic_cast<CO_Flag*>(goal))
                 playerKeys->game_turbo.fDown = true;
@@ -636,7 +655,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
 
         if (carriedItem && carriedItem->getMovingObjectType() == movingobject_star && (static_cast<CO_Star*>(carriedItem))->getType() == 0 && !starmode->isplayerstar(pPlayer))
             playerKeys->game_turbo.fDown = false;
-        else if (starmode->isplayerstar(pPlayer) && pPlayer->throw_star == 0)
+        else if (starmode->isplayerstar(pPlayer) && canTakeStar())
             playerKeys->game_turbo.fDown = true;
     }
 
@@ -1354,7 +1373,7 @@ void CSimpleAI::Think(COutputControl * playerKeys)
             playerKeys->game_jump.fDown = true;
     } else {
         //Try to jump 1 out of 50 chances when on ground
-        if (RandomNumberGenerator::gameplay().getBoolean(50))
+        if (aiRandom().getBoolean(50))
             playerKeys->game_jump.fDown = true;
         else
             playerKeys->game_jump.fDown = false;

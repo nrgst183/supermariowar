@@ -59,7 +59,7 @@
 namespace rollback::net {
 
 constexpr uint32_t PROTOCOL_MAGIC = 0x52574d53; // "SMWR"
-constexpr uint16_t PROTOCOL_VERSION = 3;
+constexpr uint16_t PROTOCOL_VERSION = 4;    // 4: CPU players play by the host's input
 
 constexpr int MAX_PEERS = 4;
 

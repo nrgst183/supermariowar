@@ -42,6 +42,7 @@ struct Scheme {
     bool sprite;                           // the game's own dialog (Pipe)
     bool thinRim;                          // SMB3's status bar: a thin white line, a light inner edge, no rivets
     SDL_Color edge;                        // (that inner edge)
+    bool edgeOutside = false;              // thin rim: the light edge right inside the white line, then black (Night)
 };
 const Scheme& scheme();
 // A panel in those colors, laid out like dialog(): the frame 6 pixels in from the
@@ -87,6 +88,8 @@ int scoreDigits(int x, int y, const std::string& text);
 int scoreDigitsWidth(const std::string& text);
 // A coin spinning (32 x 32; color: 0 red, 1 green, 2 gold, 3 blue)
 void spinningCoin(int x, int y, int tick, int color = 2);
+// A movie clapperboard, open (32 x 32): the theater help's item
+void clapperboard(int x, int y);
 gfxFont& gameFont();    // the match's large font (the announcements')
 
 // A connection's quality: four bars (22 x 16) lit by the ping (gray: not known yet)

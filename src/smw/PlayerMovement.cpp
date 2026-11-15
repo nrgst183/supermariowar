@@ -1,3 +1,5 @@
+#include "CpuDriver.h"
+#include "rollback/Replay.h"
 #include "player.h"
 
 #include "eyecandy.h"
@@ -344,7 +346,12 @@ void CPlayer::move()
         if (pPlayerAI) {
             //Calculate movement every 4th frame (speed up optimization)
             if (game_values.cputurn == globalID) {
-                cpu_think();
+                //Playing by input, its machine thought before the tick (CpuDriver.h)
+                if (!cpudriver::playsByInput(globalID)) {
+                    cpu_think();
+                    //(a replay: its recorded buttons; recording: these are kept)
+                    replay::afterCpuThink(globalID, *playerKeys);
+                }
 
                 if (playerKeys->game_jump.fDown || playerKeys->game_left.fDown || playerKeys->game_right.fDown)
                     suicidetimer.reset();

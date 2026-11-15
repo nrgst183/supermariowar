@@ -8,6 +8,7 @@
 #include "SimArena.h"
 
 class CObject;
+class RandomNumberGenerator;
 
 // AI comparisons in autotests (not simulation state): kills, deaths and self-deaths per player
 namespace aibench {
@@ -99,6 +100,14 @@ public:
 
     virtual void Think(COutputControl * playerKeys);
 
+    // The random numbers the AI uses: the gameplay generator while it thinks inside the
+    // simulation, `rng` while it plays by input from outside it (CpuDriver; nullptr: back)
+    static void useRandom(RandomNumberGenerator* rng);
+    // A star it threw can be taken back
+    bool canTakeStar() const;
+    // Played by input: it threw a star away, and leaves it until this tick
+    void threwStar(int untilTick) { starThrowUntil = untilTick; }
+
     void GetNearestObjects();
     void DistanceToObject(CObject * object, CObject ** target, int * nearest, bool * wrap);
     void DistanceToObjectCenter(CObject * object, CObject ** target, int * nearest, bool * wrap);
@@ -133,6 +142,9 @@ private:
     short unstickTimer = 0;
     short unstickDir = 0;
     NearestObjects nearestObjects;
+    // Played by input (CpuDriver): it can't set the player's throw_star, so it waits this long
+    // itself before taking a star it threw back
+    int starThrowUntil = 0;
 
     sim::map<int, AttentionObject*> attentionObjects;
     AttentionObject currentAttentionObject;

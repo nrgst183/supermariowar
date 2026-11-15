@@ -1,5 +1,6 @@
 #include "rollback/Replay.h"
 #include "GSGameplay.h"
+#include "CpuDriver.h"
 
 #include "eyecandy.h"
 #include "GameMode.h"
@@ -92,9 +93,12 @@ void GameplayState::applyTickInput(const InputFrame& input)
         for (CKeyState& key : keys.keys)
             key.fPressed = false;
 
-        //CPU players keep the keys their AI holds down
+        //CPU players play by input too (CpuDriver.h); one that thinks inside the simulation (it took
+        //over a human, or an old replay) keeps the keys its AI holds down
         if (game_values.playercontrol[iPlayer] == 1 && !(g_sim.cpuTakeover & (1u << iPlayer)))
             applyInputByte(input.players[iPlayer], g_sim.previousInput[iPlayer], keys);
+        else if (cpudriver::playsByInput(iPlayer))
+            applyCpuInputByte(input.players[iPlayer], g_sim.previousInput[iPlayer], keys);
 
         g_sim.previousInput[iPlayer] = input.players[iPlayer];
     }
@@ -113,7 +117,8 @@ void GameplayState::takeOverByCpu(uint8_t slotMask)
 {
     for (short iPlayer = 0; iPlayer < 4; iPlayer++) {
         const uint8_t bit = static_cast<uint8_t>(1u << iPlayer);
-        if (!(slotMask & bit) || (g_sim.cpuTakeover & bit) || game_values.playercontrol[iPlayer] != 1)
+        //(online, the host's CPU players too: they played by its input)
+        if (!(slotMask & bit) || (g_sim.cpuTakeover & bit) || game_values.playercontrol[iPlayer] == 0)
             continue;
         g_sim.cpuTakeover |= bit;
         //Let go of the keys the human held; the AI presses its own

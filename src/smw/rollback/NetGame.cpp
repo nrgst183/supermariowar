@@ -728,8 +728,11 @@ void NetGame::beginMatch()
     session.peerCount = net::MAX_PEERS;
     session.localPeer = m_lobby->localPeer();
     const std::array<int, net::MAX_PEERS> connections = m_lobby->mesh().peerConnections();
-    for (int k = 0; k < INPUT_MAX_PLAYERS; k++)
-        session.slotPeer[static_cast<size_t>(k)] = config.slots[static_cast<size_t>(k)].peer;
+    //The host's machine plays the CPU players: their AI's buttons are its input (CpuDriver.h)
+    for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
+        const MatchSlot& slot = config.slots[static_cast<size_t>(k)];
+        session.slotPeer[static_cast<size_t>(k)] = slot.control == 2 ? 0 : slot.peer;
+    }
     int peers = 1;
     for (int p = 0; p < net::MAX_PEERS; p++) {
         bool inMatch = p == 0;

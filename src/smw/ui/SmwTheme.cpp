@@ -101,9 +101,9 @@ void block(int x, int y, int w, int h, Tone tone)
 const Scheme& scheme()
 {
     static const Scheme schemes[] = {
-        //Night: dark blue in SMB3's status bar frame (a white line between black ones)
-        {{22, 26, 58, 255}, {34, 40, 86, 255}, {10, 12, 30, 255}, {255, 255, 255, 255}, {255, 255, 255, 255}, {189, 189, 188, 255},
-            {255, 255, 255, 255}, false, true, {56, 72, 140, 255}},
+        //Night: deep blue in a white line, a pale blue one and black
+        {{20, 56, 128, 255}, {28, 68, 148, 255}, {8, 26, 66, 255}, {255, 255, 255, 255}, {255, 255, 255, 255}, {189, 189, 188, 255},
+            {255, 255, 255, 255}, false, true, {216, 228, 248, 255}, true},
         //Pipe: the game's green dialog
         {{57, 154, 0, 255}, {48, 140, 0, 255}, {9, 60, 0, 255}, {107, 203, 0, 255}, {148, 243, 0, 255}, {16, 113, 0, 255},
             {255, 255, 255, 255}, true, false, {}},
@@ -132,6 +132,15 @@ void rounded(int x, int y, int w, int h, int cut, SDL_Color c)
 void framed(int x, int y, int w, int h, bool rivets)
 {
     const Scheme& c = scheme();
+    if (c.thinRim && c.edgeOutside) {
+        //Night: black, white, the light edge, black, the body
+        rounded(x, y, w, h, 4, BLACK);
+        rounded(x + 1, y + 1, w - 2, h - 2, 4, c.rim);
+        rounded(x + 3, y + 3, w - 6, h - 6, 3, c.edge);
+        rounded(x + 5, y + 5, w - 10, h - 10, 2, BLACK);
+        fill(x + 7, y + 7, w - 14, h - 14, c.body);
+        return;
+    }
     if (c.thinRim) {
         //SMB3: black, white, black, the light edge, the body (rounded)
         rounded(x, y, w, h, 4, BLACK);
@@ -285,6 +294,28 @@ void flag(int x, int y, SDL_Color c)
         "#...",
         "#...",
     }, {{'#', BLACK}, {'c', c}, {'l', shade(c, 140)}});
+}
+
+void clapperboard(int x, int y)
+{
+    prompts::art(x, y, {
+        "...............k",
+        "............wwwk",
+        ".........kkkwwkk",
+        "......wwwkkwwkk.",
+        "...kkkwwkkww....",
+        "wwwkkwwkk.......",
+        "wwkkww..........",
+        "wkk.............",
+        "kkkwwwkkkwwwkkkw",
+        "wkkkwwwkkkwwwkkk",
+        "wwkkkwwwkkkwwwkk",
+        "################",
+        "kkkkkkkkkkkkkkkk",
+        "kkllllllllkkkkkk",
+        "kkkkkkkkkkkkkkkk",
+        "kkkkkkkkkkkkkkkk",
+    }, {{'#', BLACK}, {'w', {255, 255, 255, 255}}, {'k', {32, 32, 40, 255}}, {'l', {176, 192, 192, 255}}});
 }
 
 void tooltip(int cx, int y, const std::string& text)

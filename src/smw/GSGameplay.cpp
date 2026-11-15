@@ -1,3 +1,4 @@
+#include "CpuDriver.h"
 #include "GSGameplay.h"
 
 #include "CmdArgs.h"
@@ -883,6 +884,11 @@ void GameplayState::update()
         InputFrame input = gatherLocalInput(game_values.playerInput, game_values.playercontrol);
         if (cmd::g_autotest.enabled && cmd::g_autotest.humans > 0)
             input = autoTestHumanInput();
+        //The CPU players' buttons: their AI runs here, outside the simulation
+        for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
+            if (cpudriver::playsByInput(slot))
+                input.players[slot] = cpudriver::next(slot);
+        }
 
         if (cmd::g_autotest.enabled && cmd::g_autotest.synctest > 0) {
             if (!syncTest)
@@ -953,12 +959,17 @@ void GameplayState::updateNetplay()
         return;
     }
 
-    //The local players use the first input devices, whatever their slots
+    //The local players use the first input devices, whatever their slots; the host's machine plays
+    //the CPU players (their AI's buttons)
     InputFrame input;
     int device = 0;
     for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
         if (!net.isLocalSlot(slot))
             continue;
+        if (game_values.playercontrol[slot] == 2) {
+            input.players[slot] = cpudriver::next(slot);
+            continue;
+        }
         if (cmd::g_autotest.enabled && cmd::g_autotest.humans > 0)
             input.players[slot] = autoTestNetHumanInput(slot);
         else

@@ -209,6 +209,14 @@ private:
 
     void cpu_think();
 
+public:
+    // CpuDriver.h: `ai`, outside the simulation, thinks for this player and may only change
+    // `keys` (the player stays as it was; `unlockFire`: the AI let it fire again)
+    bool hasAI() const { return pPlayerAI != nullptr; }
+    void thinkByInput(CPlayerAI& ai, COutputControl& keys, bool& unlockFire);
+
+private:
+
 		void updateSprite();
 		void Jump(short iMove, float jumpModifier, bool fKuriboBounce);
 

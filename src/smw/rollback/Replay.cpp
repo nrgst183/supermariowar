@@ -17,6 +17,7 @@
 #include "StateChecksum.h"
 #include "Snapshot.h"
 #include "eyecandy.h"
+#include "input.h"
 #include "GSGameplay.h"
 #include "Resimulation.h"
 #include "sfx.h"
@@ -50,6 +51,15 @@ struct Writer {
     void u16(uint16_t v) { u8(static_cast<uint8_t>(v)); u8(static_cast<uint8_t>(v >> 8)); }
     void u32(uint32_t v) { u16(static_cast<uint16_t>(v)); u16(static_cast<uint16_t>(v >> 16)); }
     void u64(uint64_t v) { u32(static_cast<uint32_t>(v)); u32(static_cast<uint32_t>(v >> 32)); }
+    // 7 bits per byte, the high bit says another byte follows
+    void varint(uint32_t v)
+    {
+        while (v >= 0x80) {
+            u8(static_cast<uint8_t>(v | 0x80));
+            v >>= 7;
+        }
+        u8(static_cast<uint8_t>(v));
+    }
     void bytes(const std::vector<uint8_t>& b) { u32(static_cast<uint32_t>(b.size())); out.insert(out.end(), b.begin(), b.end()); }
     void str(const std::string& s)
     {
@@ -74,6 +84,18 @@ struct Reader {
     uint16_t u16() { const uint16_t lo = u8(); return static_cast<uint16_t>(lo | (u8() << 8)); }
     uint32_t u32() { const uint32_t lo = u16(); return lo | (static_cast<uint32_t>(u16()) << 16); }
     uint64_t u64() { const uint64_t lo = u32(); return lo | (static_cast<uint64_t>(u32()) << 32); }
+    uint32_t varint()
+    {
+        uint32_t v = 0;
+        for (int shift = 0; shift < 35 && ok; shift += 7) {
+            const uint8_t b = u8();
+            v |= static_cast<uint32_t>(b & 0x7f) << shift;
+            if (!(b & 0x80))
+                return v;
+        }
+        ok = false;
+        return 0;
+    }
     std::vector<uint8_t> bytes(size_t max)
     {
         const uint32_t n = u32();
@@ -117,6 +139,27 @@ struct Recording {
     std::vector<std::array<uint32_t, INPUT_MAX_PLAYERS>> pingSum;
     std::vector<std::array<uint16_t, INPUT_MAX_PLAYERS>> pingCount;
 };
+
+// The buttons as 16 bits: held (0-7), just pressed (8-15)
+uint16_t packKeys(const COutputControl& keys)
+{
+    uint16_t bits = 0;
+    for (int k = 0; k < NUM_KEYS && k < 8; k++) {
+        if (keys.keys[k].fDown)
+            bits |= static_cast<uint16_t>(1u << k);
+        if (keys.keys[k].fPressed)
+            bits |= static_cast<uint16_t>(1u << (k + 8));
+    }
+    return bits;
+}
+
+void unpackKeys(uint16_t bits, COutputControl& keys)
+{
+    for (int k = 0; k < NUM_KEYS && k < 8; k++) {
+        keys.keys[k].fDown = (bits >> k) & 1u;
+        keys.keys[k].fPressed = (bits >> (k + 8)) & 1u;
+    }
+}
 Recording g_rec;
 
 std::string skinPathOf(int slot)
@@ -226,6 +269,7 @@ struct Playback {
     std::vector<std::pair<int, std::unique_ptr<rollback::Snapshot>>> keyframes;
     std::vector<Marker> markers;
     std::string musicNow;    // the recorded song playing ("": none yet)
+    std::array<std::vector<Replay::CpuKeys>, INPUT_MAX_PLAYERS> cpuKeysBySlot;    // the CPUs' buttons, by player
 };
 Playback g_play;
 bool g_returnedFromReplay = false;
@@ -383,21 +427,26 @@ std::vector<uint8_t> Replay::serialize() const
     w.bytes(map);
     w.u32(static_cast<uint32_t>(ticks.size()));
 
-    //Run-length: the inputs stay the same for many ticks
-    std::vector<std::pair<uint16_t, TickRecord>> runs;
-    for (const TickRecord& tick : ticks) {
-        if (!runs.empty() && runs.back().second == tick && runs.back().first < 0xffff)
-            runs.back().first++;
-        else
-            runs.emplace_back(1, tick);
-    }
-    w.u32(static_cast<uint32_t>(runs.size()));
-    for (const auto& [length, tick] : runs) {
-        w.u16(length);
-        for (uint8_t b : tick.input.players)
-            w.u8(b);
-        w.u8(tick.cpuMask);
-    }
+    //(version 4) Run-length, each player's bytes (and the CPU mask) on their own: a player's
+    //input stays the same for several ticks, even when someone's changes every tick
+    auto writeRuns = [&](auto valueOf) {
+        std::vector<std::pair<uint32_t, uint8_t>> runs;
+        for (const TickRecord& tick : ticks) {
+            const uint8_t v = valueOf(tick);
+            if (!runs.empty() && runs.back().second == v)
+                runs.back().first++;
+            else
+                runs.emplace_back(1, v);
+        }
+        w.u32(static_cast<uint32_t>(runs.size()));
+        for (const auto& [length, v] : runs) {
+            w.varint(length);
+            w.u8(v);
+        }
+    };
+    for (size_t slot = 0; slot < INPUT_MAX_PLAYERS; slot++)
+        writeRuns([slot](const TickRecord& tick) { return tick.input.players[slot]; });
+    writeRuns([](const TickRecord& tick) { return tick.cpuMask; });
 
     w.u32(static_cast<uint32_t>(checksums.size()));
     for (const auto& [tick, sum] : checksums) {
@@ -418,6 +467,13 @@ std::vector<uint8_t> Replay::serialize() const
         for (uint16_t ping : window)
             w.u16(ping);
     }
+    //(version 4)
+    w.u32(static_cast<uint32_t>(cpuKeys.size()));
+    for (const CpuKeys& change : cpuKeys) {
+        w.u32(change.tick);
+        w.u8(change.slot);
+        w.u16(change.keys);
+    }
     return std::move(w.out);
 }
 
@@ -430,6 +486,7 @@ bool Replay::deserialize(const std::vector<uint8_t>& bytes)
     const uint16_t version = r.u16();
     if (version < 1 || version > VERSION)
         return false;
+    this->version = version;
     dataHash = r.u64();
     startTime = static_cast<int64_t>(r.u64());
     config = r.bytes(1 << 16);
@@ -440,19 +497,47 @@ bool Replay::deserialize(const std::vector<uint8_t>& bytes)
     mapName = r.str();
     map = r.bytes(rollback::MAP_MAX_BYTES);
     const uint32_t tickCount = r.u32();
-    const uint32_t runCount = r.u32();
-    if (!r.ok || tickCount > 50'000'000u || runCount > tickCount)
+    if (!r.ok || tickCount > 50'000'000u)
         return false;
-    ticks.reserve(tickCount);
-    for (uint32_t k = 0; k < runCount && r.ok; k++) {
-        const uint16_t length = r.u16();
-        TickRecord tick;
-        for (uint8_t& b : tick.input.players)
-            b = r.u8() & InputBit::MASK;
-        tick.cpuMask = r.u8();
-        if (ticks.size() + length > tickCount)
+    if (version >= 4) {
+        //Each player's runs, then the CPU mask's
+        ticks.assign(tickCount, TickRecord {});
+        for (int column = 0; column <= INPUT_MAX_PLAYERS && r.ok; column++) {
+            const uint32_t runCount = r.u32();
+            if (runCount > tickCount)
+                return false;
+            uint32_t at = 0;
+            for (uint32_t k = 0; k < runCount && r.ok; k++) {
+                const uint32_t length = r.varint();
+                const uint8_t v = r.u8();
+                if (length > tickCount - at)
+                    return false;
+                for (uint32_t t = at; t < at + length; t++) {
+                    if (column < INPUT_MAX_PLAYERS)
+                        ticks[t].input.players[static_cast<size_t>(column)] = v;
+                    else
+                        ticks[t].cpuMask = v;
+                }
+                at += length;
+            }
+            if (at != tickCount)
+                return false;
+        }
+    } else {
+        const uint32_t runCount = r.u32();
+        if (runCount > tickCount)
             return false;
-        ticks.insert(ticks.end(), length, tick);
+        ticks.reserve(tickCount);
+        for (uint32_t k = 0; k < runCount && r.ok; k++) {
+            const uint16_t length = r.u16();
+            TickRecord tick;
+            for (uint8_t& b : tick.input.players)
+                b = r.u8();
+            tick.cpuMask = r.u8();
+            if (ticks.size() + length > tickCount)
+                return false;
+            ticks.insert(ticks.end(), length, tick);
+        }
     }
     const uint32_t sums = r.u32();
     for (uint32_t k = 0; k < sums && r.ok; k++) {
@@ -479,6 +564,21 @@ bool Replay::deserialize(const std::vector<uint8_t>& bytes)
             for (uint16_t& ping : window)
                 ping = r.u16();
             pings.push_back(window);
+        }
+    }
+    if (version >= 4) {
+        const uint32_t changes = r.u32();
+        if (changes > 50'000'000u)
+            return false;
+        cpuKeys.reserve(changes);
+        for (uint32_t k = 0; k < changes && r.ok; k++) {
+            CpuKeys change;
+            change.tick = r.u32();
+            change.slot = r.u8();
+            change.keys = r.u16();
+            if (change.slot >= INPUT_MAX_PLAYERS)
+                return false;
+            cpuKeys.push_back(change);
         }
     }
     return r.ok && ticks.size() == tickCount;
@@ -581,6 +681,10 @@ void recordTick(const InputFrame& input)
     while (ticks.size() < tick)
         ticks.push_back(ticks.empty() ? TickRecord() : ticks.back());
     ticks.push_back(TickRecord {input, g_sim.cpuTakeover});
+    //(the CPUs' buttons of this tick and later come again)
+    std::vector<Replay::CpuKeys>& cpu = g_rec.replay.cpuKeys;
+    while (!cpu.empty() && cpu.back().tick >= tick)
+        cpu.pop_back();
 
     //Online: the other players' pings, for the replay's ping bars
     const rollback::NetGame& net = rollback::NetGame::instance();
@@ -629,6 +733,8 @@ std::string finishRecording()
         replay.ticks.resize(ticks);
     for (auto it = replay.checksums.begin(); it != replay.checksums.end();)
         it = it->first > ticks ? replay.checksums.erase(it) : std::next(it);
+    while (!replay.cpuKeys.empty() && replay.cpuKeys.back().tick >= ticks)
+        replay.cpuKeys.pop_back();
     //The pings: an average per window
     replay.pings.clear();
     const size_t windows = std::min(g_rec.pingSum.size(), (ticks + Replay::PING_WINDOW - 1) / Replay::PING_WINDOW);
@@ -711,6 +817,8 @@ bool startPlayback(const std::string& file, std::string& error)
 
     g_play = Playback();
     g_play.replay = std::move(replay);
+    for (const Replay::CpuKeys& change : g_play.replay.cpuKeys)
+        g_play.cpuKeysBySlot[change.slot].push_back(change);
     saveMenu(g_play.backup);
     g_play.active = true;
     g_play.status.total = static_cast<int>(g_play.replay.ticks.size());
@@ -749,6 +857,37 @@ bool startPlayback(const std::string& file, std::string& error)
     prepareTimeline();
     syncMusic();
     return true;
+}
+
+bool cpuInputs()
+{
+    return !g_play.active || g_play.replay.version >= 4;
+}
+
+void afterCpuThink(int slot, COutputControl& keys)
+{
+    if (slot < 0 || slot >= INPUT_MAX_PLAYERS)
+        return;
+    const uint32_t tick = static_cast<uint32_t>(std::max(0, g_sim.tick));
+    if (g_rec.active) {
+        //A change from this CPU's last recorded buttons (the list is in tick order)
+        const uint16_t bits = packKeys(keys);
+        std::vector<Replay::CpuKeys>& cpu = g_rec.replay.cpuKeys;
+        auto last = std::find_if(cpu.rbegin(), cpu.rend(), [slot](const Replay::CpuKeys& c) { return c.slot == slot; });
+        if (last == cpu.rend() || last->keys != bits)
+            cpu.push_back(Replay::CpuKeys {tick, static_cast<uint8_t>(slot), bits});
+        return;
+    }
+    if (!g_play.active)
+        return;
+    const std::vector<Replay::CpuKeys>& slotKeys = g_play.cpuKeysBySlot[static_cast<size_t>(slot)];
+    if (slotKeys.empty())
+        return;
+    //The last change at or before this tick
+    auto it = std::upper_bound(slotKeys.begin(), slotKeys.end(), tick, [](uint32_t t, const Replay::CpuKeys& c) { return t < c.tick; });
+    if (it == slotKeys.begin())
+        return;
+    unpackKeys(std::prev(it)->keys, keys);
 }
 
 int pingAt(int slot)

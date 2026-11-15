@@ -34,8 +34,9 @@
 //     with the peers' (desync detection).
 //
 // PREDICTION. A missing input repeats the last input received from that
-// player. CPU players and empty slots have no input (zero): the simulation
-// runs their AI the same way on every peer.
+// player. CPU players are a peer's players like the humans (the game gives
+// them to the host, whose machine runs their AI: CpuDriver.h); empty slots
+// have no input (zero).
 //
 // BARRIERS: IRREVERSIBLE EVENTS. Leaving the match is not part of the
 // simulation and can't be rolled back, so it must only happen at a frame

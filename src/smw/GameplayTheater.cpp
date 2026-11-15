@@ -361,7 +361,7 @@ void drawHelp()
     const int y = 58;
     theme::panel(x, y, w, h);
     //(its title: an announcement, like the match's)
-    theme::announce(App::screenWidth / 2, y - 26, "Theater", [](int ix, int iy) { theme::spinningCoin(ix, iy, 0); });
+    theme::announce(App::screenWidth / 2, y - 26, "Theater", [](int ix, int iy) { theme::clapperboard(ix, iy); });
     const int padX = x + 272;
     const int keyX = x + 394;
     theme::heading(padX - 6, y + 40, 116, prompts::style() == prompts::Style::OriginalXbox ? "Xbox (orig.)" : "Controller");
@@ -773,19 +773,32 @@ void GameplayState::drawReplayOverlay()
     const int done = TRACK_W * std::clamp(g_sim.tick, 0, total) / total;
     theme::progressLine(TRACK_X - 4, TRACK_Y, TRACK_W + 8, static_cast<float>(std::clamp(g_sim.tick, 0, total)) / static_cast<float>(total));
     int lastFlag = -100;
+    int lastKill = -100;
     for (const replay::Marker& m : replay::markers()) {
         const int mx = TRACK_X + TRACK_W * m.tick / total;
-        //(one flag in 10 pixels: in some modes the score changes all the time)
-        if (m.delta != 0 && mx - lastFlag < 10)
+        //(one flag in 10 pixels, one kill mark in 8: in some modes the score changes all the time)
+        if (m.delta > 0 && mx - lastFlag < 10)
             continue;
-        if (m.delta != 0)
-            lastFlag = mx;
-        if (m.delta == 0)
+        if (m.delta < 0 && mx - lastKill < 8)
+            continue;
+        if (m.delta == 0) {
             theme::modeIcon(mx - 3, TRACK_Y - 18, 13);
-        else if (m.delta > 0)
+        } else if (m.delta > 0) {
+            lastFlag = mx;
             theme::flag(mx - 1, TRACK_Y - 14, teamColor(m.team));
-        else
-            prompts::fill(mx, TRACK_Y - 4, 2, 4, teamColor(m.team));
+        } else {
+            //A kill: an outlined post in the team's color, standing on the line
+            lastKill = mx;
+            const SDL_Color c = teamColor(m.team);
+            prompts::art(mx - 3, TRACK_Y - 8, {
+                "###",
+                "#l#",
+                "#c#",
+                "#c#",
+                "#c#",
+                "###",
+            }, {{'#', {0, 0, 0, 255}}, {'c', c}, {'l', theme::shade(c, 150)}});
+        }
     }
     drawPlayhead(TRACK_X + done, TRACK_Y + 8, th.dragging);
     //(the times: the status bar's timer)
