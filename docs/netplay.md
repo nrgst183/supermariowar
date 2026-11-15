@@ -49,7 +49,7 @@ Every match type can be played online: single games, minigames, and the multi-ma
 
 **Network stats.** The bar at the top of the screen, under the scores, shows every other player's connection (signal bars and round trip time), the input delay in frames, and how many rollbacks happen per second. It is off by default and only drawn in online matches. Toggle it with **F3** during a match, or with **Options, Graphics, Network Stats**.
 
-**Waiting.** When another player's inputs are late by more than the game can predict (about eight frames), the match freezes for a moment. After a split second, a box shows **Waiting for <name>**, for how long, and a pipe that runs down to the moment the CPU takes over. If a player is silent for **5 seconds** the connection is considered lost, and the CPU takes over that player (see below). After 3 seconds of waiting, the box also counts down the seconds. A player that is only lagging is never dropped before that.
+**Waiting.** When another player's inputs are late by more than the game can predict (about eight frames), the match freezes for a moment. After a split second, a box shows **Waiting for <name>**, for how long, and a line that runs down to the moment the CPU takes over. If a player is silent for **5 seconds** the connection is considered lost, and the CPU takes over that player (see below). After 3 seconds of waiting, the box also counts down the seconds. A player that is only lagging is never dropped before that.
 
 **Leaving.** There is no pause online (the others cannot wait for you). Pressing the exit key asks **Leave online match?**. If you leave, you go back to the main menu and the others play on without you. Closing the game has the same effect.
 

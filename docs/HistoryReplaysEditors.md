@@ -36,8 +36,8 @@ Replays play in the theater (`src/smw/GameplayTheater.cpp`), modelled on Halo 3'
 along the bottom is a riveted panel (Graphics > Overlay Colors: Night, the default, dark blue
 in SMB3's white status bar frame; Pipe, the game's green dialog; Castle; SMB3, the status
 bar's own blue; the editors' panels use the same
-colors, see `src/smw/ui/SmwTheme.h`): the timeline is a pipe (green as far as the
-replay has played, a dot sunk into the pipe for the playhead, flags in the scoring team's color, a checkered
+colors, see `src/smw/ui/SmwTheme.h`): the timeline is a line (white as far as the
+replay has played, a gold knob for the playhead, flags in the scoring team's color, a checkered
 flag at the end of the match) with the buttons under it. Each button shows the controller
 button or the key that does the same, for the device used last; any connected controller
 works.
@@ -51,8 +51,8 @@ works.
 | follow a player (their name, the buttons they hold) | X | F | the camera button |
 | hide the bar | Y | H | the eye button |
 | the controls | Back | F1 | the ? block |
-| leave | B | Escape | the pipe |
-| jump | | Home / End | click or drag on the pipe |
+| leave | B | Escape | the warp pipe |
+| jump | | Home / End | click or drag on the meter |
 
 When a replay starts it is simulated once without sound or effects (a few ms), keeping a
 snapshot every 4 seconds: jumping anywhere is instant.

@@ -56,7 +56,7 @@ void drawWaitingBox(const rollback::NetGame& net, const rollback::NetGame::WaitI
     const int cx = App::screenWidth / 2;
 
     theme::panel(x, y, w, h);
-    theme::spinner(x + 44, y + 44, static_cast<int>(wait.waitingMs / 16));
+    theme::spinningCoin(x + 28, y + 28, static_cast<int>(wait.waitingMs / 16));
     theme::bigFont().draw(x + 72, y + 22, "Waiting for");
 
     //The names may not fit: chop them
@@ -66,16 +66,10 @@ void drawWaitingBox(const rollback::NetGame& net, const rollback::NetGame::WaitI
     const std::string seconds = std::format("{:.1f} s", static_cast<double>(wait.waitingMs) / 1000.0);
     theme::font().drawCentered(cx, y + 80, seconds);
 
-    //The time left until the CPU takes over: a pipe, green while there's time
+    //The time left until the CPU takes over: a line running down
     const uint32_t timeoutMs = static_cast<uint32_t>(std::max(1000, cmd::g_net.timeoutMs));
     const float left = 1.0f - std::min(1.0f, static_cast<float>(wait.waitingMs) / static_cast<float>(timeoutMs));
-    const int pipeX = x + 30;
-    const int pipeW = w - 60 - 8;
-    const int done = static_cast<int>(static_cast<float>(pipeW) * left);
-    theme::pipeLip(pipeX - 8, y + 104, true);
-    theme::pipe(pipeX, y + 104, done, true);
-    theme::pipe(pipeX + done, y + 104, pipeW - done, false);
-    theme::pipeLip(pipeX + pipeW, y + 104, false);
+    theme::progressLine(x + 26, y + 104, w - 52, left);
     if (wait.waitingMs >= SHOW_HINT_AFTER_MS)
         theme::font().drawCentered(cx, y + 124, std::format("CPU takes over in {} s", (timeoutMs - std::min(timeoutMs, wait.waitingMs) + 999) / 1000));
 }
@@ -163,12 +157,8 @@ void drawNetOverlay()
 
     const rollback::NetGame::DropNotice drop = net.dropNotice();
     if (!drop.text.empty() && drop.ageMs < SHOW_DROP_MS) {
-        //A banner: who left, the CPU takes over
-        const int w = theme::bigFont().getWidth(drop.text) + 54;
-        const int x = (App::screenWidth - w) / 2;
-        theme::strip(x, 70, w, 36);
-        theme::statusIcon(x + 12, 80, theme::Status::Warn);
-        theme::bigFont().draw(x + 36, 76, drop.text);
+        //An announcement: who left (the card: a Bob-omb), the CPU takes over
+        theme::announce(App::screenWidth / 2, 70, drop.text, [](int ix, int iy) { theme::statusIcon(ix + 8, iy + 8, theme::Status::Warn); });
     }
 
     const rollback::NetGame::WaitInfo wait = net.waitInfo();

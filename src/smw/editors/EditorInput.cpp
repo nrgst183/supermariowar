@@ -760,12 +760,23 @@ void drawActions()
 {
     const MenuLayout layout = menuLayout();
     frameBox(layout.x, layout.y, MENU_W, layout.h);
-    theme::bigFont().drawCentered(SCREEN_W / 2, layout.y + 2, s.editor == Editor::Level ? "Level Editor" : "World Editor");
+    //(its title: SMB3's status bar and an item card)
+    theme::announce(SCREEN_W / 2, std::max(0, layout.y - 34), s.editor == Editor::Level ? "Level Editor" : "World Editor",
+        [](int ix, int iy) { theme::icon(ix + 8, iy + 8, s.editor == Editor::Level ? theme::Icon::QuestionBlock : theme::Icon::Star); });
     for (const MenuEntry& e : layout.entries) {
         if (e.action < 0) {
-            //A heading: the menus' gray pipe
+            //A heading: the menus' gray pipe, an item (SMB3's power-ups) for each group
             theme::block(e.x - 4, e.y - 1, e.w + 4, MENU_LINE, theme::Tone::Gray);
-            theme::font().draw(e.x + 4, e.y - 1, e.text);
+            static const std::pair<const char*, int> items[] = {
+                {"Modes", 5}, {"Layers", 12}, {"Look", 6}, {"File", 26}, {"Other", 9}, {"World", 25}};
+            int item = 27;
+            for (const auto& [name, index] : items) {
+                if (std::string(e.text) == name)
+                    item = index;
+            }
+            if (theme::res().spr_storedpowerupsmall)
+                theme::res().spr_storedpowerupsmall.draw(e.x - 1, e.y - 1, {item * 16, 0, 16, 16});
+            theme::font().draw(e.x + 18, e.y - 1, e.text);
             continue;
         }
         const Action& action = actions()[static_cast<size_t>(e.action)];
@@ -952,21 +963,11 @@ void drawSession()
     }
     const std::string notice = coedit::notice();
     if (!notice.empty()) {
-        const int w = theme::font().getWidth(notice) + 40;
-        const int x = (SCREEN_W - w) / 2;
-        theme::block(x, 40, w, 24, theme::Tone::Blue);
-        //(an "i" on a white button)
-        prompts::art(x + 6, 44, {
-            ".####.",
-            "#bwwb#",
-            "#bbbb#",
-            "#bwwb#",
-            "#bwwb#",
-            "#bwwb#",
-            "#bwwb#",
-            ".####.",
-        }, {{'#', {0, 0, 0, 255}}, {'w', {255, 255, 255, 255}}, {'b', {16, 48, 136, 255}}});
-        theme::font().draw(x + 24, 43, notice);
+        //An announcement (the card: a 1-up for who came, else a Bob-omb)
+        const bool came = notice.find("joined") != std::string::npos;
+        theme::announce(SCREEN_W / 2, 36, notice, [came](int ix, int iy) {
+            theme::statusIcon(ix + 8, iy + 8, came ? theme::Status::Good : theme::Status::Warn);
+        });
     }
 }
 

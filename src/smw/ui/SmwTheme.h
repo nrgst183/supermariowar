@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <functional>
 #include <string>
 
 class CResourceManager;
@@ -68,11 +69,32 @@ void heading(int x, int y, int w, const std::string& text);
 
 SDL_Color shade(SDL_Color c, int percent);    // lighter (> 100) or darker (< 100)
 
+// SMB3's status bar (Super Mario All-Stars): a framed bar in the overlay colors, and the item cards
+// beside it (a framed square). An announcement is both: the bar with the text (the menus' large font,
+// 44 high) centered on cx, and a card with the icon (drawn at x, y, up to 32 x 32) at its right.
+// Returns the total width.
+void itemCard(int x, int y, int size);
+int announce(int cx, int y, const std::string& text, const std::function<void(int x, int y)>& icon = {});
+// A progress line in the status bar's colors (16 high, the line in its middle): white as far as
+// `fraction`, the rest sunk in the overlay's colors
+void progressLine(int x, int y, int w, float fraction);
+// The status bar's timer: a clock and the time (16 high); returns the width
+int timer(int x, int y, const std::string& time);
+int timerWidth(const std::string& time);
+// The score digits of the match's score panels (16 x 16 each, 18 apart); ':' '/' and ' ' between them.
+// Returns the width.
+int scoreDigits(int x, int y, const std::string& text);
+int scoreDigitsWidth(const std::string& text);
+// A coin spinning (32 x 32; color: 0 red, 1 green, 2 gold, 3 blue)
+void spinningCoin(int x, int y, int tick, int color = 2);
+gfxFont& gameFont();    // the match's large font (the announcements')
+
 // A connection's quality: four bars (22 x 16) lit by the ping (gray: not known yet)
 void signal(int x, int y, int pingMs);
 // The same, small (15 x 12): for the score panels
 void signalSmall(int x, int y, int pingMs);
-// A status (16 x 16): i, a check, !, an X
+// A status (16 x 16), with the game's power-ups: a ? block (info), a 1-up (fine), a Bob-omb (a warning),
+// a poison mushroom (a problem)
 enum class Status { Info, Good, Warn, Error };
 void statusIcon(int x, int y, Status status);
 // Something going on: eight dots round a circle (about 34 across), the bright one going round

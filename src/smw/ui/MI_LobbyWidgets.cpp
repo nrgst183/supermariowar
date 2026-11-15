@@ -512,7 +512,7 @@ void MI_LobbyScene::Draw()
     using prompts::Pad;
     if (m_joining) {
         creamFrame(144, 110);
-        theme::spinner(320, 168, m_tick++);
+        theme::spinningCoin(304, 150, m_tick++);
         rm->menu_font_large.drawCentered(320, 196, "Connecting...");
         rm->menu_font_small.drawCentered(320, 232, ellipsize(rm->menu_font_small, m_status, 320));
         prompts::drawPrompts(320, 262, {{{Pad::B}, {prompts::menuKey(prompts::MENU_CANCEL)}, "stop"}});

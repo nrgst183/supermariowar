@@ -346,8 +346,115 @@ void signalSmall(int x, int y, int pingMs)
     }
 }
 
+gfxFont& gameFont()
+{
+    return res().game_font_large;
+}
+
+void itemCard(int x, int y, int size)
+{
+    strip(x, y, size, size);
+}
+
+int announce(int cx, int y, const std::string& text, const std::function<void(int x, int y)>& icon)
+{
+    const int barW = bigFont().getWidth(text) + 40;
+    const int w = barW + (icon ? 6 + 44 : 0);
+    const int x = cx - w / 2;
+    strip(x, y, barW, 44);
+    bigFont().drawCentered(x + barW / 2, y + 22 - bigFont().getHeight() / 2, text);
+    if (icon) {
+        itemCard(x + barW + 6, y, 44);
+        icon(x + barW + 6 + 6, y + 6);
+    }
+    return w;
+}
+
+void progressLine(int x, int y, int w, float fraction)
+{
+    const Scheme& c = scheme();
+    if (w < 8)
+        return;
+    //A rounded bar: black around, a sunk track, the played part white (lit at the top)
+    const int ly = y + 4;
+    fill(x + 2, ly, w - 4, 8, BLACK);
+    fill(x, ly + 2, w, 4, BLACK);
+    fill(x + 2, ly + 2, w - 4, 4, c.well);
+    fill(x + 2, ly + 2, w - 4, 1, shade(c.edge.a ? c.edge : c.rim, 60));
+    const int done = static_cast<int>(static_cast<float>(w - 4) * std::clamp(fraction, 0.0f, 1.0f));
+    if (done > 0) {
+        fill(x + 2, ly + 2, done, 4, {200, 208, 224, 255});
+        fill(x + 2, ly + 2, done, 2, {255, 255, 255, 255});
+    }
+}
+
+int timerWidth(const std::string& time)
+{
+    return 18 + font().getWidth(time);
+}
+
+int timer(int x, int y, const std::string& time)
+{
+    icon(x, y, Icon::Clock);
+    font().draw(x + 18, y, time);
+    return timerWidth(time);
+}
+
+int scoreDigitsWidth(const std::string& text)
+{
+    int w = 0;
+    for (char c : text)
+        w += c >= '0' && c <= '9' ? 18 : 10;
+    return std::max(0, w - 2);
+}
+
+int scoreDigits(int x, int y, const std::string& text)
+{
+    const gfxSprite& digits = res().spr_scoretext;
+    const SDL_Color navy {16, 24, 112, 255};
+    int cx = x;
+    for (char c : text) {
+        if (c >= '0' && c <= '9') {
+            if (digits)
+                digits.draw(cx, y, {(c - '0') * 16, 0, 16, 16});
+            cx += 18;
+            continue;
+        }
+        //(the font has digits only: the rest in its colors, white outlined navy)
+        if (c == ':') {
+            for (int dy : {3, 9}) {
+                fill(cx + 1, y + dy, 6, 6, {255, 255, 255, 255});
+                fill(cx + 3, y + dy + 2, 2, 2, navy);
+            }
+        } else if (c == '/') {
+            for (int k = 0; k < 6; k++)
+                fill(cx + 5 - k, y + 2 + k * 2, 3, 3, {255, 255, 255, 255});
+            for (int k = 0; k < 6; k++)
+                fill(cx + 6 - k, y + 3 + k * 2, 1, 1, navy);
+        }
+        cx += 10;
+    }
+    return cx - x;
+}
+
+void spinningCoin(int x, int y, int tick, int color)
+{
+    const gfxSprite& coins = res().spr_coin;
+    if (!coins)
+        return;
+    static const int frames[] = {0, 1, 2, 3, 2, 1};    //(face, turning, edge, back: and the way back)
+    const int frame = frames[(tick / 6) % 6];
+    coins.draw(x, y, {frame * 32, std::clamp(color, 0, 3) * 32, 32, 32});
+}
+
 void statusIcon(int x, int y, Status status)
 {
+    //The game's power-ups (powerups/small.png), else drawn
+    if (res().spr_storedpowerupsmall) {
+        const int icon = status == Status::Good ? 1 : status == Status::Warn ? 8 : status == Status::Error ? 0 : 27;
+        res().spr_storedpowerupsmall.draw(x, y, {icon * 16, 0, 16, 16});
+        return;
+    }
     SDL_Color c {40, 112, 232, 255};
     std::vector<const char*> sign = {"........", "...ww...", "........", "...ww...", "...ww...", "...ww...", "...ww...", "........"};
     if (status == Status::Good) {
