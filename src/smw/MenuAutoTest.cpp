@@ -390,25 +390,25 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             if (f == 80) t.shot = "e2_level_painted";
             t.start = tap(f, 90);
             if (f == 100) t.shot = "e3_level_actions";
-            t.right = tap(f, 110);
-            for (int k = 0; k < 7; k++)
-                t.down = t.down || tap(f, 115 + 4 * k);
-            if (f == 150) t.shot = "e4_level_save_as_selected";
-            t.a = t.a || tap(f, 155);
-            if (f == 180) t.shot = "e5_level_keyboard";
-            t.down = t.down || tap(f, 185);
-            t.right = t.right || tap(f, 190) || tap(f, 194);
-            t.a = t.a || tap(f, 200) || tap(f, 204);
-            if (f == 215) t.shot = "e6_level_typed";
-            t.back = tap(f, 220);
-            if (f == 240) t.shot = "e7_level_back_in_editor";
-            t.back = t.back || tap(f, 250);
-            if (f == 265) t.shot = "e8_level_exit_prompt";
-            if (f >= 270) { t.px = 282; t.py = 266; }
-            t.a = t.a || tap(f, 275);
+            //"Save as..." (23 down)
+            for (int k = 0; k < 23; k++)
+                t.down = t.down || tap(f, 110 + 4 * k);
+            if (f == 205) t.shot = "e4_level_save_as_selected";
+            t.a = t.a || tap(f, 210);
+            if (f == 235) t.shot = "e5_level_keyboard";
+            t.down = t.down || tap(f, 240);
+            t.right = t.right || tap(f, 245) || tap(f, 249);
+            t.a = t.a || tap(f, 255) || tap(f, 259);
+            if (f == 270) t.shot = "e6_level_typed";
+            t.back = tap(f, 275);
+            if (f == 295) t.shot = "e7_level_back_in_editor";
+            t.back = t.back || tap(f, 305);
+            if (f == 320) t.shot = "e8_level_exit_prompt";
+            if (f >= 325) { t.px = 282; t.py = 266; }
+            t.a = t.a || tap(f, 330);
             //(still here: try again)
-            if (f > 300 && f % 40 == 0) t.back = true;
-            if (f > 300 && f % 40 == 20) t.a = true;
+            if (f > 360 && f % 40 == 0) t.back = true;
+            if (f > 360 && f % 40 == 20) t.a = true;
             return t;
         };
         auto worldScript = [tap](editors::Editor, int f, int) {

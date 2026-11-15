@@ -605,17 +605,17 @@ std::vector<Cursor> remoteCursors()
     return list;
 }
 
-std::vector<std::pair<std::string, SDL_Color>> people()
+std::vector<Person> people()
 {
-    std::vector<std::pair<std::string, SDL_Color>> list;
+    std::vector<Person> list;
     if (!active())
         return list;
-    list.emplace_back(g.myName, colorOf(g.myId));
+    list.push_back(Person {g.myName, colorOf(g.myId), g.host, true});
     if (!g.host)
-        list.emplace_back(nameOf(0), colorOf(0));
+        list.push_back(Person {nameOf(0), colorOf(0), true, false});
     for (const Peer& p : g.peers) {
         if (p.id != 0 && (!g.host || p.welcomed))
-            list.emplace_back(p.name, colorOf(p.id));
+            list.push_back(Person {p.name, colorOf(p.id), false, false});
     }
     return list;
 }

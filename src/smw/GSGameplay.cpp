@@ -513,7 +513,8 @@ void GameplayState::handleInput()
                 }
             }
             if (event.key.key == SDLK_F1) {
-                game_values.showfps = !game_values.showfps;
+                if (!replay::playing())    //(the theater's controls)
+                    game_values.showfps = !game_values.showfps;
             } else if (event.key.key == SDLK_F3) {
                 game_values.shownetstats = !game_values.shownetstats;    //only drawn online
             } else if (event.key.key == SDLK_ESCAPE) {

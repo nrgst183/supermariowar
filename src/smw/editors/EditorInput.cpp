@@ -1,6 +1,7 @@
 #include "EditorInput.h"
 
 #include "CoEdit.h"
+#include "ui/InputPrompts.h"
 #include "gfx.h"
 #include "joystick.h"
 #include "ResourceManager.h"
@@ -12,6 +13,7 @@
 #include <deque>
 #include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 extern CResourceManager* rm;
@@ -37,29 +39,52 @@ struct Action {
     SDL_Keycode key;
     bool shift = false;
     bool ctrl = false;
+    const char* group = "";    // a heading when it changes
 };
 
 const std::vector<Action> LEVEL_ACTIONS = {
-    {"Tiles", SDLK_T}, {"Blocks", SDLK_I}, {"Map items", SDLK_O}, {"Warps", SDLK_W},
+    {"Tiles", SDLK_T, false, false, "Modes"}, {"Blocks", SDLK_I}, {"Map items", SDLK_O}, {"Warps", SDLK_W},
     {"Move", SDLK_M}, {"Tile types", SDLK_L}, {"Platforms", SDLK_P}, {"Hazards", SDLK_H},
     {"Animated tiles", SDLK_A}, {"Race goals", SDLK_J}, {"Block properties", SDLK_K}, {"No player spawn", SDLK_X},
-    {"No item spawn", SDLK_Z}, {"Active tile layer", SDLK_Y}, {"Hide other layers", SDLK_U}, {"Hide blocks", SDLK_V},
-    {"Optimize layers", SDLK_END}, {"Backgrounds", SDLK_G}, {"Background thumbnails", SDLK_B}, {"Music category", SDLK_R},
-    {"Floating eyecandy", SDLK_E}, {"New map", SDLK_N}, {"Save", SDLK_S}, {"Save as...", SDLK_S, true},
-    {"Find map...", SDLK_F}, {"New search...", SDLK_F, true}, {"Previous map", SDLK_PAGEUP}, {"Next map", SDLK_PAGEDOWN},
-    {"Clear all", SDLK_DELETE, false, true}, {"Screenshot", SDLK_INSERT}, {"Help", SDLK_F1}, {"Leave the editor", SDLK_ESCAPE},
+    {"No item spawn", SDLK_Z},
+    {"Active layer", SDLK_Y, false, false, "Layers"}, {"Hide other layers", SDLK_U}, {"Hide blocks", SDLK_V}, {"Optimize layers", SDLK_END},
+    {"Backgrounds", SDLK_G, false, false, "Look"}, {"Thumbnails", SDLK_B}, {"Music category", SDLK_R}, {"Eyecandy", SDLK_E},
+    {"New map", SDLK_N, false, false, "File"}, {"Save", SDLK_S}, {"Save as...", SDLK_S, true}, {"Find map...", SDLK_F},
+    {"New search...", SDLK_F, true}, {"Previous map", SDLK_PAGEUP}, {"Next map", SDLK_PAGEDOWN},
+    {"Clear all", SDLK_DELETE, false, true, "Other"}, {"Screenshot", SDLK_INSERT}, {"Help", SDLK_F1}, {"Leave", SDLK_ESCAPE},
 };
 
 const std::vector<Action> WORLD_ACTIONS = {
-    {"Water", SDLK_1}, {"Land", SDLK_2}, {"Stage objects", SDLK_3}, {"Paths", SDLK_4},
+    {"Water", SDLK_1, false, false, "Modes"}, {"Land", SDLK_2}, {"Stage objects", SDLK_3}, {"Paths", SDLK_4},
     {"Objects", SDLK_5}, {"Bridges", SDLK_6}, {"Connections", SDLK_P}, {"Warps", SDLK_W},
-    {"Vehicles", SDLK_V}, {"Copy vehicle", SDLK_C}, {"Start and doors", SDLK_T}, {"Vehicle boundaries", SDLK_B},
-    {"Initial powerups", SDLK_I}, {"Edit stages", SDLK_E}, {"Automatic path/land", SDLK_A}, {"Stage previews", SDLK_SPACE},
-    {"Music category", SDLK_R}, {"Resize world", SDLK_K}, {"New world", SDLK_N}, {"Save", SDLK_S},
-    {"Save as...", SDLK_S, true}, {"Find world...", SDLK_F}, {"New search...", SDLK_F, true}, {"Previous world", SDLK_PAGEUP},
-    {"Next world", SDLK_PAGEDOWN}, {"Clear all", SDLK_DELETE, false, true}, {"Screenshot", SDLK_INSERT}, {"Help", SDLK_F1},
-    {"Leave the editor", SDLK_ESCAPE},
+    {"Vehicles", SDLK_V}, {"Copy vehicle", SDLK_C}, {"Start and doors", SDLK_T}, {"Vehicle bounds", SDLK_B},
+    {"Start powerups", SDLK_I}, {"Edit stages", SDLK_E},
+    {"Auto path/land", SDLK_A, false, false, "World"}, {"Stage previews", SDLK_SPACE}, {"Music category", SDLK_R}, {"Resize world", SDLK_K},
+    {"New world", SDLK_N, false, false, "File"}, {"Save", SDLK_S}, {"Save as...", SDLK_S, true}, {"Find world...", SDLK_F},
+    {"New search...", SDLK_F, true}, {"Previous world", SDLK_PAGEUP}, {"Next world", SDLK_PAGEDOWN},
+    {"Clear all", SDLK_DELETE, false, true, "Other"}, {"Screenshot", SDLK_INSERT}, {"Help", SDLK_F1}, {"Leave", SDLK_ESCAPE},
 };
+
+// The key cap of an action ("Shift+S", "PgUp")
+std::string keyName(const Action& action)
+{
+    std::string name;
+    switch (action.key) {
+        case SDLK_PAGEUP: name = "PgUp"; break;
+        case SDLK_PAGEDOWN: name = "PgDn"; break;
+        case SDLK_DELETE: name = "Del"; break;
+        case SDLK_INSERT: name = "Ins"; break;
+        case SDLK_ESCAPE: name = "Esc"; break;
+        case SDLK_SPACE: name = "Space"; break;
+        case SDLK_END: name = "End"; break;
+        default: name = SDL_GetKeyName(action.key); break;
+    }
+    if (action.shift)
+        name = "Shift+" + name;
+    if (action.ctrl)
+        name = "Ctrl+" + name;
+    return name;
+}
 
 // ---- the on-screen keyboard (the characters the editors' name dialogs take)
 
@@ -211,7 +236,10 @@ struct State {
     int ctrlFrames = 0;
 
     Overlay overlay = Overlay::None;
-    int overlayOwner = 0;
+    int overlayOwner = 0;              // the controller that opened it (-1: keyboard / mouse)
+    int hoverKey = -1;                 // the on-screen keyboard's key under the mouse
+    bool hints = true;                 // the controller's button bar (LB)
+    Uint64 startMs = 0;
     int actionIndex = 0;
     int textEntries = 0;
     int oskCol = 0;
@@ -351,48 +379,228 @@ void moveInGrid(Pointer& p, int& col, int& row, int cols, int rows)
         s.overlayDirty = true;
 }
 
+// The action menu's layout: headings and actions in three columns
+struct MenuEntry {
+    int action = -1;    // -1: a heading
+    const char* text = "";
+    int col = 0;
+    int x = 0, y = 0, w = 0;
+};
+constexpr int MENU_W = 616;
+constexpr int MENU_LINE = 17;
+constexpr int MENU_COLS = 3;
+
+struct MenuLayout {
+    std::vector<MenuEntry> entries;
+    int x = 0, y = 0, h = 0;
+};
+
+MenuLayout menuLayout()
+{
+    const std::vector<Action>& list = actions();
+    //(lines: a heading before every group)
+    std::vector<MenuEntry> lines;
+    for (int k = 0; k < static_cast<int>(list.size()); k++) {
+        if (list[static_cast<size_t>(k)].group[0])
+            lines.push_back(MenuEntry {-1, list[static_cast<size_t>(k)].group});
+        lines.push_back(MenuEntry {k, list[static_cast<size_t>(k)].label});
+    }
+    const int perCol = (static_cast<int>(lines.size()) + MENU_COLS - 1) / MENU_COLS;
+    MenuLayout layout;
+    layout.h = perCol * MENU_LINE + 92;
+    layout.x = (SCREEN_W - MENU_W) / 2;
+    layout.y = std::max(6, (SCREEN_H - layout.h) / 2);
+    const int colW = (MENU_W - 16) / MENU_COLS;
+    for (size_t k = 0; k < lines.size(); k++) {
+        MenuEntry e = lines[k];
+        int index = static_cast<int>(k);
+        e.col = index / perCol;
+        //(a heading doesn't end a column)
+        if (e.action < 0 && index % perCol == perCol - 1)
+            e.col++;
+        e.x = layout.x + 10 + e.col * colW;
+        e.w = colW - 8;
+        layout.entries.push_back(e);
+    }
+    //The rows of each column
+    std::array<int, MENU_COLS + 1> rows {};
+    for (MenuEntry& e : layout.entries) {
+        const int col = std::min(e.col, MENU_COLS);
+        e.y = layout.y + 34 + rows[static_cast<size_t>(col)] * MENU_LINE;
+        rows[static_cast<size_t>(col)]++;
+    }
+    return layout;
+}
+
+// The action next to `index` in a direction (dx: column, dy: row)
+int menuNeighbor(int index, int dx, int dy)
+{
+    const MenuLayout layout = menuLayout();
+    const MenuEntry* current = nullptr;
+    for (const MenuEntry& e : layout.entries) {
+        if (e.action == index)
+            current = &e;
+    }
+    if (!current)
+        return 0;
+    const int count = static_cast<int>(actions().size());
+    if (dy != 0)
+        return (index + dy + count) % count;
+    //Left / right: the nearest action in the next column
+    const int col = (current->col + dx + MENU_COLS) % MENU_COLS;
+    int best = index;
+    int bestDistance = 1 << 30;
+    for (const MenuEntry& e : layout.entries) {
+        if (e.action < 0 || e.col != col)
+            continue;
+        const int d = std::abs(e.y - current->y);
+        if (d < bestDistance) {
+            bestDistance = d;
+            best = e.action;
+        }
+    }
+    return best;
+}
+
+int menuActionAt(float x, float y)
+{
+    for (const MenuEntry& e : menuLayout().entries) {
+        if (e.action >= 0 && x >= e.x - 4 && x < e.x + e.w && y >= e.y - 2 && y < e.y + MENU_LINE - 2)
+            return e.action;
+    }
+    return -1;
+}
+
+void runAction(int index)
+{
+    if (index < 0 || index >= static_cast<int>(actions().size()))
+        return;
+    const Action& action = actions()[static_cast<size_t>(index)];
+    s.overlay = Overlay::None;
+    s.overlayDirty = true;
+    tapKey(action.key, action.shift, action.ctrl);
+}
+
+void openActions(int owner)
+{
+    //(let go of anything held first)
+    for (size_t k = 0; k < s.pointers.size(); k++) {
+        if (s.pointers[k].buttons & SDL_BUTTON_LMASK)
+            pushButton(static_cast<int>(k), SDL_BUTTON_LEFT, false);
+        if (s.pointers[k].buttons & SDL_BUTTON_RMASK)
+            pushButton(static_cast<int>(k), SDL_BUTTON_RIGHT, false);
+    }
+    s.overlay = Overlay::Actions;
+    s.overlayOwner = owner;
+    s.overlayDirty = true;
+}
+
 void updateActions(Pointer& p)
 {
-    const int count = static_cast<int>(actions().size());
-    const int rows = (count + 1) / 2;
-    int col = s.actionIndex / rows;
-    int row = s.actionIndex % rows;
-    moveInGrid(p, col, row, 2, rows);
-    s.actionIndex = std::min(count - 1, col * rows + row);
+    const bool up = p.pad.buttons[UP] || p.pad.ly < -0.6f;
+    const bool down = p.pad.buttons[DOWN] || p.pad.ly > 0.6f;
+    const bool left = p.pad.buttons[LEFT] || p.pad.lx < -0.6f;
+    const bool right = p.pad.buttons[RIGHT] || p.pad.lx > 0.6f;
+    if (p.up.fire(up))
+        s.actionIndex = menuNeighbor(s.actionIndex, 0, -1);
+    if (p.down.fire(down))
+        s.actionIndex = menuNeighbor(s.actionIndex, 0, 1);
+    if (p.left.fire(left))
+        s.actionIndex = menuNeighbor(s.actionIndex, -1, 0);
+    if (p.right.fire(right))
+        s.actionIndex = menuNeighbor(s.actionIndex, 1, 0);
+    if (up || down || left || right)
+        s.overlayDirty = true;
 
     if (p.pressed(B) || p.pressed(START) || p.pressed(BACK)) {
         s.overlay = Overlay::None;
         s.overlayDirty = true;
     } else if (p.pressed(A)) {
-        const Action& action = actions()[static_cast<size_t>(s.actionIndex)];
-        s.overlay = Overlay::None;
-        s.overlayDirty = true;
-        tapKey(action.key, action.shift, action.ctrl);
+        runAction(s.actionIndex);
     }
+}
+
+// The keyboard and the mouse in the action menu (the editor doesn't get them)
+void actionsEvent(const SDL_Event& e)
+{
+    s.overlayDirty = true;
+    if (e.type == SDL_EVENT_KEY_DOWN) {
+        switch (e.key.key) {
+            case SDLK_UP: s.actionIndex = menuNeighbor(s.actionIndex, 0, -1); break;
+            case SDLK_DOWN: s.actionIndex = menuNeighbor(s.actionIndex, 0, 1); break;
+            case SDLK_LEFT: s.actionIndex = menuNeighbor(s.actionIndex, -1, 0); break;
+            case SDLK_RIGHT: s.actionIndex = menuNeighbor(s.actionIndex, 1, 0); break;
+            case SDLK_RETURN:
+            case SDLK_KP_ENTER:
+            case SDLK_SPACE: runAction(s.actionIndex); break;
+            case SDLK_ESCAPE:
+            case SDLK_TAB: s.overlay = Overlay::None; break;
+            default: break;
+        }
+    } else if (e.type == SDL_EVENT_MOUSE_MOTION) {
+        const int at = menuActionAt(e.motion.x, e.motion.y);
+        if (at >= 0)
+            s.actionIndex = at;
+    } else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+        const int at = menuActionAt(e.button.x, e.button.y);
+        if (e.button.button == SDL_BUTTON_LEFT && at >= 0)
+            runAction(at);
+        else
+            s.overlay = Overlay::None;    //(a click elsewhere, or the right button)
+    }
+}
+
+// The on-screen keyboard's keys: index row * OSK_COLS + col (the last row: 5 wide keys)
+constexpr int OSK_KEY_W = 38;
+constexpr int OSK_KEY_H = 24;
+SDL_Rect oskKeyRect(int row, int col)
+{
+    const int w = OSK_COLS * OSK_KEY_W + 24;
+    const int h = (OSK_TEXT_ROWS + 1) * OSK_KEY_H + 56;
+    const int x = (SCREEN_W - w) / 2;
+    const int y = SCREEN_H - h - 10;
+    const bool special = row == OSK_TEXT_ROWS;
+    const int c = special ? col / 2 * 2 : col;
+    return SDL_Rect {x + 12 + c * OSK_KEY_W, y + 10 + row * OSK_KEY_H, special ? OSK_KEY_W * 2 - 4 : OSK_KEY_W - 4, OSK_KEY_H - 4};
+}
+
+int oskKeyAt(float x, float y)
+{
+    for (int row = 0; row <= OSK_TEXT_ROWS; row++) {
+        for (int col = 0; col < OSK_COLS; col++) {
+            const SDL_Rect r = oskKeyRect(row, col);
+            if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
+                return row * OSK_COLS + col;
+        }
+    }
+    return -1;
+}
+
+void oskPress(int row, int col)
+{
+    auto typeChar = [](char c) {
+        const bool letter = c >= 'a' && c <= 'z';
+        tapKey(static_cast<SDL_Keycode>(c), s.oskShift && letter);
+    };
+    if (row < OSK_TEXT_ROWS) {
+        typeChar(OSK_ROWS[static_cast<size_t>(row)][col]);
+    } else {
+        switch (col / 2) {
+            case 0: s.oskShift = !s.oskShift; break;
+            case 1: typeChar(' '); break;
+            case 2: tapKey(SDLK_BACKSPACE); break;
+            case 3: tapKey(SDLK_RETURN); break;
+            default: tapKey(SDLK_ESCAPE); break;
+        }
+    }
+    s.overlayDirty = true;
 }
 
 void updateKeyboard(Pointer& p)
 {
     moveInGrid(p, s.oskCol, s.oskRow, OSK_COLS, OSK_TEXT_ROWS + 1);
-
-    auto typeChar = [](char c) {
-        const bool letter = c >= 'a' && c <= 'z';
-        tapKey(static_cast<SDL_Keycode>(c), s.oskShift && letter);
-    };
-    if (p.pressed(A)) {
-        if (s.oskRow < OSK_TEXT_ROWS) {
-            typeChar(OSK_ROWS[static_cast<size_t>(s.oskRow)][s.oskCol]);
-        } else {
-            switch (s.oskCol / 2) {
-                case 0: s.oskShift = !s.oskShift; break;
-                case 1: typeChar(' '); break;
-                case 2: tapKey(SDLK_BACKSPACE); break;
-                case 3: tapKey(SDLK_RETURN); break;
-                default: tapKey(SDLK_ESCAPE); break;
-            }
-        }
-        s.overlayDirty = true;
-    }
+    if (p.pressed(A))
+        oskPress(s.oskRow, s.oskCol);
     if (p.pressed(B))
         tapKey(SDLK_BACKSPACE);
     if (p.pressed(X)) {
@@ -400,7 +608,7 @@ void updateKeyboard(Pointer& p)
         s.overlayDirty = true;
     }
     if (p.pressed(Y))
-        typeChar(' ');
+        tapKey(SDLK_SPACE);
     if (p.pressed(START) || p.pressed(RB))
         tapKey(SDLK_RETURN);
     if (p.pressed(BACK))
@@ -457,14 +665,10 @@ void updatePointer(int index)
         tapKey(SDLK_RETURN);
     if (p.pressed(BACK))
         tapKey(SDLK_ESCAPE);
-    if (p.pressed(START)) {
-        //(let go of anything held first)
-        if (p.buttons & SDL_BUTTON_LMASK)
-            pushButton(index, SDL_BUTTON_LEFT, false);
-        if (p.buttons & SDL_BUTTON_RMASK)
-            pushButton(index, SDL_BUTTON_RIGHT, false);
-        s.overlay = Overlay::Actions;
-        s.overlayOwner = index;
+    if (p.pressed(START))
+        openActions(index);
+    if (p.pressed(LB)) {
+        s.hints = !s.hints;
         s.overlayDirty = true;
     }
 }
@@ -551,89 +755,201 @@ void drawArrow(float fx, float fy, SDL_Color color, const std::string& label)
 
 void drawActions()
 {
-    const std::vector<Action>& list = actions();
-    const int rows = static_cast<int>(list.size() + 1) / 2;
-    const int lineH = 18;
-    const int w = 560;
-    const int h = rows * lineH + 80;
-    const int x = (SCREEN_W - w) / 2;
-    const int y = std::max(8, (SCREEN_H - h) / 2);
-    frameBox(x, y, w, h);
-    rm->menu_font_large.drawCentered(SCREEN_W / 2, y + 6, s.editor == Editor::Level ? "Level Editor" : "World Editor");
-    for (int k = 0; k < static_cast<int>(list.size()); k++) {
-        const int col = k / rows;
-        const int row = k % rows;
-        const int ix = x + 12 + col * (w / 2);
-        const int iy = y + 32 + row * lineH;
-        if (k == s.actionIndex)
-            fill(ix - 4, iy - 2, w / 2 - 16, lineH, {72, 112, 200, 255});
-        rm->menu_font_small.draw(ix, iy, list[static_cast<size_t>(k)].label);
+    const MenuLayout layout = menuLayout();
+    frameBox(layout.x, layout.y, MENU_W, layout.h);
+    rm->menu_font_large.drawCentered(SCREEN_W / 2, layout.y + 6, s.editor == Editor::Level ? "Level Editor" : "World Editor");
+    for (const MenuEntry& e : layout.entries) {
+        if (e.action < 0) {
+            //A heading: a line with its name
+            fill(e.x, e.y + 8, e.w, 1, {110, 110, 160, 255});
+            const int tw = rm->menu_font_small.getWidth(e.text) + 8;
+            fill(e.x + 6, e.y + 1, tw, 14, {24, 24, 48, 255});
+            rm->menu_font_small.draw(e.x + 10, e.y, e.text);
+            continue;
+        }
+        const Action& action = actions()[static_cast<size_t>(e.action)];
+        const bool selected = e.action == s.actionIndex;
+        if (selected)
+            fill(e.x - 4, e.y - 2, e.w + 4, MENU_LINE, {72, 112, 200, 255});
+        rm->menu_font_small.draw(e.x, e.y, action.label);
+        //(its key, right-aligned)
+        const std::string key = keyName(action);
+        const int kw = std::max(16, rm->menu_font_small.getWidth(key) + 8);
+        if (rm->menu_font_small.getWidth(action.label) + kw + 6 < e.w)
+            prompts::drawKey(e.x + e.w - kw - 2, e.y - 1, key);
     }
-    rm->menu_font_small.drawCentered(SCREEN_W / 2, y + h - 38, "A: do it    B: close");
-    rm->menu_font_small.drawCentered(SCREEN_W / 2, y + h - 20, "In the editor: X shift   Y ctrl   RB enter   Back escape");
+    //How to use it, with the device in use
+    const int fy = layout.y + layout.h - 44;
+    std::vector<std::tuple<prompts::Pad, std::string, std::string>> row1 = {
+        {prompts::Pad::DPad, "Arrows", "choose"}, {prompts::Pad::A, "Enter", "do it"}, {prompts::Pad::B, "Esc", "close"}};
+    int w = 0;
+    for (const auto& [pad, key, label] : row1)
+        w += prompts::promptWidth(pad, key, label) + 18;
+    int x = SCREEN_W / 2 - w / 2;
+    for (const auto& [pad, key, label] : row1)
+        x += prompts::drawPrompt(x, fy, pad, key, label) + 18;
+    const char* tip = prompts::lastDevice() == prompts::Device::Controller ? "Or press the keys shown, on a keyboard" : "Or click one; the keys work in the editor too";
+    rm->menu_font_small.drawCentered(SCREEN_W / 2, fy + 20, tip);
 }
 
 void drawKeyboard()
 {
-    const int keyW = 38;
-    const int keyH = 24;
-    const int w = OSK_COLS * keyW + 24;
-    const int h = (OSK_TEXT_ROWS + 1) * keyH + 56;
-    const int x = (SCREEN_W - w) / 2;
-    const int y = SCREEN_H - h - 10;
-    frameBox(x, y, w, h);
+    const SDL_Rect first = oskKeyRect(0, 0);
+    const int w = OSK_COLS * OSK_KEY_W + 24;
+    const int h = (OSK_TEXT_ROWS + 1) * OSK_KEY_H + 56;
+    frameBox(first.x - 12, first.y - 10, w, h);
     for (int row = 0; row <= OSK_TEXT_ROWS; row++) {
         for (int col = 0; col < OSK_COLS; col++) {
             const bool special = row == OSK_TEXT_ROWS;
             if (special && col % 2)
                 continue;
-            const int kx = x + 12 + col * keyW;
-            const int ky = y + 10 + row * keyH;
-            const int kw = special ? keyW * 2 - 4 : keyW - 4;
+            const SDL_Rect r = oskKeyRect(row, col);
             const bool selected = s.oskRow == row && (special ? s.oskCol / 2 == col / 2 : s.oskCol == col);
+            const bool hover = s.hoverKey == row * OSK_COLS + col || (special && s.hoverKey == row * OSK_COLS + col + 1);
             const bool lit = special && col / 2 == 0 && s.oskShift;
-            fill(kx, ky, kw, keyH - 4, selected ? SDL_Color {72, 112, 200, 255} : (lit ? SDL_Color {60, 90, 60, 255} : SDL_Color {44, 44, 80, 255}));
+            SDL_Color c {44, 44, 80, 255};
+            if (lit)
+                c = {60, 110, 60, 255};
+            if (hover)
+                c = {70, 70, 130, 255};
+            if (selected && prompts::lastDevice() == prompts::Device::Controller)
+                c = {72, 112, 200, 255};
+            fill(r.x, r.y, r.w, r.h, c);
             std::string label;
             if (special) {
                 label = OSK_KEYS[static_cast<size_t>(col / 2)];
             } else {
-                char c = OSK_ROWS[static_cast<size_t>(row)][col];
-                if (s.oskShift && c >= 'a' && c <= 'z')
-                    c = static_cast<char>(c - 32);
-                label = c == ' ' ? std::string("spc") : std::string(1, c);
+                char ch = OSK_ROWS[static_cast<size_t>(row)][col];
+                if (s.oskShift && ch >= 'a' && ch <= 'z')
+                    ch = static_cast<char>(ch - 32);
+                label = ch == ' ' ? std::string("spc") : std::string(1, ch);
             }
-            rm->menu_font_small.drawCentered(kx + kw / 2, ky + 3, label);
+            rm->menu_font_small.drawCentered(r.x + r.w / 2, r.y + 3, label);
         }
     }
-    rm->menu_font_small.drawCentered(SCREEN_W / 2, y + h - 22, "A: type   B: delete   X: shift   Y: space   Start: done   Back: cancel");
+    //The buttons, with the device in use
+    const int fy = first.y - 10 + h - 24;
+    std::vector<std::tuple<prompts::Pad, std::string, std::string>> row = {
+        {prompts::Pad::A, "", "type"}, {prompts::Pad::B, "", "delete"}, {prompts::Pad::X, "", "shift"},
+        {prompts::Pad::Y, "", "space"}, {prompts::Pad::Start, "", "done"}, {prompts::Pad::Back, "", "cancel"}};
+    if (prompts::lastDevice() == prompts::Device::Controller) {
+        int tw = 0;
+        for (const auto& [pad, key, label] : row)
+            tw += prompts::promptWidth(pad, key, label) + 10;
+        int x = SCREEN_W / 2 - tw / 2;
+        for (const auto& [pad, key, label] : row)
+            x += prompts::drawPrompt(x, fy, pad, key, label) + 10;
+    } else {
+        rm->menu_font_small.drawCentered(SCREEN_W / 2, fy, "Type, or click the keys");
+    }
+}
+
+// A tile's outline (where a cursor edits)
+void tileOutline(float px, float py, SDL_Color c)
+{
+    const int x = static_cast<int>(px) / TILE * TILE;
+    const int y = static_cast<int>(py) / TILE * TILE;
+    fill(x, y, TILE, 2, c);
+    fill(x, y + TILE - 2, TILE, 2, c);
+    fill(x, y, 2, TILE, c);
+    fill(x + TILE - 2, y, 2, TILE, c);
+}
+
+// Where the hint bar is: shown, and its top
+bool hintsShown(int* top)
+{
+    const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+    const bool shown = controller ? s.hints : SDL_GetTicks() - s.startMs <= 8000;
+    //(at the bottom, or at the top while a cursor is down there)
+    bool low = s.cy > SCREEN_H - 70;
+    for (const Pointer& p : s.pointers)
+        low = low || (p.shown && p.y > SCREEN_H - 70);
+    if (top)
+        *top = low ? 20 : SCREEN_H - 22;
+    return shown && s.overlay == Overlay::None;
+}
+
+// The controller's buttons (LB hides it); on the keyboard, how to open the actions
+void drawHints()
+{
+    const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+    int y = 0;
+    if (!hintsShown(&y))
+        return;
+    std::vector<std::tuple<prompts::Pad, std::string, std::string>> items;
+    if (controller)
+        items = {{prompts::Pad::A, "", "place"}, {prompts::Pad::B, "", "remove"}, {prompts::Pad::X, "", "shift"},
+            {prompts::Pad::Y, "", "ctrl"}, {prompts::Pad::RB, "", "ok"}, {prompts::Pad::Start, "", "menu"},
+            {prompts::Pad::Back, "", "back"}, {prompts::Pad::LB, "", "hide"}};
+    else
+        items = {{prompts::Pad::Start, "Tab", "all actions"}, {prompts::Pad::Back, "F1", "help"}, {prompts::Pad::B, "Esc", "back"}};
+    const int gap = 7;
+    int w = 8;
+    for (const auto& [pad, key, label] : items)
+        w += prompts::promptWidth(pad, key, label) + gap;
+    const int x = (SCREEN_W - w) / 2;
+    fill(x - 2, y - 2, w + 4, 20, {0, 0, 0, 255});
+    fill(x, y, w, 16, {24, 24, 52, 255});
+    int ix = x + 4;
+    for (const auto& [pad, key, label] : items)
+        ix += prompts::drawPrompt(ix, y, pad, key, label) + gap;
 }
 
 // Who is editing (online), and the latest notice
 void drawSession()
 {
-    const std::vector<std::pair<std::string, SDL_Color>> people = coedit::people();
+    const std::vector<coedit::Person> people = coedit::people();
     if (!people.empty()) {
-        int y = SCREEN_H - 16 * static_cast<int>(people.size()) - 4;
-        for (const auto& [name, color] : people) {
-            const int w = rm->menu_font_small.getWidth(name) + 18;
-            fill(2, y, w, 15, {0, 0, 0, 255});
-            fill(4, y + 3, 9, 9, color);
-            rm->menu_font_small.draw(16, y + 1, name);
-            y += 16;
+        const int lineH = 16;
+        int w = rm->menu_font_small.getWidth("Editing together") + 12;
+        for (const coedit::Person& p : people)
+            w = std::max(w, rm->menu_font_small.getWidth(p.name + (p.you ? " (you)" : "")) + (p.host ? 52 : 34));
+        const int h = lineH * static_cast<int>(people.size()) + 20;
+        const int x = 4;
+        //(above the hint bar when it is at the bottom)
+        int hintsTop = 0;
+        const int bottom = hintsShown(&hintsTop) && hintsTop > SCREEN_H / 2 ? hintsTop - 4 : SCREEN_H - 4;
+        const int y = bottom - h;
+        fill(x, y, w, h, {0, 0, 0, 255});
+        fill(x + 1, y + 1, w - 2, h - 2, {24, 24, 52, 255});
+        rm->menu_font_small.draw(x + 6, y + 2, "Editing together");
+        int py = y + 18;
+        for (const coedit::Person& p : people) {
+            fill(x + 6, py + 3, 10, 10, {0, 0, 0, 255});
+            fill(x + 7, py + 4, 8, 8, p.color);
+            const std::string name = p.name + (p.you ? " (you)" : "");
+            rm->menu_font_small.draw(x + 22, py, name);
+            if (p.host) {
+                //A crown after the host's name
+                const SDL_Color gold {248, 208, 40, 255};
+                const int cx = x + 26 + rm->menu_font_small.getWidth(name);
+                fill(cx, py + 7, 13, 6, {0, 0, 0, 255});
+                fill(cx + 1, py + 8, 11, 4, gold);
+                for (int k = 0; k < 3; k++) {
+                    fill(cx + k * 5, py + 2, 3, 6, {0, 0, 0, 255});
+                    fill(cx + 1 + k * 5, py + 3, 1, 5, gold);
+                }
+            }
+            py += lineH;
         }
     }
     const std::string notice = coedit::notice();
     if (!notice.empty()) {
-        const int w = rm->menu_font_small.getWidth(notice) + 16;
+        const int w = rm->menu_font_small.getWidth(notice) + 34;
         const int x = (SCREEN_W - w) / 2;
-        frameBox(x, 40, w, 18);
-        rm->menu_font_small.draw(x + 8, 42, notice);
+        frameBox(x, 44, w, 20);
+        //(an "i")
+        prompts::disc(x + 12, 54, 7, {48, 110, 224, 255});
+        rm->menu_font_small.drawCentered(x + 12, 47, "i");
+        rm->menu_font_small.draw(x + 24, 47, notice);
     }
 }
 
 bool overlayWanted()
 {
     if (s.overlay != Overlay::None || coedit::active() || !coedit::notice().empty())
+        return true;
+    if (prompts::lastDevice() == prompts::Device::Controller ? s.hints && !s.pointers.empty() : SDL_GetTicks() - s.startMs < 8000)
         return true;
     for (const Pointer& p : s.pointers) {
         if (p.shown)
@@ -646,7 +962,17 @@ void drawOverlay()
 {
     if (!rm)
         return;
-    for (const coedit::Cursor& c : coedit::remoteCursors())
+    //Where everyone edits: the tile under each cursor, then the cursors
+    const std::vector<coedit::Cursor> remote = coedit::remoteCursors();
+    for (const coedit::Cursor& c : remote)
+        tileOutline(c.x, c.y, c.color);
+    if (s.overlay == Overlay::None) {
+        for (size_t k = 0; k < s.pointers.size(); k++) {
+            if (s.pointers[k].shown)
+                tileOutline(s.pointers[k].x, s.pointers[k].y, pointerColor(static_cast<int>(k)));
+        }
+    }
+    for (const coedit::Cursor& c : remote)
         drawArrow(c.x, c.y, c.color, c.name);
     if (s.overlay == Overlay::None) {
         const bool several = s.pointers.size() > 1;
@@ -655,6 +981,7 @@ void drawOverlay()
             if (p.shown)
                 drawArrow(p.x, p.y, pointerColor(static_cast<int>(k)), several ? "P" + std::to_string(k + 1) : std::string());
         }
+        drawHints();
     }
     drawSession();
     if (s.overlay == Overlay::Actions)
@@ -753,6 +1080,14 @@ void update()
         Pointer& p = s.pointers[k];
         p.last = p.pad;
         p.pad = k < pads.size() ? pads[k] : Pad();
+        //(a controller in use: its buttons in the prompts)
+        bool used = p.pad.lx != 0 || p.pad.ly != 0 || p.pad.rx != 0 || p.pad.ry != 0;
+        for (int b = 0; b < BUTTON_COUNT; b++)
+            used = used || p.pressed(static_cast<Button>(b));
+        if (used && prompts::lastDevice() != prompts::Device::Controller) {
+            prompts::setLastDevice(prompts::Device::Controller);
+            s.overlayDirty = true;
+        }
     }
 
     //Text wanted and a controller in use: the on-screen keyboard
@@ -813,6 +1148,7 @@ void begin(Editor editor)
     s.active = true;
     s.editor = editor;
     s.controllers.open();
+    s.startMs = SDL_GetTicks();
     s.cursorWasVisible = SDL_CursorVisible();
     float mx = 0;
     float my = 0;
@@ -851,6 +1187,44 @@ bool pollEvent(SDL_Event* event)
         }
         if (!SDL_PollEvent(event))
             break;
+        prompts::note(*event);
+        //The action menu has the keyboard and the mouse while it is open
+        if (s.overlay == Overlay::Actions && (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP ||
+                event->type == SDL_EVENT_MOUSE_MOTION || event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP)) {
+            if (event->type == SDL_EVENT_MOUSE_MOTION) {
+                s.cx = std::clamp(event->motion.x, 0.0f, SCREEN_W - 1.0f);
+                s.cy = std::clamp(event->motion.y, 0.0f, SCREEN_H - 1.0f);
+                s.owner = -1;
+                if (!s.mouseUsed) {
+                    s.mouseUsed = true;
+                    SDL_ShowCursor();
+                }
+            }
+            if (event->type != SDL_EVENT_KEY_UP && event->type != SDL_EVENT_MOUSE_BUTTON_UP)
+                actionsEvent(*event);
+            continue;
+        }
+        //Tab: the action menu, for the keyboard and the mouse
+        if (s.overlay == Overlay::None && event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_TAB && !event->key.repeat) {
+            openActions(-1);
+            continue;
+        }
+        //The on-screen keyboard: the mouse clicks its keys (typing goes to the editor as always)
+        if (s.overlay == Overlay::Keyboard) {
+            if (event->type == SDL_EVENT_MOUSE_MOTION) {
+                const int key = oskKeyAt(event->motion.x, event->motion.y);
+                if (key != s.hoverKey) {
+                    s.hoverKey = key;
+                    s.overlayDirty = true;
+                }
+            } else if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && event->button.button == SDL_BUTTON_LEFT) {
+                const int key = oskKeyAt(event->button.x, event->button.y);
+                if (key >= 0) {
+                    oskPress(key / OSK_COLS, key % OSK_COLS);
+                    continue;
+                }
+            }
+        }
         switch (event->type) {
             case SDL_EVENT_JOYSTICK_ADDED:
             case SDL_EVENT_JOYSTICK_REMOVED:

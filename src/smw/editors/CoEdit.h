@@ -143,7 +143,13 @@ struct Cursor {
     float y = 0;
 };
 std::vector<Cursor> remoteCursors();
-std::vector<std::pair<std::string, SDL_Color>> people();    // everyone, us first
+struct Person {
+    std::string name;
+    SDL_Color color;
+    bool host = false;
+    bool you = false;
+};
+std::vector<Person> people();    // everyone, us first
 SDL_Color ourColor();
 std::string notice();          // the latest notice (joins, leaves), "" when it has expired
 void setNotice(const std::string& text);
