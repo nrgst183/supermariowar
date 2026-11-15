@@ -2,6 +2,7 @@
 
 #include "CoEdit.h"
 #include "ui/InputPrompts.h"
+#include "ui/SmwTheme.h"
 #include "gfx.h"
 #include "joystick.h"
 #include "ResourceManager.h"
@@ -705,10 +706,10 @@ void fill(int x, int y, int w, int h, SDL_Color c)
     SDL_FillSurfaceRect(screen, &rect, SDL_MapSurfaceRGB(screen, c.r, c.g, c.b));
 }
 
+// The game's green dialog around an area
 void frameBox(int x, int y, int w, int h)
 {
-    fill(x - 2, y - 2, w + 4, h + 4, {255, 255, 255, 255});
-    fill(x, y, w, h, {24, 24, 48, 255});
+    theme::dialog(x - 10, y - 10, w + 26, h + 26);
 }
 
 void drawArrow(float fx, float fy, SDL_Color color, const std::string& label)
@@ -747,9 +748,11 @@ void drawArrow(float fx, float fy, SDL_Color color, const std::string& label)
         const int w = rm->menu_font_small.getWidth(label) + 6;
         const int lx = std::min(x0 + 12, SCREEN_W - w);
         const int ly = std::min(y0 + 16, SCREEN_H - 16);
-        fill(lx, ly, w, 15, {0, 0, 0, 255});
-        fill(lx + 1, ly + 1, w - 2, 13, color);
-        rm->menu_font_small.draw(lx + 3, ly + 1, label);
+        fill(lx + 2, ly, w - 4, 16, {0, 0, 0, 255});
+        fill(lx, ly + 2, w, 12, {0, 0, 0, 255});
+        fill(lx + 2, ly + 2, w - 4, 12, color);
+        fill(lx + 2, ly + 2, w - 4, 2, theme::shade(color, 140));
+        theme::font().draw(lx + 3, ly + 1, label);
     }
 }
 
@@ -757,39 +760,38 @@ void drawActions()
 {
     const MenuLayout layout = menuLayout();
     frameBox(layout.x, layout.y, MENU_W, layout.h);
-    rm->menu_font_large.drawCentered(SCREEN_W / 2, layout.y + 6, s.editor == Editor::Level ? "Level Editor" : "World Editor");
+    theme::bigFont().drawCentered(SCREEN_W / 2, layout.y + 2, s.editor == Editor::Level ? "Level Editor" : "World Editor");
     for (const MenuEntry& e : layout.entries) {
         if (e.action < 0) {
-            //A heading: a line with its name
-            fill(e.x, e.y + 8, e.w, 1, {110, 110, 160, 255});
-            const int tw = rm->menu_font_small.getWidth(e.text) + 8;
-            fill(e.x + 6, e.y + 1, tw, 14, {24, 24, 48, 255});
-            rm->menu_font_small.draw(e.x + 10, e.y, e.text);
+            //A heading: the menus' gray pipe
+            theme::block(e.x - 4, e.y - 1, e.w + 4, MENU_LINE, theme::Tone::Gray);
+            theme::font().draw(e.x + 4, e.y - 1, e.text);
             continue;
         }
         const Action& action = actions()[static_cast<size_t>(e.action)];
         const bool selected = e.action == s.actionIndex;
         if (selected)
-            fill(e.x - 4, e.y - 2, e.w + 4, MENU_LINE, {72, 112, 200, 255});
-        rm->menu_font_small.draw(e.x, e.y, action.label);
+            theme::block(e.x - 4, e.y - 2, e.w + 4, MENU_LINE + 1, theme::Tone::Green);
+        theme::font().draw(e.x + 2, e.y - 1, action.label);
         //(its key, right-aligned)
         const std::string key = keyName(action);
-        const int kw = std::max(16, rm->menu_font_small.getWidth(key) + 8);
-        if (rm->menu_font_small.getWidth(action.label) + kw + 6 < e.w)
+        const int kw = std::max(16, theme::font().getWidth(key) + 8);
+        if (theme::font().getWidth(action.label) + kw + 8 < e.w)
             prompts::drawKey(e.x + e.w - kw - 2, e.y - 1, key);
     }
     //How to use it, with the device in use
-    const int fy = layout.y + layout.h - 44;
+    const int fy = layout.y + layout.h - 40;
     std::vector<std::tuple<prompts::Pad, std::string, std::string>> row1 = {
         {prompts::Pad::DPad, "Arrows", "choose"}, {prompts::Pad::A, "Enter", "do it"}, {prompts::Pad::B, "Esc", "close"}};
     int w = 0;
     for (const auto& [pad, key, label] : row1)
         w += prompts::promptWidth(pad, key, label) + 18;
+    theme::inset(SCREEN_W / 2 - w / 2 - 8, fy - 4, w + 8, 24);
     int x = SCREEN_W / 2 - w / 2;
     for (const auto& [pad, key, label] : row1)
         x += prompts::drawPrompt(x, fy, pad, key, label) + 18;
     const char* tip = prompts::lastDevice() == prompts::Device::Controller ? "Or press the keys shown, on a keyboard" : "Or click one; the keys work in the editor too";
-    rm->menu_font_small.drawCentered(SCREEN_W / 2, fy + 20, tip);
+    theme::font().drawCentered(SCREEN_W / 2, fy + 22, tip);
 }
 
 void drawKeyboard()
@@ -797,7 +799,15 @@ void drawKeyboard()
     const SDL_Rect first = oskKeyRect(0, 0);
     const int w = OSK_COLS * OSK_KEY_W + 24;
     const int h = (OSK_TEXT_ROWS + 1) * OSK_KEY_H + 56;
-    frameBox(first.x - 12, first.y - 10, w, h);
+    //(wide enough for the buttons' row too)
+    int rowW = 0;
+    if (prompts::lastDevice() == prompts::Device::Controller) {
+        for (prompts::Pad pad : {prompts::Pad::A, prompts::Pad::B, prompts::Pad::X, prompts::Pad::Y, prompts::Pad::Start, prompts::Pad::Back})
+            rowW += prompts::padWidth(pad) + 13;
+        rowW += theme::font().getWidth("typedeleteshiftspacedonecancel");
+    }
+    const int bw = std::max(w, rowW + 24);
+    frameBox(SCREEN_W / 2 - bw / 2, first.y - 10, bw, h);
     for (int row = 0; row <= OSK_TEXT_ROWS; row++) {
         for (int col = 0; col < OSK_COLS; col++) {
             const bool special = row == OSK_TEXT_ROWS;
@@ -807,14 +817,12 @@ void drawKeyboard()
             const bool selected = s.oskRow == row && (special ? s.oskCol / 2 == col / 2 : s.oskCol == col);
             const bool hover = s.hoverKey == row * OSK_COLS + col || (special && s.hoverKey == row * OSK_COLS + col + 1);
             const bool lit = special && col / 2 == 0 && s.oskShift;
-            SDL_Color c {44, 44, 80, 255};
+            theme::Tone tone = theme::Tone::Gray;
             if (lit)
-                c = {60, 110, 60, 255};
-            if (hover)
-                c = {70, 70, 130, 255};
-            if (selected && prompts::lastDevice() == prompts::Device::Controller)
-                c = {72, 112, 200, 255};
-            fill(r.x, r.y, r.w, r.h, c);
+                tone = theme::Tone::Gold;
+            if (hover || (selected && prompts::lastDevice() == prompts::Device::Controller))
+                tone = theme::Tone::Green;
+            theme::block(r.x, r.y, r.w, r.h, tone);
             std::string label;
             if (special) {
                 label = OSK_KEYS[static_cast<size_t>(col / 2)];
@@ -824,7 +832,7 @@ void drawKeyboard()
                     ch = static_cast<char>(ch - 32);
                 label = ch == ' ' ? std::string("spc") : std::string(1, ch);
             }
-            rm->menu_font_small.drawCentered(r.x + r.w / 2, r.y + 3, label);
+            theme::font().drawCentered(r.x + r.w / 2, r.y + 2, label);
         }
     }
     //The buttons, with the device in use
@@ -840,7 +848,7 @@ void drawKeyboard()
         for (const auto& [pad, key, label] : row)
             x += prompts::drawPrompt(x, fy, pad, key, label) + 10;
     } else {
-        rm->menu_font_small.drawCentered(SCREEN_W / 2, fy, "Type, or click the keys");
+        theme::font().drawCentered(SCREEN_W / 2, fy, "Type, or click the keys");
     }
 }
 
@@ -849,6 +857,16 @@ void tileOutline(float px, float py, SDL_Color c)
 {
     const int x = static_cast<int>(px) / TILE * TILE;
     const int y = static_cast<int>(py) / TILE * TILE;
+    //(black around, so it shows on any tile)
+    const SDL_Color black {0, 0, 0, 255};
+    fill(x - 2, y - 2, TILE + 4, 2, black);
+    fill(x - 2, y + TILE, TILE + 4, 2, black);
+    fill(x - 2, y, 2, TILE, black);
+    fill(x + TILE, y, 2, TILE, black);
+    fill(x + 2, y + 2, TILE - 4, 2, black);
+    fill(x + 2, y + TILE - 4, TILE - 4, 2, black);
+    fill(x + 2, y + 4, 2, TILE - 8, black);
+    fill(x + TILE - 4, y + 4, 2, TILE - 8, black);
     fill(x, y, TILE, 2, c);
     fill(x, y + TILE - 2, TILE, 2, c);
     fill(x, y, 2, TILE, c);
@@ -888,8 +906,7 @@ void drawHints()
     for (const auto& [pad, key, label] : items)
         w += prompts::promptWidth(pad, key, label) + gap;
     const int x = (SCREEN_W - w) / 2;
-    fill(x - 2, y - 2, w + 4, 20, {0, 0, 0, 255});
-    fill(x, y, w, 16, {24, 24, 52, 255});
+    theme::block(x - 4, y - 4, w + 8, 24, theme::Tone::Dark);
     int ix = x + 4;
     for (const auto& [pad, key, label] : items)
         ix += prompts::drawPrompt(ix, y, pad, key, label) + gap;
@@ -900,48 +917,56 @@ void drawSession()
 {
     const std::vector<coedit::Person> people = coedit::people();
     if (!people.empty()) {
-        const int lineH = 16;
-        int w = rm->menu_font_small.getWidth("Editing together") + 12;
+        const int lineH = 18;
+        int w = theme::font().getWidth("Editing together") + 28;
         for (const coedit::Person& p : people)
-            w = std::max(w, rm->menu_font_small.getWidth(p.name + (p.you ? " (you)" : "")) + (p.host ? 52 : 34));
-        const int h = lineH * static_cast<int>(people.size()) + 20;
-        const int x = 4;
+            w = std::max(w, theme::font().getWidth(p.name + (p.you ? " (you)" : "")) + (p.host ? 64 : 46));
+        const int h = lineH * static_cast<int>(people.size()) + 46;
+        const int x = 2;
         //(above the hint bar when it is at the bottom)
         int hintsTop = 0;
-        const int bottom = hintsShown(&hintsTop) && hintsTop > SCREEN_H / 2 ? hintsTop - 4 : SCREEN_H - 4;
+        const int bottom = hintsShown(&hintsTop) && hintsTop > SCREEN_H / 2 ? hintsTop - 6 : SCREEN_H;
         const int y = bottom - h;
-        fill(x, y, w, h, {0, 0, 0, 255});
-        fill(x + 1, y + 1, w - 2, h - 2, {24, 24, 52, 255});
-        rm->menu_font_small.draw(x + 6, y + 2, "Editing together");
-        int py = y + 18;
+        theme::dialog(x, y, w, h);
+        theme::font().draw(x + 14, y + 10, "Editing together");
+        int py = y + 30;
         for (const coedit::Person& p : people) {
-            fill(x + 6, py + 3, 10, 10, {0, 0, 0, 255});
-            fill(x + 7, py + 4, 8, 8, p.color);
+            //A coin in their color
+            prompts::art(x + 14, py + 1, {
+                ".####.",
+                "#llcc#",
+                "#lcDc#",
+                "#ccDc#",
+                "#ccDd#",
+                "#cccd#",
+                "#ccdd#",
+                ".####.",
+            }, {{'#', {0, 0, 0, 255}}, {'l', theme::shade(p.color, 150)}, {'c', p.color}, {'d', theme::shade(p.color, 60)},
+                {'D', theme::shade(p.color, 75)}}, 2);
             const std::string name = p.name + (p.you ? " (you)" : "");
-            rm->menu_font_small.draw(x + 22, py, name);
-            if (p.host) {
-                //A crown after the host's name
-                const SDL_Color gold {248, 208, 40, 255};
-                const int cx = x + 26 + rm->menu_font_small.getWidth(name);
-                fill(cx, py + 7, 13, 6, {0, 0, 0, 255});
-                fill(cx + 1, py + 8, 11, 4, gold);
-                for (int k = 0; k < 3; k++) {
-                    fill(cx + k * 5, py + 2, 3, 6, {0, 0, 0, 255});
-                    fill(cx + 1 + k * 5, py + 3, 1, 5, gold);
-                }
-            }
+            theme::font().draw(x + 32, py, name);
+            if (p.host)
+                theme::crown(x + 36 + theme::font().getWidth(name), py + 1);
             py += lineH;
         }
     }
     const std::string notice = coedit::notice();
     if (!notice.empty()) {
-        const int w = rm->menu_font_small.getWidth(notice) + 34;
+        const int w = theme::font().getWidth(notice) + 40;
         const int x = (SCREEN_W - w) / 2;
-        frameBox(x, 44, w, 20);
-        //(an "i")
-        prompts::disc(x + 12, 54, 7, {48, 110, 224, 255});
-        rm->menu_font_small.drawCentered(x + 12, 47, "i");
-        rm->menu_font_small.draw(x + 24, 47, notice);
+        theme::block(x, 40, w, 24, theme::Tone::Blue);
+        //(an "i" on a white button)
+        prompts::art(x + 6, 44, {
+            ".####.",
+            "#bwwb#",
+            "#bbbb#",
+            "#bwwb#",
+            "#bwwb#",
+            "#bwwb#",
+            "#bwwb#",
+            ".####.",
+        }, {{'#', {0, 0, 0, 255}}, {'w', {255, 255, 255, 255}}, {'b', {16, 48, 136, 255}}});
+        theme::font().draw(x + 24, 43, notice);
     }
 }
 

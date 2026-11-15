@@ -565,7 +565,6 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         auto script = [hostRole](editors::Editor, int f, int pointer) {
             using editors::input::TestInput;
             TestInput t;
-            auto tap = [f](int from) { return f >= from && f < from + 2; };
             if (pointer != 0)
                 return t;
             //The host: another map/world first (the joiner must get it), then wait for the joiner
@@ -645,6 +644,18 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         }
     }
 #endif
+
+    //--at-role controls: the controls menu (its "Button Prompts" option)
+    if (at.shotsRole == "controls" && step == 1) {
+        if (t == 1)
+            return MENU_CODE_TO_CONTROLS_MENU;
+        if (t == 20) {
+            shot("c1_controls_menu");
+            step = 1000;
+            t = 0;
+        }
+        return MENU_CODE_NONE;
+    }
 
     //--at-role history: the match history screen and a replay of its newest match
     if (at.shotsRole == "history" || at.shotsRole == "theater") {

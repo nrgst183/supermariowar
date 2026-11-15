@@ -7,19 +7,20 @@
 //
 // Everything works with a controller (any connected one), the keyboard or the
 // mouse; the bar's buttons show the controller button or the key that does
-// the same (whichever was used last, see ui/InputPrompts.h):
+// the same (whichever was used last, see ui/InputPrompts.h). The look is the
+// game's (ui/SmwTheme.h): the dock is its green dialog, the timeline a pipe.
 //
 //                       controller        keyboard      mouse
 //   play / pause        A (or Start)      Space         the play button
-//   back / forward 5 s  LB / RB           Left / Right  the << >> buttons
+//   back / forward 5 s  LB / RB           Left / Right  the arrow buttons
 //     (paused: 1 frame)  (d-pad < >)
 //   rewind / fast fwd   LT / RT (hold)    Shift+Left / Shift+Right (hold)
-//   speed               d-pad up / down   Up / Down     the speed button (right click: slower)
-//   follow a player     X                 F             the follow button
-//   hide the bar        Y                 H             the hide button
-//   the controls        Back              F1            the ? button
-//   leave               B                 Escape        the X button
-//   jump                                                click / drag on the timeline
+//   speed               d-pad up / down   Up / Down     the clock button (right click: slower)
+//   follow a player     X                 F             the camera button
+//   hide the bar        Y                 H             the eye button
+//   the controls        Back              F1            the ? block
+//   leave               B                 Escape        the pipe
+//   jump                                  Home / End    click / drag on the timeline
 //
 // The bar hides itself while the replay plays; any input shows it again.
 
@@ -37,6 +38,7 @@
 #include "SimulationState.h"
 #include "rollback/Replay.h"
 #include "ui/InputPrompts.h"
+#include "ui/SmwTheme.h"
 
 #include <SDL3/SDL.h>
 
@@ -55,17 +57,21 @@ constexpr int NORMAL_SPEED = 2;
 constexpr int SKIP_TICKS = 313;        // 5 seconds
 constexpr int UI_SHOW_FRAMES = 200;    // after the last input
 
-// The layout (screen coordinates)
-constexpr int BAR_Y = 448;
-constexpr int BUTTON_Y = BAR_Y + 4;
-constexpr int BUTTON_H = 24;
-constexpr int TRACK_X = 70;
-constexpr int TRACK_W = 500;
-constexpr int TRACK_Y = 428;
-constexpr int TRACK_H = 8;
+// The layout (screen coordinates): the dock (the game's green dialog) at the
+// bottom, the timeline (a pipe) in it, the buttons under it
+constexpr int DOCK_Y = 394;
+constexpr int TRACK_X = 74;
+constexpr int TRACK_W = 492;
+constexpr int TRACK_Y = 420;
+constexpr int TRACK_H = 16;
+constexpr int BUTTON_Y = 446;
+constexpr int BUTTON_H = 26;
 
 constexpr SDL_Color WHITE {255, 255, 255, 255};
-constexpr SDL_Color DARK {16, 16, 32, 255};
+constexpr SDL_Color BLACK {0, 0, 0, 255};
+constexpr SDL_Color GOLD {248, 200, 40, 255};
+constexpr SDL_Color GOLD_LIGHT {255, 240, 144, 255};
+constexpr SDL_Color PAPER {236, 236, 244, 255};
 
 // The bar's buttons
 enum Control { BACK5, PLAY, FORWARD5, SPEED, FOLLOW, HIDE, HELP, LEAVE, CONTROL_COUNT };
@@ -133,10 +139,12 @@ SDL_Color teamColor(int team)
     return WHITE;
 }
 
-void box(int x, int y, int w, int h, SDL_Color inside)
+// The theme's tone nearest to a player's color
+theme::Tone slotTone(int slot)
 {
-    prompts::fill(x - 1, y - 1, w + 2, h + 2, {0, 0, 0, 255});
-    prompts::fill(x, y, w, h, inside);
+    const short id = slot >= 0 && slot < 4 ? game_values.colorids[slot] : 0;
+    static const theme::Tone tones[] = {theme::Tone::Red, theme::Tone::Green, theme::Tone::Gold, theme::Tone::Blue};
+    return tones[std::clamp<int>(id, 0, 3)];
 }
 
 int tickAt(float mouseX)
@@ -173,126 +181,205 @@ bool barShown()
     return !th.hidden && (th.paused || th.help || replay::playbackStatus().finished || th.uiFrames > 0);
 }
 
-// The width of a button's icon box
+// The width of a button
 int buttonWidth(Control c)
 {
-    return c == SPEED ? 36 : 26;
+    return c == SPEED ? 62 : 30;
 }
 
 // Lays out the buttons: the play controls on the left, the others on the right
 void layout()
 {
     Theater& th = g_theater;
-    int x = 8;
+    int x = 14;
     for (int c = BACK5; c <= SPEED; c++) {
         const int w = buttonWidth(static_cast<Control>(c));
         th.rects[static_cast<size_t>(c)] = {x, BUTTON_Y, w, BUTTON_H};
-        x += w + prompts::promptWidth(CONTROLS[static_cast<size_t>(c)].pad, CONTROLS[static_cast<size_t>(c)].key, "") + 8;
+        x += w + 2 + prompts::promptWidth(CONTROLS[static_cast<size_t>(c)].pad, CONTROLS[static_cast<size_t>(c)].key, "") + 6;
     }
-    x = App::screenWidth - 6;
+    x = App::screenWidth - 14;
     for (int c = LEAVE; c >= FOLLOW; c--) {
         const int w = buttonWidth(static_cast<Control>(c));
         x -= prompts::promptWidth(CONTROLS[static_cast<size_t>(c)].pad, CONTROLS[static_cast<size_t>(c)].key, "") + 2 + w;
         th.rects[static_cast<size_t>(c)] = {x, BUTTON_Y, w, BUTTON_H};
-        x -= 8;
+        x -= 6;
     }
 }
 
-void drawIcon(Control c, const SDL_Rect& r, bool hover, bool active)
+// The icons (8x8, in doubled pixels: 16x16)
+const std::vector<prompts::Ink> GOLD_INKS = {{'#', BLACK}, {'g', GOLD}, {'l', GOLD_LIGHT}};
+
+void iconBack(int x, int y)
+{
+    prompts::art(x - 2, y, {
+        "...##...##",
+        "..#l#..#l#",
+        ".#lg#.#lg#",
+        "#lgg##lgg#",
+        "#ggg##ggg#",
+        ".#gg#.#gg#",
+        "..#g#..#g#",
+        "...##...##",
+    }, GOLD_INKS);
+}
+
+void iconForward(int x, int y)
+{
+    prompts::art(x - 2, y, {
+        "##...##...",
+        "#l#..#l#..",
+        "#lg#.#lg#.",
+        "#lgg##lgg#",
+        "#ggg##ggg#",
+        "#gg#.#gg#.",
+        "#g#..#g#..",
+        "##...##...",
+    }, GOLD_INKS);
+}
+
+void iconPlay(int x, int y)
+{
+    prompts::art(x + 1, y, {
+        "##.....",
+        "#l##...",
+        "#lgg#..",
+        "#lggg##",
+        "#gggg##",
+        "#ggg#..",
+        "#g##...",
+        "##.....",
+    }, GOLD_INKS);
+}
+
+void iconPause(int x, int y)
+{
+    prompts::art(x + 1, y, {
+        "###.###",
+        "#l#.#l#",
+        "#l#.#l#",
+        "#g#.#g#",
+        "#g#.#g#",
+        "#g#.#g#",
+        "#g#.#g#",
+        "###.###",
+    }, GOLD_INKS);
+}
+
+void iconCamera(int x, int y, SDL_Color lens)
+{
+    prompts::art(x, y, {
+        ".###....",
+        "########",
+        "#ww##ww#",
+        "#w#ll#w#",
+        "#w#lL#w#",
+        "#ww##ww#",
+        "#wwwwww#",
+        "########",
+    }, {{'#', BLACK}, {'w', PAPER}, {'l', lens}, {'L', theme::shade(lens, 150)}});
+}
+
+void iconEye(int x, int y)
+{
+    prompts::art(x, y + 1, {
+        "..####..",
+        ".#wwww#.",
+        "#ww##ww#",
+        "#w#bB#w#",
+        "#ww##ww#",
+        ".#wwww#.",
+        "..####..",
+    }, {{'#', BLACK}, {'w', PAPER}, {'b', {40, 112, 232, 255}}, {'B', WHITE}});
+}
+
+void drawIcon(Control c, int x, int y)
 {
     const Theater& th = g_theater;
-    prompts::frame(r.x, r.y, r.w, r.h, hover ? SDL_Color {255, 232, 120, 255} : (active ? SDL_Color {120, 220, 96, 255} : SDL_Color {220, 220, 235, 255}),
-        hover ? SDL_Color {70, 70, 120, 255} : SDL_Color {36, 36, 72, 255});
-    const int cx = r.x + r.w / 2;
-    const int cy = r.y + r.h / 2;
     switch (c) {
-        case BACK5:
-            prompts::triangle(cx - 9, cy - 6, 8, 12, false, WHITE);
-            prompts::triangle(cx - 1, cy - 6, 8, 12, false, WHITE);
-            break;
-        case FORWARD5:
-            prompts::triangle(cx - 7, cy - 6, 8, 12, true, WHITE);
-            prompts::triangle(cx + 1, cy - 6, 8, 12, true, WHITE);
-            break;
+        case BACK5: iconBack(x, y); break;
+        case FORWARD5: iconForward(x, y); break;
         case PLAY:
-            if (th.paused || replay::playbackStatus().finished) {
-                prompts::triangle(cx - 4, cy - 7, 10, 14, true, WHITE);
-            } else {
-                prompts::fill(cx - 6, cy - 6, 4, 13, WHITE);
-                prompts::fill(cx + 2, cy - 6, 4, 13, WHITE);
-            }
+            if (th.paused || replay::playbackStatus().finished)
+                iconPlay(x, y);
+            else
+                iconPause(x, y);
             break;
-        case SPEED:
-            rm->menu_font_small.drawCentered(cx, r.y + 5, SPEED_NAMES[th.speed]);
-            break;
-        case FOLLOW:
-            //A player: head and shoulders
-            prompts::disc(cx, cy - 4, 4, active ? slotColor(th.follow) : WHITE);
-            prompts::fill(cx - 7, cy + 2, 15, 6, active ? slotColor(th.follow) : WHITE);
-            break;
-        case HIDE:
-            //An eye
-            for (int dx = -9; dx <= 9; dx++) {
-                const int half = static_cast<int>(5.0f * std::sqrt(1.0f - (dx * dx) / 81.0f));
-                prompts::fill(cx + dx, cy - half, 1, 2 * half + 1, WHITE);
-            }
-            prompts::disc(cx, cy, 3, {36, 36, 72, 255});
-            break;
-        case HELP:
-            rm->menu_font_large.drawCentered(cx, r.y + 2, "?");
-            break;
-        case LEAVE:
-            prompts::line(cx - 6, cy - 6, cx + 6, cy + 6, 3, WHITE);
-            prompts::line(cx - 6, cy + 6, cx + 6, cy - 6, 3, WHITE);
-            break;
-        default:
-            break;
+        case SPEED: theme::icon(x, y, theme::Icon::Clock); break;
+        case FOLLOW: iconCamera(x, y, th.follow >= 0 ? slotColor(th.follow) : SDL_Color {120, 120, 140, 255}); break;
+        case HIDE: iconEye(x, y); break;
+        case HELP: theme::icon(x, y, theme::Icon::QuestionBlock); break;
+        case LEAVE: theme::modeIcon(x, y, 25); break;    //(a warp pipe: out)
+        default: break;
+    }
+}
+
+void drawButton(Control c, const SDL_Rect& r, bool hover, bool active)
+{
+    const Theater& th = g_theater;
+    //Like the menus' fields: gray, green when selected (here: under the mouse, or switched on)
+    theme::block(r.x, r.y, r.w, r.h, hover ? theme::Tone::Green : active ? theme::Tone::Gold : theme::Tone::Gray);
+    if (c == SPEED) {
+        drawIcon(c, r.x + 5, r.y + 5);
+        theme::font().drawCentered(r.x + 40, r.y + 5, SPEED_NAMES[th.speed]);
+    } else {
+        drawIcon(c, r.x + (r.w - 16) / 2, r.y + 5);
     }
 }
 
 void drawHelp()
 {
-    const int w = 560;
-    const int h = 300;
+    const int w = 580;
+    const int h = 336;
     const int x = (App::screenWidth - w) / 2;
-    const int y = 70;
-    prompts::frame(x - 2, y - 2, w + 4, h + 4, WHITE, {24, 24, 52, 255});
-    rm->menu_font_large.drawCentered(App::screenWidth / 2, y + 8, "Theater");
-    rm->menu_font_small.draw(x + 250, y + 36, "Controller");
-    rm->menu_font_small.draw(x + 380, y + 36, "Keyboard");
+    const int y = 40;
+    theme::dialog(x, y, w, h);
+    theme::bigFont().drawCentered(App::screenWidth / 2, y + 12, "Theater");
+    const int padX = x + 272;
+    const int keyX = x + 394;
+    theme::heading(padX - 6, y + 42, 116, prompts::style() == prompts::Style::OriginalXbox ? "Xbox (orig.)" : "Controller");
+    theme::heading(keyX - 6, y + 42, 168, "Keyboard");
     struct Row {
+        Control icon;
         const char* what;
         std::vector<Pad> pads;
         std::vector<std::string> keys;
     };
     const Row rows[] = {
-        {"Play / pause", {Pad::A}, {"Space"}},
-        {"Back / forward 5 s", {Pad::LB, Pad::RB}, {"Left", "Right"}},
-        {"  paused: one frame", {Pad::Left, Pad::Right}, {"Left", "Right"}},
-        {"Rewind / fast fwd (hold)", {Pad::LT, Pad::RT}, {"Shift", "Left", "Right"}},
-        {"Slower / faster", {Pad::Down, Pad::Up}, {"Down", "Up"}},
-        {"Follow a player", {Pad::X}, {"F"}},
-        {"Hide the bar", {Pad::Y}, {"H"}},
-        {"These controls", {Pad::Back}, {"F1"}},
-        {"Leave", {Pad::B}, {"Esc"}},
-        {"Jump in the replay", {}, {}},
+        {PLAY, "Play / pause", {Pad::A}, {"Space"}},
+        {FORWARD5, "Back / forward 5 s", {Pad::LB, Pad::RB}, {"Left", "Right"}},
+        {CONTROL_COUNT, "  paused: one frame", {Pad::Left, Pad::Right}, {"Left", "Right"}},
+        {BACK5, "Rewind / fast fwd (hold)", {Pad::LT, Pad::RT}, {"Shift", "Left", "Right"}},
+        {SPEED, "Slower / faster", {Pad::Down, Pad::Up}, {"Down", "Up"}},
+        {FOLLOW, "Follow a player", {Pad::X}, {"F"}},
+        {HIDE, "Hide the bar", {Pad::Y}, {"H"}},
+        {HELP, "These controls", {Pad::Back}, {"F1"}},
+        {LEAVE, "Leave", {Pad::B}, {"Esc"}},
+        {CONTROL_COUNT, "Jump in the replay", {}, {}},
     };
-    int ry = y + 58;
+    int ry = y + 68;
+    bool odd = false;
     for (const Row& row : rows) {
-        rm->menu_font_small.draw(x + 16, ry + 1, row.what);
-        int px = x + 250;
+        if (odd)
+            prompts::fill(x + 14, ry - 2, w - 34, 22, {48, 140, 0, 255});
+        odd = !odd;
+        if (row.icon != CONTROL_COUNT)
+            drawIcon(row.icon, x + 20, ry + 1);
+        else if (row.pads.empty())
+            theme::coin(x + 20, ry + 1);
+        theme::font().draw(x + 44, ry + 1, row.what);
+        int px = padX;
         for (Pad p : row.pads)
-            px += prompts::drawPad(px, ry, p) + 3;
-        int kx = x + 380;
+            px += prompts::drawPad(px, ry + 1, p) + 3;
+        int kx = keyX;
         for (const std::string& k : row.keys)
-            kx += prompts::drawKey(kx, ry, k) + 3;
+            kx += prompts::drawKey(kx, ry + 1, k) + 3;
         if (row.pads.empty()) {
-            prompts::drawMouse(x + 250, ry, true, false);
-            rm->menu_font_small.draw(x + 266, ry + 1, "click or drag on the timeline");
+            prompts::drawMouse(padX, ry + 1, true, false);
+            theme::font().draw(padX + 22, ry + 2, "click or drag on the pipe");
         }
         ry += 22;
     }
-    rm->menu_font_small.drawCentered(App::screenWidth / 2, y + h - 22, "Close: the same button again");
+    theme::font().drawCentered(App::screenWidth / 2, y + h - 34, "Close: the same button again");
 }
 
 void showUi()
@@ -596,32 +683,61 @@ void GameplayState::drawReplayOverlay()
             if (player->getGlobalID() != th.follow)
                 continue;
             const int cx = player->leftX() + 16;
-            const int top = player->topY();
             const SDL_Color c = slotColor(th.follow);
-            const int ay = std::max(14, top - 12);
-            for (int row = 0; row < 6; row++)
-                prompts::fill(cx - 6 + row, ay + row, 12 - 2 * row, 1, c);
-            rm->menu_font_small.drawCentered(cx, std::max(0, ay - 16), followName(th.follow));
+            const int ay = std::max(22, player->topY() - 14);
+            prompts::art(cx - 8, ay, {
+                "########",
+                "#cccccc#",
+                ".#cCcc#.",
+                "..#cc#..",
+                "...##...",
+            }, {{'#', BLACK}, {'c', c}, {'C', theme::shade(c, 150)}});
+            theme::font().drawCentered(cx, std::max(0, ay - 18), followName(th.follow));
         }
     }
 
     if (!barShown()) {
         //Just a reminder
-        const int w = prompts::promptWidth(Pad::Back, "F1", "Replay");
-        prompts::drawPrompt(App::screenWidth - w - 6, App::screenHeight - 20, Pad::Back, "F1", "Replay");
+        const int w = prompts::promptWidth(Pad::Back, "F1", "Replay") + 14;
+        theme::block(App::screenWidth - w - 4, App::screenHeight - 28, w, 24, theme::Tone::Dark);
+        prompts::drawPrompt(App::screenWidth - w + 3, App::screenHeight - 24, Pad::Back, "F1", "Replay");
         if (th.help)
             drawHelp();
         return;
     }
 
-    //A dark band behind the timeline (and the title while paused)
-    const bool titled = th.paused || finished;
-    const int bandTop = titled ? TRACK_Y - 46 : TRACK_Y - 14;
-    prompts::fill(0, bandTop, App::screenWidth, BAR_Y - bandTop, DARK);
+    //The dock: the game's green dialog along the bottom (its edges off the screen)
+    theme::dialog(-6, DOCK_Y, App::screenWidth + 12, App::screenHeight - DOCK_Y + 20);
 
-    //The bar: the menus' header strip, the buttons with their prompts
-    rm->menu_plain_field.draw(0, BAR_Y, {0, 0, 320, 32});
-    rm->menu_plain_field.draw(320, BAR_Y, {192, 0, 320, 32});
+    //The timeline: a pipe, green as far as the replay is; the score changes
+    //are flags in the scoring team's color, the end a checkered flag; the
+    //playhead a coin
+    const int total = std::max(1, status.total);
+    const int done = TRACK_W * std::clamp(g_sim.tick, 0, total) / total;
+    theme::pipe(TRACK_X, TRACK_Y, done, true);
+    theme::pipe(TRACK_X + done, TRACK_Y, TRACK_W - done, false);
+    theme::pipeLip(TRACK_X - 8, TRACK_Y, true);
+    theme::pipeLip(TRACK_X + TRACK_W, TRACK_Y, finished);
+    int lastFlag = -100;
+    for (const replay::Marker& m : replay::markers()) {
+        const int mx = TRACK_X + TRACK_W * m.tick / total;
+        //(one flag in 10 pixels: in some modes the score changes all the time)
+        if (m.delta != 0 && mx - lastFlag < 10)
+            continue;
+        if (m.delta != 0)
+            lastFlag = mx;
+        if (m.delta == 0)
+            theme::modeIcon(mx - 3, TRACK_Y - 18, 13);
+        else if (m.delta > 0)
+            theme::flag(mx - 1, TRACK_Y - 14, teamColor(m.team));
+        else
+            prompts::fill(mx, TRACK_Y - 4, 2, 4, teamColor(m.team));
+    }
+    theme::coin(TRACK_X + done - 8, TRACK_Y);
+    theme::font().drawRightJustified(TRACK_X - 14, TRACK_Y, history::formatDuration(g_sim.tick));
+    theme::font().draw(TRACK_X + TRACK_W + 14, TRACK_Y, history::formatDuration(status.total));
+
+    //The buttons, each with its controller button or key
     int hovered = -1;
     for (int c = 0; c < CONTROL_COUNT; c++) {
         const SDL_Rect& r = th.rects[static_cast<size_t>(c)];
@@ -629,46 +745,41 @@ void GameplayState::drawReplayOverlay()
         if (hover)
             hovered = c;
         const bool active = (c == FOLLOW && th.follow >= 0) || (c == HELP && th.help);
-        drawIcon(static_cast<Control>(c), r, hover, active);
+        drawButton(static_cast<Control>(c), r, hover, active);
         const ControlInfo& info = CONTROLS[static_cast<size_t>(c)];
-        prompts::drawPrompt(r.x + r.w + 2, BUTTON_Y + 4, info.pad, info.key, "");
+        prompts::drawPrompt(r.x + r.w + 2, BUTTON_Y + 5, info.pad, info.key, "");
     }
 
-    //The time
-    //(between the two groups of buttons; smaller if it doesn't fit)
-    const std::string time = finished ? std::string("End") : history::formatDuration(g_sim.tick) + " / " + history::formatDuration(status.total);
-    const SDL_Rect& lastLeft = th.rects[SPEED];
-    const int gapFrom = lastLeft.x + lastLeft.w + prompts::promptWidth(CONTROLS[SPEED].pad, CONTROLS[SPEED].key, "") + 4;
-    const int gapTo = th.rects[FOLLOW].x - 4;
-    if (rm->menu_font_large.getWidth(time) <= gapTo - gapFrom)
-        rm->menu_font_large.drawCentered((gapFrom + gapTo) / 2, BAR_Y + 6, time);
-    else
-        rm->menu_font_small.drawCentered((gapFrom + gapTo) / 2, BAR_Y + 9, time);
-
-    //The timeline: progress, markers, the playhead
-    box(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, {32, 32, 48, 255});
-    const int total = std::max(1, status.total);
-    const int done = TRACK_W * std::clamp(g_sim.tick, 0, total) / total;
-    prompts::fill(TRACK_X, TRACK_Y, done, TRACK_H, {72, 184, 56, 255});
-    for (const replay::Marker& m : replay::markers()) {
-        const int mx = TRACK_X + TRACK_W * m.tick / total;
-        if (m.delta == 0)    //the end of the match: a gold flag
-            box(mx - 2, TRACK_Y - 9, 5, 7, {248, 216, 32, 255});
-        else
-            prompts::fill(mx, TRACK_Y - (m.delta > 0 ? 5 : 3), 2, m.delta > 0 ? 4 : 2, teamColor(m.team));
-    }
-    const int px = TRACK_X + done;
-    box(px - 3, TRACK_Y - 5, 7, TRACK_H + 10, WHITE);
-    rm->menu_font_small.drawRightJustified(TRACK_X - 6, TRACK_Y - 4, history::formatDuration(g_sim.tick));
-    rm->menu_font_small.draw(TRACK_X + TRACK_W + 6, TRACK_Y - 4, history::formatDuration(status.total));
     //(the mouse over the timeline: the time there)
     if (prompts::lastDevice() == prompts::Device::Keyboard && th.mouseY >= TRACK_Y - 10 && th.mouseY < TRACK_Y + TRACK_H + 6 &&
-            th.mouseX >= TRACK_X && th.mouseX < TRACK_X + TRACK_W) {
-        const std::string at = history::formatDuration(tickAt(th.mouseX));
-        const int w = rm->menu_font_small.getWidth(at) + 8;
-        const int tx = std::clamp(static_cast<int>(th.mouseX) - w / 2, 0, App::screenWidth - w);
-        box(tx, TRACK_Y - 26, w, 16, {48, 48, 96, 255});
-        rm->menu_font_small.draw(tx + 4, TRACK_Y - 26, at);
+            th.mouseX >= TRACK_X && th.mouseX < TRACK_X + TRACK_W)
+        theme::tooltip(static_cast<int>(th.mouseX), TRACK_Y - 6, history::formatDuration(tickAt(th.mouseX)));
+
+    //Paused, or the end: a banner over the dock (the mode, the map, when)
+    const bool titled = th.paused || finished;
+    if (titled) {
+        std::string title = (game_values.gamemode ? game_values.gamemode->GetModeName() : std::string("Replay"));
+        if (!replay::mapName().empty())
+            title += "  -  " + replay::mapName();
+        const std::string when = history::formatTime(replay::startTime());
+        const char* state = finished ? "The end" : "Paused";
+        const int stateW = theme::font().getWidth(state) + 34;
+        const int w = stateW + theme::font().getWidth(title) + theme::font().getWidth(when) + 86;
+        const int x = (App::screenWidth - w) / 2;
+        const int y = DOCK_Y - 28;
+        theme::block(x, y, w, 26, theme::Tone::Gray);
+        theme::block(x + 4, y + 4, stateW, 18, finished ? theme::Tone::Gold : theme::Tone::Red);
+        if (finished)
+            theme::modeIcon(x + 7, y + 5, 13);
+        else
+            prompts::art(x + 9, y + 7, {"##.##", "##.##", "##.##", "##.##", "##.##", "##.##"}, {{'#', WHITE}});
+        theme::font().draw(x + 28, y + 4, state);
+        const int tx = x + 4 + stateW + 10;
+        const short modeIndex = game_values.gamemode ? GetModeIconIndexFromMode(game_values.gamemode->gamemode) : -1;
+        if (modeIndex >= 0)
+            theme::modeIcon(tx, y + 5, modeIndex);
+        theme::font().draw(tx + 22, y + 4, title);
+        theme::font().drawRightJustified(x + w - 10, y + 4, when);
     }
 
     //The followed player's buttons
@@ -676,38 +787,31 @@ void GameplayState::drawReplayOverlay()
         const COutputControl& held = g_sim.playerKeys[static_cast<size_t>(th.follow)];
         const std::array<const CKeyState*, 6> pressed = {&held.game_left, &held.game_right, &held.game_jump, &held.game_down, &held.game_turbo, &held.game_powerup};
         const char* labels[] = {"<", ">", "J", "v", "R", "P"};
-        const int panelW = 6 * 17 + 8 + rm->menu_font_small.getWidth(followName(th.follow)) + 8;
+        const int panelW = 6 * 18 + 30 + theme::font().getWidth(followName(th.follow));
         const int panelX = App::screenWidth - panelW - 4;
-        const int panelY = TRACK_Y - (titled ? 66 : 34);
-        box(panelX, panelY, panelW, 20, {24, 24, 52, 255});
-        rm->menu_font_small.draw(panelX + 6, panelY + 2, followName(th.follow));
-        int x = panelX + panelW - 6 * 17 - 2;
+        const int panelY = DOCK_Y - (titled ? 58 : 28);
+        theme::block(panelX, panelY, panelW, 26, theme::Tone::Dark);
+        iconCamera(panelX + 6, panelY + 5, slotColor(th.follow));
+        theme::font().draw(panelX + 26, panelY + 4, followName(th.follow));
+        int x = panelX + panelW - 6 * 18 - 4;
         for (int k = 0; k < 6; k++) {
-            box(x, panelY + 2, 14, 16, pressed[static_cast<size_t>(k)]->fDown ? slotColor(th.follow) : SDL_Color {40, 40, 64, 255});
-            rm->menu_font_small.drawCentered(x + 7, panelY + 2, labels[k]);
-            x += 17;
+            theme::block(x, panelY + 4, 16, 18, pressed[static_cast<size_t>(k)]->fDown ? slotTone(th.follow) : theme::Tone::Gray);
+            theme::font().drawCentered(x + 8, panelY + 4, labels[k]);
+            x += 18;
         }
     }
 
-    //The title while paused; the tooltip of the button under the mouse
-    if (titled) {
-        std::string title = (game_values.gamemode ? game_values.gamemode->GetModeName() : std::string("Replay"));
-        if (!replay::mapName().empty())
-            title += "  -  " + replay::mapName();
-        title += "    " + history::formatTime(replay::startTime());
-        rm->menu_font_small.drawCentered(App::screenWidth / 2, TRACK_Y - 40, title);
-        rm->menu_font_small.drawCentered(App::screenWidth / 2, TRACK_Y - 22, finished ? "The end: play to watch again" : "Paused");
-    }
+    //The tooltip of the button under the mouse
     if (hovered >= 0) {
-        const char* label = CONTROLS[static_cast<size_t>(hovered)].label;
-        const int w = rm->menu_font_small.getWidth(label) + 10;
         const SDL_Rect& r = th.rects[static_cast<size_t>(hovered)];
-        const int tx = std::clamp(r.x + r.w / 2 - w / 2, 0, App::screenWidth - w);
-        box(tx, BAR_Y - 22, w, 18, {48, 48, 96, 255});
-        rm->menu_font_small.draw(tx + 5, BAR_Y - 21, label);
+        theme::tooltip(r.x + r.w / 2, BUTTON_Y - 2, CONTROLS[static_cast<size_t>(hovered)].label);
     }
-    if (status.diverged)
-        rm->menu_font_small.drawCentered(App::screenWidth / 2, 4, "This replay plays differently in this version of the game");
+    if (status.diverged) {
+        const char* warning = "This replay plays differently in this version of the game";
+        const int w = theme::font().getWidth(warning) + 16;
+        theme::block((App::screenWidth - w) / 2, 4, w, 22, theme::Tone::Red);
+        theme::font().drawCentered(App::screenWidth / 2, 7, warning);
+    }
     if (th.help)
         drawHelp();
 

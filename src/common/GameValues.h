@@ -164,6 +164,7 @@ public:
     bool		toplayer;
     bool		smoothmotion = true;    // draw moving things between ticks (interpolated)
     bool		shownetstats = false;   // online: the network info line (ping, input delay, rollbacks)
+    short		buttonprompts = 0;      // the controller glyphs in the theater and the editors: 0 auto, 1 Xbox, 2 original Xbox
     bool		teamcolors;
     bool		sound;
     bool		startgamecountdown;

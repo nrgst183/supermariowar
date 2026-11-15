@@ -1,10 +1,12 @@
 #include "InputPrompts.h"
 
 #include "gfx.h"
+#include "GameValues.h"
 #include "ResourceManager.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cctype>
 #include <cstdlib>
 
 extern CResourceManager* rm;
@@ -13,6 +15,7 @@ namespace prompts {
 namespace {
 
 Device g_last = Device::Keyboard;
+void noteController(SDL_JoystickID id);
 constexpr float DEADZONE = 0.22f;
 
 constexpr SDL_Color WHITE {255, 255, 255, 255};
@@ -35,15 +38,6 @@ void text(int x, int y, const std::string& s)
 int textWidth(const std::string& s)
 {
     return rm ? rm->menu_font_small.getWidth(s) : static_cast<int>(s.size()) * 8;
-}
-
-// A rounded box (one pixel cut from the corners)
-void roundBox(int x, int y, int w, int h, SDL_Color border, SDL_Color inside)
-{
-    fill(x + 1, y, w - 2, h, border);
-    fill(x, y + 1, w, h - 2, border);
-    fill(x + 2, y + 1, w - 4, h - 2, inside);
-    fill(x + 1, y + 2, w - 2, h - 4, inside);
 }
 
 } // namespace
@@ -71,17 +65,28 @@ void note(const SDL_Event& event)
                 g_last = Device::Keyboard;
             break;
         case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+            g_last = Device::Controller;
+            noteController(event.gbutton.which);
+            break;
         case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
+            g_last = Device::Controller;
+            noteController(event.jbutton.which);
+            break;
         case SDL_EVENT_JOYSTICK_HAT_MOTION:
             g_last = Device::Controller;
+            noteController(event.jhat.which);
             break;
         case SDL_EVENT_GAMEPAD_AXIS_MOTION:
-            if (std::abs(event.gaxis.value) > 16000)
+            if (std::abs(event.gaxis.value) > 16000) {
                 g_last = Device::Controller;
+                noteController(event.gaxis.which);
+            }
             break;
         case SDL_EVENT_JOYSTICK_AXIS_MOTION:
-            if (std::abs(event.jaxis.value) > 16000)
+            if (std::abs(event.jaxis.value) > 16000) {
                 g_last = Device::Controller;
+                noteController(event.jaxis.which);
+            }
             break;
         default:
             break;
@@ -131,98 +136,403 @@ void line(int x0, int y0, int x1, int y1, int thickness, SDL_Color c)
     }
 }
 
+// ---- pixel art
+
+void art(int x, int y, const std::vector<const char*>& rows, const std::vector<Ink>& inks, int scale)
+{
+    auto colorOf = [&inks](char c) -> const SDL_Color* {
+        for (const Ink& ink : inks) {
+            if (ink.c == c)
+                return &ink.color;
+        }
+        return nullptr;
+    };
+    for (size_t row = 0; row < rows.size(); row++) {
+        const char* line = rows[row];
+        //(runs of one color as one rectangle)
+        for (int col = 0; line[col];) {
+            const SDL_Color* c = colorOf(line[col]);
+            int run = 1;
+            while (line[col + run] && line[col + run] == line[col])
+                run++;
+            if (c)
+                fill(x + col * scale, y + static_cast<int>(row) * scale, run * scale, scale, *c);
+            col += run;
+        }
+    }
+}
+
+namespace {
+
+// 3x5 capitals and digits
+struct TinyChar {
+    char ch;
+    const char* rows[5];
+};
+const TinyChar TINY[] = {
+    {'A', {".#.", "#.#", "###", "#.#", "#.#"}},
+    {'B', {"##.", "#.#", "##.", "#.#", "##."}},
+    {'C', {".##", "#..", "#..", "#..", ".##"}},
+    {'K', {"#.#", "#.#", "##.", "#.#", "#.#"}},
+    {'L', {"#..", "#..", "#..", "#..", "###"}},
+    {'R', {"##.", "#.#", "##.", "#.#", "#.#"}},
+    {'S', {".##", "#..", ".#.", "..#", "##."}},
+    {'T', {"###", ".#.", ".#.", ".#.", ".#."}},
+    {'X', {"#.#", "#.#", ".#.", "#.#", "#.#"}},
+    {'Y', {"#.#", "#.#", ".#.", ".#.", ".#."}},
+    {'0', {"###", "#.#", "#.#", "#.#", "###"}},
+    {'1', {".#.", "##.", ".#.", ".#.", "###"}},
+    {'2', {"##.", "..#", ".#.", "#..", "###"}},
+    {'4', {"#.#", "#.#", "###", "..#", "..#"}},
+    {'5', {"###", "#..", "##.", "..#", "##."}},
+    {'8', {"###", "#.#", "###", "#.#", "###"}},
+    {'x', {"...", "#.#", ".#.", "#.#", "..."}},
+    {'/', {"..#", "..#", ".#.", "#..", "#.."}},
+};
+
+const TinyChar* tinyChar(char ch)
+{
+    for (const TinyChar& t : TINY) {
+        if (t.ch == ch)
+            return &t;
+    }
+    return nullptr;
+}
+
+} // namespace
+
+int tinyText(int x, int y, const std::string& s, SDL_Color c, int scale)
+{
+    int cx = x;
+    for (char ch : s) {
+        if (const TinyChar* t = tinyChar(ch)) {
+            for (int row = 0; row < 5; row++) {
+                for (int col = 0; col < 3; col++) {
+                    if (t->rows[row][col] == '#')
+                        fill(cx + col * scale, y + row * scale, scale, scale, c);
+                }
+            }
+        }
+        cx += 4 * scale;
+    }
+    return std::max(0, cx - x - scale);
+}
+
+int tinyWidth(const std::string& s, int scale)
+{
+    return s.empty() ? 0 : static_cast<int>(s.size()) * 4 * scale - scale;
+}
+
+// ---- the controller styles
+
+namespace {
+
+Style g_detected = Style::Xbox;
+
+void noteController(SDL_JoystickID id)
+{
+    Uint16 vendor = 0, product = 0;
+    const char* name = nullptr;
+    if (SDL_Gamepad* pad = SDL_GetGamepadFromID(id)) {
+        vendor = SDL_GetGamepadVendor(pad);
+        product = SDL_GetGamepadProduct(pad);
+        name = SDL_GetGamepadName(pad);
+    } else if (SDL_Joystick* joy = SDL_GetJoystickFromID(id)) {
+        vendor = SDL_GetJoystickVendor(joy);
+        product = SDL_GetJoystickProduct(joy);
+        name = SDL_GetJoystickName(joy);
+    } else {
+        vendor = SDL_GetJoystickVendorForID(id);
+        product = SDL_GetJoystickProductForID(id);
+        name = SDL_GetJoystickNameForID(id);
+    }
+    g_detected = isOriginalXbox(vendor, product, name) ? Style::OriginalXbox : Style::Xbox;
+}
+
+} // namespace
+
+bool isOriginalXbox(Uint16 vendor, Uint16 product, const char* name)
+{
+    struct Id {
+        Uint16 vendor, product;
+    };
+    //Microsoft's (the Duke, the Controller S), and the licensed ones (Mad Catz, Logitech, Nyko, Pelican...)
+    static const Id ids[] = {
+        {0x045e, 0x0202}, {0x045e, 0x0285}, {0x045e, 0x0287}, {0x045e, 0x0288}, {0x045e, 0x0289},
+        {0x0738, 0x4506}, {0x0738, 0x4516}, {0x0738, 0x4520}, {0x0738, 0x4522}, {0x0738, 0x4526}, {0x0738, 0x4536}, {0x0738, 0x4556},
+        {0x046d, 0xca84}, {0x046d, 0xca88}, {0x0e6f, 0x0003}, {0x0e6f, 0x0005}, {0x0e6f, 0x0006}, {0x0e6f, 0x0008},
+        {0x0e4c, 0x1097}, {0x0e4c, 0x2390}, {0x0e4c, 0x3510}, {0x0c12, 0x8802}, {0x0c12, 0x8809}, {0x0f30, 0x0202},
+        {0x0f30, 0x8888}, {0x102c, 0xff0c}, {0x0d2f, 0x0002}, {0x044f, 0x0f07}, {0x0e8f, 0x3008}, {0xffff, 0xffff},
+    };
+    for (const Id& id : ids) {
+        if (id.vendor == vendor && id.product == product && vendor != 0xffff)
+            return true;
+    }
+    if (!name)
+        return false;
+    std::string lower(name);
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    for (const char* hint : {"original xbox", "xbox controller s", "xbox duke", "duke", "ogx", "xbox classic", "xid"}) {
+        if (lower.find(hint) != std::string::npos)
+            return true;
+    }
+    return false;
+}
+
+Style style()
+{
+    if (game_values.buttonprompts == 1)
+        return Style::Xbox;
+    if (game_values.buttonprompts == 2)
+        return Style::OriginalXbox;
+    return g_detected;
+}
+
 // ---- glyphs
 
-int drawPad(int x, int y, Pad pad)
+namespace {
+
+constexpr SDL_Color FACE[] = {{56, 184, 48, 255}, {224, 48, 40, 255}, {40, 112, 232, 255}, {248, 192, 16, 255}};
+constexpr SDL_Color FACE_LIGHT[] = {{152, 240, 120, 255}, {255, 152, 136, 255}, {136, 184, 255, 255}, {255, 240, 136, 255}};
+constexpr SDL_Color FACE_DARK[] = {{16, 104, 16, 255}, {136, 16, 16, 255}, {16, 48, 144, 255}, {168, 104, 0, 255}};
+constexpr const char* FACE_LETTER[] = {"A", "B", "X", "Y"};
+
+constexpr SDL_Color PAD_BODY {52, 52, 64, 255};       // the Xbox's dark buttons
+constexpr SDL_Color PAD_LIGHT {96, 96, 112, 255};
+constexpr SDL_Color SILVER {184, 188, 200, 255};      // the original's triggers and START / BACK
+constexpr SDL_Color SILVER_LIGHT {232, 236, 244, 255};
+constexpr SDL_Color SILVER_DARK {112, 116, 128, 255};
+
+// A round button (8x8, doubled)
+const std::vector<const char*> ROUND = {
+    "..####..",
+    ".#llbb#.",
+    "#llbbbb#",
+    "#lbbbbb#",
+    "#bbbbbb#",
+    "#bbbbdb#",
+    ".#bddb#.",
+    "..####..",
+};
+
+int faceButton(int x, int y, int i, bool draw)
+{
+    if (!draw)
+        return 17;
+    if (style() == Style::OriginalXbox) {
+        //A colored gem, a white letter
+        art(x, y, ROUND, {{'#', BLACK}, {'l', FACE_LIGHT[i]}, {'b', FACE[i]}, {'d', FACE_DARK[i]}});
+        tinyText(x + 6, y + 4, FACE_LETTER[i], FACE_DARK[i]);
+        tinyText(x + 5, y + 3, FACE_LETTER[i], WHITE);
+    } else {
+        //A dark button with a rim and the letter in its color
+        art(x, y, {
+            "..####..",
+            ".#rrrr#.",
+            "#rbbbbr#",
+            "#rbbbbr#",
+            "#rbbbbr#",
+            "#rbbbbr#",
+            ".#rrrr#.",
+            "..####..",
+        }, {{'#', BLACK}, {'r', FACE_DARK[i]}, {'b', PAD_BODY}});
+        tinyText(x + 5, y + 3, FACE_LETTER[i], FACE[i]);
+    }
+    return 17;
+}
+
+// LB / RB (Xbox), White / Black (the original)
+int bumper(int x, int y, bool right, bool draw)
+{
+    if (style() == Style::OriginalXbox) {
+        if (draw) {
+            const SDL_Color body = right ? SDL_Color {24, 24, 28, 255} : SDL_Color {236, 236, 240, 255};
+            const SDL_Color light = right ? SDL_Color {88, 88, 100, 255} : WHITE;
+            const SDL_Color dark = right ? SDL_Color {8, 8, 8, 255} : SDL_Color {168, 168, 180, 255};
+            art(x, y, ROUND, {{'#', right ? SDL_Color {120, 120, 132, 255} : BLACK}, {'l', light}, {'b', body}, {'d', dark}});
+        }
+        return 17;
+    }
+    if (draw) {
+        art(x, y, {
+            "..##########..",
+            ".#llllllllll#.",
+            "#lbbbbbbbbbbb#",
+            "#bbbbbbbbbbbb#",
+            "#bbbbbbbbbbbb#",
+            "#bbbbbbbbbbbb#",
+            "#dddddddddddd#",
+            "##############",
+        }, {{'#', BLACK}, {'l', PAD_LIGHT}, {'b', PAD_BODY}, {'d', {30, 30, 38, 255}}});
+        tinyText(x + 7, y + 3, right ? "RB" : "LB", WHITE);
+    }
+    return 29;
+}
+
+// LT / RT (Xbox), L / R (the original)
+int trigger(int x, int y, bool right, bool draw)
+{
+    const bool original = style() == Style::OriginalXbox;
+    if (draw) {
+        art(x, y, {
+            "..######..",
+            ".#llllll#.",
+            "#llbbbbbb#",
+            "#lbbbbbbb#",
+            "#bbbbbbbb#",
+            "#bbbbbbbb#",
+            "#bbbbbbbd#",
+            ".########.",
+        }, {{'#', BLACK}, {'l', original ? SILVER_LIGHT : PAD_LIGHT}, {'b', original ? SILVER : SDL_Color {74, 74, 88, 255}},
+            {'d', original ? SILVER_DARK : PAD_BODY}});
+        if (original)
+            tinyText(x + 7, y + 3, right ? "R" : "L", {24, 24, 32, 255});
+        else
+            tinyText(x + 3, y + 3, right ? "RT" : "LT", WHITE);
+    }
+    return 21;
+}
+
+// Start and Back: Menu and View (Xbox), START and BACK (the original)
+int startBack(int x, int y, bool start, bool draw)
+{
+    if (style() == Style::OriginalXbox) {
+        const std::string label = start ? "START" : "BACK";
+        const int w = tinyWidth(label) + 10;
+        if (draw) {
+            //A silver pill with its name
+            fill(x + 2, y, w - 4, 16, BLACK);
+            fill(x, y + 2, w, 12, BLACK);
+            fill(x + 2, y + 2, w - 4, 12, SILVER);
+            fill(x + 2, y + 2, w - 4, 2, SILVER_LIGHT);
+            fill(x + 2, y + 12, w - 4, 2, SILVER_DARK);
+            tinyText(x + 5, y + 3, label, {16, 16, 24, 255});
+        }
+        return w + 1;
+    }
+    if (draw) {
+        art(x, y, {
+            "...........",
+            ".#########.",
+            "#lllllllll#",
+            "#bbbbbbbbb#",
+            "#bbbbbbbbb#",
+            "#bbbbbbbbb#",
+            ".#########.",
+            "...........",
+        }, {{'#', BLACK}, {'l', PAD_LIGHT}, {'b', PAD_BODY}});
+        if (start) {
+            for (int k = 0; k < 3; k++)
+                fill(x + 7, y + 5 + 2 * k, 8, 1, WHITE);
+        } else {
+            frame(x + 6, y + 4, 6, 6, WHITE, PAD_BODY);
+            frame(x + 10, y + 6, 6, 6, WHITE, PAD_BODY);
+        }
+    }
+    return 23;
+}
+
+int dpad(int x, int y, Pad pad, bool draw)
+{
+    if (!draw)
+        return 17;
+    const bool original = style() == Style::OriginalXbox;
+    art(x, y, {
+        "..####..",
+        "..#ll#..",
+        "###bb###",
+        "#lbbbbb#",
+        "#bbbbbd#",
+        "###bd###",
+        "..#dd#..",
+        "..####..",
+    }, {{'#', BLACK}, {'l', original ? SILVER_LIGHT : PAD_LIGHT}, {'b', original ? SILVER : SDL_Color {74, 74, 88, 255}},
+        {'d', original ? SILVER_DARK : PAD_BODY}});
+    const SDL_Color lit {255, 216, 40, 255};
+    if (pad == Pad::Up)
+        fill(x + 6, y + 2, 4, 5, lit);
+    else if (pad == Pad::Down)
+        fill(x + 6, y + 9, 4, 5, lit);
+    else if (pad == Pad::Left)
+        fill(x + 2, y + 6, 5, 4, lit);
+    else if (pad == Pad::Right)
+        fill(x + 9, y + 6, 5, 4, lit);
+    return 17;
+}
+
+int stick(int x, int y, bool right, bool draw)
+{
+    if (draw) {
+        art(x, y, ROUND, {{'#', BLACK}, {'l', SILVER_LIGHT}, {'b', SILVER}, {'d', SILVER_DARK}});
+        art(x + 4, y + 4, {".##.", "#..#", "#..#", ".##."}, {{'#', SILVER_DARK}});
+        tinyText(x + 6, y + 4, right ? "R" : "L", {24, 24, 32, 255}, 1);
+    }
+    return 17;
+}
+
+int padGlyph(int x, int y, Pad pad, bool draw)
 {
     switch (pad) {
-        case Pad::A:
-        case Pad::B:
-        case Pad::X:
-        case Pad::Y: {
-            static const SDL_Color colors[] = {{56, 176, 64, 255}, {214, 56, 48, 255}, {48, 110, 224, 255}, {232, 184, 32, 255}};
-            static const char* letters[] = {"A", "B", "X", "Y"};
-            const int i = static_cast<int>(pad) - static_cast<int>(Pad::A);
-            disc(x + 8, y + 8, 8, BLACK);
-            disc(x + 8, y + 8, 7, colors[i]);
-            text(x + 8 - textWidth(letters[i]) / 2, y + 1, letters[i]);
-            return 17;
-        }
-        case Pad::LB:
-        case Pad::RB:
-        case Pad::LT:
-        case Pad::RT: {
-            static const char* names[] = {"LB", "RB", "LT", "RT"};
-            const int i = static_cast<int>(pad) - static_cast<int>(Pad::LB);
-            const bool trigger = pad == Pad::LT || pad == Pad::RT;
-            const int w = textWidth(names[i]) + 8;
-            roundBox(x, y + (trigger ? 0 : 2), w, trigger ? 16 : 13, BLACK, trigger ? SDL_Color {90, 90, 110, 255} : DARK);
-            text(x + 4, y + (trigger ? 1 : 1), names[i]);
-            return w + 1;
-        }
-        case Pad::Start:
-        case Pad::Back: {
-            roundBox(x, y + 2, 22, 12, BLACK, DARK);
-            if (pad == Pad::Start) {
-                for (int k = 0; k < 3; k++)
-                    fill(x + 6, y + 5 + 3 * k, 10, 1, WHITE);
-            } else {
-                frame(x + 5, y + 5, 7, 6, WHITE, DARK);
-                frame(x + 9, y + 7, 7, 6, WHITE, DARK);
-            }
-            return 23;
-        }
+        case Pad::A: return faceButton(x, y, 0, draw);
+        case Pad::B: return faceButton(x, y, 1, draw);
+        case Pad::X: return faceButton(x, y, 2, draw);
+        case Pad::Y: return faceButton(x, y, 3, draw);
+        case Pad::LB: return bumper(x, y, false, draw);
+        case Pad::RB: return bumper(x, y, true, draw);
+        case Pad::LT: return trigger(x, y, false, draw);
+        case Pad::RT: return trigger(x, y, true, draw);
+        case Pad::Start: return startBack(x, y, true, draw);
+        case Pad::Back: return startBack(x, y, false, draw);
         case Pad::Up:
         case Pad::Down:
         case Pad::Left:
         case Pad::Right:
-        case Pad::DPad: {
-            //A cross; the direction lit
-            fill(x + 5, y, 6, 16, BLACK);
-            fill(x, y + 5, 16, 6, BLACK);
-            fill(x + 6, y + 1, 4, 14, GREY);
-            fill(x + 1, y + 6, 14, 4, GREY);
-            const SDL_Color lit {255, 214, 48, 255};
-            if (pad == Pad::Up)
-                fill(x + 5, y, 6, 7, lit);
-            else if (pad == Pad::Down)
-                fill(x + 5, y + 9, 6, 7, lit);
-            else if (pad == Pad::Left)
-                fill(x, y + 5, 7, 6, lit);
-            else if (pad == Pad::Right)
-                fill(x + 9, y + 5, 7, 6, lit);
-            return 17;
-        }
-        case Pad::LStick:
-        case Pad::RStick:
-            disc(x + 8, y + 8, 8, BLACK);
-            disc(x + 8, y + 8, 7, GREY);
-            disc(x + 8, y + 8, 4, DARK);
-            text(x + 8 - textWidth(pad == Pad::LStick ? "L" : "R") / 2, y + 1, pad == Pad::LStick ? "L" : "R");
-            return 17;
+        case Pad::DPad: return dpad(x, y, pad, draw);
+        case Pad::LStick: return stick(x, y, false, draw);
+        case Pad::RStick: return stick(x, y, true, draw);
     }
     return 0;
 }
 
+} // namespace
+
+int drawPad(int x, int y, Pad pad)
+{
+    return padGlyph(x, y, pad, true);
+}
+
+int padWidth(Pad pad)
+{
+    return padGlyph(0, 0, pad, false);
+}
+
+// A key cap: the menus' gray pipe colors
 int drawKey(int x, int y, const std::string& label)
 {
     const int w = std::max(16, textWidth(label) + 8);
-    roundBox(x, y, w, 16, {200, 200, 215, 255}, {70, 70, 96, 255});
-    fill(x + 2, y + 13, w - 4, 1, {40, 40, 56, 255});
+    fill(x + 2, y, w - 4, 16, BLACK);
+    fill(x, y + 2, w, 12, BLACK);
+    fill(x + 2, y + 2, w - 4, 12, {144, 160, 160, 255});
+    fill(x + 2, y + 2, w - 4, 2, {176, 192, 192, 255});
+    fill(x + 2, y + 12, w - 4, 2, {80, 96, 96, 255});
     text(x + (w - textWidth(label)) / 2, y + 1, label);
     return w + 1;
 }
 
 int drawMouse(int x, int y, bool left, bool right)
 {
-    roundBox(x, y, 12, 16, BLACK, {220, 220, 230, 255});
-    fill(x + 6, y + 1, 1, 6, BLACK);
-    fill(x + 1, y + 7, 10, 1, BLACK);
-    if (left)
-        fill(x + 2, y + 2, 4, 5, {214, 56, 48, 255});
-    if (right)
-        fill(x + 7, y + 2, 4, 5, {214, 56, 48, 255});
-    return 13;
+    const SDL_Color red {232, 56, 40, 255};
+    art(x, y, {
+        ".#######.",
+        "#LLL#RRR#",
+        "#LLL#RRR#",
+        "#########",
+        "#wwwwwww#",
+        "#wwwwwww#",
+        "#wwwwwww#",
+        ".#######.",
+    }, {{'#', BLACK}, {'L', left ? red : SILVER_LIGHT}, {'R', right ? red : SILVER_LIGHT}, {'w', SILVER_LIGHT}});
+    return 19;
 }
 
 int drawPrompt(int x, int y, Pad pad, const std::string& key, const std::string& label)
@@ -246,17 +556,12 @@ int drawPrompt(int x, int y, Pad pad, const std::string& key, const std::string&
 int promptWidth(Pad pad, const std::string& key, const std::string& label)
 {
     int w = 0;
-    if (g_last == Device::Controller) {
-        switch (pad) {
-            case Pad::LB: case Pad::RB: case Pad::LT: case Pad::RT: w = textWidth("LB") + 9; break;
-            case Pad::Start: case Pad::Back: w = 23; break;
-            default: w = 17; break;
-        }
-    } else if (key.empty() || key == "RMB") {
-        w = 13;
-    } else {
+    if (g_last == Device::Controller)
+        w = padWidth(pad);
+    else if (key.empty() || key == "RMB")
+        w = 19;
+    else
         w = std::max(16, textWidth(key) + 8) + 1;
-    }
     return label.empty() ? w : w + 3 + textWidth(label);
 }
 

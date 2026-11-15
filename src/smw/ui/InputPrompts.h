@@ -11,8 +11,15 @@
 // Prompts show how to do something with the device that was used last: a
 // controller's buttons (A, B, X, Y in their colors, the shoulders and
 // triggers, Start, Back, the d-pad), or a keyboard key cap, or the mouse.
-// Every glyph is 16 pixels high and drawn on blitdest; the draw functions
-// return the width they took.
+// Every glyph is 16 pixels high, drawn as pixel art in the game's doubled
+// pixels on blitdest; the draw functions return the width they took.
+//
+// Two controller styles: the Xbox one (dark buttons with colored letters, LB
+// RB LT RT, View and Menu) and the original Xbox's (the Duke and the
+// Controller S: colored gem buttons, White and Black, the L and R triggers,
+// START and BACK). The "Button prompts" option picks one, or Auto: the style
+// of the controller used last (an original Xbox controller is known by its
+// USB ids or its name, see isOriginalXbox()).
 //
 // Gamepads reads every connected controller directly (not through the
 // players' input settings), so any controller works in these screens.
@@ -26,8 +33,13 @@ void setLastDevice(Device device);
 
 enum class Pad { A, B, X, Y, LB, RB, LT, RT, Start, Back, Up, Down, Left, Right, DPad, LStick, RStick };
 
+enum class Style { Xbox, OriginalXbox };
+Style style();    // the option, or (Auto) the controller used last
+bool isOriginalXbox(Uint16 vendor, Uint16 product, const char* name);
+
 constexpr int HEIGHT = 16;
 int drawPad(int x, int y, Pad pad);
+int padWidth(Pad pad);
 int drawKey(int x, int y, const std::string& label);
 int drawMouse(int x, int y, bool left, bool right);
 // The pad glyph on a controller, else the key cap ("" key: the mouse);
@@ -41,6 +53,17 @@ void frame(int x, int y, int w, int h, SDL_Color border, SDL_Color inside);
 void disc(int cx, int cy, int r, SDL_Color c);
 void triangle(int x, int y, int w, int h, bool right, SDL_Color c);    // pointing left or right
 void line(int x0, int y0, int x1, int y1, int thickness, SDL_Color c);
+
+// Pixel art: one string per row, one character per pixel (drawn `scale`
+// pixels wide); each character's color from `inks`, others are see-through.
+struct Ink {
+    char c;
+    SDL_Color color;
+};
+void art(int x, int y, const std::vector<const char*>& rows, const std::vector<Ink>& inks, int scale = 2);
+// Small capitals and digits (3x5 pixels, times `scale`); returns the width
+int tinyText(int x, int y, const std::string& s, SDL_Color c, int scale = 2);
+int tinyWidth(const std::string& s, int scale = 2);
 
 // ---- the controllers
 

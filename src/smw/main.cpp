@@ -24,6 +24,7 @@
 #include "path.h"
 #include "player.h"
 #include "RandomNumberGenerator.h"
+#include "ui/SmwTheme.h"
 #include "ResourceManager.h"
 #include "sfx.h"
 #include "SimulationState.h"
@@ -230,6 +231,7 @@ void create_globals()
 {
     // this instance will contain the other relevant objects
     rm = new CResourceManager();
+    theme::init(rm);
     // delete these or use boost GC shared_ptr
 
     g_map = new CMap();
@@ -426,6 +428,8 @@ void main_game()
     create_gamemodes();
 
     game_values.ReadConfig();
+    if (cmd::g_autotest.enabled && cmd::g_autotest.prompts >= 0)
+        game_values.buttonprompts = static_cast<short>(cmd::g_autotest.prompts);
 
     // Online, every peer must run at the normal speed: pace --autotest runs
     if (cmd::g_net.enabled() && cmd::g_autotest.enabled && cmd::g_autotest.realtime == 0)

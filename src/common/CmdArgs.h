@@ -29,6 +29,7 @@ struct AutoTestArgs {
     int humans = 0;          // the first N players are humans, with seeded random input (not from devices)
     int synctest = 0;        // rollback sync test distance in ticks; 0 = off
     int peersum = 0;         // print the cross-machine state checksum every N frames; 0 = off
+    int prompts = -1;        // --at-prompts N: the "Button prompts" option (0 auto, 1 Xbox, 2 original Xbox)
     int replaySeeks = 0;     // --replay: jump to a random tick every N frames (tests the theater's seeking)
     bool norender = false;   // skip drawing and presenting (much faster under valgrind or sanitizers)
     int shotEvery = 0;       // save a PNG of the screen every N drawn frames of an online match; 0 = off

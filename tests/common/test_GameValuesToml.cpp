@@ -27,6 +27,7 @@ std::pair<CGameConfig, config::Bridge> makePeculiar()
     config.framelimiter = 13;
     config.smoothmotion = false;
     config.shownetstats = true;
+    config.buttonprompts = 2;
     config.fullscreen = true;
     bridge.menugraphicspack = "Classical Menu";
     bridge.worldgraphicspack = "Unbiased World";
@@ -212,7 +213,7 @@ TEST_CASE("TOML config document covers every descriptor field exactly once")
     }, config::NamedLayout<CGameConfig>::sections);
 
     CHECK(counts[0] == 11);
-    CHECK(counts[1] == 71);
+    CHECK(counts[1] == 72);
     CHECK(counts[2] == 2); // gamemode_settings, gamemode_goals
 }
 

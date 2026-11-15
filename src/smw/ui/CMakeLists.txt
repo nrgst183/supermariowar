@@ -39,4 +39,6 @@ target_sources(smw PRIVATE
     MI_World.h
     MI_WorldPreviewDisplay.cpp
     MI_WorldPreviewDisplay.h
+    SmwTheme.cpp
+    SmwTheme.h
 )

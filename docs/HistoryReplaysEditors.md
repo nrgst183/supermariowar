@@ -25,22 +25,37 @@ replay plays differently (another game version) the theater says so.
 
 ## The theater
 
-Replays play in the theater (`src/smw/GameplayTheater.cpp`), modelled on Halo 3's:
+Replays play in the theater (`src/smw/GameplayTheater.cpp`), modelled on Halo 3's. Its dock
+along the bottom is the game's green dialog: the timeline is a pipe (green as far as the
+replay has played, a coin for the playhead, flags in the scoring team's color, a checkered
+flag at the end of the match) with the buttons under it. Each button shows the controller
+button or the key that does the same, for the device used last; any connected controller
+works.
 
-| Key (player 1's game keys) | |
-|---|---|
-| Jump or Start | play / pause |
-| Left / Right | skip 5 s (paused: one frame; held: repeats) |
-| Down | speed: 1/4, 1/2, 1, 2, 4, 8x |
-| Run (held) | fast forward |
-| Powerup | follow the next player: their name and the buttons they hold |
-| H | hide the bar |
-| Escape | leave |
-| Mouse | click or drag on the timeline to jump |
+| | Controller | Keyboard | Mouse |
+|---|---|---|---|
+| play / pause | A (or Start) | Space | the play button |
+| back / forward 5 s (paused: a frame) | LB / RB (d-pad left / right) | Left / Right | the arrow buttons |
+| rewind / fast forward (held) | LT / RT | Shift+Left / Shift+Right | |
+| slower / faster (1/4x to 8x) | d-pad down / up | Down / Up | the clock button (right click: slower) |
+| follow a player (their name, the buttons they hold) | X | F | the camera button |
+| hide the bar | Y | H | the eye button |
+| the controls | Back | F1 | the ? block |
+| leave | B | Escape | the pipe |
+| jump | | Home / End | click or drag on the pipe |
 
-The timeline shows the score changes (team colors) and the end of the match (gold). When
-a replay starts it is simulated once without sound or effects (a few ms), keeping a
+When a replay starts it is simulated once without sound or effects (a few ms), keeping a
 snapshot every 4 seconds: jumping anywhere is instant.
+
+## Button prompts
+
+The theater and the editors draw controller buttons in two styles
+(`src/smw/ui/InputPrompts.h`): the Xbox one (A B X Y, LB RB, LT RT, View and Menu) and the
+original Xbox's (the Duke and the Controller S: the colored gem buttons, White and Black,
+the L and R triggers, START and BACK). Controls > Button Prompts picks one; Auto (the
+default) uses the style of the controller pressed last. An original Xbox controller is
+recognised by its USB ids (Microsoft's and the licensed ones) or its name; through an
+adapter that reports itself as an Xbox 360 pad, pick Original Xbox by hand.
 
 ## The editors (main menu > Editors)
 
@@ -62,9 +77,14 @@ Game controllers work in them (`src/smw/editors/EditorInput.h`):
 | RB | Enter |
 | Back | Escape (in the main mode: asks to quit; A on Yes) |
 | Start | the action menu: every mode and command of the editor |
+| LB | hide or show the buttons' bar |
+
+On a keyboard, Tab opens the action menu too; it lists each command's key, and the mouse
+can click its entries. The bar along the bottom shows the controller's buttons (or, for a
+few seconds, Tab, F1 and Esc), and every cursor marks the tile it edits.
 
 When an editor asks for a name, an on-screen keyboard opens (A types, B deletes,
-X shift, Y space, Start done, Back cancel).
+X shift, Y space, Start done, Back cancel; with the mouse: click the keys).
 
 ## Editing together
 
@@ -92,9 +112,10 @@ The others may Save As a copy of their own.
 
 - `--autotest --replay FILE --at-replay-seeks N`: plays a replay with a random jump every
   N frames; the checksums after each jump must still match
-- `--autotest --at-match shots --at-role history|theater|editors --at-shots DIR`:
-  screenshots of the history screen, the theater, and both editors driven by a scripted
-  controller (followed by a match, to check that the game came back intact)
+- `--autotest --at-match shots --at-role history|theater|editors|controls --at-shots DIR`:
+  screenshots of the history screen, the theater, both editors driven by a scripted
+  controller (followed by a match, to check that the game came back intact), and the
+  controls menu; `--at-prompts 1|2` draws the Xbox or the original Xbox buttons
 - `--at-role cohost` and `--at-role cojoin --at-addr 127.0.0.1` (`--at-shotmap 1`: the
   world editor): two or more games edit together with scripted controllers, at the same
   time and on the same cells; each prints a hash of its document (`cotest:`), which must
