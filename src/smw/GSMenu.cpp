@@ -45,6 +45,7 @@
 #include "menu/EditorsMenu.h"
 #ifdef SMW_HAS_EDITORS
 #include "editors/EditorLauncher.h"
+#include "editors/CoEdit.h"
 #endif
 #include "ui/MI_MatchHistory.h"
 #include "menu/MatchSelectionMenu.h"
@@ -511,6 +512,23 @@ void MenuState::update()
             }
         }
 
+#ifdef SMW_HAS_EDITORS
+        //Joining an editing session: the editor opens once the host answers
+        if (editors::coedit::state() != editors::coedit::State::Off) {
+            editors::coedit::pump();
+            const editors::coedit::State coeditState = editors::coedit::state();
+            if (coeditState == editors::coedit::State::Joined) {
+                if (!RunEditor(editors::coedit::editor()))
+                    return;
+            } else if (coeditState == editors::coedit::State::Ended) {
+                mEditorsMenu->SetStatus(editors::coedit::statusText());
+                editors::coedit::leave("");
+            } else if (coeditState == editors::coedit::State::Connecting) {
+                mEditorsMenu->SetStatus(editors::coedit::statusText());
+            }
+        }
+#endif
+
         MenuCodeEnum code = MENU_CODE_NONE;
         //(online, the world map runs only on the frames its lockstep has a tick for: OnlineSeriesWorldTick)
         mSeriesSkipUpdate = rollback::NetGame::instance().seriesActive();
@@ -549,21 +567,29 @@ void MenuState::update()
             mCurrentMenu = mEditorsMenu.get();
         } else if (MENU_CODE_EDITORS_EXIT == code) {
             mCurrentMenu = mMainMenu.get();
-        } else if (MENU_CODE_RUN_LEVEL_EDITOR == code || MENU_CODE_RUN_WORLD_EDITOR == code) {
+        } else if (MENU_CODE_RUN_LEVEL_EDITOR == code || MENU_CODE_RUN_WORLD_EDITOR == code || MENU_CODE_HOST_LEVEL_EDITOR == code ||
+                MENU_CODE_HOST_WORLD_EDITOR == code) {
 #ifdef SMW_HAS_EDITORS
-            //The editor runs in the window until it is closed (EditorLauncher.h)
-            rm->backgroundmusic[2].stop();
-            const bool keepRunning = editors::run(MENU_CODE_RUN_LEVEL_EDITOR == code ? editors::Editor::Level : editors::Editor::World);
-            if (!keepRunning) {
-                Exit();
-                return;
+            const bool level = MENU_CODE_RUN_LEVEL_EDITOR == code || MENU_CODE_HOST_LEVEL_EDITOR == code;
+            const editors::Editor editor = level ? editors::Editor::Level : editors::Editor::World;
+            if (MENU_CODE_HOST_LEVEL_EDITOR == code || MENU_CODE_HOST_WORLD_EDITOR == code) {
+                //Editing together: the others join this computer's address
+                std::string error;
+                if (!editors::coedit::host(editor, editors::coedit::DEFAULT_PORT, game_values.onlinename, error)) {
+                    mEditorsMenu->SetStatus("Can't host: " + error);
+                    return;
+                }
             }
-            if (game_values.music)
-                rm->backgroundmusic[2].play(false, false);
-            //Maps saved in the editor: the map field shows the list again
-            mGameSettingsMenu->miMapField->LoadCurrentMap();
-            game_values.playerInput.ResetKeys();
-            return;
+            if (!RunEditor(editor))
+                return;
+#endif
+        } else if (MENU_CODE_JOIN_EDITOR == code) {
+#ifdef SMW_HAS_EDITORS
+            std::string error;
+            if (editors::coedit::join(mEditorsMenu->joinAddress(), game_values.onlinename, error))
+                mEditorsMenu->SetStatus(editors::coedit::statusText());
+            else
+                mEditorsMenu->SetStatus("Can't join: " + error);
 #endif
         } else if (MENU_CODE_TO_ONLINE_MENU == code) {
             mOnlineMenu->ClearMessage();
@@ -1412,6 +1438,34 @@ void MenuState::DisplayControllingTeamMessage(short iControlTeam)
 
     mCurrentMenu->AddEyeCandy<EC_Announcement>(&rm->menu_font_large, &rm->spr_announcementicons, szMessage, iControlTeam < 0 ? 4 : game_values.colorids[game_values.teamids[iControlTeam][0]], 120, 100);
 }
+
+#ifdef SMW_HAS_EDITORS
+// Runs an editor (alone, or in the editing session that is open); false if
+// the game quits
+bool MenuState::RunEditor(editors::Editor editor)
+{
+    //The editor runs in the window until it is closed (EditorLauncher.h)
+    rm->backgroundmusic[2].stop();
+    const bool keepRunning = editors::run(editor);
+    const bool together = editors::coedit::state() != editors::coedit::State::Off;
+    if (together) {
+        editors::coedit::leave(editors::coedit::isHost() ? "the host left" : "left");
+        mEditorsMenu->SetStatus("The editing session ended");
+    } else {
+        mEditorsMenu->SetStatus("");
+    }
+    if (!keepRunning) {
+        Exit();
+        return false;
+    }
+    if (game_values.music)
+        rm->backgroundmusic[2].play(false, false);
+    //Maps saved in the editor: the map field shows the list again
+    mGameSettingsMenu->miMapField->LoadCurrentMap();
+    game_values.playerInput.ResetKeys();
+    return true;
+}
+#endif
 
 void MenuState::Exit()
 {

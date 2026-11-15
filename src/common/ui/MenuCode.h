@@ -121,6 +121,9 @@ enum MenuCodeEnum {
     MENU_CODE_EDITORS_EXIT,
     MENU_CODE_RUN_LEVEL_EDITOR,
     MENU_CODE_RUN_WORLD_EDITOR,
+    MENU_CODE_HOST_LEVEL_EDITOR,        // editing together (editors/CoEdit.h)
+    MENU_CODE_HOST_WORLD_EDITOR,
+    MENU_CODE_JOIN_EDITOR,
 };
 
 enum class MenuNavDirection : unsigned char {

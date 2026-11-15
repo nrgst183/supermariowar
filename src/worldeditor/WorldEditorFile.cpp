@@ -285,6 +285,12 @@ void loadcurrentworld()
 	ReadVehiclesIntoEditor();
 	ReadWarpsIntoEditor();
 
+	setupworldview();
+}
+
+// The view of the world (after it was loaded or its size changed)
+void setupworldview()
+{
 	draw_offset_col = 0;
 	draw_offset_row = 0;
 

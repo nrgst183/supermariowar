@@ -2,6 +2,9 @@
 #define GAMESTATE_MENU_H
 
 #include "GameState.h"
+#ifdef SMW_HAS_EDITORS
+#include "editors/EditorLauncher.h"
+#endif
 #include "MatchTypes.h"
 #include "rollback/NetSeries.h"
 #include "ui/MenuCode.h"
@@ -103,7 +106,10 @@ class MenuState : public GameState
 		void CreateMenu();
 		bool ReadTourFile();
 		void StartGame();
-		void Exit();
+		#ifdef SMW_HAS_EDITORS
+        bool RunEditor(editors::Editor editor);
+#endif
+        void Exit();
 		MenuCodeEnum AutoTestMenuUpdate();
 		void ResetTournamentBackToMainMenu();
 

@@ -10,6 +10,10 @@
 #include "gfx.h"
 #include "GSGameplay.h"
 #include "menu/MatchHistoryMenu.h"
+#include "menu/EditorsMenu.h"
+#ifdef SMW_HAS_EDITORS
+#include "editors/CoEdit.h"
+#endif
 #ifdef SMW_HAS_EDITORS
 #include "editors/EditorInput.h"
 #endif
@@ -377,7 +381,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         using editors::input::TestInput;
         //A button held for two frames from `from`
         auto tap = [](int f, int from) { return f >= from && f < from + 2; };
-        auto levelScript = [tap](editors::Editor, int f) {
+        auto levelScript = [tap](editors::Editor, int f, int) {
             TestInput t;
             if (f == 10) t.shot = "e1_level_start";
             if (f >= 20 && f < 45) { t.lx = 0.8f; t.ly = 0.5f; }
@@ -407,7 +411,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             if (f > 300 && f % 40 == 20) t.a = true;
             return t;
         };
-        auto worldScript = [tap](editors::Editor, int f) {
+        auto worldScript = [tap](editors::Editor, int f, int) {
             TestInput t;
             if (f == 10) t.shot = "w1_world_start";
             if (f >= 20 && f < 50) t.ry = 1.0f;     //scrolls the world (arrow keys)
@@ -502,6 +506,141 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                     t = 0;
                 }
                 timedOut(60 * 60, "the match after the editors");
+                return MENU_CODE_NONE;
+        }
+    }
+#endif
+
+#ifdef SMW_HAS_EDITORS
+    //--at-role colocal: two controllers in one level editor, painting at the same time
+    if (at.shotsRole == "colocal") {
+        auto script = [](editors::Editor, int f, int pointer) {
+            editors::input::TestInput t;
+            //(controller 1 picks a tile first)
+            if (pointer == 0 && f == 10)
+                t.key = SDLK_T;
+            if (pointer == 0 && f >= 16 && f < 24) {
+                t.px = 80;
+                t.py = 48;
+                t.a = f >= 18 && f < 21;
+            }
+            //Both paint: controller 1 places a row, controller 2 removes another, at once
+            if (f >= 40 && f < 90) {
+                t.px = 40.0f + static_cast<float>(f - 40) * 11.0f;
+                t.py = pointer == 0 ? 96.0f : 288.0f;
+                t.a = true;
+            }
+            if (f == 100)
+                t.shot = "local_two_cursors";
+            if (f > 120) {
+                const int k = f % 40;
+                t.back = pointer == 0 && k < 2;
+                if (k >= 10 && pointer == 0) {
+                    t.px = 282;
+                    t.py = 266;
+                }
+                t.a = pointer == 0 && k >= 14 && k < 16;
+            }
+            return t;
+        };
+        if (step == 1) {
+            if (t == 1) {
+                editors::input::setTestDriver(script, at.shotsDir, 2);
+                return MENU_CODE_RUN_LEVEL_EDITOR;
+            }
+            if (t == 4) {
+                step = 1000;
+                t = 0;
+            }
+            return MENU_CODE_NONE;
+        }
+    }
+
+    //--at-role cohost / cojoin (--at-addr): two games edit one map together, with scripted controllers
+    //(--at-shotmap 1: the world editor). Both print their document's hash: they must match.
+    if (at.shotsRole == "cohost" || at.shotsRole == "cojoin") {
+        const bool hostRole = at.shotsRole == "cohost";
+        const bool world = at.shotsMap == 1;
+        static int start = -1;    //(the frame the other one was there)
+        auto script = [hostRole](editors::Editor, int f, int pointer) {
+            using editors::input::TestInput;
+            TestInput t;
+            auto tap = [f](int from) { return f >= from && f < from + 2; };
+            if (pointer != 0)
+                return t;
+            //The host: another map/world first (the joiner must get it), then wait for the joiner
+            if (hostRole && f == 5)
+                t.key = SDLK_PAGEDOWN;
+            //The level editor's host picks a tile to paint with (the tile mode's palette)
+            if (hostRole && f == 10)
+                t.key = SDLK_T;
+            if (hostRole && f >= 16 && f < 24) {
+                t.px = 80;
+                t.py = 48;
+                t.a = f >= 18 && f < 21;
+            }
+            const bool together = editors::coedit::people().size() >= 2;
+            if (start < 0 && together)
+                start = f;
+            if (start < 0)
+                return t;
+            const int g = f - start;
+            if (g == 20)
+                t.shot = hostRole ? "co_host_start" : "co_join_start";
+            //Paint: the host a row at y 96, the joiner one at y 320; both the row at y 224 (place against remove)
+            if (g >= 30 && g < 80) {
+                const float x = 40.0f + static_cast<float>(g - 30) * 11.0f;
+                t.px = x;
+                t.py = hostRole ? 96.0f : 320.0f;
+                t.a = hostRole;
+                t.b = !hostRole;
+            }
+            if (g >= 90 && g < 140) {
+                t.px = 40.0f + static_cast<float>(g - 90) * 11.0f + (hostRole ? 0.0f : 3.0f);
+                t.py = 224.0f;
+                t.a = hostRole;
+                t.b = !hostRole;
+            }
+            if (g == 150)
+                t.shot = hostRole ? "co_host_painted" : "co_join_painted";
+            //A joiner's Save: only the host saves the shared file
+            if (!hostRole && g == 170)
+                t.key = SDLK_S;
+            if (g == 200 || g == 260) {
+                const editors::coedit::Stats& st = editors::coedit::stats();
+                printf("cotest: %s frame %d hash %016llx sent %llu applied %llu skipped %llu\n", hostRole ? "host" : "join", g,
+                    static_cast<unsigned long long>(editors::coedit::documentHash()), static_cast<unsigned long long>(st.opsSent),
+                    static_cast<unsigned long long>(st.opsApplied), static_cast<unsigned long long>(st.opsSkipped));
+            }
+            //Leave: the joiner first, then the host once alone
+            const bool leave = hostRole ? (g > 300 && !together) || g > 900 : g > 280;
+            if (leave) {
+                const int k = f % 40;
+                t.back = k < 2;
+                if (k >= 10) {
+                    t.px = 282;
+                    t.py = 266;
+                }
+                t.a = k >= 14 && k < 16;
+            }
+            return t;
+        };
+        switch (step) {
+            case 1:
+                if (t == 1) {
+                    game_values.onlinename = hostRole ? "Mario" : "Luigi";
+                    editors::input::setTestDriver(script, at.shotsDir);
+                    if (hostRole)
+                        return world ? MENU_CODE_HOST_WORLD_EDITOR : MENU_CODE_HOST_LEVEL_EDITOR;
+                    mEditorsMenu->joinAddressRef() = at.shotsAddr;
+                    return MENU_CODE_JOIN_EDITOR;
+                }
+                //(the joiner: back here once its editor closed)
+                if (t > 2 && editors::coedit::state() == editors::coedit::State::Off) {
+                    step = 1000;
+                    t = 0;
+                }
+                timedOut(60 * 60, "the editing session");
                 return MENU_CODE_NONE;
         }
     }

@@ -114,6 +114,7 @@ void AddWarpToTile(short iCol, short iRow, short iType);
 void RemoveWarpFromTile(short iCol, short iRow);
 
 void loadcurrentworld();
+void setupworldview();
 int savecurrentworld();
 int findcurrentstring();
 int new_world();

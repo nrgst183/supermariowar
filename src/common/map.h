@@ -206,6 +206,7 @@ void insert_platforms_into_map();
 void loadcurrentmap();
 void SetNoSpawn(short nospawnmode, short col, short row, bool value);
 int editor_platforms();
+class CoeditDocument;    // editing together (src/smw/editors/CoEdit.h)
 } // namespace leveleditor
 
 class CMap
@@ -464,6 +465,7 @@ class CMap
 		friend void leveleditor::loadcurrentmap();
 		friend void leveleditor::SetNoSpawn(short, short, short, bool);
 		friend int leveleditor::editor_platforms();
+		friend class leveleditor::CoeditDocument;
 
 		friend class B_BreakableBlock;
 		friend class B_DonutBlock;

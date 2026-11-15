@@ -30,6 +30,11 @@
 // Start done, Back cancel.
 //
 // The mouse and keyboard keep working; moving the mouse hides the drawn cursor.
+//
+// Several controllers: every one gets its own cursor (local editing
+// together): each paints and clicks where its cursor is, the editor's mode
+// is shared. Online (CoEdit.h): the session runs from here too (its network,
+// sending this frame's changes), and the others' cursors and names are drawn.
 namespace editors::input {
 
 void begin(Editor editor);
@@ -53,10 +58,12 @@ struct TestInput {
     bool up = false, down = false, left = false, right = false;
     float lx = 0, ly = 0, rx = 0, ry = 0;
     float px = -1, py = -1;    // >= 0: puts the pointer there
+    SDL_Keycode key = 0;       // a key press
     std::string shot;
 };
-using TestDriver = std::function<TestInput(Editor editor, int frame)>;
-void setTestDriver(TestDriver driver, std::string shotDir);
+// (`pointer`: which controller; `pointers` of them, for local editing together)
+using TestDriver = std::function<TestInput(Editor editor, int frame, int pointer)>;
+void setTestDriver(TestDriver driver, std::string shotDir, int pointers = 1);
 
 // While an editor asks for text (its dialog()): the on-screen keyboard
 struct TextEntry {

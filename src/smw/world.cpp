@@ -133,9 +133,9 @@ void WorldMap::Resize(short w, short h)
     //Create new map
     Grid<WorldMapTile> newTiles(w, h);
 
-    //Copy tiles to new map
-    for (short iCol = 0; iCol < getWidth(); iCol++) {
-        for (short iRow = 0; iRow < getHeight(); iRow++) {
+    //Copy tiles to new map (over the new size: shrinking must not write past it)
+    for (short iCol = 0; iCol < w; iCol++) {
+        for (short iRow = 0; iRow < h; iRow++) {
             WorldMapTile& newTile = newTiles.at(iCol, iRow);
             if (iCol < iOldWidth && iRow < iOldHeight) {
                 newTile = std::move(tiles.at(iCol, iRow));
@@ -145,7 +145,7 @@ void WorldMap::Resize(short w, short h)
                 newTile.iForegroundSprite = 0;
                 newTile.iConnectionType = 0;
                 newTile.iType = 0;
-                newTile.iID = iRow * getWidth() + iCol;
+                newTile.iID = iRow * w + iCol;
                 newTile.iVehicleBoundary = 0;
                 newTile.iWarp = 0;
             }

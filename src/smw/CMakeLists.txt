@@ -79,6 +79,8 @@ endif()
 # The map and world editors, built in (editors/EditorLauncher.h); not on the web
 if(NOT EMSCRIPTEN)
 	target_sources(smw PRIVATE
+		editors/CoEdit.cpp
+		editors/CoEdit.h
 		editors/EditorInput.cpp
 		editors/EditorInput.h
 		editors/EditorLauncher.cpp

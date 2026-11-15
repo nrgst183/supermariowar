@@ -66,6 +66,28 @@ Game controllers work in them (`src/smw/editors/EditorInput.h`):
 When an editor asks for a name, an on-screen keyboard opens (A types, B deletes,
 X shift, Y space, Start done, Back cancel).
 
+## Editing together
+
+**On one computer:** every connected controller gets its own cursor (P1, P2, ...); each
+paints and clicks where its cursor is. The editor's mode and selected tile are shared.
+
+**Over the network** (Editors > Host Map / Host World, or Join with the host's address;
+port 7301): everyone edits the same map or world in their own game, and sees the others'
+cursors with their names (the nickname from the Online menu), who is there (bottom left),
+and who joins or leaves.
+
+How it works (`src/smw/editors/CoEdit.h`): every game edits its own copy. Once per frame,
+each compares its copy with the last synced state; every changed map cell, world tile or
+section (items, hazards, platforms, backgrounds and music; stages, vehicles, warps, start
+items) is sent as an operation. The host puts all operations in one order and sends them
+to everyone, so all copies end up the same: when two people change the same cell at once,
+the later one (in the host's order) wins everywhere. Because changes are found by comparing,
+every tool of the editors works together without changes to the tools.
+
+The host opens the map or world (the others get it when they join) and is the only one who
+saves to its file, or switches to another map or world (that switches it for everyone).
+The others may Save As a copy of their own.
+
 ## Testing
 
 - `--autotest --replay FILE --at-replay-seeks N`: plays a replay with a random jump every
@@ -73,3 +95,7 @@ X shift, Y space, Start done, Back cancel).
 - `--autotest --at-match shots --at-role history|theater|editors --at-shots DIR`:
   screenshots of the history screen, the theater, and both editors driven by a scripted
   controller (followed by a match, to check that the game came back intact)
+- `--at-role cohost` and `--at-role cojoin --at-addr 127.0.0.1` (`--at-shotmap 1`: the
+  world editor): two or more games edit together with scripted controllers, at the same
+  time and on the same cells; each prints a hash of its document (`cotest:`), which must
+  be the same everywhere. `--at-role colocal`: two controllers in one editor
