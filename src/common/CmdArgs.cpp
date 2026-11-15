@@ -70,6 +70,7 @@ void print_help(const char* title, const char* version)
     printf("      --at-shot-every <N> Save a PNG of the screen every N drawn frames of a\n"
            "                          match (needs rendering), into --at-shot-dir <DIR>\n");
     printf("      --at-shot-dir <DIR> Where --at-shot-every saves the screenshots\n");
+    printf("      --at-shot-ticks 1   --at-shot-every counts simulation ticks, not drawn frames\n");
     printf("\nRollback netplay (testing; combines with --autotest):\n");
     printf("      --net-host <PORT>   Host a lobby on this UDP port\n");
     printf("      --net-peers <N>     --autotest host: wait for N peers, the host included (default 2)\n");
@@ -142,6 +143,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-cpu-level") at.cpuLevel = atoi(val.c_str());
             else if (arg == "--at-ai-old") at.aiLegacyMask = atoi(val.c_str());
             else if (arg == "--at-ai-bench") at.aiBench = atoi(val.c_str()) != 0;
+            else if (arg == "--at-shot-ticks") at.shotTicks = atoi(val.c_str()) != 0;
             else if (arg == "--at-resim") at.resim = atoi(val.c_str()) != 0;
             else if (arg == "--at-realtime") at.realtime = atoi(val.c_str());
             else if (arg == "--at-humans") at.humans = atoi(val.c_str());

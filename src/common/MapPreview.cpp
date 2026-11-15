@@ -337,8 +337,13 @@ void CMap::predrawforeground(gfxSprite &foregroundspr)
     if (SDL_MUSTLOCK(foregroundspr.getSurface()))
         SDL_LockSurface(foregroundspr.getSurface());
 
-    SDL_FillSurfaceRect(foregroundspr.getSurface(), nullptr, SDL_MapSurfaceRGB(foregroundspr.getSurface(), 255, 0, 255));
-    SDL_SetSurfaceColorKey(foregroundspr.getSurface(), true, SDL_MapSurfaceRGB(foregroundspr.getSurface(), 255, 0, 255));
+    // Start fully transparent and draw the front layers over it. (This used to be a magenta fill
+    // with a magenta color key, which doesn't take effect on this 32-bit surface with alpha under
+    // SDL3: the empty parts of front layer tiles were drawn magenta.)
+    SDL_Surface* surface = foregroundspr.getSurface();
+    SDL_SetSurfaceColorKey(surface, false, 0);
+    SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGBA(surface, 0, 0, 0, 0));
+    SDL_SetSurfaceBlendMode(surface, SDL_BLENDMODE_BLEND);
 
     if (SDL_MUSTLOCK(foregroundspr.getSurface()))
         SDL_UnlockSurface(foregroundspr.getSurface());

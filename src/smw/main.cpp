@@ -133,6 +133,16 @@ void autoScreenshot()
     static int saved = 0;
     if (cmd::g_autotest.shotEvery <= 0 || cmd::g_autotest.shotDir.empty() || game_values.appstate != AppState::Game)
         return;
+    if (cmd::g_autotest.shotTicks) {
+        // Every N simulation ticks, on the first frame drawn after that tick (for comparing
+        // frame rate modes: the same tick must look the same however often we draw)
+        static int lastTick = -1;
+        if (g_sim.tick == lastTick || g_sim.tick % cmd::g_autotest.shotEvery != 0)
+            return;
+        lastTick = g_sim.tick;
+        gfx_save_screenshot(std::format("{}/tick_{:06d}.png", cmd::g_autotest.shotDir, g_sim.tick));
+        return;
+    }
     if (++drawn % cmd::g_autotest.shotEvery != 0)
         return;
     gfx_save_screenshot(std::format("{}/shot_{:04d}.png", cmd::g_autotest.shotDir, saved++));

@@ -198,6 +198,7 @@ void CMap::SetupAnimatedTiles()
         animatedTilesSurface = gfxSprite::blank(1024, 1024);
 
         int iTransparentColor = SDL_MapSurfaceRGB(animatedTilesSurface.getSurface(), 255, 0, 255);
+        const Uint32 iClearColor = SDL_MapSurfaceRGBA(animatedTilesSurface.getSurface(), 0, 0, 0, 0);
 
         std::vector<AnimatedTile*>::iterator iter = animatedtiles.begin(), lim = animatedtiles.end();
 
@@ -249,7 +250,8 @@ void CMap::SetupAnimatedTiles()
                 for (short sTileAnimationFrame = 0; sTileAnimationFrame < 4; sTileAnimationFrame++) {
                     tile->rAnimationSrc[1][sTileAnimationFrame] = rDst;
 
-                    SDL_FillSurfaceRect(animatedTilesSurface.getSurface(), &rDst, iTransparentColor);
+                    // The front layer is transparent where it has no tiles (see predrawforeground)
+                    SDL_FillSurfaceRect(animatedTilesSurface.getSurface(), &rDst, iClearColor);
 
                     for (short iLayer = 2; iLayer < 4; iLayer++) {
                         TilesetTile * tilesetTile = &tile->layers[iLayer];

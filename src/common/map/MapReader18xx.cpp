@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "MapReader.h"
 
 #include "map.h"
@@ -77,6 +78,8 @@ void MapReader1800::read_tileset(BinaryFile& mapfile)
         translationid[iID] = g_tilesetmanager->indexFromName(translation[iTileset].szName);
 
         if (translationid[iID] == TILESETUNKNOWN) {
+            // Its tiles are drawn as "unknown tile" markers
+            fprintf(stderr, "[map] Tileset '%s' used by the map isn't installed\n", translation[iTileset].szName);
             tilesetwidths[iID] = 1;
             tilesetheights[iID] = 1;
         } else {

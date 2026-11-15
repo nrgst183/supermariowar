@@ -28,6 +28,7 @@ struct Graph {
     uint64_t stamp = 0;          // hash of what the graph was built from
     bool built = false;
     std::array<bool, NODES> spot {};
+    std::array<bool, H> edgeOpen {};   // a player fits through the left/right screen edge in this row
     std::vector<Edge> edges;     // all edges, grouped by node
     std::array<uint16_t, NODES + 1> first {};
 };
@@ -111,6 +112,8 @@ void build()
     for (int r = 0; r < H; r++)
         for (int c = 0; c < W; c++)
             gr.spot[node(c, r)] = standable(c, r);
+    for (int r = 0; r < H; r++)
+        gr.edgeOpen[r] = passable(0, r) && passable(W - 1, r);
 
     auto add = [&](Move m, int c, int r, int cost) {
         gr.edges.push_back(Edge {static_cast<uint16_t>(node(wrapCol(c), r)), static_cast<uint8_t>(cost < 255 ? cost : 255), m});
@@ -223,6 +226,39 @@ int shortestDir(int from, int to)
 }
 
 }  // namespace
+
+bool CanCrossEdge(int y1, int y2)
+{
+    if (!g_map)
+        return true;
+    ensureGraph();
+    int top = (y1 < y2 ? y1 : y2) / TILESIZE - 3;   // a jump reaches about 3 tiles up
+    int bottom = (y1 > y2 ? y1 : y2) / TILESIZE + 3;
+    if (top < 0)
+        top = 0;
+    if (bottom >= H)
+        bottom = H - 1;
+    for (int r = top; r <= bottom; r++) {
+        if (g_graph.edgeOpen[r])
+            return true;
+    }
+    // Above the map the edges are always open
+    return (y1 < y2 ? y1 : y2) < TILESIZE;
+}
+
+int HorizontalDistance(int dx, int y1, int y2, bool* wrapped)
+{
+    bool wrap = false;
+    if (dx > App::screenWidth / 2 || dx < -App::screenWidth / 2) {
+        if (CanCrossEdge(y1, y2)) {
+            dx += dx > 0 ? -App::screenWidth : App::screenWidth;
+            wrap = true;
+        }
+    }
+    if (wrapped)
+        *wrapped = wrap;
+    return dx;
+}
 
 bool PlayerSpot(int ix, int iy, int& col, int& row)
 {

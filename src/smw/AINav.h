@@ -31,6 +31,15 @@ struct Step {
 // The spot a player at (ix,iy) (top left) stands on, or lands on; false when none
 bool PlayerSpot(int ix, int iy, int& col, int& row);
 
+// Whether a player around height y1 or y2 (pixels) can cross the left/right screen edge: some maps
+// close the edges with walls, there the way around the screen doesn't exist. A row counts when
+// the edge tiles on both sides are free and is within a jump of either height.
+bool CanCrossEdge(int y1, int y2);
+
+// The horizontal distance dx = (to - from) the short way around the screen when the edge can be
+// crossed near those heights, otherwise straight across; wrapped tells which one it is
+int HorizontalDistance(int dx, int y1, int y2, bool* wrapped = nullptr);
+
 // The first move of the shortest path from (col,row) to the spot nearest to the point (x,y)
 Step NextStep(int col, int row, int targetX, int targetY);
 

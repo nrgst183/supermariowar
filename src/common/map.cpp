@@ -159,7 +159,8 @@ void CMap::loadMap(const std::string& file, ReadType iReadType)
     }
 
     MapReader* reader = MapReader::getLoaderByVersion(version);
-    reader->load(*this, mapfile, iReadType);
+    if (!reader->load(*this, mapfile, iReadType))
+        fprintf(stderr, "[map] %s couldn't be read completely (see above)\n", file.c_str());
     delete reader;
     reader = nullptr;
 

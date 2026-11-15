@@ -93,7 +93,7 @@ constexpr int NUMMAPHAZARDPARAMS = 5;
 
 constexpr int NUMSPAWNAREATYPES = 6;
 constexpr int MAXSPAWNAREAS = 128;
-constexpr int MAXDRAWAREAS = 128;
+constexpr int MAXDRAWAREAS = MAPWIDTH * MAPHEIGHT;  // at most one per tile (some old maps have up to 300)
 
 constexpr int MAX_BONUS_CHESTS = 5;
 constexpr int MAX_WORLD_BONUSES_AWARDED = 3;

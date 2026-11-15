@@ -4,6 +4,7 @@
 #include "map.h"
 #include "MapReaderConstants.h"
 #include "FileIO.h"
+#include "Game.h"
 #include "TilesetManager.h"
 
 #include <iostream>
@@ -214,14 +215,18 @@ bool MapReader1600::read_spawn_areas(CMap& map, BinaryFile& mapfile)
 bool MapReader1600::read_draw_areas(CMap& map, BinaryFile& mapfile)
 {
     //Read draw areas (foreground tiles drawing optimization)
-    map.numdrawareas = static_cast<short>(mapfile.read_i32());
+    const int count = mapfile.read_i32();
 
-    if (map.numdrawareas > MAXDRAWAREAS) {
-        std::cout << std::endl << " ERROR: Number of draw areas (" << map.numdrawareas
+    if (count < 0 || count > MAXDRAWAREAS) {
+        // A broken count: draw the whole front layer instead (never index past the array)
+        std::cout << std::endl << " ERROR: Number of draw areas (" << count
                   << ") was greater than max allowed (" << MAXDRAWAREAS << ')'
                   << std::endl;
+        map.numdrawareas = 1;
+        map.drawareas[0] = {0, 0, App::screenWidth, App::screenHeight};
         return false;
     }
+    map.numdrawareas = static_cast<short>(count);
 
     //Load rects to help optimize drawing the foreground
     for (int m = 0; m < map.numdrawareas; m++) {

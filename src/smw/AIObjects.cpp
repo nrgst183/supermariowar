@@ -1,4 +1,5 @@
 #include "ai.h"
+#include "AINav.h"
 
 #include "GameValues.h"
 #include "input.h"
@@ -462,13 +463,12 @@ void CPlayerAI::DistanceToObject(CObject * object, CObject ** target, int * near
     short ty = object->y() - pPlayer->iy;
     bool fScreenWrap = false;
 
-    //See if it is a shorter distance wrapping around the screen
-    if (tx > App::screenWidth/2) {
-        tx = App::screenWidth - tx;
-        fScreenWrap = true;
-    } else if (tx < -App::screenWidth/2) {
-        tx = App::screenWidth + tx;
-        fScreenWrap = true;
+    //See if it is a shorter distance wrapping around the screen (and whether the map lets us)
+    if (tx > App::screenWidth/2 || tx < -App::screenWidth/2) {
+        if (!improved() || ainav::CanCrossEdge(pPlayer->iy, pPlayer->iy + ty)) {
+            tx = tx > 0 ? App::screenWidth - tx : App::screenWidth + tx;
+            fScreenWrap = true;
+        }
     }
 
     int distance_player_pow2 = tx*tx + ty*ty;    // a^2 = b^2 + c^2 :)
@@ -487,12 +487,12 @@ void CPlayerAI::DistanceToObjectCenter(CObject * object, CObject ** target, int 
     short ty = object->y() + (object->collisionRectH() / 2) - pPlayer->iy - HALFPH;
     bool fScreenWrap = false;
 
-    if (tx > App::screenWidth/2) {
-        tx = App::screenWidth - tx;
-        fScreenWrap = true;
-    } else if (tx < -App::screenWidth/2) {
-        tx = App::screenWidth + tx;
-        fScreenWrap = true;
+    //See if it is a shorter distance wrapping around the screen (and whether the map lets us)
+    if (tx > App::screenWidth/2 || tx < -App::screenWidth/2) {
+        if (!improved() || ainav::CanCrossEdge(pPlayer->iy, pPlayer->iy + ty)) {
+            tx = tx > 0 ? App::screenWidth - tx : App::screenWidth + tx;
+            fScreenWrap = true;
+        }
     }
 
     int distance_player_pow2 = tx*tx + ty*ty;
@@ -512,12 +512,12 @@ void CPlayerAI::DistanceToPlayer(CPlayer * player, CPlayer ** target, int * near
     short ty = player->iy - pPlayer->iy;
     bool fScreenWrap = false;
 
-    if (tx > App::screenWidth/2) {
-        tx = App::screenWidth - tx;
-        fScreenWrap = true;
-    } else if (tx < -App::screenWidth/2) {
-        tx = App::screenWidth + tx;
-        fScreenWrap = true;
+    //See if it is a shorter distance wrapping around the screen (and whether the map lets us)
+    if (tx > App::screenWidth/2 || tx < -App::screenWidth/2) {
+        if (!improved() || ainav::CanCrossEdge(pPlayer->iy, pPlayer->iy + ty)) {
+            tx = tx > 0 ? App::screenWidth - tx : App::screenWidth + tx;
+            fScreenWrap = true;
+        }
     }
 
     int distance_player_pow2 = tx*tx + ty*ty;

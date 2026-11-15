@@ -15,6 +15,7 @@ extern int kills[4];
 extern int deaths[4];
 extern int selfDeaths[4];
 extern int styleKills[32];
+extern int stuck[4];         // turns pushing left/right without moving
 extern int navTried[3];     // path moves: jump, drop, walk
 extern int navReached[3];
 void reset();

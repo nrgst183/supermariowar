@@ -176,7 +176,7 @@ void GraphicsSDL::changeFullScreen(bool fullscreen) const
 
 bool GraphicsSDL::saveScreenshot(const std::string& path) const
 {
-    if (IMG_SavePNG(sdl_screen_surface, path.c_str()) != 0) {
+    if (!IMG_SavePNG(sdl_screen_surface, path.c_str())) {  // SDL3: true on success
         fprintf(stderr, "[gfx] Couldn't write the screenshot to file: %s\n", SDL_GetError());
         return false;
     }
@@ -195,7 +195,7 @@ void GraphicsSDL::takeScreenshot() const
     path_ss << std::put_time(std::localtime(&now), path_format);
     const std::string path = convertPath(path_ss.str());
 
-    if (IMG_SavePNG(sdl_screen_surface, path.c_str()) != 0) {
+    if (!IMG_SavePNG(sdl_screen_surface, path.c_str())) {  // SDL3: true on success
         fprintf(stderr, "[gfx] Couldn't write the screenshot to file: %s\n", SDL_GetError());
         return;
     }

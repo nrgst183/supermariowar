@@ -84,6 +84,7 @@ int kills[4] = {};
 int deaths[4] = {};
 int selfDeaths[4] = {};
 int styleKills[32] = {};
+int stuck[4] = {};
 int navTried[3] = {};
 int navReached[3] = {};
 
@@ -98,9 +99,10 @@ void print()
     for (int g = 0; g < 4; g++) {
         const CPlayer* p = GetPlayerFromGlobalID(g);
         const int team = p ? p->getTeamID() : -1;
-        printf("aibench: player %d %s team %d kills %d deaths %d self %d score %d winner %d\n", g,
+        printf("aibench: player %d %s team %d kills %d deaths %d self %d score %d winner %d stuck %d\n", g,
             (cmd::g_autotest.aiLegacyMask & (1 << g)) ? "old" : "new", team, kills[g], deaths[g], selfDeaths[g],
-            team >= 0 ? g_sim.score[team].score : -1, team >= 0 && game_values.gamemode->winningteam == team ? 1 : 0);
+            team >= 0 ? g_sim.score[team].score : -1, team >= 0 && game_values.gamemode->winningteam == team ? 1 : 0, stuck[g]);
+        stuck[g] = 0;
     }
     printf("aibench: nav jump %d/%d drop %d/%d walk %d/%d\n", navReached[0], navTried[0], navReached[1], navTried[1], navReached[2], navTried[2]);
     for (int k = 0; k < 3; k++)
@@ -360,11 +362,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
             if (improvedFighting() && plainFight) {
                 // Climb up beside an opponent above us, never right under their feet
                 int ox = player->ix + PW / 2;
-                int odx = ox - (ix + PW / 2);
-                if (odx > App::screenWidth / 2)
-                    odx -= App::screenWidth;
-                else if (odx < -App::screenWidth / 2)
-                    odx += App::screenWidth;
+                const int odx = ainav::HorizontalDistance(ox - (ix + PW / 2), iy, player->iy);
                 const bool above = player->iy < iy - 40;
                 if (above)
                     ox += odx > 0 ? -SIDE_OFFSET : SIDE_OFFSET;
@@ -572,6 +570,11 @@ void CPlayerAI::Think(COutputControl * playerKeys)
 
     if (improved())
         AimWeapon(playerKeys, actionType);
+
+    // AI comparisons: count turns spent pushing against something without moving
+    if (cmd::g_autotest.aiBench && pPlayer->globalID < 4 && (playerKeys->game_left.fDown != playerKeys->game_right.fDown) &&
+            pPlayer->velx == 0.0f && !pPlayer->inair)
+        aibench::stuck[pPlayer->globalID]++;
 
     //Jump if trying to move left/right and x velocity is zero
     if (!navActive && (playerKeys->game_left.fDown || playerKeys->game_right.fDown) && pPlayer->velx == 0.0f)
@@ -816,11 +819,7 @@ ExitDeathCheck:
 // level with us; for targets well above us, or below and to the side, we follow a path.
 bool CPlayerAI::NeedsPath(int x, int y) const
 {
-    int dx = x - (pPlayer->ix + PW / 2);
-    if (dx > App::screenWidth / 2)
-        dx -= App::screenWidth;
-    else if (dx < -App::screenWidth / 2)
-        dx += App::screenWidth;
+    const int dx = ainav::HorizontalDistance(x - (pPlayer->ix + PW / 2), pPlayer->iy, y);
     const int dy = y - (pPlayer->iy + PH / 2);
     return dy < -40 || (dy > 48 && (dx < -48 || dx > 48));
 }
@@ -993,11 +992,7 @@ void CPlayerAI::AimWeapon(COutputControl * playerKeys, short actionType)
         if (!other || other == pPlayer || !other->isready() || other->getTeamID() == pPlayer->getTeamID() || other->isInvincible())
             continue;
 
-        int dx = other->ix + PW / 2 - px;
-        if (dx > App::screenWidth / 2)
-            dx -= App::screenWidth;
-        else if (dx < -App::screenWidth / 2)
-            dx += App::screenWidth;
+        const int dx = ainav::HorizontalDistance(other->ix + PW / 2 - px, pPlayer->iy, other->iy);
         const int dy = other->iy + PH / 2 - py;   // > 0: the opponent is lower
         const int adx = abs(dx);
         const bool inFront = dx == 0 || (dx > 0) == facingRight;
