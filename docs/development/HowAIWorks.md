@@ -273,6 +273,14 @@ Improvements (2026)
    wall, or on another level and not close, are reached by following a path instead of walking
    straight at them, and dodging an opponent overhead goes toward the side with room.
 
+6. **Movement and defense items** (`UseMovementItems()`, every mode): the feather's extra jump
+   gets the CPU above an opponent beside it, up to goals and out of danger; the leaf's tail
+   shake glides it over danger and across to goals; the P-Wings fly it over an opponent to dive
+   onto them, up to goals or out of danger (holding jump to stay up). With the tanooki suit it
+   turns into a statue when someone is about to land on it or something dangerous is close, and
+   stays one while it lasts. It keeps away from opponents that are statues or shielded, and super
+   stomps with the tanooki suit or the Kuribo shoe from above.
+
 2 and 3 are on in the modes about knocking out the others or getting somewhere (classic, frag,
 time limit, jail, chicken, tag, king of the hill, race, owned, frenzy, survival, phanto, shyguy
 tag). In the item modes (coins, eggs, flags, stars, domination, greed, health, collection,
@@ -282,8 +290,8 @@ fighting. The CPU still thinks on every 4th frame, and the path search is a smal
 the map, so it is deterministic and safe for online play and rollback.
 
 Comparing AI versions: `--at-ai-old MASK` keeps the original logic for the players whose bit
-is set, and `--at-ai-bench 1` prints kills, deaths, score, stuck turns and direction reversals per
-player after each match:
+is set, and `--at-ai-bench 1` prints kills, deaths, score, stuck turns, direction reversals and item
+uses per player after each match:
 
 ```
 smw --autotest --at-match single --at-players 4 --at-humans 0 --at-mode 0 --at-cpu-level 4 \

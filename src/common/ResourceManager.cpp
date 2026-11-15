@@ -433,6 +433,7 @@ bool CResourceManager::LoadGameSounds()
     sfx_skid = open("sfx/packs/skid.wav");
     sfx_capejump = open("sfx/packs/capejump.wav");
     sfx_invinciblemusic = open("sfx/packs/invincible.wav");
+    sfx_invinciblemusic.setLong(true);
     sfx_extraguysound = open("sfx/packs/1up.wav");
     sfx_sprout = open("sfx/packs/sprout.wav");
     sfx_collectpowerup = open("sfx/packs/collectpowerup.wav");
@@ -445,6 +446,7 @@ bool CResourceManager::LoadGameSounds()
     sfx_fireball = open("sfx/packs/fireball.wav");
     sfx_springjump = open("sfx/packs/springjump.wav");
     sfx_timewarning = open("sfx/packs/timewarning.wav");
+    sfx_timewarning.setLong(true);
     sfx_hit = open("sfx/packs/hit.wav");
     sfx_chicken = open("sfx/packs/chicken.wav");
     sfx_transform = open("sfx/packs/transform.wav");
@@ -457,6 +459,7 @@ bool CResourceManager::LoadGameSounds()
     sfx_pipe = open("sfx/packs/warp.wav");
     sfx_thunder = open("sfx/packs/thunder.wav");
     sfx_slowdownmusic = open("sfx/packs/clock.wav");
+    sfx_slowdownmusic.setLong(true);
     sfx_flyingsound = open("sfx/packs/slowdown.wav");
     sfx_storedpowerupsound = open("sfx/packs/storedpowerup.wav");
     sfx_kicksound = open("sfx/packs/kick.wav");

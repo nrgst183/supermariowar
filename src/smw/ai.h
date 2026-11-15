@@ -16,6 +16,9 @@ extern int deaths[4];
 extern int selfDeaths[4];
 extern int styleKills[32];
 extern int stuck[4];
+enum ItemUse { ItemFeather, ItemLeaf, ItemPWings, ItemStatue, ItemKinds };
+extern int itemUses[ItemKinds][4];   // times the CPU used these items
+void count(ItemUse kind, int player);
 extern int reversals[4];     // turns that reversed the direction         // turns pushing left/right without moving
 extern int navTried[3];     // path moves: jump, drop, walk
 extern int navReached[3];
@@ -103,6 +106,8 @@ public:
     bool NavigateTo(COutputControl * playerKeys, int x, int y);
     bool NeedsPath(int x, int y) const;
     void Stabilize(COutputControl * playerKeys);
+    bool AboutToBeStomped() const;
+    void UseMovementItems(COutputControl * playerKeys, short actionType, const NearestObjects& nearest);
 
 protected:
     bool improved() const;

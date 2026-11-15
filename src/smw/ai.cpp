@@ -85,6 +85,13 @@ int deaths[4] = {};
 int selfDeaths[4] = {};
 int styleKills[32] = {};
 int stuck[4] = {};
+int itemUses[ItemKinds][4] = {};
+
+void count(ItemUse kind, int player)
+{
+    if (cmd::g_autotest.aiBench && player >= 0 && player < 4)
+        itemUses[kind][player]++;
+}
 int reversals[4] = {};
 int navTried[3] = {};
 int navReached[3] = {};
@@ -105,6 +112,10 @@ void print()
             team >= 0 ? g_sim.score[team].score : -1, team >= 0 && game_values.gamemode->winningteam == team ? 1 : 0, stuck[g], reversals[g]);
         stuck[g] = 0;
         reversals[g] = 0;
+        printf("aibench: items player %d %s feather %d leaf %d pwings %d statue %d\n", g, (cmd::g_autotest.aiLegacyMask & (1 << g)) ? "old" : "new",
+            itemUses[ItemFeather][g], itemUses[ItemLeaf][g], itemUses[ItemPWings][g], itemUses[ItemStatue][g]);
+        for (int k = 0; k < ItemKinds; k++)
+            itemUses[k][g] = 0;
     }
     printf("aibench: nav jump %d/%d drop %d/%d walk %d/%d\n", navReached[0], navTried[0], navReached[1], navTried[1], navReached[2], navTried[2]);
     for (int k = 0; k < 3; k++)
@@ -581,8 +592,8 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     if (playerKeys->game_turbo.fDown && !carriedItem && !pPlayer->inair)
         playerKeys->game_turbo.fPressed = true;
 
-    //Stay inside tanooki statue
-    if (pPlayer->tanookisuit.isOn() && pPlayer->tanookisuit.isStatue())
+    //Stay inside tanooki statue (the improved CPU decides that in UseMovementItems())
+    if (!improved() && pPlayer->tanookisuit.isOn() && pPlayer->tanookisuit.isStatue())
         playerKeys->game_down.fDown = true;
 
     //"Star Mode" specific stuff
@@ -753,6 +764,9 @@ ExitDeathCheck:
         iDeathY--;
         heightlimit--;
     }
+
+    if (improved())
+        UseMovementItems(playerKeys, actionType, nearestObjects);
 
     /***************************************************
     * 5. Use stored powerups
@@ -977,6 +991,13 @@ void CPlayerAI::FightPlayer(COutputControl * playerKeys, CPlayer * player, bool 
             left = true;
     };
 
+    // A tanooki statue or a shielded opponent can't be hurt, and a statue lands as a super stomp:
+    // keep away until it's over
+    if (player->IsTanookiStatue() || player->isShielded()) {
+        away(dx);
+        return;
+    }
+
     if (dy < -12) {
         // The opponent is above us
         if (abs(dx) < UNDER_FEET && player->vely >= 0.0f) {
@@ -1063,6 +1084,120 @@ void CPlayerAI::Stabilize(COutputControl * playerKeys)
     left = dir < 0;
     right = dir > 0;
     lastIx = pPlayer->ix;
+}
+
+// Is an opponent about to land on us (they're above us, close, and on the way down)?
+bool CPlayerAI::AboutToBeStomped() const
+{
+    for (const CPlayer* other : g_sim.players) {
+        if (!other || other == pPlayer || !other->isready() || other->getTeamID() == pPlayer->getTeamID())
+            continue;
+        const int dx = ainav::HorizontalDistance(other->ix - pPlayer->ix, other->iy, pPlayer->iy);
+        const int dy = other->iy - pPlayer->iy;   // < 0: above us
+        if (dx > -40 && dx < 40 && dy < -8 && dy > -96 && other->vely > -1.0f)
+            return true;
+    }
+    return false;
+}
+
+// The items that move us or protect us: the feather (an extra jump in the air), the leaf (shaking
+// the tail slows a fall), the P-Wings (flight) and the tanooki suit (the statue can't be hurt, and
+// comes down as a super stomp). Each starts with a fresh press of a button, so a button we hold
+// is let go for a turn first.
+void CPlayerAI::UseMovementItems(COutputControl * playerKeys, short actionType, const NearestObjects& nearest)
+{
+    if (pPlayer->isFrozen() || pPlayer->bobomb || pPlayer->kuriboshoe.is_on())
+        return;
+
+    // Where we want to go
+    bool hasTarget = false;
+    int tx = 0, ty = 0;
+    if (actionType == 0 && nearest.player) {
+        tx = nearest.player->ix + PW / 2;
+        ty = nearest.player->iy + PH / 2;
+        hasTarget = true;
+    } else if (actionType == 1 && nearest.goal) {
+        tx = nearest.goal->x() + nearest.goal->w() / 2;
+        ty = nearest.goal->y() + nearest.goal->h() / 2;
+        hasTarget = true;
+    }
+    const int dx = hasTarget ? ainav::HorizontalDistance(tx - (pPlayer->ix + PW / 2), pPlayer->iy, ty) : 0;
+    const int dy = hasTarget ? ty - (pPlayer->iy + PH / 2) : 0;
+    const bool targetAbove = hasTarget && dy < -40 && dx > -220 && dx < 220;
+    const bool fallingIntoDanger = iFallDanger != 0 && pPlayer->vely > 0.0f;
+    bool& jump = playerKeys->game_jump.fDown;
+    auto freshJump = [&]() { jump = !pPlayer->lockjump; };   // let go first if we're holding it
+
+    // Tanooki: become a statue when someone is about to land on us or something dangerous is close
+    if (pPlayer->tanookisuit.isOn()) {
+        const bool threatened = AboutToBeStomped() || (actionType == 2 && nearest.threat && nearest.threatdistance < 64 * 64);
+        if (pPlayer->tanookisuit.isStatue()) {
+            // Stay a statue for as long as it lasts (letting go early measured worse)
+            playerKeys->game_down.fDown = true;
+            playerKeys->game_left.fDown = playerKeys->game_right.fDown = false;
+            return;
+        }
+        if (threatened && !pPlayer->tail.isInUse()) {
+            playerKeys->game_down.fDown = true;
+            if (pPlayer->lockfire) {
+                playerKeys->game_turbo.fDown = false;   // let go of turbo: the statue needs a fresh press
+            } else {
+                playerKeys->game_turbo.fDown = true;
+                playerKeys->game_turbo.fPressed = true;
+                aibench::count(aibench::ItemStatue, pPlayer->globalID);
+            }
+            return;
+        }
+    }
+
+    if (!pPlayer->inair)
+        return;
+
+    // In a fight we want to come down on them, so we aim above them
+    const bool fight = actionType == 0 && hasTarget;
+    const int aboveDy = dy - 56;   // to a point a little above their head
+
+    switch (pPlayer->powerup) {
+        case 3: // Feather: an extra jump at the top of a jump
+            if (pPlayer->extrajumps < game_values.featherjumps && pPlayer->vely > -1.0f) {
+                // ... to get above an opponent next to us (not one right over us), to a goal above
+                // us, or out of danger
+                const bool overThem = fight && dx > -110 && dx < 110 && (dx < -40 || dx > 40) && dy > -70 && dy < 16;
+                const bool upToGoal = actionType == 1 && targetAbove;
+                if (overThem || upToGoal || fallingIntoDanger) {
+                    freshJump();
+                    aibench::count(aibench::ItemFeather, pPlayer->globalID);
+                }
+            }
+            break;
+
+        case 7: // Leaf: shake the tail to glide over danger or across to a goal
+            if (pPlayer->vely > 1.0f && (fallingIntoDanger || (actionType == 1 && hasTarget && dy > -40 && (dx < -64 || dx > 64)))) {
+                freshJump();
+                aibench::count(aibench::ItemLeaf, pPlayer->globalID);
+            }
+            break;
+
+        case 8: // P-Wings: fly over an opponent and dive onto them, up to a goal, or out of danger
+            if (pPlayer->flying) {
+                jump = true;   // letting go of jump ends the flight
+                if (hasTarget) {
+                    const int wantDy = fight ? aboveDy : dy;
+                    const bool overHead = fight && dx > -16 && dx < 16 && dy > 8;
+                    playerKeys->game_down.fDown = !fallingIntoDanger && (overHead || wantDy > 24);
+                    playerKeys->game_left.fDown = dx < -8;
+                    playerKeys->game_right.fDown = dx > 8;
+                }
+            } else if (pPlayer->extrajumps == 0 && pPlayer->vely > -2.0f &&
+                    (fallingIntoDanger || (hasTarget && (dy < -64 || (fight && (dx < -120 || dx > 120)))))) {
+                freshJump();
+                aibench::count(aibench::ItemPWings, pPlayer->globalID);
+            }
+            break;
+
+        default:
+            break;
+    }
 }
 
 // Fire the held weapon when an opponent is in its line of fire, instead of at random moments.

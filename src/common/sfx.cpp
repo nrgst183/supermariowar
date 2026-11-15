@@ -26,7 +26,7 @@ public:
 
     MixAudioPtr openAudio(const std::filesystem::path& path);
 
-    std::pair<MIX_Track*, size_t> playAsEffect(const MixAudioPtr& audio, long repeats = 0);
+    std::pair<MIX_Track*, size_t> playAsEffect(const MixAudioPtr& audio, long repeats = 0, bool isLong = false);
     void playAsMusic(const MixAudioPtr& audio, long repeats = -1);
     bool isMusicPlaying() const;
 
@@ -49,6 +49,7 @@ private:
     MixTrackPtr m_music_track;
     std::array<MixTrackPtr, sfxSound::k_channels> m_sfx_tracks;
     size_t m_next_free_sfxtrack_idx = 0;
+    std::array<bool, sfxSound::k_channels> m_long_track {};   // the track plays a long sound (see sfxSound::setLong)
 
     void playAudio(const MixAudioPtr& audio, const MixTrackPtr& track, long repeats);
     void stopAudioTrack(const MixTrackPtr& track) const;
@@ -123,10 +124,34 @@ MixAudioPtr AudioSystem::openAudio(const fs::path& path)
 }
 
 
-std::pair<MIX_Track*, size_t> AudioSystem::playAsEffect(const MixAudioPtr& audio, long repeats)
+std::pair<MIX_Track*, size_t> AudioSystem::playAsEffect(const MixAudioPtr& audio, long repeats, bool isLong)
 {
-    const size_t track_idx = m_next_free_sfxtrack_idx;
-    m_next_free_sfxtrack_idx = (m_next_free_sfxtrack_idx + 1) % m_sfx_tracks.size();
+    // A free track if there is one; otherwise take over the next one that doesn't play a long
+    // sound (taking tracks in turn, without looking, cut the star music off a moment after it
+    // started, and the music never came back)
+    const size_t count = m_sfx_tracks.size();
+    size_t track_idx = m_next_free_sfxtrack_idx;
+    bool found = false;
+    for (size_t k = 0; k < count && !found; k++) {
+        const size_t idx = (m_next_free_sfxtrack_idx + k) % count;
+        if (!MIX_TrackPlaying(m_sfx_tracks[idx].get())) {
+            track_idx = idx;
+            found = true;
+        }
+    }
+    for (size_t k = 0; k < count && !found; k++) {
+        const size_t idx = (m_next_free_sfxtrack_idx + k) % count;
+        if (!m_long_track[idx]) {
+            track_idx = idx;
+            found = true;
+        }
+    }
+    m_next_free_sfxtrack_idx = (track_idx + 1) % count;
+
+    // Stop what's still playing there, so its sound knows it's done
+    if (MIX_TrackPlaying(m_sfx_tracks[track_idx].get()))
+        MIX_StopTrack(m_sfx_tracks[track_idx].get(), 0);
+    m_long_track[track_idx] = isLong;
 
     playAudio(audio, m_sfx_tracks[track_idx], repeats);
 
@@ -232,12 +257,21 @@ bool sfxSound::play()
     if (current_time - m_last_start_time < 40)
         return false;
 
-    const auto [track_ptr, track_idx] = s_audiosys->playAsEffect(m_audio);
+    const auto [track_ptr, track_idx] = s_audiosys->playAsEffect(m_audio, 0, m_long);
 
     m_last_start_time = current_time;
-    m_channels.set(track_idx);
-    s_channels[track_idx] = {track_ptr, this};
+    ownChannel(track_ptr, track_idx);
     return true;
+}
+
+void sfxSound::ownChannel(MIX_Track* track, size_t idx)
+{
+    // The sound that had this channel before no longer plays on it
+    sfxSound* previous = s_channels[idx].second;
+    if (previous && previous != this)
+        previous->m_channels.reset(idx);
+    m_channels.set(idx);
+    s_channels[idx] = {track, this};
 }
 
 void sfxSound::playLoop(int loops)
@@ -245,8 +279,8 @@ void sfxSound::playLoop(int loops)
     if (sim::isResimulating())
         return;
 
-    const auto [track_ptr, track_idx] = s_audiosys->playAsEffect(m_audio, loops);
-    m_channels.set(track_idx);
+    const auto [track_ptr, track_idx] = s_audiosys->playAsEffect(m_audio, loops, m_long);
+    ownChannel(track_ptr, track_idx);
 }
 
 void sfxSound::stop()

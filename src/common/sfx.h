@@ -37,12 +37,19 @@ public:
 
     bool isPlaying() const { return m_channels.any(); }
 
+    // A long sound that works like music (the star music, the clock, the time warning): other
+    // sounds don't take its channel while it plays
+    void setLong(bool isLong) { m_long = isLong; }
+
     static void onTrackFinished(void*, MIX_Track* rawptr);
 
 private:
     MixAudioPtr m_audio;
     std::bitset<k_channels> m_channels;
     size_t m_last_start_time = 0;
+    bool m_long = false;
+
+    void ownChannel(MIX_Track* track, size_t idx);
 
     static inline std::array<std::pair<MIX_Track*, sfxSound*>, k_channels> s_channels {};
 };
