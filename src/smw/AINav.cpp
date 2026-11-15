@@ -260,6 +260,32 @@ int HorizontalDistance(int dx, int y1, int y2, bool* wrapped)
     return dx;
 }
 
+int FreeRun(int ix, int iy, int dir, int max)
+{
+    if (!g_map)
+        return max;
+    ensureGraph();
+    // The rows the player's body covers
+    const int top = iy < 0 ? 0 : iy / TILESIZE;
+    const int bottom = (iy + PH - 1) / TILESIZE;
+    // The column the player's leading edge is in
+    int edge = dir < 0 ? ix : ix + PW - 1;
+    if (edge < 0)
+        edge += App::screenWidth;
+    else if (edge >= App::screenWidth)
+        edge -= App::screenWidth;
+    int c = edge / TILESIZE;
+    for (int n = 0; n < max; n++) {
+        c += dir;
+        // Leaving the screen: only where the far side is open too
+        for (int r = top; r <= bottom && r < H; r++) {
+            if (!passable(c, r))
+                return n;
+        }
+    }
+    return max;
+}
+
 bool PlayerSpot(int ix, int iy, int& col, int& row)
 {
     if (!g_map)

@@ -40,6 +40,10 @@ bool CanCrossEdge(int y1, int y2);
 // crossed near those heights, otherwise straight across; wrapped tells which one it is
 int HorizontalDistance(int dx, int y1, int y2, bool* wrapped = nullptr);
 
+// How many tiles a player at (ix,iy) (top left) can run in direction dir (-1/1) before a wall,
+// up to max (the screen edge counts as a wall where the map closes it)
+int FreeRun(int ix, int iy, int dir, int max = 5);
+
 // The first move of the shortest path from (col,row) to the spot nearest to the point (x,y)
 Step NextStep(int col, int row, int targetX, int targetY);
 

@@ -264,6 +264,15 @@ Improvements (2026)
    shortest path, and climbs to a spot beside an opponent rather than under it. While in the air
    it finishes the move it started and steers with its drift taken into account.
 
+4. **Screen edges** (`ainav::CanCrossEdge()`/`HorizontalDistance()`): the way around the screen
+   counts only where the map leaves an opening at the left and right edges near the CPU's height
+   (maps like Sidewinder close the edges with walls). Distances to players, goals and threats,
+   aiming and path decisions all use it.
+5. **Never stuck** (`Stabilize()`): the CPU hops over low obstacles right away, and after 3
+   turns of pushing without moving it jumps and turns around for a while. Opponents behind a
+   wall, or on another level and not close, are reached by following a path instead of walking
+   straight at them, and dodging an opponent overhead goes toward the side with room.
+
 2 and 3 are on in the modes about knocking out the others or getting somewhere (classic, frag,
 time limit, jail, chicken, tag, king of the hill, race, owned, frenzy, survival, phanto, shyguy
 tag). In the item modes (coins, eggs, flags, stars, domination, greed, health, collection,
@@ -273,7 +282,8 @@ fighting. The CPU still thinks on every 4th frame, and the path search is a smal
 the map, so it is deterministic and safe for online play and rollback.
 
 Comparing AI versions: `--at-ai-old MASK` keeps the original logic for the players whose bit
-is set, and `--at-ai-bench 1` prints kills, deaths and score per player after each match:
+is set, and `--at-ai-bench 1` prints kills, deaths, score, stuck turns and direction reversals per
+player after each match:
 
 ```
 smw --autotest --at-match single --at-players 4 --at-humans 0 --at-mode 0 --at-cpu-level 4 \

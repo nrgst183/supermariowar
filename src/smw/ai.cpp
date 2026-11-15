@@ -85,6 +85,7 @@ int deaths[4] = {};
 int selfDeaths[4] = {};
 int styleKills[32] = {};
 int stuck[4] = {};
+int reversals[4] = {};
 int navTried[3] = {};
 int navReached[3] = {};
 
@@ -99,10 +100,11 @@ void print()
     for (int g = 0; g < 4; g++) {
         const CPlayer* p = GetPlayerFromGlobalID(g);
         const int team = p ? p->getTeamID() : -1;
-        printf("aibench: player %d %s team %d kills %d deaths %d self %d score %d winner %d stuck %d\n", g,
+        printf("aibench: player %d %s team %d kills %d deaths %d self %d score %d winner %d stuck %d rev %d\n", g,
             (cmd::g_autotest.aiLegacyMask & (1 << g)) ? "old" : "new", team, kills[g], deaths[g], selfDeaths[g],
-            team >= 0 ? g_sim.score[team].score : -1, team >= 0 && game_values.gamemode->winningteam == team ? 1 : 0, stuck[g]);
+            team >= 0 ? g_sim.score[team].score : -1, team >= 0 && game_values.gamemode->winningteam == team ? 1 : 0, stuck[g], reversals[g]);
         stuck[g] = 0;
+        reversals[g] = 0;
     }
     printf("aibench: nav jump %d/%d drop %d/%d walk %d/%d\n", navReached[0], navTried[0], navReached[1], navTried[1], navReached[2], navTried[2]);
     for (int k = 0; k < 3; k++)
@@ -571,11 +573,6 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     if (improved())
         AimWeapon(playerKeys, actionType);
 
-    // AI comparisons: count turns spent pushing against something without moving
-    if (cmd::g_autotest.aiBench && pPlayer->globalID < 4 && (playerKeys->game_left.fDown != playerKeys->game_right.fDown) &&
-            pPlayer->velx == 0.0f && !pPlayer->inair)
-        aibench::stuck[pPlayer->globalID]++;
-
     //Jump if trying to move left/right and x velocity is zero
     if (!navActive && (playerKeys->game_left.fDown || playerKeys->game_right.fDown) && pPlayer->velx == 0.0f)
         playerKeys->game_jump.fDown = true;
@@ -635,6 +632,9 @@ void CPlayerAI::Think(COutputControl * playerKeys)
             playerKeys->game_turbo.fDown = false;
         }
     }
+
+    if (improved())
+        Stabilize(playerKeys);
 
     /***************************************************
     * 4. Deal with falling onto spikes (this needs to be improved)
@@ -813,6 +813,28 @@ ExitDeathCheck:
             playerKeys->game_powerup.fDown = true;
         }
     }
+
+    // AI comparisons: count direction reversals (dithering) and turns spent pushing against
+    // something without moving
+    if (cmd::g_autotest.aiBench && pPlayer->globalID < 4) {
+        static int benchLastDir[4] = {0, 0, 0, 0};
+        const int d = playerKeys->game_left.fDown == playerKeys->game_right.fDown ? 0 : playerKeys->game_left.fDown ? -1 : 1;
+        if (d != 0 && benchLastDir[pPlayer->globalID] == -d)
+            aibench::reversals[pPlayer->globalID]++;
+        if (d != 0)
+            benchLastDir[pPlayer->globalID] = d;
+    }
+    if (cmd::g_autotest.aiBench && pPlayer->globalID < 4) {
+        // Stuck: pushing the same way as last turn and not having moved at all since
+        static int benchLastIx[4] = {-1000, -1000, -1000, -1000};
+        static int benchLastPush[4] = {0, 0, 0, 0};
+        const int g = pPlayer->globalID;
+        const int push = playerKeys->game_left.fDown == playerKeys->game_right.fDown ? 0 : playerKeys->game_left.fDown ? -1 : 1;
+        if (push != 0 && push == benchLastPush[g] && pPlayer->ix == benchLastIx[g] && !pPlayer->inair && !pPlayer->isFrozen())
+            aibench::stuck[g]++;
+        benchLastPush[g] = push;
+        benchLastIx[g] = pPlayer->ix;
+    }
 }
 
 // The simple "move toward it and jump when close" approach works when the target is about
@@ -821,7 +843,14 @@ bool CPlayerAI::NeedsPath(int x, int y) const
 {
     const int dx = ainav::HorizontalDistance(x - (pPlayer->ix + PW / 2), pPlayer->iy, y);
     const int dy = y - (pPlayer->iy + PH / 2);
-    return dy < -40 || (dy > 48 && (dx < -48 || dx > 48));
+    const int adx = dx < 0 ? -dx : dx;
+    if (dy < -40 || (dy > 48 && adx > 48))
+        return true;
+    // A wall between us: walking straight at it gets nowhere
+    if (adx > 16 && ainav::FreeRun(pPlayer->ix, pPlayer->iy, dx < 0 ? -1 : 1, 1) == 0)
+        return true;
+    // On another level and not close: the way there may go around
+    return (dy < -24 || dy > 24) && adx > 96;
 }
 
 bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
@@ -935,7 +964,18 @@ void CPlayerAI::FightPlayer(COutputControl * playerKeys, CPlayer * player, bool 
     bool& left = playerKeys->game_left.fDown;
     bool& right = playerKeys->game_right.fDown;
     auto toward = [&](int d) { if (d < 0) left = true; else if (d > 0) right = true; };
-    auto away = [&](int d) { if (d < 0) right = true; else left = true; };
+    auto away = [&](int d) {
+        // Away from them; straight above or below us, toward the side with more room
+        int dir = d < 0 ? 1 : d > 0 ? -1 : 0;
+        const int runRight = ainav::FreeRun(pPlayer->ix, pPlayer->iy, 1);
+        const int runLeft = ainav::FreeRun(pPlayer->ix, pPlayer->iy, -1);
+        if (dir == 0 || (dir > 0 ? runRight : runLeft) == 0)
+            dir = runRight >= runLeft ? 1 : -1;
+        if (dir > 0)
+            right = true;
+        else
+            left = true;
+    };
 
     if (dy < -12) {
         // The opponent is above us
@@ -957,6 +997,16 @@ void CPlayerAI::FightPlayer(COutputControl * playerKeys, CPlayer * player, bool 
         if (pPlayer->inair) {
             if (abs(aimDx) > 4)
                 toward(aimDx);
+            // Right above them with the tanooki suit or the shoe: super stomp
+            if (abs(aimDx) < 24 && !pPlayer->superstomp.isInSuperStompState() &&
+                    (pPlayer->tanookisuit.isOn() || pPlayer->kuriboshoe.is_on())) {
+                playerKeys->game_down.fDown = true;
+                playerKeys->game_jump.fPressed = true;
+                if (pPlayer->tanookisuit.isOn()) {
+                    playerKeys->game_turbo.fPressed = true;
+                    pPlayer->lockfire = false;
+                }
+            }
         } else {
             toward(aimDx);
             if (abs(aimDx) < 24)
@@ -972,6 +1022,47 @@ void CPlayerAI::FightPlayer(COutputControl * playerKeys, CPlayer * player, bool 
         else if (pPlayer->inair && pPlayer->vely < 0.0f)
             playerKeys->game_jump.fDown = true;               // full height
     }
+}
+
+// Keep the CPU from getting stuck: it hops over low obstacles right away, and after 3 turns of
+// pushing without moving it jumps and turns around for a while. This runs every turn, whatever
+// the CPU was doing.
+void CPlayerAI::Stabilize(COutputControl * playerKeys)
+{
+    bool& left = playerKeys->game_left.fDown;
+    bool& right = playerKeys->game_right.fDown;
+    int dir = left == right ? 0 : left ? -1 : 1;
+
+    if (unstickTimer > 0) {
+        unstickTimer--;
+        dir = unstickDir;
+        // Still against something: hop
+        if (!pPlayer->inair && pPlayer->ix == lastIx)
+            playerKeys->game_jump.fDown = !pPlayer->lockjump;
+    } else {
+        // A low obstacle right in front of us (one tile, free above it): hop over it now (jumping
+        // needs a fresh press of the button)
+        if (dir != 0 && !pPlayer->inair && ainav::FreeRun(pPlayer->ix, pPlayer->iy, dir, 1) == 0 &&
+                ainav::FreeRun(pPlayer->ix, pPlayer->iy - TILESIZE, dir, 1) > 0)
+            playerKeys->game_jump.fDown = !pPlayer->lockjump;
+
+        const bool pushing = dir != 0 && !pPlayer->inair && pPlayer->ix == lastIx && !pPlayer->isFrozen();
+        stuckThinks = pushing ? static_cast<short>(stuckThinks + 1) : 0;
+        if (stuckThinks >= 3) {
+            stuckThinks = 0;
+            navMove = 0;
+            // Turn around (if there's room behind us) and jump: that clears most things
+            const int back = ainav::FreeRun(pPlayer->ix, pPlayer->iy, -dir);
+            unstickDir = static_cast<short>(back > 0 ? -dir : dir);
+            unstickTimer = 6;
+            playerKeys->game_jump.fDown = !pPlayer->lockjump;
+            dir = unstickDir;
+        }
+    }
+
+    left = dir < 0;
+    right = dir > 0;
+    lastIx = pPlayer->ix;
 }
 
 // Fire the held weapon when an opponent is in its line of fire, instead of at random moments.
