@@ -21,13 +21,16 @@ enum class Move : unsigned char {
     Drop,   // fall through the platform we stand on
     RunJump,// a running jump (run held, faster than walking): 4 tiles up beside a ledge 2 columns over
             // (dir: the way to it; a tile of run-up behind), then onto it
+    Warp,   // into a warp pipe next to us (dir -1/1: walk into its side; 0: press down on it), out of
+            // one of its exits (where its connection leads)
 };
 
 struct Step {
     Move move = Move::None;
     int toCol = -1;      // the spot the move leads to
     int toRow = -1;
-    int dir = 0;         // -1 left, 1 right, 0 straight up/down (shortest way around the screen); RunJump: the run's way
+    int dir = 0;         // -1 left, 1 right, 0 straight up/down (shortest way around the screen); RunJump: the run's
+                         // way; Warp: into the pipe (0: down)
     int distance = 0;    // path cost to the target (rough number of moves)
 };
 

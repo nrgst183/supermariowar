@@ -222,11 +222,86 @@ void build()
     gr.built = true;
 }
 
+// Warp pipes: a pipe beside a spot (we walk into its side) or under it (we press down) leads to
+// every other exit of its connection (the game picks one at random). Edges go into a second
+// list, appended to each node's own after build() (see addWarps).
+void addWarps()
+{
+    Graph& gr = g_graph;
+    std::vector<std::vector<Edge>> extra(NODES);
+    bool any = false;
+    // Where a player coming out of an exit ends up standing
+    auto exitSpot = [](const WarpExit& e) {
+        int c = -1, r = -1;
+        int x = e.x;
+        if (e.direction == WARP_EXIT_RIGHT)
+            x += TILESIZE;
+        else if (e.direction == WARP_EXIT_LEFT)
+            x -= TILESIZE;
+        //(as PlayerSpot, without building the graph again)
+        int cx = x + PW / 2;
+        if (cx < 0)
+            cx += App::screenWidth;
+        else if (cx >= App::screenWidth)
+            cx -= App::screenWidth;
+        c = wrapCol(cx / TILESIZE);
+        r = (e.y + PH - 1) / TILESIZE;
+        if (r < 0 || r >= H)
+            return -1;
+        if (!g_graph.spot[node(c, r)]) {
+            r = landing(c, r);
+            if (r < 0)
+                return -1;
+        }
+        return node(c, r);
+    };
+    for (int r = 0; r < H; r++) {
+        for (int c = 0; c < W; c++) {
+            if (!gr.spot[node(c, r)])
+                continue;
+            for (int side : {-1, 1, 0}) {
+                const int wc = wrapCol(c + side);
+                const int wr = side == 0 ? r + 1 : r;
+                if (wr >= H)
+                    continue;
+                Warp* w = g_map->warp(static_cast<short>(wc), static_cast<short>(wr));
+                const WarpEnterDirection want = side < 0 ? WARP_LEFT : side > 0 ? WARP_RIGHT : WARP_DOWN;
+                if (!w || w->connection < 0 || w->direction != want)
+                    continue;
+                for (int k = 0; k < g_map->warpExitCount(); k++) {
+                    const WarpExit& e = g_map->warpExit(k);
+                    if (e.connection != w->connection || e.id == w->id)
+                        continue;
+                    const int to = exitSpot(e);
+                    if (to < 0 || to == node(c, r))
+                        continue;
+                    extra[node(c, r)].push_back(Edge {static_cast<uint16_t>(to), 8, Move::Warp});
+                    any = true;
+                }
+            }
+        }
+    }
+    if (!any)
+        return;
+    std::vector<Edge> merged;
+    merged.reserve(gr.edges.size() + 64);
+    for (int n = 0; n < NODES; n++) {
+        const int from = gr.first[n];
+        const int until = gr.first[n + 1];
+        gr.first[n] = static_cast<uint16_t>(merged.size());
+        merged.insert(merged.end(), gr.edges.begin() + from, gr.edges.begin() + until);
+        merged.insert(merged.end(), extra[n].begin(), extra[n].end());
+    }
+    gr.first[NODES] = static_cast<uint16_t>(merged.size());
+    gr.edges = std::move(merged);
+}
+
 void ensureGraph()
 {
     const uint64_t stamp = mapStamp();
     if (!g_graph.built || g_graph.stamp != stamp) {
         build();
+        addWarps();
         g_graph.stamp = stamp;
     }
 }
@@ -455,6 +530,14 @@ Step NextStep(int col, int row, int targetX, int targetY)
                 result.toCol = e.to % W;
                 result.toRow = e.to / W;
                 result.dir = shortestDir(col, result.toCol);
+                if (e.move == Move::Warp) {
+                    //(the pipe's side, or 0: under us)
+                    const Warp* w = g_map->warp(static_cast<short>(wrapCol(col - 1)), static_cast<short>(row));
+                    result.dir = w && w->direction == WARP_LEFT ? -1 : 0;
+                    const Warp* wr = g_map->warp(static_cast<short>(wrapCol(col + 1)), static_cast<short>(row));
+                    if (result.dir == 0 && wr && wr->direction == WARP_RIGHT)
+                        result.dir = 1;
+                }
                 result.distance = dist[u];
                 return result;
             }

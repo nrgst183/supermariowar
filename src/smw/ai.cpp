@@ -491,13 +491,23 @@ void CPlayerAI::Think(COutputControl * playerKeys)
                                spotCol == block->x() / TILESIZE;
             const int dx = ainav::HorizontalDistance(blockX - (ix + PW / 2), iy, spotY);
             if (under) {
-                //Under it: line up with it, then jump into it
-                if (dx < -4)
+                //Under it: line up with it, then jump into it (not following a path: in the air, the
+                //branch below keeps jump held, so that the jump gets its full height)
+                navMove = 0;
+                //(the box can be in a 1-tile shaft: jump nearly still, or we'd rise beside it)
+                const float v = pPlayer->velx;
+                if (dx >= -8 && dx <= 8) {
+                    if (v > 1.0f)
+                        playerKeys->game_left.fDown = true;     //brake
+                    else if (v < -1.0f)
+                        playerKeys->game_right.fDown = true;
+                    else
+                        playerKeys->game_jump.fDown = !pPlayer->lockjump;
+                } else if (dx < 0) {
                     playerKeys->game_left.fDown = true;
-                else if (dx > 4)
+                } else {
                     playerKeys->game_right.fDown = true;
-                if (dx >= -8 && dx <= 8)
-                    playerKeys->game_jump.fDown = !pPlayer->lockjump;
+                }
             } else if (pPlayer->inair && navMove == 0 && dx >= -24 && dx <= 24 && block->y() < iy) {
                 //Jumping into it: keep rising, stay under it
                 if (pPlayer->vely < 0.0f)
@@ -1005,6 +1015,21 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
             // Falling through needs a fresh press of down
             playerKeys->game_down.fDown = !pPlayer->lockfall;
             break;
+        case ainav::Move::Warp: {
+            // Walk into the pipe's side, or stand over the pipe under us and press down
+            if (step.dir < 0) {
+                left = true;
+            } else if (step.dir > 0) {
+                right = true;
+            } else {
+                const int d = col * TILESIZE + (TILESIZE - PW) / 2 - px;
+                if (d < -4 || d > 4)
+                    steerTo(col);
+                else
+                    playerKeys->game_down.fDown = true;
+            }
+            break;
+        }
         case ainav::Move::Jump: {
             // Jumping needs a fresh press of jump; line up under the gap for straight-up jumps
             int d = col * TILESIZE + (TILESIZE - PW) / 2 - px;

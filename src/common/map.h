@@ -288,6 +288,9 @@ class CMap
 		void lockconnection(int connection);
 
 		WarpExit * getRandomWarpExit(int connection, int currentID);
+		// The warp exits (the AI plans paths through warps)
+		int warpExitCount() const { return numwarpexits; }
+		const WarpExit& warpExit(int k) const { return warpexits[k]; }
 
 		void clearWarpLocks();
 		void drawWarpLocks();

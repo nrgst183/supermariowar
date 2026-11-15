@@ -274,9 +274,14 @@ Improvements (2026)
    walks onto its start running, takes off before the middle of the column, brakes until its head
    is above the ledge's underside, then steers onto it (Sidewinder's middle level to its top one).
    A running jump in progress is never left half done by the difficulty's skipped turns.
+   **Warp pipes** are moves too: from a spot beside a pipe's side (walk into it) or on top of a
+   pipe that warps down (press down), to the spot in front of every other exit of its connection
+   (the game picks one of them at random). On Derelict that is the only way between the floors.
 
    **? blocks**: a ? block ready to give a power-up is a goal too (a little ahead of other goals as
-   far away), reached at the spot under it (`ainav::SpotBelow()`) and hit with a jump; the CPU
+   far away), reached at the spot under it (`ainav::SpotBelow()`) and hit with a jump (nearly
+   standing still, and held to its full height: a box 3 tiles up, like Derelict's top one, is
+   only just in reach, and can sit in a 1-tile shaft); the CPU
    loses interest in one it can't get to, as with other goals. The power-up that comes out is then
    a goal like any other. This is on in every mode.
 
