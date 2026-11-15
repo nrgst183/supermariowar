@@ -48,6 +48,23 @@
 #include <emscripten.h>
 #endif
 
+#ifdef SMW_EMBEDDED_EDITOR
+// Built into the game: the events, the input state and the screen flips go
+// through the controller layer (editors/EditorInput.h)
+#include "editors/EditorInput.h"
+#define SDL_PollEvent(e) ::editors::input::pollEvent(e)
+#define SDL_GetKeyboardState(n) ::editors::input::keyboardState(n)
+#define SDL_GetModState() ::editors::input::modState()
+#define SDL_GetMouseState(x, y) ::editors::input::mouseState(x, y)
+#define gfx_flipscreen() ::editors::input::flip()
+#endif
+
+#ifdef SMW_EMBEDDED_EDITOR
+// Built into the game (EditorLauncher.h): the editor's own names are in a
+// namespace; the screen, the eyecandy and the simulation state are the game's
+namespace leveleditor {
+#endif
+
 
 enum {EDITOR_EDIT, EDITOR_TILES, EDITOR_QUIT, SAVE_AS, FIND, CLEAR_MAP, EDITOR_BLOCKS, NEW_MAP, SAVE, EDITOR_WARP, EDITOR_EYECANDY, DISPLAY_HELP, EDITOR_PLATFORM, EDITOR_TILETYPE, EDITOR_BACKGROUNDS, EDITOR_MAPITEMS, EDITOR_ANIMATION, EDITOR_PROPERTIES, EDITOR_MODEITEMS, EDITOR_MAPHAZARDS};
 
@@ -197,8 +214,12 @@ void ClearTilesetTile(TilesetTile * tile);
 void UpdateTileType(short x, short y);
 void RemoveMapItemAt(short x, short y);
 
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern SDL_Surface *screen;
+#endif
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern SDL_Surface *blitdest;
+#endif
 extern SDL_Event event;
 extern TileType set_type;
 extern int set_tile_rows;
@@ -237,12 +258,22 @@ extern bool selectedtiles[MAPWIDTH][MAPHEIGHT];
 extern bool moveselectedtiles[MAPWIDTH][MAPHEIGHT];
 extern EditorMapTile copiedtiles[MAPWIDTH][MAPHEIGHT];
 extern int copiedlayer;
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern short x_shake;
+#endif
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern short y_shake;
+#endif
 extern int mouse_x, mouse_y;
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern CEyecandyContainer eyecandy[3];
+#endif
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern CGameMode *gamemodes[GAMEMODE_LAST];
+#endif
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern SimulationState g_sim;
+#endif
 extern TileType * animatedtiletypes;
 extern gfxSprite s_platform;
 extern gfxSprite s_platformpathbuttons;
@@ -265,3 +296,7 @@ extern SDL_Rect rNewButton[2];
 extern SDL_Rect rTypeButton[8][4];
 extern short view_tileset_repeat_direction;
 extern short view_tileset_repeat_timer;
+
+#ifdef SMW_EMBEDDED_EDITOR
+} // namespace leveleditor
+#endif

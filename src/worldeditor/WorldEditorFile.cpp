@@ -137,6 +137,10 @@ int save_as()
 
 bool dialog(const char * title, const char * instructions, char * input, int inputsize)
 {
+#ifdef SMW_EMBEDDED_EDITOR
+    //(a controller: the on-screen keyboard)
+    ::editors::input::TextEntry textEntry;
+#endif
 	unsigned int currentChar = 0;
 
 	drawmap(false, TILESIZE);

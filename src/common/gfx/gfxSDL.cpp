@@ -166,6 +166,11 @@ float GraphicsSDL::refreshRate() const
     return mode ? mode->refresh_rate : 0.0f;
 }
 
+bool GraphicsSDL::isFullScreen() const
+{
+    return sdl_window && (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
+}
+
 void GraphicsSDL::changeFullScreen(bool fullscreen) const
 {
     if (!SDL_SetWindowFullscreen(sdl_window, fullscreen)) {

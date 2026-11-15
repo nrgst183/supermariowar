@@ -37,6 +37,7 @@ using SpriteStrip = std::array<gfxSprite, PGFX_LAST>;
 
 bool gfx_init(int w, int h, bool fullscreen);
 void gfx_changefullscreen(bool fullscreen);
+bool gfx_isfullscreen();
 void gfx_flipscreen();
 /// Turns VSync on or off; returns true if the renderer now does what was asked
 bool gfx_setvsync(bool enabled);

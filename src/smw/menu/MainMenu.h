@@ -24,6 +24,8 @@ private:
     MI_PlayerSelect* miPlayerSelect;
 
     MI_Button* miOnlineButton = nullptr;
+    MI_Button* miHistoryButton = nullptr;
+    MI_Button* miEditorsButton = nullptr;
     MI_Button* miOptionsButton;
     MI_Button* miControlsButton;
 

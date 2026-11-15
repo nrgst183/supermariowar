@@ -24,6 +24,8 @@
 #include "WorldTourStop.h"
 #include "NetOverlay.h"
 #include "rollback/NetGame.h"
+#include "rollback/Replay.h"
+#include "MatchHistory.h"
 #include "rollback/StateChecksum.h"
 #include "rollback/SyncTest.h"
 #include "gamemodes/Chicken.h"
@@ -454,6 +456,25 @@ void GameplayState::onEnterState()
 #endif
     autoTestFrames = 0;
     autoTestOverFrames = 0;
+    replayEndFrames = 0;
+    resetTheater();
+    //(online, the match starts while the lobby is open)
+    matchOnline = rollback::NetGame::instance().active() && !replay::playing();
+}
+
+// Every way out of a match passes here: the match goes in the history, with
+// its replay (a replay itself leaves nothing)
+void GameplayState::onLeaveState()
+{
+    if (replay::playing()) {
+        replay::stopPlayback();
+        //--replay with --autotest: done
+        if (!cmd::g_replay.empty() && cmd::g_autotest.enabled)
+            game_values.appstate = AppState::Quit;
+        return;
+    }
+    const std::string replayFile = replay::finishRecording();
+    history::recordMatchEnd(replayFile, matchOnline);
 }
 
 void GameplayState::handleInput()
@@ -503,8 +524,8 @@ void GameplayState::handleInput()
                 gfx_take_screenshot();
             }
 #ifdef _DEBUG
-            else if (rollback::NetGame::instance().inMatch()) {
-                //No debug keys online: they change the simulation on one peer only
+            else if (rollback::NetGame::instance().inMatch() || replay::playing()) {
+                //No debug keys online (they change the simulation on one peer only) or in replays
             }
             else if (event.key.key == SDLK_LEFTBRACKET) {
                 game_values.framelimiter++;
@@ -609,6 +630,10 @@ void GameplayState::handleInput()
         default:
             break;
         }
+
+        //A replay: the theater's mouse and keys (GameplayTheater.cpp)
+        if (replay::playing())
+            theaterEvent(event);
 
         //Feed the player control structures with input data
         //Use menu controls when exit game dialog is up
@@ -832,6 +857,11 @@ void GameplayState::update()
     debug_gameplay();
 #endif
 
+    if (replay::playing()) {
+        updateReplay();
+        return;
+    }
+
     if (updateAutoTest())
         return;
 
@@ -982,6 +1012,7 @@ void GameplayState::render(float alpha)
     }
 
     drawNetOverlay();    //online only; pure drawing
+    drawReplayOverlay();
 
 #ifdef _DEBUG
     if (g_fAutoTest)

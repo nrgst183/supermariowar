@@ -1,5 +1,6 @@
 #include "LevelEditorState.h"
 
+#ifndef SMW_EMBEDDED_EDITOR  // stand-ins for the game's code (the game has the real ones)
 void CPlayer::flipsidesifneeded() {}
 bool CPlayer::isInvincible() const { return false; }
 bool CPlayer::isShielded() const { return false; }
@@ -11,6 +12,7 @@ void removeifprojectile(IO_MovingObject * object, bool playsound, bool forcedead
 
 SDL_Surface		*screen;
 SDL_Surface		*blitdest;
+#endif
 SDL_Event		event;
 
 TileType		set_type = TileType::Solid;
@@ -60,8 +62,10 @@ EditorMapTile	copiedtiles[MAPWIDTH][MAPHEIGHT];
 int				copiedlayer;
 
 //// Global stuff that the map editor doesn't need, but has references to
+#ifndef SMW_EMBEDDED_EDITOR
 short			x_shake = 0;
 short			y_shake = 0;
+#endif
 
 int				mouse_x, mouse_y;
 
@@ -78,12 +82,14 @@ void bound_mouse_motion_coords() {
     mouse_y = bound_to_window_h(event.motion.y);
 }
 
+#ifndef SMW_EMBEDDED_EDITOR  // stand-ins for the game's code (the game has the real ones)
 CEyecandyContainer eyecandy[3];
 CGameMode		*gamemodes[GAMEMODE_LAST];
 SimulationState g_sim;
 CPlayer::~CPlayer() {}
 
 void SDLCALL musicfinished(void*, MIX_Track* rawptr){}
+#endif
 
 IO_MovingObject* createpowerup(short iType, short ix, short iy, bool side, bool spawn)
 {

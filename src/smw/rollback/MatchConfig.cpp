@@ -261,10 +261,21 @@ std::vector<std::string> skinDownloadDirs()
     return {convertPath("skins/net/"), GetHomeDirectory() + "skins/net/"};
 }
 
+namespace {
+std::array<std::string, INPUT_MAX_PLAYERS> g_skinOverride;
+}
+
+void setMatchSkinOverride(const std::array<std::string, INPUT_MAX_PLAYERS>* paths)
+{
+    g_skinOverride = paths ? *paths : std::array<std::string, INPUT_MAX_PLAYERS> {};
+}
+
 void loadMatchSkin(int slot, short color)
 {
     const NetLobby* lobby = NetGame::instance().lobby();
-    const std::string path = lobby ? lobby->slotSkinPath(slot) : std::string();
+    std::string path = slot >= 0 && slot < INPUT_MAX_PLAYERS ? g_skinOverride[static_cast<size_t>(slot)] : std::string();
+    if (path.empty() && lobby)
+        path = lobby->slotSkinPath(slot);
     if (!path.empty()) {
         try {
             rm->spr_player[slot] = rm->LoadFullSkin(std::filesystem::path(path), color);
@@ -382,10 +393,29 @@ bool MatchConfig::deserialize(const uint8_t* data, size_t size)
     return teamCount >= 1 && teamCount <= 4;
 }
 
+namespace {
+bool captureConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot, uint32_t seed, int inputDelay, std::string& error,
+    const std::string* loadedMap);
+}
+
 bool captureMatchConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot, uint32_t seed, int inputDelay, std::string& error)
 {
+    return captureConfig(config, peerOfSlot, seed, inputDelay, error, nullptr);
+}
+
+bool captureLocalMatchConfig(MatchConfig& config, const std::string& loadedMap, uint32_t seed, std::string& error)
+{
+    //The local players: "peer 0" drives every human slot
+    const std::array<int8_t, INPUT_MAX_PLAYERS> peerOfSlot {{0, 0, 0, 0}};
+    return captureConfig(config, peerOfSlot, seed, 0, error, &loadedMap);
+}
+
+namespace {
+bool captureConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot, uint32_t seed, int inputDelay, std::string& error,
+    const std::string* loadedMap)
+{
     const bool series = isSeriesMatchType(game_values.matchtype);
-    if (game_values.matchtype != MatchType::SingleGame && game_values.matchtype != MatchType::MiniGame && !series) {
+    if (!loadedMap && game_values.matchtype != MatchType::SingleGame && game_values.matchtype != MatchType::MiniGame && !series) {
         error = "this match type can't be played online";
         return false;
     }
@@ -405,7 +435,14 @@ bool captureMatchConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_
     const bool minigame = mode == game_mode_pipe_minigame || mode == game_mode_boss_minigame || mode == game_mode_boxes_minigame;
     const bool worldMinigameMap = minigame && game_values.matchtype == MatchType::World && game_values.tourstopcurrent < game_values.tourstops.size() &&
         maplist->findexact(game_values.tourstops[game_values.tourstopcurrent]->pszMapFile.c_str(), true);
-    if (mode == game_mode_bonus) {
+    if (loadedMap) {
+        //The map that the menu loaded (a quick game's random one, a world's stage)
+        const std::string root = convertPath("");
+        if (!root.empty() && loadedMap->rfind(root, 0) == 0)
+            config.mapRef = loadedMap->substr(root.size());
+        else
+            config.mapRef = "@" + stripPathAndExtension(*loadedMap);
+    } else if (mode == game_mode_bonus) {
         config.mapRef = "maps/special/two52_special_bonushouse.map";
     } else if (worldMinigameMap) {
         const std::string& file = maplist->currentFilename();
@@ -435,7 +472,7 @@ bool captureMatchConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_
             break;
         }
     }
-    config.mapHash = fileHash(mapPathFor(config));
+    config.mapHash = fileHash(loadedMap ? *loadedMap : mapPathFor(config));
     if (config.mapHash == 0) {
         error = "could not read the map " + config.mapRef;
         return false;
@@ -479,6 +516,7 @@ bool captureMatchConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_
     }
     return true;
 }
+} // namespace
 
 bool isSeriesMatchType(MatchType type)
 {

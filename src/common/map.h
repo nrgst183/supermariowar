@@ -175,6 +175,39 @@ void DrawPlatform(PlatformPathType pathtype, std::span<const TilesetTile> tiles,
 	short iSize, short iPlatformWidth, short iPlatformHeight,
 	bool fDrawPlatform, bool fDrawShadow, SDL_Surface* dst);
 
+// The level editor built into the game (src/smw/editors) has the same
+// functions in its own namespace: they get the same access (see the friends
+// of CMap and MovingPlatform)
+namespace leveleditor {
+void drawmap(bool fScreenshot, short iBlockSize, bool fWithPlatforms);
+void drawlayer(int layer, bool fUseCopied, short iBlockSize);
+void takescreenshot();
+bool copyselectedtiles();
+void clearselectedmaptiles();
+void pasteselectedtiles(int movex, int movey);
+TileType CalculateTileType(short x, short y);
+void UpdateTileType(short x, short y);
+bool TileTypeIsModified(short x, short y);
+void AdjustMapItems(short x, short y);
+void RemoveMapItemAt(short x, short y);
+int editor_edit();
+int editor_tiles();
+int editor_blocks();
+int editor_warp();
+int editor_modeitems();
+void init_editor_properties(short iBlockCol, short iBlockRow);
+int editor_properties(short iBlockCol, short iBlockRow);
+int editor_maphazards();
+short NewMapHazard();
+short* GetBlockProperty(short x, short y, short iBlockCol, short iBlockRow, short* iSettingIndex);
+int save_as();
+void draw_platform(short iPlatform, bool fDrawTileTypes);
+void insert_platforms_into_map();
+void loadcurrentmap();
+void SetNoSpawn(short nospawnmode, short col, short row, bool value);
+int editor_platforms();
+} // namespace leveleditor
+
 class CMap
 {
 	public:
@@ -185,6 +218,8 @@ class CMap
 		void clearPlatforms();
 
 		void loadMap(const std::string& file, ReadType iReadType);
+		// The file of the latest loadMap()
+		const std::string& loadedFile() const { return szLoadedFile; }
 		void saveMap(const std::string& file);
 
 		gfxSprite createThumbnailSurface(bool fUseClassicPack);
@@ -285,6 +320,7 @@ class CMap
 		bool IsInPlatformNoSpawnZone(short x, short y, short width, short height);
 
 		std::string szBackgroundFile;
+		std::string szLoadedFile;
 		short backgroundID;
 		short eyecandy[3];
 		short musicCategoryID;
@@ -400,6 +436,34 @@ class CMap
 		friend void loadmap(char * szMapFile);
 		friend void SetNoSpawn(short nospawnmode, short col, short row, bool value);
 		friend int editor_platforms();
+
+		friend void leveleditor::drawmap(bool, short, bool);
+		friend void leveleditor::drawlayer(int, bool, short);
+		friend void leveleditor::takescreenshot();
+		friend bool leveleditor::copyselectedtiles();
+		friend void leveleditor::clearselectedmaptiles();
+		friend void leveleditor::pasteselectedtiles(int, int);
+		friend TileType leveleditor::CalculateTileType(short, short);
+		friend void leveleditor::UpdateTileType(short, short);
+		friend bool leveleditor::TileTypeIsModified(short, short);
+		friend void leveleditor::AdjustMapItems(short, short);
+		friend void leveleditor::RemoveMapItemAt(short, short);
+		friend int leveleditor::editor_edit();
+		friend int leveleditor::editor_tiles();
+		friend int leveleditor::editor_blocks();
+		friend int leveleditor::editor_warp();
+		friend int leveleditor::editor_modeitems();
+		friend void leveleditor::init_editor_properties(short, short);
+		friend int leveleditor::editor_properties(short, short);
+		friend int leveleditor::editor_maphazards();
+		friend short leveleditor::NewMapHazard();
+		friend short* leveleditor::GetBlockProperty(short, short, short, short, short*);
+		friend int leveleditor::save_as();
+		friend void leveleditor::draw_platform(short, bool);
+		friend void leveleditor::insert_platforms_into_map();
+		friend void leveleditor::loadcurrentmap();
+		friend void leveleditor::SetNoSpawn(short, short, short, bool);
+		friend int leveleditor::editor_platforms();
 
 		friend class B_BreakableBlock;
 		friend class B_DonutBlock;

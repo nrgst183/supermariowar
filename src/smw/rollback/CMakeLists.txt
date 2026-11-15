@@ -1,5 +1,7 @@
 target_sources(smw PRIVATE
     MatchConfig.cpp
+    Replay.cpp
+    Replay.h
     MatchConfig.h
     NetGame.cpp
     NetGame.h

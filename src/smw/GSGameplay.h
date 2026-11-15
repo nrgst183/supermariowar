@@ -46,6 +46,7 @@ class GameplayState : public GameState
         ~GameplayState();
 
         void onEnterState() override;
+        void onLeaveState() override;
 
         void createPlayers();
         void initScoreDisplayPosition();
@@ -56,6 +57,12 @@ class GameplayState : public GameState
         void handleInput();
         bool updateAutoTest();
         void updateNetplay();
+        // A replay: the theater (GameplayTheater.cpp)
+        void updateReplay();
+        void leaveReplay();
+        void drawReplayOverlay();
+        void theaterEvent(const union SDL_Event& event);
+        void resetTheater();
         void autoTestDecideSeriesMatch();
         bool updateMatchTransition();
 
@@ -89,6 +96,8 @@ class GameplayState : public GameState
 
         RenderInterpolator interpolator;
         bool lastUpdateTicked = false;  // whether the latest update() ran a tick (not paused)
+        int replayEndFrames = 0;        // frames since the replay's last tick
+        bool matchOnline = false;       // the match is an online one (for the match history)
 
         std::unique_ptr<rollback::SyncTest> syncTest;    // --at-synctest
 

@@ -12,6 +12,7 @@
 
 #include "WorldEditorState.h"
 
+#ifndef SMW_EMBEDDED_EDITOR  // standalone program (in the game: EditorLauncher.h)
 // Defines the platform entry point (WinMain on Windows), so include it in this file only
 #include <SDL3/SDL_main.h>
 
@@ -24,6 +25,8 @@
     #endif
     #endif
 #endif
+#endif
+
 
 constexpr const char* MAPTITLESTRING = "World Editor";
 
@@ -70,6 +73,7 @@ void SetStageMode(short iIndex, const char * szModeName, const char * szGoalName
 
 void inner_main();
 
+#ifndef SMW_EMBEDDED_EDITOR  // the standalone program's entry point
 //main main main
 int main(int argc, char *argv[])
 {
@@ -111,6 +115,7 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+#endif
 
 void inner_main()
 {
@@ -119,12 +124,16 @@ void inner_main()
     printf("-------------------------------------------------------------------------------\n");
     printf("\n---------------- startup ----------------\n");
 
+#ifndef SMW_EMBEDDED_EDITOR
     App::registerSdlMetadata(TITLESTRING);
+#endif
 
     ensureSettingsDir();
 
     /* This must occur before any data files are loaded */
+#ifndef SMW_EMBEDDED_EDITOR
     Initialize_Paths();
+#endif
 
 	bool done;
 
@@ -140,13 +149,26 @@ void inner_main()
         }
     }
 
+#ifndef SMW_EMBEDDED_EDITOR
 	gfx_init(640,480, g_fFullScreen);
+#else
+    //(a new session: every editor state starts over; the menus get their controls again below)
+    state = EDITOR_EDIT;
+    for (UI_Menu* menu : {&mStageSettingsMenu, &mBonusItemPicker, &mVehicleMenu}) {
+        menu->~UI_Menu();
+        new (menu) UI_Menu();
+    }
+    delete mModeOptionsMenu;
+    mModeOptionsMenu = nullptr;
+#endif
 	blitdest = screen;
 
         rm = new CResourceManager();
 
         g_map = new CMap();
+#ifndef SMW_EMBEDDED_EDITOR  //(in the game: the game's tilesets, edited live)
         g_tilesetmanager = new CTilesetManager(convertPath("gfx/Classic/tilesets"));
+#endif
         filterslist = new FiltersList();
         maplist = new MapList(true);
         menugraphicspacklist = new GraphicsList;

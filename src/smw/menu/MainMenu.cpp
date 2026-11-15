@@ -29,9 +29,13 @@ UI_MainMenu::UI_MainMenu()
 
 #ifndef SMW_NO_ONLINE
     // Online (rollback netplay); web builds have no network code
-    miOnlineButton = new MI_Button(&rm->spr_selectfield, 120, 322, "Online", 400);
+    miOnlineButton = new MI_Button(&rm->spr_selectfield, 120, 322, "Online", 200);
     miOnlineButton->SetCode(MENU_CODE_TO_ONLINE_MENU);
+    miHistoryButton = new MI_Button(&rm->spr_selectfield, 320, 322, "History", 200);
+#else
+    miHistoryButton = new MI_Button(&rm->spr_selectfield, 120, 322, "History", 400);
 #endif
+    miHistoryButton->SetCode(MENU_CODE_TO_HISTORY_MENU);
 
 #ifdef __EMSCRIPTEN__
     miOptionsButton = new MI_Button(&rm->spr_selectfield, 120, 362, "Options", 400);
@@ -45,30 +49,38 @@ UI_MainMenu::UI_MainMenu()
 
 #ifdef __EMSCRIPTEN__
     miExitButton = nullptr;
+    miEditorsButton = nullptr;
 #else
-    miExitButton = new MI_Button(&rm->spr_selectfield, 120, 402, "Exit", 640 * 0.625f);
+    // The map and world editors (EditorLauncher.h)
+    miEditorsButton = new MI_Button(&rm->spr_selectfield, 120, 402, "Editors", 200);
+    miEditorsButton->SetCode(MENU_CODE_TO_EDITORS_MENU);
+    miExitButton = new MI_Button(&rm->spr_selectfield, 320, 402, "Exit", 200);
     miExitButton->SetCode(MENU_CODE_EXIT_APPLICATION);
 #endif
 
 #ifndef __EMSCRIPTEN__
-    AddControl(miMainStartButton, miExitButton, miPlayerSelect, nullptr, miQuickGameButton);
+    AddControl(miMainStartButton, miEditorsButton, miPlayerSelect, nullptr, miQuickGameButton);
     AddControl(miQuickGameButton, miExitButton, miPlayerSelect, miMainStartButton, nullptr);
 #ifndef SMW_NO_ONLINE
     AddControl(miPlayerSelect, miMainStartButton, miOnlineButton, nullptr, nullptr);
-    AddControl(miOnlineButton, miPlayerSelect, miOptionsButton, nullptr, nullptr);
-    AddControl(miOptionsButton, miOnlineButton, miExitButton, miControlsButton, miControlsButton);
-    AddControl(miControlsButton, miOnlineButton, miExitButton, miOptionsButton, miOptionsButton);
+    AddControl(miOnlineButton, miPlayerSelect, miOptionsButton, miHistoryButton, miHistoryButton);
+    AddControl(miHistoryButton, miPlayerSelect, miControlsButton, miOnlineButton, miOnlineButton);
+    AddControl(miOptionsButton, miOnlineButton, miEditorsButton, miControlsButton, miControlsButton);
+    AddControl(miControlsButton, miHistoryButton, miExitButton, miOptionsButton, miOptionsButton);
 #else
-    AddControl(miPlayerSelect, miMainStartButton, miOptionsButton, nullptr, nullptr);
-    AddControl(miOptionsButton, miPlayerSelect, miExitButton, miControlsButton, miControlsButton);
-    AddControl(miControlsButton, miPlayerSelect, miExitButton, miOptionsButton, miOptionsButton);
+    AddControl(miPlayerSelect, miMainStartButton, miHistoryButton, nullptr, nullptr);
+    AddControl(miHistoryButton, miPlayerSelect, miOptionsButton, nullptr, nullptr);
+    AddControl(miOptionsButton, miHistoryButton, miEditorsButton, miControlsButton, miControlsButton);
+    AddControl(miControlsButton, miHistoryButton, miExitButton, miOptionsButton, miOptionsButton);
 #endif
-    AddControl(miExitButton, miOptionsButton, miMainStartButton, nullptr, nullptr);
+    AddControl(miEditorsButton, miOptionsButton, miMainStartButton, miExitButton, miExitButton);
+    AddControl(miExitButton, miControlsButton, miQuickGameButton, miEditorsButton, miEditorsButton);
 #else
     AddControl(miMainStartButton, miControlsButton, miPlayerSelect, nullptr, miQuickGameButton);
     AddControl(miQuickGameButton, miControlsButton, miPlayerSelect, miMainStartButton, nullptr);
-    AddControl(miPlayerSelect, miMainStartButton, miOptionsButton, nullptr, nullptr);
-    AddControl(miOptionsButton, miPlayerSelect, miControlsButton, nullptr, nullptr);
+    AddControl(miPlayerSelect, miMainStartButton, miHistoryButton, nullptr, nullptr);
+    AddControl(miHistoryButton, miPlayerSelect, miOptionsButton, nullptr, nullptr);
+    AddControl(miOptionsButton, miHistoryButton, miControlsButton, nullptr, nullptr);
     AddControl(miControlsButton, miOptionsButton, miMainStartButton, nullptr, nullptr);
 #endif
 

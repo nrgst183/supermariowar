@@ -79,7 +79,7 @@ void MapReader1800::read_tileset(BinaryFile& mapfile)
 
         if (translationid[iID] == TILESETUNKNOWN) {
             // Its tiles are drawn as "unknown tile" markers
-            fprintf(stderr, "[map] Tileset '%s' used by the map isn't installed\n", translation[iTileset].szName);
+            fprintf(stderr, "[map] Tileset '%s' used by the map isn't installed\n", translation[iTileset].szName.c_str());
             tilesetwidths[iID] = 1;
             tilesetheights[iID] = 1;
         } else {

@@ -13,6 +13,7 @@ public:
 
     void flipScreen() const;
     void changeFullScreen(bool fullcreen) const;
+    bool isFullScreen() const;
     void setTitle(const char*) const;
     void showErrorBox(const char*) const;
     void takeScreenshot() const;

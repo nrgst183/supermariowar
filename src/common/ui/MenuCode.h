@@ -112,6 +112,15 @@ enum MenuCodeEnum {
     MENU_CODE_ONLINE_OPTIONS_BACK,
     MENU_CODE_ONLINE_KICK,
     MENU_CODE_ONLINE_SETTINGS_BACK,     // a joiner leaves the settings view
+
+    // Match history (MatchHistory.h) and the editors
+    MENU_CODE_TO_HISTORY_MENU,
+    MENU_CODE_HISTORY_EXIT,
+    MENU_CODE_HISTORY_PLAY_REPLAY,
+    MENU_CODE_TO_EDITORS_MENU,
+    MENU_CODE_EDITORS_EXIT,
+    MENU_CODE_RUN_LEVEL_EDITOR,
+    MENU_CODE_RUN_WORLD_EDITOR,
 };
 
 enum class MenuNavDirection : unsigned char {

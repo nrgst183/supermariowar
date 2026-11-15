@@ -74,6 +74,9 @@ struct MatchConfig {
 // False (with a message) if this match can't be played online.
 bool captureMatchConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot, uint32_t seed, int inputDelay, std::string& error);
 
+// A local match for its replay (Replay.h): the match the menus set up, on the
+// map they loaded (any match type; every human slot is "peer 0")
+bool captureLocalMatchConfig(MatchConfig& config, const std::string& loadedMap, uint32_t seed, std::string& error);
 // Tournament, tour and world: the multi-match modes (NetSeries.h)
 bool isSeriesMatchType(MatchType type);
 // Before a series match is captured or compared: the series state that the
@@ -97,6 +100,8 @@ std::vector<std::string> skinDownloadDirs();
 // Loads the sprites of the player in a slot of the running online match: the skin of its owner
 // (downloaded if need be), the default skin while it isn't here. Cosmetic only.
 void loadMatchSkin(int slot, short color);
+// A replay: the skin files of its players, used instead of the lobby's (null: none)
+void setMatchSkinOverride(const std::array<std::string, INPUT_MAX_PLAYERS>* paths);
 
 // Every peer: sets up game_values, loads the map and enters the gameplay
 // state with the match ready to run frame 0

@@ -9,6 +9,10 @@
 #include "GameValues.h"
 #include "gfx.h"
 #include "GSGameplay.h"
+#include "menu/MatchHistoryMenu.h"
+#ifdef SMW_HAS_EDITORS
+#include "editors/EditorInput.h"
+#endif
 #include "GameplayStyles.h"
 #include "joystick.h"
 #include "map.h"
@@ -39,6 +43,7 @@
 #include "menu/GameSettingsMenu.h"
 #include "menu/MainMenu.h"
 #include "menu/MapFilterEditMenu.h"
+#include "menu/MatchHistoryMenu.h"
 #include "menu/MatchSelectionMenu.h"
 #include "menu/ModeOptionsMenu.h"
 #include "menu/OptionsMenu.h"
@@ -366,6 +371,171 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             next();
         return MENU_CODE_NONE;
     }
+#ifdef SMW_HAS_EDITORS
+    //--at-role editors: the editors, played with a scripted controller (EditorInput.h), then a match
+    if (at.shotsRole == "editors") {
+        using editors::input::TestInput;
+        //A button held for two frames from `from`
+        auto tap = [](int f, int from) { return f >= from && f < from + 2; };
+        auto levelScript = [tap](editors::Editor, int f) {
+            TestInput t;
+            if (f == 10) t.shot = "e1_level_start";
+            if (f >= 20 && f < 45) { t.lx = 0.8f; t.ly = 0.5f; }
+            t.a = (f >= 50 && f < 75);              //paint a stroke
+            if (f >= 55 && f < 75) t.lx = 1.0f;
+            if (f == 80) t.shot = "e2_level_painted";
+            t.start = tap(f, 90);
+            if (f == 100) t.shot = "e3_level_actions";
+            t.right = tap(f, 110);
+            for (int k = 0; k < 7; k++)
+                t.down = t.down || tap(f, 115 + 4 * k);
+            if (f == 150) t.shot = "e4_level_save_as_selected";
+            t.a = t.a || tap(f, 155);
+            if (f == 180) t.shot = "e5_level_keyboard";
+            t.down = t.down || tap(f, 185);
+            t.right = t.right || tap(f, 190) || tap(f, 194);
+            t.a = t.a || tap(f, 200) || tap(f, 204);
+            if (f == 215) t.shot = "e6_level_typed";
+            t.back = tap(f, 220);
+            if (f == 240) t.shot = "e7_level_back_in_editor";
+            t.back = t.back || tap(f, 250);
+            if (f == 265) t.shot = "e8_level_exit_prompt";
+            if (f >= 270) { t.px = 282; t.py = 266; }
+            t.a = t.a || tap(f, 275);
+            //(still here: try again)
+            if (f > 300 && f % 40 == 0) t.back = true;
+            if (f > 300 && f % 40 == 20) t.a = true;
+            return t;
+        };
+        auto worldScript = [tap](editors::Editor, int f) {
+            TestInput t;
+            if (f == 10) t.shot = "w1_world_start";
+            if (f >= 20 && f < 50) t.ry = 1.0f;     //scrolls the world (arrow keys)
+            if (f >= 20 && f < 35) t.rx = 1.0f;
+            if (f == 55) t.shot = "w2_world_scrolled";
+            t.start = tap(f, 60);
+            if (f == 70) t.shot = "w3_world_actions";
+            //"Edit stages" (13 down), then a click on stage 1
+            for (int k = 0; k < 13; k++)
+                t.down = t.down || tap(f, 75 + 4 * k);
+            t.a = tap(f, 130);
+            if (f >= 140 && f < 150) { t.px = 16; t.py = 16; }
+            t.b = tap(f, 150);    //(right click: edit the stage)
+            if (f == 170) t.shot = "w5_world_stage_menu";
+            t.back = tap(f, 180) || tap(f, 195) || tap(f, 210);
+            if (f == 225) t.shot = "w4_world_exit_prompt";
+            if (f >= 228) { t.px = 282; t.py = 266; }
+            t.a = t.a || tap(f, 232);
+            if (f > 260 && f % 40 == 0) t.back = true;
+            if (f > 260 && f % 40 == 20) t.a = true;
+            return t;
+        };
+        switch (step) {
+            case 1:
+                if (t == 1)
+                    return MENU_CODE_TO_EDITORS_MENU;
+                if (t == 15)
+                    shot("e0_editors_menu");
+                if (t == 18)
+                    next();
+                return MENU_CODE_NONE;
+            case 2:
+                if (t == 1) {
+                    editors::input::setTestDriver(levelScript, at.shotsDir);
+                    return MENU_CODE_RUN_LEVEL_EDITOR;
+                }
+                if (t == 6)
+                    shot("e9_menu_after_level_editor");
+                if (t == 8)
+                    next();
+                return MENU_CODE_NONE;
+            case 3:
+                if (t == 1) {
+                    editors::input::setTestDriver(worldScript, at.shotsDir);
+                    return MENU_CODE_RUN_WORLD_EDITOR;
+                }
+                if (t == 6) {
+                    editors::input::setTestDriver(nullptr, {});
+                    shot("w9_menu_after_world_editor");
+                }
+                if (t == 8) {
+                    //Both again: a second session starts over
+                    static int rounds = 0;
+                    if (++rounds < 2) {
+                        step = 2;
+                        t = 0;
+                        return MENU_CODE_NONE;
+                    }
+                    next();
+                }
+                return MENU_CODE_NONE;
+            case 4:
+                //The game still plays (its graphics and settings came back)
+                if (t == 1)
+                    return MENU_CODE_EDITORS_EXIT;
+                if (t == 5)
+                    shot("g0_main_menu_after_editors");
+                if (t == 8) {
+                    //Two CPU players, a single game on the current map
+                    for (int k = 0; k < 4; k++)
+                        game_values.playercontrol[k] = k < 2 ? 2 : 0;
+                    game_values.matchtype = MatchType::SingleGame;
+                    mTeamSelectMenu->ResetTeamSelect();
+                    game_values.tournamentcontrolteam = -1;
+                    SetControllingTeamForSettingsMenu(game_values.tournamentcontrolteam, false);
+                    return MENU_CODE_TO_GAME_SETUP_MENU;
+                }
+                if (t == 10) {
+                    mGameSettingsMenu->GameModeChanged(0);
+                    game_values.gamemode = gamemodes[mGameSettingsMenu->GetCurrentGameModeID()];
+                    currentgamemode = 0;
+                    mGameSettingsMenu->miMapField->LoadCurrentMap();
+                    next();
+                    return MENU_CODE_START_GAME;
+                }
+                return MENU_CODE_NONE;
+            case 5:
+                //(back from the match: it ran in the gameplay state)
+                if (g_autoTestMatchesDone >= 1 && t > 3) {
+                    shot("g9_menu_after_match");
+                    step = 1000;
+                    t = 0;
+                }
+                timedOut(60 * 60, "the match after the editors");
+                return MENU_CODE_NONE;
+        }
+    }
+#endif
+
+    //--at-role history: the match history screen and a replay of its newest match
+    if (at.shotsRole == "history" || at.shotsRole == "theater") {
+        switch (step) {
+            case 1:
+                if (t == 1)
+                    return MENU_CODE_TO_HISTORY_MENU;
+                if (t == 20)
+                    shot("h1_history");
+                if (t == 24)
+                    next();
+                return MENU_CODE_NONE;
+            case 2:
+                if (t == 1) {
+                    next();
+                    return MENU_CODE_HISTORY_PLAY_REPLAY;
+                }
+                return MENU_CODE_NONE;
+            case 3:
+                //(the replay runs in the gameplay state; back here afterwards)
+                if (mCurrentMenu == mMatchHistoryMenu.get() && t > 5) {
+                    shot("h3_history_after_replay");
+                    step = 1000;
+                    t = 0;
+                }
+                timedOut(60 * 120, "the end of the replay");
+                return MENU_CODE_NONE;
+        }
+    }
+
     if (step == 1) {
         if (t == 1) {
             game_values.onlinename = nick;

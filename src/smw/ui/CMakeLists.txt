@@ -12,6 +12,8 @@ target_sources(smw PRIVATE
     MI_MapBrowser.cpp
     MI_MapBrowser.h
     MI_MapFilterScroll.cpp
+    MI_MatchHistory.cpp
+    MI_MatchHistory.h
     MI_MapFilterScroll.h
     MI_PacksField.cpp
     MI_PacksField.h

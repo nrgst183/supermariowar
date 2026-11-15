@@ -1,4 +1,5 @@
 #include "NetGame.h"
+#include "Replay.h"
 
 #include "CmdArgs.h"
 #include "FileList.h"
@@ -76,6 +77,16 @@ int NetGame::localPeer() const
 bool NetGame::isLocalSlot(int slot) const
 {
     return m_session && m_session->config().slotPeer[static_cast<size_t>(slot)] == m_session->config().localPeer;
+}
+
+std::string NetGame::slotPlayerName(int slot) const
+{
+    if (slot < 0 || slot >= INPUT_MAX_PLAYERS)
+        return {};
+    const int peer = m_config.slots[static_cast<size_t>(slot)].peer;
+    if (peer < 0 || peer >= net::MAX_PEERS)
+        return {};
+    return m_matchNames[static_cast<size_t>(peer)];
 }
 
 std::string NetGame::peerName(int peer) const
@@ -765,6 +776,18 @@ void NetGame::beginMatch()
     m_lobby->addEvent(LobbyEvent::Type::MatchStarted, -1, "");
     m_mapFile.reset();
 
+    //The replay (match history): the names and skins of the players
+    std::array<std::string, INPUT_MAX_PLAYERS> names;
+    std::array<std::string, INPUT_MAX_PLAYERS> skins;
+    for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
+        const MatchSlot& slot = config.slots[static_cast<size_t>(k)];
+        if (slot.control == 0)
+            continue;
+        names[static_cast<size_t>(k)] = slot.peer >= 0 ? m_matchNames[static_cast<size_t>(slot.peer)] : "CPU";
+        skins[static_cast<size_t>(k)] = m_lobby->slotSkinPath(k);
+    }
+    replay::beginOnline(bytes, names, skins);
+
     startConfiguredMatch(config);
 
     m_session = std::make_unique<RollbackSession>(session, *m_transport, *this, monotonicMs());
@@ -1055,6 +1078,7 @@ void NetGame::takeOverSlots(uint8_t slotMask)
 
 void NetGame::onConfirmedChecksum(int frame, uint64_t sum)
 {
+    replay::recordChecksum(frame, sum);
     printf("netsum: match %d frame %d %016llx\n", m_matchId, frame, static_cast<unsigned long long>(sum));
 }
 

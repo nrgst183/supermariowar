@@ -59,6 +59,23 @@
 	#include <windows.h>
 #endif
 
+
+#ifdef SMW_EMBEDDED_EDITOR
+// Built into the game: the events, the input state and the screen flips go
+// through the controller layer (editors/EditorInput.h)
+#include "editors/EditorInput.h"
+#define SDL_PollEvent(e) ::editors::input::pollEvent(e)
+#define SDL_GetKeyboardState(n) ::editors::input::keyboardState(n)
+#define SDL_GetModState() ::editors::input::modState()
+#define SDL_GetMouseState(x, y) ::editors::input::mouseState(x, y)
+#define gfx_flipscreen() ::editors::input::flip()
+#endif
+
+#ifdef SMW_EMBEDDED_EDITOR
+// Built into the game (EditorLauncher.h): the editor's own names are in a
+// namespace; the screen, the eyecandy and the simulation state are the game's
+namespace worldeditor {
+#endif
 // TODO: Fix JS related problems.
 #ifdef __EMSCRIPTEN__
 #define SDL_Delay(n) ;
@@ -142,8 +159,12 @@ void EditStage(short iEditStage);
 void EnableStageMenu(bool fEnable);
 void NewStage(short * iEditStage);
 
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern SDL_Surface *screen;
+#endif
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern SDL_Surface *blitdest;
+#endif
 extern gfxSprite sMapSurface;
 extern SDL_Rect rectSrcSurface;
 extern SDL_Rect rectDstSurface;
@@ -170,8 +191,12 @@ extern WorldMapTile copiedtiles[MAPWIDTH][MAPHEIGHT];
 extern int mouse_x, mouse_y;
 extern WorldVehicle g_wvVehicleStamp;
 extern gfxSprite spr_warplock;
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern short x_shake;
+#endif
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern short y_shake;
+#endif
 extern gfxSprite spr_awardsouls, spr_fireballexplosion;
 extern gfxSprite spr_backmap[2];
 extern gfxSprite spr_background;
@@ -185,11 +210,17 @@ extern sfxSound sfx_kicksound;
 extern sfxSound sfx_mip;
 extern sfxSound sfx_transform;
 extern gfxSprite **spr_player[4];
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern CGameMode *gamemodes[GAMEMODE_LAST];
+#endif
 extern gfxSprite spr_overlay, spr_overlayhole;
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern CEyecandyContainer eyecandy[3];
+#endif
 extern gfxSprite spr_frontmap[2];
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 extern SimulationState g_sim;
+#endif
 extern gfxSprite spr_scoretext;
 extern gfxSprite spr_poof;
 extern bool ignoreclick;
@@ -237,3 +268,7 @@ extern gfxSprite sMapThumbnail;
 extern short iOldStageId;
 extern int g_iNumGameModeSettings[GAMEMODE_LAST];
 extern SDL_Rect rItemDst[NUM_WORLD_ITEMS];
+
+#ifdef SMW_EMBEDDED_EDITOR
+} // namespace worldeditor
+#endif

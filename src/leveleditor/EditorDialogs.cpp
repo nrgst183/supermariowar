@@ -158,6 +158,10 @@ int save_as()
 
 bool dialog(const char * title, const char * instructions, char * input, int inputsize)
 {
+#ifdef SMW_EMBEDDED_EDITOR
+    //(a controller: the on-screen keyboard)
+    ::editors::input::TextEntry textEntry;
+#endif
 // FIXME
 #ifdef __EMSCRIPTEN__
     return false;

@@ -119,6 +119,7 @@ void CMap::ClearAnimatedTiles()
 
 void CMap::loadMap(const std::string& file, ReadType iReadType)
 {
+    szLoadedFile = file;
     iTileAnimationTimer = 0;
     iTileAnimationFrame = 0;
 

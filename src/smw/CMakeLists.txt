@@ -3,6 +3,8 @@ add_executable(smw WIN32
 
 	ai.cpp
 	AINav.cpp
+	MatchHistory.cpp
+	GameplayTheater.cpp
 	AIObjects.cpp
 	ai.h
 	FPSLimiter.cpp
@@ -72,6 +74,19 @@ endif()
 if (WIN32)
 	# Add EXE icon on Windows
 	target_sources(smw PRIVATE "${PROJECT_SOURCE_DIR}/resources/windows/smw.rc")
+endif()
+
+# The map and world editors, built in (editors/EditorLauncher.h); not on the web
+if(NOT EMSCRIPTEN)
+	target_sources(smw PRIVATE
+		editors/EditorInput.cpp
+		editors/EditorInput.h
+		editors/EditorLauncher.cpp
+		editors/EditorLauncher.h
+		editors/EmbeddedLevelEditor.cpp
+		editors/EmbeddedWorldEditor.cpp
+	)
+	target_compile_definitions(smw PRIVATE SMW_HAS_EDITORS)
 endif()
 
 #

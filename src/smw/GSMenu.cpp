@@ -2,6 +2,7 @@
 
 #include "rollback/MatchConfig.h"
 #include "rollback/NetGame.h"
+#include "rollback/Replay.h"
 
 #include "CmdArgs.h"
 #include "FileList.h"
@@ -40,6 +41,12 @@
 #include "menu/GameSettingsMenu.h"
 #include "menu/MainMenu.h"
 #include "menu/MapFilterEditMenu.h"
+#include "menu/MatchHistoryMenu.h"
+#include "menu/EditorsMenu.h"
+#ifdef SMW_HAS_EDITORS
+#include "editors/EditorLauncher.h"
+#endif
+#include "ui/MI_MatchHistory.h"
 #include "menu/MatchSelectionMenu.h"
 #include "menu/ModeOptionsMenu.h"
 #include "menu/OnlineLobbyMenu.h"
@@ -115,6 +122,8 @@ bool MenuState::init()
     // Online menu
     mOnlineMenu = std::make_unique<UI_OnlineMenu>();
     mOnlineLobbyMenu = std::make_unique<UI_OnlineLobbyMenu>();
+    mMatchHistoryMenu = std::make_unique<UI_MatchHistoryMenu>();
+    mEditorsMenu = std::make_unique<UI_EditorsMenu>();
 
     mCurrentMenu = mMainMenu.get();
     szCurrentMapName = mGameSettingsMenu->miMapField->GetMapName();
@@ -137,6 +146,22 @@ void MenuState::onEnterState()
     game_values.playerInput.ResetKeys();
 
     fNeedMenuMusicReset = false;
+
+    //Back from a replay: the match history again (the replay changed nothing:
+    //its match's result doesn't go to a tournament, tour or world)
+    if (replay::takeReturnedFromReplay()) {
+        mMatchHistoryMenu->miHistory->Refresh();
+        mCurrentMenu = mMatchHistoryMenu.get();
+        if (game_values.music) {
+            if (game_values.matchtype == MatchType::World)
+                rm->backgroundmusic[5].play(false, false);
+            else if (game_values.matchtype == MatchType::Tour || game_values.matchtype == MatchType::Tournament)
+                rm->backgroundmusic[3].play(false, false);
+            else
+                rm->backgroundmusic[2].play(false, false);
+        }
+        return;
+    }
 
     rollback::NetGame& onlineNet = rollback::NetGame::instance();
     if (onlineNet.active() && onlineNet.lobby() && !cmd::g_net.enabled() && !onlineNet.seriesActive()) {
@@ -472,6 +497,20 @@ void MenuState::update()
             mOnlineLobbyMenu->Sync();
         SyncOnlineSettings();
 
+        //--replay: plays it once, at startup
+        static bool replayFromArgsStarted = false;
+        if (!cmd::g_replay.empty() && !replayFromArgsStarted) {
+            replayFromArgsStarted = true;
+            std::string error;
+            if (replay::startPlayback(cmd::g_replay, error))
+                return;
+            printf("replay: can't play %s: %s\n", cmd::g_replay.c_str(), error.c_str());
+            if (cmd::g_autotest.enabled) {
+                Exit();
+                return;
+            }
+        }
+
         MenuCodeEnum code = MENU_CODE_NONE;
         //(online, the world map runs only on the frames its lockstep has a tick for: OnlineSeriesWorldTick)
         mSeriesSkipUpdate = rollback::NetGame::instance().seriesActive();
@@ -492,6 +531,40 @@ void MenuState::update()
                 iDisplayErrorTimer = 0;
                 mCurrentMenu = mMainMenu.get();
             }
+        } else if (MENU_CODE_TO_HISTORY_MENU == code) {
+            mMatchHistoryMenu->miHistory->Refresh();
+            mCurrentMenu = mMatchHistoryMenu.get();
+        } else if (MENU_CODE_HISTORY_EXIT == code) {
+            mCurrentMenu = mMainMenu.get();
+        } else if (MENU_CODE_HISTORY_PLAY_REPLAY == code) {
+            std::string error;
+            if (!replay::startPlayback(mMatchHistoryMenu->miHistory->selectedReplay(), error)) {
+                mMatchHistoryMenu->miHistory->setMessage("Can't play it: " + error);
+            } else {
+                rm->backgroundmusic[2].stop();
+                return;
+            }
+        } else if (MENU_CODE_TO_EDITORS_MENU == code) {
+            mEditorsMenu->ResetMenu();
+            mCurrentMenu = mEditorsMenu.get();
+        } else if (MENU_CODE_EDITORS_EXIT == code) {
+            mCurrentMenu = mMainMenu.get();
+        } else if (MENU_CODE_RUN_LEVEL_EDITOR == code || MENU_CODE_RUN_WORLD_EDITOR == code) {
+#ifdef SMW_HAS_EDITORS
+            //The editor runs in the window until it is closed (EditorLauncher.h)
+            rm->backgroundmusic[2].stop();
+            const bool keepRunning = editors::run(MENU_CODE_RUN_LEVEL_EDITOR == code ? editors::Editor::Level : editors::Editor::World);
+            if (!keepRunning) {
+                Exit();
+                return;
+            }
+            if (game_values.music)
+                rm->backgroundmusic[2].play(false, false);
+            //Maps saved in the editor: the map field shows the list again
+            mGameSettingsMenu->miMapField->LoadCurrentMap();
+            game_values.playerInput.ResetKeys();
+            return;
+#endif
         } else if (MENU_CODE_TO_ONLINE_MENU == code) {
             mOnlineMenu->ClearMessage();
             mOnlineMenu->Open();
@@ -1216,6 +1289,10 @@ void MenuState::update()
 
             game_values.appstate = AppState::Game;
             printf("  GS_GAME\n");
+
+            //The replay of this match (match history): from here on, the
+            //match plays from the seed that the replay keeps
+            replay::beginLocal(g_map->loadedFile());
 
             g_map->predrawbackground(rm->spr_background, rm->spr_backmap[0]);
             g_map->predrawforeground(rm->spr_frontmap[0]);

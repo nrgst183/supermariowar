@@ -17,6 +17,7 @@
 
 #include "LevelEditorState.h"
 
+#ifndef SMW_EMBEDDED_EDITOR  // standalone program (in the game: EditorLauncher.h)
 // Defines the platform entry point (WinMain on Windows), so include it in this file only
 #include <SDL3/SDL_main.h>
 
@@ -29,6 +30,8 @@
     #endif
     #endif
 #endif
+#endif
+
 
 constexpr const char* MAPTITLESTRING = "Level Editor";
 
@@ -38,6 +41,7 @@ void gameloop_frame();
 
 void inner_main();
 
+#ifndef SMW_EMBEDDED_EDITOR  // the standalone program's entry point
 //main main main
 int main(int argc, char *argv[])
 {
@@ -80,6 +84,7 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+#endif
 
 void inner_main()
 {
@@ -88,12 +93,16 @@ void inner_main()
     printf("-------------------------------------------------------------------------------\n");
     printf("\n---------------- startup ----------------\n");
 
+#ifndef SMW_EMBEDDED_EDITOR
     App::registerSdlMetadata(TITLESTRING);
+#endif
 
 	ensureSettingsDir();
 
     /* This must occur before any data files are loaded */
+#ifndef SMW_EMBEDDED_EDITOR
     Initialize_Paths();
+#endif
 
 	bool done;
 
@@ -106,11 +115,26 @@ void inner_main()
         }
     }
 
+#ifndef SMW_EMBEDDED_EDITOR
 	gfx_init(640,480, g_fFullScreen);
+#else
+    //(a new session: every editor state starts over, the modes' too)
+    state = EDITOR_EDIT;
+    editor_edit_initialized = false;
+    editor_tiles_initialized = false;
+    editor_properties_initialized = false;
+    editor_animation_initialized = false;
+    editor_backgrounds_initialized = false;
+    editor_maphazards_initialized = false;
+    editor_modeitems_initialized = false;
+    editor_platforms_initialized = false;
+#endif
 	blitdest = screen;
 
         rm = new CResourceManager();
+#ifndef SMW_EMBEDDED_EDITOR  //(in the game: the game's tilesets, edited live)
         g_tilesetmanager = new CTilesetManager(convertPath("gfx/Classic/tilesets"));
+#endif
         g_map = new CMap();
         filterslist = new FiltersList();
         maplist = new MapList(false);
@@ -243,7 +267,9 @@ void inner_main()
 
 	resetselectedtiles();
 
+#ifndef SMW_EMBEDDED_EDITOR  //(the game's settings are set up)
 	game_values.init(); // Needed for FPSLimiter
+#endif
 
 	printf("entering level editor loop...\n");
 #ifdef __EMSCRIPTEN__

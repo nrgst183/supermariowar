@@ -1,7 +1,9 @@
 #include "WorldEditorState.h"
 
+#ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 SDL_Surface		*screen;
 SDL_Surface		*blitdest;
+#endif
 gfxSprite		sMapSurface;
 
 SDL_Rect		rectSrcSurface = {0, 0, 768, 608};
@@ -55,6 +57,7 @@ WorldVehicle g_wvVehicleStamp;
 
 //// Global stuff that the map editor doesn't need, but has references to
 gfxSprite		spr_warplock;
+#ifndef SMW_EMBEDDED_EDITOR  // stand-ins for the game's code and the game's own globals (EditorLauncher.h)
 short			x_shake = 0;
 short			y_shake = 0;
 
@@ -150,6 +153,7 @@ gfxSprite		spr_scoretext;
 gfxSprite		spr_poof;
 
 void CScore::AdjustScore(short iValue) {}
+#endif
 ///////
 
 

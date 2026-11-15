@@ -24,6 +24,16 @@ int editor_edit()
 			//handle messages
             while (SDL_PollEvent(&event)) {
                 switch (event.type) {
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    //A click on Yes or No (the boxes drawn below)
+                    if (event.button.button == SDL_BUTTON_LEFT && event.button.y >= 250 && event.button.y < 282) {
+                        if (event.button.x >= 250 && event.button.x < 314)
+                            return EDITOR_QUIT;
+                        if (event.button.x >= 326 && event.button.x < 390)
+                            fExiting = false;
+                    }
+                    break;
+
                 case SDL_EVENT_KEY_DOWN: {
                     const SDL_Keycode key = event.key.key;
 

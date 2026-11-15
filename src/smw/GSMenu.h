@@ -19,6 +19,8 @@ class UI_MapFilterEditMenu;
 class UI_MatchSelectionMenu;
 class UI_ModeOptionsMenu;
 class UI_OnlineLobbyMenu;
+class UI_MatchHistoryMenu;
+class UI_EditorsMenu;
 class UI_OnlineMenu;
 class UI_OptionsMenu;
 class UI_PlayerControlsMenu;
@@ -178,6 +180,8 @@ class MenuState : public GameState
 		// Online menus
 		std::unique_ptr<UI_OnlineMenu> mOnlineMenu;
 		std::unique_ptr<UI_OnlineLobbyMenu> mOnlineLobbyMenu;
+		std::unique_ptr<UI_MatchHistoryMenu> mMatchHistoryMenu;
+		std::unique_ptr<UI_EditorsMenu> mEditorsMenu;
 		bool mOnlineView = false;       //A player who is not the host looks at (or, if the host allows it, edits) the match settings
 		short mOnlineShownMode = -1;    //What the settings screen shows of the lobby's mode, goal and map (to tell the player's edits from the lobby's changes)
 		short mOnlineShownGoal = -1;

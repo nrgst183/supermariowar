@@ -8,6 +8,10 @@ target_sources(smw PRIVATE
     ModeOptionsMenu.cpp
     ModeOptionsMenu.h
     MapFilterEditMenu.cpp
+    MatchHistoryMenu.cpp
+    EditorsMenu.cpp
+    EditorsMenu.h
+    MatchHistoryMenu.h
     MapFilterEditMenu.h
     MatchSelectionMenu.cpp
     MatchSelectionMenu.h

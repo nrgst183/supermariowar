@@ -14,6 +14,7 @@ namespace cmd {
 
 AutoTestArgs g_autotest;
 NetArgs g_net;
+std::string g_replay;
 
 void show_windows_console()
 {
@@ -84,6 +85,8 @@ void print_help(const char* title, const char* version)
     printf("      --net-stats <N>     Print \"netstats:\" lines every N frames (default 300, 0 off)\n");
     printf("      --net-timeout <MS>  A peer that sends nothing for this long is gone (5000)\n");
     printf("      --net-quit-at <F>   Leave the match at frame F (disconnect test)\n");
+    printf("  --replay <FILE>         Play a replay (from the replays folder, or a path);\n");
+    printf("                          with --autotest, quit when it ends\n");
     printf("      --net-sim-latency <MS> Simulated one-way latency of every packet sent\n");
     printf("      --net-sim-jitter <MS>  Simulated +- jitter of that latency\n");
     printf("      --net-sim-loss <PCT>   Simulated loss of the unreliable packets sent\n");
@@ -143,6 +146,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-cpu-level") at.cpuLevel = atoi(val.c_str());
             else if (arg == "--at-ai-old") at.aiLegacyMask = atoi(val.c_str());
             else if (arg == "--at-ai-bench") at.aiBench = atoi(val.c_str()) != 0;
+            else if (arg == "--at-replay-seeks") at.replaySeeks = atoi(val.c_str());
             else if (arg == "--at-shot-ticks") at.shotTicks = atoi(val.c_str()) != 0;
             else if (arg == "--at-resim") at.resim = atoi(val.c_str()) != 0;
             else if (arg == "--at-realtime") at.realtime = atoi(val.c_str());
@@ -198,6 +202,15 @@ Args parse_args(int argc, char* argv[])
                 fprintf(stderr, "Error: unknown option `%s`, see `--help`\n", arg.c_str());
                 return result;
             }
+            continue;
+        }
+
+        if (arg == "--replay") {
+            if (++i >= argc) {
+                fprintf(stderr, "Error: `--replay` requires a parameter, see `--help`\n");
+                return result;
+            }
+            g_replay = argv[i];
             continue;
         }
 

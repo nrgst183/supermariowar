@@ -1,3 +1,4 @@
+#include "rollback/Replay.h"
 #include "GSGameplay.h"
 
 #include "eyecandy.h"
@@ -76,8 +77,10 @@ void GameplayState::simulateTick(const InputFrame& input)
 
 void GameplayState::advanceTick(const InputFrame& input)
 {
+    replay::recordTick(input);
     interpolator.capture();
     simulateTick(input);
+    replay::afterTick();
 }
 
 void GameplayState::applyTickInput(const InputFrame& input)

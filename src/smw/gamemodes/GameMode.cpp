@@ -174,8 +174,12 @@ void CGameMode::init()  //called once when the game is started
     gameover = false;
     playedwarningsound = false;
 
-    for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
-        g_sim.score[iScore].SetScore(0);
+    //Every team starts from zero, the subscores too (health, cards, boxes:
+    //the modes that use them set them after this); the last match's must not
+    //carry over (replays and online peers start without them)
+    for (CScore& score : g_sim.score) {
+        score.SetScore(0);
+        score.subscore.fill(0);
     }
 };
 

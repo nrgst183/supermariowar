@@ -21,14 +21,15 @@ struct AutoTestArgs {
     int seed = 0;            // RNG seed for reproducible runs; 0 = time based
     int cpuLevel = -1;       // CPU difficulty 0-4; -1 = keep the configured one
     int aiLegacyMask = 0;    // bit k: player k uses the original CPU logic (for comparing AI versions)
-    bool aiBench = false;
-    bool shotTicks = false;  // --at-shot-every counts simulation ticks instead of drawn frames    // print kills/deaths per player at the end of each match
+    bool aiBench = false;    // print kills/deaths per player at the end of each match
+    bool shotTicks = false;  // --at-shot-every counts simulation ticks instead of drawn frames
     bool resim = false;      // run every gameplay tick as a re-simulation (side effects suppressed)
     int realtime = 0;        // 0: unthrottled; 1/2/3: normal pacing with the VSync/Uncapped/62.5 FPS frame
                              // rate, printing the measured tick and render rates
     int humans = 0;          // the first N players are humans, with seeded random input (not from devices)
     int synctest = 0;        // rollback sync test distance in ticks; 0 = off
     int peersum = 0;         // print the cross-machine state checksum every N frames; 0 = off
+    int replaySeeks = 0;     // --replay: jump to a random tick every N frames (tests the theater's seeking)
     bool norender = false;   // skip drawing and presenting (much faster under valgrind or sanitizers)
     int shotEvery = 0;       // save a PNG of the screen every N drawn frames of an online match; 0 = off
     std::string shotDir;     // ... into this directory
@@ -66,6 +67,10 @@ struct NetArgs {
 };
 
 extern NetArgs g_net;
+
+/// --replay FILE: plays a replay (a file in the replays folder, or a path) at
+/// startup; with --autotest, the game quits when it ends
+extern std::string g_replay;
 
 struct Args {
     bool success = false;

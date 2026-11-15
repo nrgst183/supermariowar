@@ -124,6 +124,9 @@ class MovingPlatform : public sim::ArenaAllocated
 	friend void takescreenshot();
 	friend void loadmap(char * szMapFile);
 	friend int editor_platforms();
+	friend void leveleditor::loadcurrentmap();
+	friend void leveleditor::takescreenshot();
+	friend int leveleditor::editor_platforms();
 
 };
 

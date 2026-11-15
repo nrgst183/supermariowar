@@ -176,6 +176,10 @@ void gfx_changefullscreen(bool fullscreen) {
     gfx.changeFullScreen(fullscreen);
 }
 
+bool gfx_isfullscreen() {
+    return gfx.isFullScreen();
+}
+
 void gfx_flipscreen() {
     gfx.flipScreen();
 }
