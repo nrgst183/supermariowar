@@ -5,7 +5,8 @@
 // The map is a grid of MAPWIDTH x MAPHEIGHT tiles. A "spot" is a tile a player can
 // stand in: the tile itself is free and the one under it holds the player up. Spots are
 // linked by the moves a player can make: walking, walking off an edge, dropping through
-// a platform and jumping (up to a few tiles high and wide). The graph is rebuilt when
+// a platform and jumping (up to a few tiles high and wide; 4 tiles up with a running jump: a tile of
+// run-up, then up beside the ledge and onto it). The graph is rebuilt when
 // the map's tiles or blocks change (a match starts, a block breaks).
 //
 // Nothing here is simulation state: the graph is computed from the map, the same way
@@ -18,13 +19,15 @@ enum class Move : unsigned char {
     Walk,   // walk (or fall) toward the next column
     Jump,   // jump and steer toward the next column
     Drop,   // fall through the platform we stand on
+    RunJump,// a running jump (run held, faster than walking): 4 tiles up beside a ledge 2 columns over
+            // (dir: the way to it; a tile of run-up behind), then onto it
 };
 
 struct Step {
     Move move = Move::None;
     int toCol = -1;      // the spot the move leads to
     int toRow = -1;
-    int dir = 0;         // -1 left, 1 right, 0 straight up/down (shortest way around the screen)
+    int dir = 0;         // -1 left, 1 right, 0 straight up/down (shortest way around the screen); RunJump: the run's way
     int distance = 0;    // path cost to the target (rough number of moves)
 };
 
@@ -43,6 +46,13 @@ int HorizontalDistance(int dx, int y1, int y2, bool* wrapped = nullptr);
 // How many tiles a player at (ix,iy) (top left) can run in direction dir (-1/1) before a wall,
 // up to max (the screen edge counts as a wall where the map closes it)
 int FreeRun(int ix, int iy, int dir, int max = 5);
+
+// The spot under a block at (col,row) from which a jump hits it (at most 3 tiles below), or -1
+int SpotBelow(int col, int row);
+
+// Whether a running jump starts from the spot (col,row) in direction dir: walking onto it, hold run
+// (so we get there fast enough to take off)
+bool RunJumpFrom(int col, int row, int dir);
 
 // The first move of the shortest path from (col,row) to the spot nearest to the point (x,y)
 Step NextStep(int col, int row, int targetX, int targetY);

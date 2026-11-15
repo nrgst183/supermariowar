@@ -50,6 +50,7 @@ public:
 
         playerwrap = false;
         goalwrap = false;
+        goalIsBlock = false;
         stompwrap = false;
         teammatewrap = false;
         threatwrap = false;
@@ -71,6 +72,8 @@ public:
     bool playerwrap;
     bool teammatewrap;
     bool goalwrap;
+    bool goalIsBlock;   // the goal is a ? block to hit from below (the spot under it: goalSpotRow)
+    int goalSpotRow;
     bool stompwrap;
     bool threatwrap;
 };

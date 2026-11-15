@@ -263,6 +263,16 @@ Improvements (2026)
    blocks change. For a target well above us (or below and to the side), the CPU follows the
    shortest path, and climbs to a spot beside an opponent rather than under it. While in the air
    it finishes the move it started and steers with its drift taken into account.
+   Jumps reach 3 tiles up; a **running jump** (run held past walking speed: `VELTURBOJUMP`, 135
+   pixels) reaches 4: up beside a ledge two columns over, with a tile of run-up behind. The CPU
+   walks onto its start running, takes off before the middle of the column, brakes until its head
+   is above the ledge's underside, then steers onto it (Sidewinder's middle level to its top one).
+   A running jump in progress is never left half done by the difficulty's skipped turns.
+
+   **? blocks**: a ? block ready to give a power-up is a goal too (a little ahead of other goals as
+   far away), reached at the spot under it (`ainav::SpotBelow()`) and hit with a jump; the CPU
+   loses interest in one it can't get to, as with other goals. The power-up that comes out is then
+   a goal like any other. This is on in every mode.
 
 4. **Screen edges** (`ainav::CanCrossEdge()`/`HorizontalDistance()`): the way around the screen
    counts only where the map leaves an opening at the left and right edges near the CPU's height

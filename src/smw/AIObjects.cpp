@@ -14,6 +14,7 @@
 #include "gamemodes/Star.h"
 #include "gamemodes/Tag.h"
 #include "objects/IO_FlameCannon.h"
+#include "objects/blocks/PowerupBlock.h"
 
 #include "objects/moving/MO_BonusHouseChest.h"
 #include "objects/moving/MO_Boomerang.h"
@@ -453,6 +454,38 @@ void CPlayerAI::GetNearestObjects()
         }
 
         DistanceToPlayer(g_sim.players[iPlayer], &nearestObjects.player, &nearestObjects.playerdistance, &nearestObjects.playerwrap);
+    }
+
+    //The ? blocks ready to give a power-up: a goal too (hit from the spot under them), a little
+    //ahead of other things as far away: the power-ups are what the bots were missing out on
+    if (improved() && g_map) {
+        for (short c = 0; c < MAPWIDTH; c++) {
+            for (short r = 0; r < MAPHEIGHT; r++) {
+                IO_Block* b = g_map->block(c, r);
+                if (!b || b->GetState() != 0 || b->isHidden() || !dynamic_cast<B_PowerupBlock*>(b))
+                    continue;
+                if (attentionObjects.find(b->networkId()) != lim)
+                    continue;
+                const int spotRow = ainav::SpotBelow(c, r);
+                if (spotRow < 0)
+                    continue;
+                short tx = static_cast<short>(c * TILESIZE + TILESIZE / 2 - (pPlayer->ix + PW / 2));
+                const short ty = static_cast<short>(spotRow * TILESIZE + TILESIZE / 2 - (pPlayer->iy + PH / 2));
+                bool wrap = false;
+                if ((tx > App::screenWidth / 2 || tx < -App::screenWidth / 2) && ainav::CanCrossEdge(pPlayer->iy, pPlayer->iy + ty)) {
+                    tx = tx > 0 ? App::screenWidth - tx : App::screenWidth + tx;
+                    wrap = true;
+                }
+                const int distance = (tx * tx + ty * ty) * 9 / 16;
+                if (distance < nearestObjects.goaldistance) {
+                    nearestObjects.goal = b;
+                    nearestObjects.goaldistance = distance;
+                    nearestObjects.goalwrap = wrap;
+                    nearestObjects.goalIsBlock = true;
+                    nearestObjects.goalSpotRow = spotRow;
+                }
+            }
+        }
     }
 }
 

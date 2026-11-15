@@ -188,6 +188,22 @@ void build()
                 }
             }
 
+            // A running jump (VELTURBOJUMP, about 4 tiles): up 4 tiles beside a ledge two columns
+            // over, then onto it. It needs speed at take-off: a tile of run-up behind us. The jump
+            // carries us on a little while we brake, so this column and the next must be open all
+            // the way up (never under the ledge while rising).
+            for (int d = -1; d <= 1; d += 2) {
+                const int tc = c + 2 * d;
+                const int tr = r - 4;
+                if (!standable(tc, tr) || !standable(c - d, r))
+                    continue;
+                bool open = true;
+                for (int up = 1; up <= 4 && open; up++)
+                    open = passable(c, r - up) && passable(c + d, r - up);
+                if (open)
+                    add(Move::RunJump, tc, tr, 10);
+            }
+
             // Drop through the platform we stand on
             const int f = g_map->map(c, r + 1);
             if ((f & tile_flag_solid_on_top) && !(f & tile_flag_solid) && !blockSolid(c, r + 1)) {
@@ -226,6 +242,34 @@ int shortestDir(int from, int to)
 }
 
 }  // namespace
+
+int SpotBelow(int col, int row)
+{
+    if (!g_map)
+        return -1;
+    ensureGraph();
+    for (int y = row + 1; y <= row + 3 && y + 1 < H; y++) {
+        if (!passable(col, y))
+            return -1;
+        if (g_graph.spot[node(wrapCol(col), y)])
+            return y;
+    }
+    return -1;
+}
+
+bool RunJumpFrom(int col, int row, int dir)
+{
+    if (!g_map || col < 0 || row < 0 || row >= H)
+        return false;
+    ensureGraph();
+    const int n = node(wrapCol(col), row);
+    for (int e = g_graph.first[n]; e < g_graph.first[n + 1]; e++) {
+        const Edge& edge = g_graph.edges[static_cast<size_t>(e)];
+        if (edge.move == Move::RunJump && shortestDir(wrapCol(col), edge.to % W) == dir)
+            return true;
+    }
+    return false;
+}
 
 bool CanCrossEdge(int y1, int y2)
 {

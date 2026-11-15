@@ -232,8 +232,10 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     playerKeys->game_left.fDown = false;
     playerKeys->game_right.fDown = false;
 
-    //A percentage of the time the cpu will do nothing based on the difficulty level
-    if (RandomNumberGenerator::gameplay().getBoolean(100, iDecisionPercentage[game_values.cpudifficulty]) && pPlayer->isready())
+    //A percentage of the time the cpu will do nothing based on the difficulty level (not in the
+    //middle of a running jump: half done, it would only bump its head on the ledge)
+    const bool committed = navMove == static_cast<short>(ainav::Move::RunJump) && navActive;
+    if (RandomNumberGenerator::gameplay().getBoolean(100, iDecisionPercentage[game_values.cpudifficulty]) && pPlayer->isready() && !committed)
         return;
 
     playerKeys->game_jump.fDown = false;
@@ -460,6 +462,37 @@ void CPlayerAI::Think(COutputControl * playerKeys)
                         }
                     }
                 }
+            }
+        } else if (actionType == 1 && nearestObjects.goalIsBlock) { //Hit a ? block from below
+            CObject * block = nearestObjects.goal;
+            const int blockX = block->x() + TILESIZE / 2;
+            const int spotY = nearestObjects.goalSpotRow * TILESIZE + TILESIZE / 2;
+            int spotCol = -1, spotRow = -1;
+            const bool under = !pPlayer->inair && ainav::PlayerSpot(ix, iy, spotCol, spotRow) && spotRow == nearestObjects.goalSpotRow &&
+                               spotCol == block->x() / TILESIZE;
+            const int dx = ainav::HorizontalDistance(blockX - (ix + PW / 2), iy, spotY);
+            if (under) {
+                //Under it: line up with it, then jump into it
+                if (dx < -4)
+                    playerKeys->game_left.fDown = true;
+                else if (dx > 4)
+                    playerKeys->game_right.fDown = true;
+                if (dx >= -8 && dx <= 8)
+                    playerKeys->game_jump.fDown = !pPlayer->lockjump;
+            } else if (pPlayer->inair && navMove == 0 && dx >= -24 && dx <= 24 && block->y() < iy) {
+                //Jumping into it: keep rising, stay under it
+                if (pPlayer->vely < 0.0f)
+                    playerKeys->game_jump.fDown = true;
+                if (dx < -4)
+                    playerKeys->game_left.fDown = true;
+                else if (dx > 4)
+                    playerKeys->game_right.fDown = true;
+            } else if (!NavigateTo(playerKeys, blockX, spotY)) {
+                //No path known: head that way
+                if (dx < 0)
+                    playerKeys->game_left.fDown = true;
+                else
+                    playerKeys->game_right.fDown = true;
             }
         } else if (actionType == 1) { //Go for goal
             CObject * goal = nearestObjects.goal;
@@ -899,6 +932,16 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
                 playerKeys->game_jump.fDown = true;
             if (pPlayer->iy + PH <= floorTop + 4 || navRow * TILESIZE >= pPlayer->iy)
                 steerTo(navCol);
+        } else if (navMove == static_cast<short>(ainav::Move::RunJump)) {
+            // The whole jump; brake (back toward where we took off) until our head is above the
+            // ledge's underside, then onto it (its side may stop us on the way up: harmless)
+            const int floorBottom = (navRow + 2) * TILESIZE;
+            if (pPlayer->vely < 0.0f)
+                playerKeys->game_jump.fDown = true;
+            if (pPlayer->iy >= floorBottom)
+                steerTo(navLastCol);
+            else
+                steerTo(navCol);
         } else {
             steerTo(navCol);
         }
@@ -910,7 +953,8 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
         return false;
     if (cmd::g_autotest.aiBench && navMove != 0 && !(col == navLastCol && row == navLastRow)) {
         // We were following a move and have landed: did we get where it leads?
-        const int k = navMove == static_cast<short>(ainav::Move::Jump) ? 0 : navMove == static_cast<short>(ainav::Move::Drop) ? 1 : 2;
+        const int k = navMove == static_cast<short>(ainav::Move::Jump) || navMove == static_cast<short>(ainav::Move::RunJump) ? 0
+                      : navMove == static_cast<short>(ainav::Move::Drop) ? 1 : 2;
         aibench::navTried[k]++;
         if (col == navCol && row == navRow)
             aibench::navReached[k]++;
@@ -934,6 +978,9 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
                 left = true;
             else if (step.dir > 0)
                 right = true;
+            //(onto the start of a running jump: get there running, fast enough to take off)
+            if (step.dir != 0 && ainav::RunJumpFrom(step.toCol, step.toRow, step.dir))
+                playerKeys->game_turbo.fDown = true;
             break;
         case ainav::Move::Drop:
             // Falling through needs a fresh press of down
@@ -952,6 +999,33 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
                         left = true;
                     else
                         right = true;
+                }
+            }
+            break;
+        }
+        case ainav::Move::RunJump: {
+            // Run (with run held, past walking speed) toward the ledge and jump while we're still
+            // in this column's first part, braking at once (the jump keeps its height: the speed
+            // counts when it starts). Too far in, or too slow to get there in time: back up first.
+            const int d = step.dir < 0 ? -1 : 1;
+            const float v = pPlayer->velx * static_cast<float>(d);
+            const int along = (px + PW / 2 - (col * TILESIZE + TILESIZE / 2)) * d;
+            constexpr float TAKEOFF = VELMOVING + 0.6f;    // still over walking speed after a frame of braking
+            constexpr int LAST = 8;                          // the last place to take off (pixels past the middle)
+            bool& ahead = d < 0 ? left : right;
+            bool& back = d < 0 ? right : left;
+            if (v > TAKEOFF && along <= LAST) {
+                playerKeys->game_turbo.fDown = true;
+                playerKeys->game_jump.fDown = !pPlayer->lockjump;
+                back = true;
+            } else {
+                const float speed = v > 0.0f ? v : 0.0f;
+                const float need = (TAKEOFF * TAKEOFF - speed * speed) / (2.0f * VELMOVINGADD) + (v < 0.0f ? v * v / (2.0f * VELMOVINGADD) : 0.0f);
+                if (v >= 0.0f && static_cast<float>(along) + need <= static_cast<float>(LAST)) {
+                    playerKeys->game_turbo.fDown = true;
+                    ahead = true;
+                } else {
+                    back = true;
                 }
             }
             break;
@@ -1118,7 +1192,7 @@ void CPlayerAI::UseMovementItems(COutputControl * playerKeys, short actionType, 
         hasTarget = true;
     } else if (actionType == 1 && nearest.goal) {
         tx = nearest.goal->x() + nearest.goal->w() / 2;
-        ty = nearest.goal->y() + nearest.goal->h() / 2;
+        ty = nearest.goalIsBlock ? nearest.goalSpotRow * TILESIZE + TILESIZE / 2 : nearest.goal->y() + nearest.goal->h() / 2;
         hasTarget = true;
     }
     const int dx = hasTarget ? ainav::HorizontalDistance(tx - (pPlayer->ix + PW / 2), pPlayer->iy, ty) : 0;
