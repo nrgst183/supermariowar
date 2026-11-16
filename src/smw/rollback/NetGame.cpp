@@ -1113,12 +1113,17 @@ void NetGame::loadState(int frame)
 bool NetGame::advance(const InputFrame& input, bool resimulating)
 {
     const Clock::time_point start = Clock::now();
-    if (resimulating) {
+    //(a tick shown before by the run-ahead: seen and heard then, see GameplayTick.cpp)
+    const bool shownAhead = !resimulating && g_sim.tick <= sim::detail::aheadTick;
+    if (resimulating || shownAhead) {
         sim::ResimulationScope scope;
         sim::detail::rollbackTick = g_sim.tick;    //(its late sounds: Resimulation.h)
         GameplayState::instance().advanceTick(input);
         sim::detail::rollbackTick = -1;
-        GameplayState::instance().correction().afterResimulatedTick();
+        if (resimulating)
+            GameplayState::instance().correction().afterResimulatedTick();
+        else
+            GameplayState::instance().correction().afterTick();
     } else {
         sim::detail::shownTick = g_sim.tick;
         GameplayState::instance().advanceTick(input);

@@ -21,6 +21,7 @@
 #                         d: 150 ms latency, 20 ms jitter, 10% loss
 #                         (latency and jitter are one way: the round trip gets them twice)
 #   --matches N           matches per run (default 2)
+#   (NETPLAY_EXTRA_ARGS: more arguments for every peer, e.g. "--at-runahead 2")
 #   --frames N            frame limit of a match (default 1200, 62.5 frames a second)
 #   --match KIND          single (default), minigame, or a whole multi-match mode:
 #                         tournament (2 wins), tour (the tour "0smw", 3 stops) or
@@ -151,7 +152,7 @@ run_peer() {
         TIMEFORMAT="proccpu: user %U sys %S real %R"
         # line buffered: the disconnect tests watch the logs while the game runs
         time HOME="$home" SDL_VIDEO_DRIVER=dummy SDL_AUDIO_DRIVER=dummy \
-            $LINEBUF ./smw --datadir "${PEER_DATA[$peer]:-$ROOT/data}" --autotest --at-norender 1 --net-stats 300 "$@"
+            $LINEBUF ./smw --datadir "${PEER_DATA[$peer]:-$ROOT/data}" --autotest --at-norender 1 --net-stats 300 ${NETPLAY_EXTRA_ARGS:-} "$@"
         echo "exit $?"
     ) > "$log" 2>&1
     rm -rf "$home"

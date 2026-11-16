@@ -26,6 +26,7 @@ std::pair<CGameConfig, config::Bridge> makePeculiar()
     config.toplayer = true;
     config.framelimiter = 13;
     config.smoothmotion = false;
+    config.runahead = 3;
     config.shownetstats = true;
     config.buttonprompts = 2;
     config.overlaycolors = 3;
@@ -215,7 +216,7 @@ TEST_CASE("TOML config document covers every descriptor field exactly once")
     }, config::NamedLayout<CGameConfig>::sections);
 
     CHECK(counts[0] == 11);
-    CHECK(counts[1] == 74);
+    CHECK(counts[1] == 75);
     CHECK(counts[2] == 2); // gamemode_settings, gamemode_goals
 }
 

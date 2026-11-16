@@ -26,6 +26,7 @@
 #include "NetOverlay.h"
 #include "rollback/NetGame.h"
 #include "rollback/Replay.h"
+#include "rollback/Snapshot.h"
 #include "MatchHistory.h"
 #include "rollback/StateChecksum.h"
 #include "rollback/SyncTest.h"
@@ -851,6 +852,8 @@ bool GameplayState::updateMatchTransition()
 void GameplayState::update()
 {
     lastUpdateTicked = false;
+    //(run-ahead: back to the real state, before anything looks at it)
+    leaveRunAhead();
 
     if (rollback::NetGame::instance().inMatch()) {
         updateNetplay();
@@ -900,7 +903,9 @@ void GameplayState::update()
             sim::ResimulationScope resim;
             simulateTick(input);
         } else {
-            advanceTick(input);
+            runRealTick(input);
+            lastUpdateTicked = true;    //(drawn between the ticks of the state ahead too)
+            runAhead(input);
         }
         lastUpdateTicked = true;
     }
@@ -979,6 +984,15 @@ void GameplayState::updateNetplay()
 
     const rollback::NetGame::Outcome outcome = net.advance(input);
     lastUpdateTicked = outcome.ticks > 0;
+    if (!outcome.ended && !outcome.failed && net.inMatch()) {
+        //Run-ahead: the others' last known input, ours the newest
+        InputFrame ahead = lastTickInput;
+        for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
+            if (net.isLocalSlot(slot))
+                ahead.players[slot] = input.players[slot];
+        }
+        runAhead(ahead);
+    }
 
     if (outcome.ended || outcome.failed) {
         if (cmd::g_autotest.enabled) {

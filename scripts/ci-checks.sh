@@ -4,6 +4,7 @@
 #
 #  1. Rollback sync test, every game mode: every tick rolls back up to 8 ticks,
 #     re-simulates them and checks that the state is identical.
+#     Run-ahead: the same checksums with it as without.
 #  2. Replays: matches recorded with CPU players play back exactly (all stored
 #     checksums match), with random jumps in the timeline.
 #  3. Netplay over 127.0.0.1 (scripts/netplay-test.sh): 2 and 3 peers, without
@@ -40,6 +41,18 @@ for mode in $(seq 0 21); do
     if [ "$mismatches" -ne 0 ] || ! grep -q "replay: saved" <<< "$out"; then
         echo "FAIL mode $mode: $mismatches mismatches"
         grep -m 3 "MISMATCH" <<< "$out"
+        fails=$((fails + 1))
+    else
+        echo "ok   mode $mode"
+    fi
+done
+
+echo "== Run-ahead (the simulation must be the same with it)"
+for mode in 0 9 15; do
+    base=$(smw --at-mode "$mode" --at-frames 1200 --at-seed 7 --at-humans 2 --at-peersum 50 2>&1 | grep "^peersum")
+    ahead=$(smw --at-mode "$mode" --at-frames 1200 --at-seed 7 --at-humans 2 --at-peersum 50 --at-runahead 3 2>&1 | grep "^peersum")
+    if [ -z "$base" ] || [ "$base" != "$ahead" ]; then
+        echo "FAIL mode $mode: the checksums differ with run-ahead"
         fails=$((fails + 1))
     else
         echo "ok   mode $mode"

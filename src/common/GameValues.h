@@ -163,6 +163,7 @@ public:
     short		wandfreezetime;
     bool		toplayer;
     bool		smoothmotion = true;    // draw moving things between ticks (interpolated)
+    short		runahead = 1;           // run-ahead: show the match this many ticks ahead (0..3), less input lag
     bool		shownetstats = false;   // online: the network info line (ping, input delay, rollbacks)
     bool		showpingbars = true;    // online and in online replays: signal bars on the other players' score panels
     short		overlaycolors = 0;      // the theater's and the editors' colors: 0 night, 1 pipe (green), 2 castle, 3 SMB3 (the status bar's blue)

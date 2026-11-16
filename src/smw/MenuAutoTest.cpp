@@ -814,6 +814,18 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
+    //--at-role graphics: the graphics options menu (its "Run-Ahead" option)
+    if (at.shotsRole == "graphics" && step == 1) {
+        if (t == 1)
+            return MENU_CODE_BACK_TO_GRAPHIC_OPTIONS_MENU;
+        if (t == 20) {
+            shot("g1_graphics_menu");
+            step = 1000;
+            t = 0;
+        }
+        return MENU_CODE_NONE;
+    }
+
     //--at-role history: the match history screen and a replay of its newest match
     if (at.shotsRole == "history" || at.shotsRole == "theater") {
         switch (step) {

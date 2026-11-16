@@ -23,6 +23,7 @@ private:
     MI_SelectField<bool>* miTopLayerField;
     MI_SelectField<short>* miFrameRateField;
     MI_SelectField<bool>* miSmoothMotionField;
+    MI_SelectField<short>* miRunAheadField;
     MI_SelectField<bool>* miFullscreenField;
 
     MI_PacksField* miMenuGraphicsPackField;

@@ -24,6 +24,7 @@ struct AutoTestArgs {
     bool aiBench = false;    // print kills/deaths per player at the end of each match
     bool shotTicks = false;  // --at-shot-every counts simulation ticks instead of drawn frames
     bool resim = false;      // run every gameplay tick as a re-simulation (side effects suppressed)
+    int runahead = 0;        // --at-runahead N: run-ahead ticks (the setting isn't used in auto-play)
     int realtime = 0;        // 0: unthrottled; 1/2/3: normal pacing with the VSync/Uncapped/62.5 FPS frame
                              // rate, printing the measured tick and render rates
     int humans = 0;          // the first N players are humans, with seeded random input (not from devices)

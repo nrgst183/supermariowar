@@ -5,12 +5,11 @@
 #include "GameplayInterpolation.h"
 #include "GameState.h"
 #include "input.h"
+#include "InputFrame.h"
 
 #include <memory>
 
-namespace rollback { class SyncTest; }
-
-struct InputFrame;
+namespace rollback { class SyncTest; class Snapshot; }
 
 // The gameplay state. Every 16 ms, update() runs the frame logic around the
 // simulation: input gathering, the pause and exit dialogs, autotest
@@ -39,6 +38,14 @@ class GameplayState : public GameState
         // simulation.
         bool rendersBetweenTicks() const override { return true; }
         void render(float alpha) override;
+
+        // Run-ahead (GameplayTick.cpp): after the frame's tick, the match runs a few ticks further
+        // with the same input, and that is what is drawn (and heard): the effect of a button shows
+        // that many ticks sooner. The next frame goes back to the real state first.
+        int runAheadFrames() const;
+        void runAhead(const InputFrame& input);
+        void leaveRunAhead();
+        void runRealTick(const InputFrame& input);
 
         // Online: the corrections after a rollback, drawn smoothly (GameplayCorrection.h)
         CorrectionSmoother& correction() { return correctionSmoother; }
@@ -106,6 +113,11 @@ class GameplayState : public GameState
         bool matchOnline = false;       // the match is an online one (for the match history)
 
         std::unique_ptr<rollback::SyncTest> syncTest;    // --at-synctest
+
+        std::unique_ptr<rollback::Snapshot> aheadReal;   // run-ahead: the real state, while the one ahead is shown
+        bool aheadShown = false;                         // ... (it is)
+        bool runningAhead = false;                       // the ticks run ahead now (not recorded in the replay)
+        InputFrame lastTickInput {};                     // the input of the latest tick run
 
         short respawnanimationtimer[4];
         short respawnanimationframe[4];

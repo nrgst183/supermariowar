@@ -1,4 +1,5 @@
 #include "rollback/Replay.h"
+#include "rollback/Snapshot.h"
 #include "GSGameplay.h"
 #include "CpuDriver.h"
 
@@ -11,6 +12,10 @@
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "sfx.h"
+#include "CmdArgs.h"
+#include "Resimulation.h"
+
+#include <algorithm>
 
 #include <format>
 #include <string>
@@ -78,10 +83,101 @@ void GameplayState::simulateTick(const InputFrame& input)
 
 void GameplayState::advanceTick(const InputFrame& input)
 {
-    replay::recordTick(input);
+    lastTickInput = input;
+    //(a tick run ahead isn't part of the match yet: the replay records the real one)
+    if (!runningAhead)
+        replay::recordTick(input);
     interpolator.capture();
     simulateTick(input);
-    replay::afterTick();
+    if (!runningAhead)
+        replay::afterTick();
+}
+
+//-----------------------------------------------------------------------------
+// RUN-AHEAD
+//
+// The frame's real tick runs, its state is saved, and then the match runs a few
+// ticks further with the same input (online: the players' last known input, ours
+// the newest). That state is drawn, so a button's effect shows those ticks
+// sooner, as in an emulator's run-ahead. The next frame goes back to the saved
+// state before anything else and runs the real tick; when the player kept the
+// same buttons (nearly always), the result is the one already shown.
+//
+// Sounds and other cosmetic effects come from the newest tick run ahead, the
+// first time it runs: the ticks run again later (ahead again, or for real) are
+// re-simulations (Resimulation.h), and a sound the real input made that wasn't
+// heard ahead is played late.
+//-----------------------------------------------------------------------------
+
+int GameplayState::runAheadFrames() const
+{
+    const int frames = cmd::g_autotest.enabled ? cmd::g_autotest.runahead : game_values.runahead;
+    return std::clamp(frames, 0, 3);
+}
+
+void GameplayState::leaveRunAhead()
+{
+    //(a new match: the ticks start over)
+    if (sim::detail::aheadTick > g_sim.tick + 4)
+        sim::detail::aheadTick = -1;
+    if (!aheadShown)
+        return;
+    aheadShown = false;
+    rollback::loadState(*aheadReal);
+}
+
+void GameplayState::runAhead(const InputFrame& input)
+{
+    const int frames = runAheadFrames();
+    if (frames <= 0 || aheadShown || game_values.appstate != AppState::Game || game_values.flags.pausegame ||
+        game_values.flags.exitinggame || replay::playing())
+        return;
+    if (!aheadReal)
+        aheadReal = std::make_unique<rollback::Snapshot>();
+    rollback::saveState(*aheadReal);
+    const InputFrame real = lastTickInput;
+    runningAhead = true;
+    bool shown = true;
+    for (int k = 0; k < frames; k++) {
+        const int tick = g_sim.tick;
+        if (k < frames - 1 || tick <= sim::detail::aheadTick) {
+            //(run ahead before: seen and heard then)
+            sim::ResimulationScope scope;
+            sim::detail::rollbackTick = tick;
+            advanceTick(input);
+            sim::detail::rollbackTick = -1;
+        } else {
+            sim::detail::shownTick = tick;
+            advanceTick(input);
+            sim::detail::aheadTick = tick;
+        }
+        //(the match ends or changes ahead: that happens for real, not ahead)
+        if (game_values.appstate != AppState::Game) {
+            shown = false;
+            break;
+        }
+    }
+    runningAhead = false;
+    lastTickInput = real;
+    if (shown)
+        aheadShown = true;
+    else
+        rollback::loadState(*aheadReal);
+}
+
+// A tick of the match run for real (offline): one already shown ahead is a re-simulation
+void GameplayState::runRealTick(const InputFrame& input)
+{
+    const int tick = g_sim.tick;
+    if (tick <= sim::detail::aheadTick) {
+        sim::ResimulationScope scope;
+        sim::detail::rollbackTick = tick;
+        advanceTick(input);
+        sim::detail::rollbackTick = -1;
+    } else {
+        sim::detail::shownTick = tick;
+        advanceTick(input);
+    }
 }
 
 void GameplayState::applyTickInput(const InputFrame& input)

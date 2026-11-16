@@ -458,6 +458,7 @@ template<> struct NamedLayout<CGameConfig> {
             field("top_layer", &CGameConfig::toplayer),
             field("frame_limiter", &CGameConfig::framelimiter),
             field("smooth_motion", &CGameConfig::smoothmotion),
+            field("run_ahead", &CGameConfig::runahead),
             field("show_net_stats", &CGameConfig::shownetstats),
             field("ping_bars", &CGameConfig::showpingbars),
             field("overlay_colors", &CGameConfig::overlaycolors),

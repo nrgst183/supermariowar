@@ -21,6 +21,10 @@ inline bool resimulating = false;
 // played late instead of not at all (sfx.cpp).
 inline int rollbackTick = -1;
 inline int shownTick = -1;
+// Run-ahead (GameplayTick.cpp): the latest tick run ahead of the present and shown (-1: none). When
+// the match gets there for real, the tick runs again as a re-simulation: what it did was already
+// seen and heard.
+inline int aheadTick = -1;
 } // namespace detail
 
 inline bool isResimulating()
