@@ -498,6 +498,38 @@ bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst
         return true;
     }
 
+    // Color key only: copy what isn't the key
+    if (!op.blend && op.colorkey && op.src_alpha) {
+        for (int y = 0; y < area.h; y++) {
+            const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(src), area.sy + y) + area.sx;
+            Uint32* d = rowPtr(dst, area.dy + y) + area.dx;
+            for (int x = 0; x < area.w; x++) {
+                const Uint32 p = s[x];
+                if ((p & RGB_MASK) != op.key)
+                    d[x] = p;
+            }
+        }
+        return true;
+    }
+
+    // The usual sprite: per-pixel alpha (mostly 0 or 255), no color key or
+    // alpha modulation
+    if (op.blend && op.src_alpha && !op.colorkey && op.alpha_mod == 255) {
+        for (int y = 0; y < area.h; y++) {
+            const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(src), area.sy + y) + area.sx;
+            Uint32* d = rowPtr(dst, area.dy + y) + area.dx;
+            for (int x = 0; x < area.w; x++) {
+                const Uint32 p = s[x];
+                const Uint32 a = p >> 24;
+                if (a == 255)
+                    d[x] = p;
+                else if (a != 0)
+                    op.apply(p, d + x);
+            }
+        }
+        return true;
+    }
+
     for (int y = 0; y < area.h; y++) {
         const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(src), area.sy + y) + area.sx;
         Uint32* d = rowPtr(dst, area.dy + y) + area.dx;

@@ -75,16 +75,22 @@ SDL_Surface* IMG_Load(const char* file)
     }
 
     const unsigned char* src = rgba;
+    bool opaque = true;
     for (int y = 0; y < h; y++) {
         Uint32* dst = reinterpret_cast<Uint32*>(static_cast<Uint8*>(surface->pixels) + static_cast<size_t>(y) * surface->pitch);
-        for (int x = 0; x < w; x++, src += 4)
+        for (int x = 0; x < w; x++, src += 4) {
             dst[x] = (static_cast<Uint32>(src[3]) << 24) | (static_cast<Uint32>(src[0]) << 16) | (static_cast<Uint32>(src[1]) << 8) | src[2];
+            opaque = opaque && src[3] == 255;
+        }
     }
     stbi_image_free(rgba);
 
-    // Opaque images (no alpha channel in the file) don't need blending, as in
-    // SDL_image, where they load into a format without alpha
-    if (channels == 3 || channels == 1)
+    // Opaque images don't need blending (as in SDL_image, where an image
+    // without an alpha channel loads into a format without alpha). This also
+    // goes for PNGs with an alpha channel that is opaque everywhere: their
+    // blits become plain copies. The game turns blending on when it sets a
+    // color key or an alpha.
+    if (opaque)
         surface->blend_mode = SDL_BLENDMODE_NONE;
 
     return surface;

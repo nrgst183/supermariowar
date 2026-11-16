@@ -1,8 +1,11 @@
 // Xbox SDL3 compatibility layer: window, renderer and texture on Direct3D 8.
 //
 // The game renders on the CPU into a 640x480 surface, uploads it into a
-// streaming texture and presents it. Here the texture is a plain memory
-// buffer, and presenting copies it into the D3D back buffer and swaps.
+// streaming texture and presents it. Here presenting copies the frame into a
+// linear D3D texture (two, used in turns, so the CPU doesn't wait for the GPU
+// to finish with the last one) and draws it as one full-screen quad. Writing
+// into the back buffer from the CPU instead is very slow (on xemu at least:
+// ~170 ms per frame).
 
 #include <xtl.h>
 
@@ -47,6 +50,14 @@ constexpr int k_screen_w = 640;
 constexpr int k_screen_h = 480;
 
 SDL_Window* g_window = nullptr;
+D3DTexture* g_frame_textures[2] = {nullptr, nullptr};
+int g_frame_index = 0;
+
+struct QuadVertex {
+    float x, y, z, rhw;
+    float u, v;
+};
+constexpr DWORD k_quad_fvf = D3DFVF_XYZRHW | D3DFVF_TEX1;
 SDL_Renderer* g_renderer = nullptr;
 SDL_DisplayMode g_display_mode {};
 
@@ -102,6 +113,31 @@ bool createDevice(SDL_Renderer* renderer)
     // Soften the interlaced flicker on SD TVs
     D3DDevice_SetFlickerFilter(1);
     D3DDevice_SetSoftDisplayFilter(FALSE);
+
+    // The frame textures: linear (not swizzled), so the CPU can write them
+    // directly, and addressed in texels (0..640, 0..480)
+    for (D3DTexture*& texture : g_frame_textures) {
+        texture = D3DDevice_CreateTexture2(k_screen_w, k_screen_h, 1, 1, 0, D3DFMT_LIN_X8R8G8B8, D3DRTYPE_TEXTURE);
+        if (!texture)
+            return SDL_SetError("Couldn't create the frame texture");
+    }
+
+    // Fixed pipeline state for drawing a textured, pre-transformed quad
+    D3DDevice_SetVertexShader(k_quad_fvf);
+    D3DDevice_SetRenderState(D3DRS_ZENABLE, FALSE);
+    D3DDevice_SetRenderState(D3DRS_LIGHTING, FALSE);
+    D3DDevice_SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
+    D3DDevice_SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    D3DDevice_SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
+    D3DDevice_SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
+    D3DDevice_SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
+    D3DDevice_SetTextureStageState(0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE);
+    D3DDevice_SetTextureStageState(0, D3DTSS_MINFILTER, D3DTEXF_POINT);
+    D3DDevice_SetTextureStageState(0, D3DTSS_MAGFILTER, D3DTEXF_POINT);
+    D3DDevice_SetTextureStageState(0, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
+    D3DDevice_SetTextureStageState(0, D3DTSS_ADDRESSV, D3DTADDRESS_CLAMP);
+    D3DDevice_SetTextureStageState(1, D3DTSS_COLOROP, D3DTOP_DISABLE);
+    D3DDevice_SetTextureStageState(1, D3DTSS_ALPHAOP, D3DTOP_DISABLE);
 
     D3DDevice_Clear(0, NULL, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
     D3DDevice_Swap(0);
@@ -247,17 +283,18 @@ void updateOverlayStats()
     g_overlay.window_start_cycles = now_cycles;
 }
 
-void copyToBackBuffer(const SDL_Texture* texture)
+void presentTexture(const SDL_Texture* texture)
 {
-    D3DSurface* backbuffer = D3DDevice_GetBackBuffer2(0);
-    if (!backbuffer)
-        return;
+    D3DTexture* frame = g_frame_textures[g_frame_index];
+    g_frame_index ^= 1;
 
     const Uint8* src = texture->source ? static_cast<const Uint8*>(texture->source) : reinterpret_cast<const Uint8*>(texture->pixels);
     const int src_pitch = texture->source ? texture->source_pitch : texture->pitch;
 
+    // Waits if the GPU still draws from this texture (two frames ago)
     D3DLOCKED_RECT locked;
-    D3DSurface_LockRect(backbuffer, &locked, NULL, 0);
+    locked.pBits = nullptr;
+    D3DTexture_LockRect(frame, 0, &locked, NULL, 0);
     if (locked.pBits) {
         auto* dst = static_cast<Uint8*>(locked.pBits);
         const int w = SDL_min(texture->w, k_screen_w);
@@ -265,17 +302,32 @@ void copyToBackBuffer(const SDL_Texture* texture)
         if (locked.Pitch == src_pitch && w == k_screen_w) {
             memcpy(dst, src, static_cast<size_t>(src_pitch) * h);
         } else {
-            for (int y = 0; y < h; y++) {
+            for (int y = 0; y < h; y++)
                 memcpy(dst + static_cast<size_t>(y) * locked.Pitch, src + static_cast<size_t>(y) * src_pitch, static_cast<size_t>(w) * 4);
-            }
         }
         if (g_sdlx_overlay) {
             for (int i = 0; i < 6; i++)
                 drawText(dst, locked.Pitch, 40, 40 + i * 20, g_overlay.lines[i]);
         }
     }
-    D3DSurface_UnlockRect(backbuffer);
-    D3DSurface_Release(backbuffer);
+    D3DTexture_UnlockRect(frame, 0);
+
+    // One quad over the screen; -0.5 lines the texels up with the pixels
+    const float x0 = -0.5f, y0 = -0.5f;
+    const float x1 = k_screen_w - 0.5f, y1 = k_screen_h - 0.5f;
+    const float u1 = static_cast<float>(k_screen_w), v1 = static_cast<float>(k_screen_h);
+    const QuadVertex quad[4] = {
+        {x0, y0, 0.0f, 1.0f, 0.0f, 0.0f},
+        {x1, y0, 0.0f, 1.0f, u1, 0.0f},
+        {x1, y1, 0.0f, 1.0f, u1, v1},
+        {x0, y1, 0.0f, 1.0f, 0.0f, v1},
+    };
+
+    D3DDevice_BeginScene();
+    D3DDevice_SetTexture(0, reinterpret_cast<D3DBaseTexture*>(frame));
+    D3DDevice_DrawVerticesUP(D3DPT_QUADLIST, 4, quad, sizeof(QuadVertex));
+    D3DDevice_SetTexture(0, NULL);
+    D3DDevice_EndScene();
 }
 } // namespace
 
@@ -457,7 +509,7 @@ bool SDL_RenderPresent(SDL_Renderer* renderer)
 
     const Uint64 copy_start = sdlx_cycles();
     if (renderer->pending) {
-        copyToBackBuffer(renderer->pending);
+        presentTexture(renderer->pending);
     } else {
         D3DDevice_Clear(0, NULL, D3DCLEAR_TARGET, renderer->clear_color, 1.0f, 0);
     }
