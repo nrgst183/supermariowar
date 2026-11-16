@@ -9,12 +9,10 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 > **About this fork.** This is a just-for-fun fork of [mmatyas/supermariowar](https://github.com/mmatyas/supermariowar). Basically everything added here was claude-slopped: I had Claude (Anthropic's AI) write the additions to the game for fun. All the credit for Super Mario War goes to Mátyás Mustoha ([mmatyas](https://github.com/mmatyas)), who made the fork this one is built on and keeps the game alive, and to the original developers: Samuele Poletto (*Mario War*), Florian Hufsky and the 72dpiarmy community (*Super Mario War*), and everyone who made the maps, skins, worlds and sounds over the years. See [History](#history) below.
 
 - [What's new in this fork](#whats-new-in-this-fork)
-  - [Gameplay and bots](#gameplay-and-bots)
-  - [Online play with rollback netcode](#online-play-with-rollback-netcode)
-  - [Editors](#editors)
-  - [Menus](#menus)
+  - [Online multiplayer](#online-multiplayer)
+  - [Map and world editors in the game](#map-and-world-editors-in-the-game)
   - [Theater: replays of every match](#theater-replays-of-every-match)
-  - [Under the hood](#under-the-hood)
+  - [Improvements](#improvements)
 - [History](#history)
 - [About](#about)
 - [Building](#building-instructions)
@@ -33,17 +31,7 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 
 ## What's new in this fork
 
-### Gameplay and bots
-
-![Four CPU players with random skins on Boo's Mansion, The Arctic, Airshipz and Mushroom Valley](docs/gfx/fork/gameplay.png)
-
-- **Smarter CPU players.** The bots find their way around a map instead of running at walls: they plan paths over jumps, drops and Sidewinder-style running jumps, take warp pipes between floors (Derelict), go for the ? blocks and the power-ups that come out, and fight better (stomping, dodging stomps).
-- **CPU players play by input.** Their AI runs outside the game simulation and sends button presses like a human player, so replays keep the CPUs' exact play and online matches stay in sync.
-- **A Super Mario Bros. 3 style interface**: status-bar panels in several color schemes (Night, Pipe, Castle, SMB3), power-up icons, and readable overlays that don't shake with the screen.
-- **Controller prompts** for Xbox controllers, including the original Xbox controller (detected automatically, or chosen in the controls menu).
-- Random skins per player, smooth motion between frames, and 50 more classic community maps.
-
-### Online play with rollback netcode
+### Online multiplayer
 
 ![The online lobby: the host, a joiner playing with two players on one computer, and a CPU; a joiner downloading the host's map](docs/gfx/fork/online.png)
 
@@ -54,46 +42,32 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 
 See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 
-### Editors
+### Map and world editors in the game
 
-The **map and world editors** are inside the game (**Main menu, Editors**), with mouse, keyboard and full controller support. **Edit together**: one player hosts a map or a world, the others join and edit it at the same time.
+![The map editor](docs/gfx/fork/map_editor.png)
 
-#### Map editor
+![The world editor](docs/gfx/fork/world_editor.png)
 
-![The map editor: its window on the blocks and on the tile types; three players' gloves and the info chip; a screen's commands (platforms) and the tile picker; the on-screen keyboard](docs/gfx/fork/map_editor.png)
-
-- **The editor window** (Start or Tab) docks beside the map: tools (paint, erase, move, pick), layers, and palettes of blocks, items and tile types with a tip for each. With a controller, the d-pad moves a highlight through it and choosing a block takes you straight back to the map.
-- **Every player gets a glove**: each controller (and the mouse) has its own animated Mario Paint style glove in the player's color, with a frame on the tile it edits. On the map, X takes what's under the glove, Y changes the layer and LB / RB step through the blocks, items and tile types; the chip in the corner shows what's selected.
-- **Every screen works with a controller**: the tile picker, warps, platforms, hazards, race goals, backgrounds and the rest show what the buttons do there, and Start lists the screen's commands (new platform, its path, delete...).
-- **An on-screen keyboard** in the original Xbox dashboard's style, built from the game's pipes and blocks, for naming maps with a controller.
-
-#### World editor
-
-![The world editor: its window with the modes, and the world with its info chip](docs/gfx/fork/world_editor.png)
-
-- The same **editor window**, with the world editor's modes, world settings and file commands, driven by the d-pad or clicked with the mouse.
-- An **info chip** with the mode, the world and the cell under the cursor, and the controller's buttons.
-
-### Menus
-
-![The Editors menu and the Online menu](docs/gfx/fork/menus.png)
-
-- The **Editors** menu picks maps or worlds, then this computer or online (host or join), and the **Online** menu is laid out in the same rounded panels with pipe buttons, with prompts for the controller or the keys you're using.
+- **Make and edit maps and worlds right in the game** (**Main menu, Editors**), with a mouse and keyboard or a controller.
+- **Edit together**: one player hosts a map or a world, the others join and edit it with them at the same time, online or on one computer.
 
 ### Theater: replays of every match
 
 ![The theater: jumping to the next kill, paused with a controller, the controls, and the leave prompt](docs/gfx/fork/theater.png)
 
 - Every match is saved as a small replay (the inputs, not a video), with the skins, the music and the players' pings. **Main menu, History** lists your matches.
-- The **theater** plays them back with a timeline (score changes and kills marked on it), pause, frame stepping, fast forward and rewind, smooth slow motion, a camera that follows any player, and jumping anywhere by clicking or dragging on the timeline.
-- **Fully playable with a controller**: the d-pad jumps to the previous or next *moment* (a kill, a point, the end of the match, landing just before it), the left stick scrubs through the replay, and B asks before it leaves.
+- The **theater** plays them back with a timeline (score changes and kills marked on it), pause, frame stepping, fast forward and rewind, smooth slow motion, a camera that follows any player, and jumping to any moment, with a controller or the mouse and keyboard.
 
 See [docs/HistoryReplaysEditors.md](docs/HistoryReplaysEditors.md).
 
-### Under the hood
+### Improvements
 
-- The game simulation is deterministic and runs on a fixed tick, which is what makes rollback, replays and the theater possible.
-- GitHub Actions builds every push for Linux, macOS, Windows, the web and the original Xbox, runs the unit tests, and runs `scripts/ci-checks.sh`: the rollback sync test in every game mode, replays with random jumps, and online matches over localhost with simulated lag, packet loss and disconnects.
+![Four CPU players with random skins on Boo's Mansion, The Arctic, Airshipz and Mushroom Valley](docs/gfx/fork/gameplay.png)
+
+- **Smarter CPU players** that find their way around a map: running jumps, warp pipes, ? blocks and power-ups, and better fighting.
+- **50 more classic community maps**, random skins per player, and smooth motion between frames.
+- **A Super Mario Bros. 3 style interface**, refreshed menus, and controller prompts for Xbox controllers, including the original Xbox controller.
+- The game simulation is deterministic and runs on a fixed tick, which is what makes rollback, replays and the theater possible. GitHub Actions builds every push for Linux, macOS, Windows, the web and the original Xbox, and checks that online play and replays stay in sync.
 
 
 ## History
