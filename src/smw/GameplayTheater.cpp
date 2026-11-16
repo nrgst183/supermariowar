@@ -59,13 +59,17 @@ constexpr int UI_SHOW_FRAMES = 200;    // after the last input
 
 // The layout (screen coordinates): the dock (the game's green dialog) at the
 // bottom, the timeline (a line) in it, the buttons under it
-constexpr int DOCK_Y = 394;
-constexpr int TRACK_X = 88;
-constexpr int TRACK_W = 446;
-constexpr int TRACK_Y = 420;
-constexpr int TRACK_H = 16;
-constexpr int BUTTON_Y = 446;
-constexpr int BUTTON_H = 26;
+// (the timeline is drawn half again as big, like the buttons' icons: TIMELINE_*
+// are its row's place on the screen, TRACK_* the line's)
+constexpr int DOCK_Y = 364;
+constexpr int TIMELINE_Y = 370;
+constexpr int TIMELINE_H = 60;
+constexpr int TRACK_X = 105;
+constexpr int TRACK_W = 429;
+constexpr int TRACK_Y = 400;    //(the line's middle: TRACK_Y + 12)
+constexpr int TRACK_H = 24;
+constexpr int BUTTON_Y = 432;
+constexpr int BUTTON_H = 36;
 
 constexpr SDL_Color WHITE {255, 255, 255, 255};
 constexpr SDL_Color BLACK {0, 0, 0, 255};
@@ -261,28 +265,48 @@ bool barShown()
     return !th.hidden && (th.paused || th.help || replay::playbackStatus().finished || th.uiFrames > 0);
 }
 
-// The width of a button
-int buttonWidth(Control c)
+// The buttons' icons: the 16 pixel icons, half again as big
+constexpr int BUTTON_ICON = 24;
+
+// The buttons' padding: as roomy as fits (the keys' caps are wider than a controller's buttons)
+int g_buttonPad = 10;
+
+// The width of a button: its icon, (the speed,) and its controller button or key inside it
+int buttonWidth(Control c, int pad = g_buttonPad)
 {
-    return c == SPEED ? 62 : 30;
+    const ControlInfo& info = CONTROLS[static_cast<size_t>(c)];
+    //(the speed: its name instead of an icon, as wide as the widest)
+    const int icon = c == SPEED ? theme::font().getWidth("1/4x") : BUTTON_ICON;
+    return pad + icon + pad / 2 + 2 + prompts::promptWidth(info.pad, info.key, "") + pad;
 }
 
 // Lays out the buttons: the play controls on the left, the others on the right
 void layout()
 {
     Theater& th = g_theater;
+    //(the padding: the most that lets both groups fit side by side)
+    g_buttonPad = 4;
+    for (int pad = 10; pad > 4; pad--) {
+        int total = 14 + 14 + 6 * 8 + 16;
+        for (int c = 0; c < CONTROL_COUNT; c++)
+            total += buttonWidth(static_cast<Control>(c), pad);
+        if (total <= App::screenWidth) {
+            g_buttonPad = pad;
+            break;
+        }
+    }
     int x = 14;
     for (int c = BACK5; c <= SPEED; c++) {
         const int w = buttonWidth(static_cast<Control>(c));
         th.rects[static_cast<size_t>(c)] = {x, BUTTON_Y, w, BUTTON_H};
-        x += w + 2 + prompts::promptWidth(CONTROLS[static_cast<size_t>(c)].pad, CONTROLS[static_cast<size_t>(c)].key, "") + 6;
+        x += w + 8;
     }
     x = App::screenWidth - 14;
     for (int c = LEAVE; c >= FOLLOW; c--) {
         const int w = buttonWidth(static_cast<Control>(c));
-        x -= prompts::promptWidth(CONTROLS[static_cast<size_t>(c)].pad, CONTROLS[static_cast<size_t>(c)].key, "") + 2 + w;
+        x -= w;
         th.rects[static_cast<size_t>(c)] = {x, BUTTON_Y, w, BUTTON_H};
-        x -= 6;
+        x -= 8;
     }
 }
 
@@ -411,17 +435,53 @@ void drawPlayhead(int cx, int cy, bool held)
     }, {{'#', BLACK}, {'l', GOLD_LIGHT}, {'g', gold}, {'d', {200, 136, 0, 255}}});
 }
 
+// Some drawing, half again as big: drawn at its size on the side (in the area's
+// coordinates, divided by 1.5), then scaled up as pixel art
+template <typename Draw>
+void drawBigger(const SDL_Rect& area, Draw draw)
+{
+    const int w = (area.w * 2 + 2) / 3;
+    const int h = (area.h * 2 + 2) / 3;
+    static SDL_Surface* canvas = nullptr;
+    if (!canvas || canvas->w < w || canvas->h < h) {
+        SDL_DestroySurface(canvas);
+        canvas = SDL_CreateSurface(std::max(w, App::screenWidth), std::max(h, 64), SDL_PIXELFORMAT_ARGB8888);
+        if (!canvas)
+            return;
+        SDL_SetSurfaceBlendMode(canvas, SDL_BLENDMODE_BLEND);
+    }
+    const SDL_Rect src {0, 0, w, h};
+    SDL_FillSurfaceRect(canvas, &src, SDL_MapSurfaceRGBA(canvas, 0, 0, 0, 0));
+    SDL_Surface* screen = blitdest;
+    blitdest = canvas;
+    SDL_SetSurfaceClipRect(canvas, &src);
+    draw();
+    SDL_SetSurfaceClipRect(canvas, nullptr);
+    blitdest = screen;
+    const SDL_Rect dst {area.x, area.y, w * 3 / 2, h * 3 / 2};
+    SDL_BlitSurfaceScaled(canvas, &src, blitdest, &dst, SDL_SCALEMODE_PIXELART);
+}
+
+// A button's icon, half again as big (24 pixels: x, y its top left)
+void drawIconBigger(Control c, int x, int y)
+{
+    //(room around the 16 pixels: some icons reach past them)
+    drawBigger({x - 12, y - 12, 48, 48}, [c] { drawIcon(c, 8, 8); });
+}
+
 void drawButton(Control c, const SDL_Rect& r, bool hover, bool active)
 {
     const Theater& th = g_theater;
     //Like the menus' fields: gray, green when selected (here: under the mouse, or switched on)
     theme::block(r.x, r.y, r.w, r.h, hover ? theme::Tone::Green : active ? theme::Tone::Gold : theme::Tone::Gray);
-    if (c == SPEED) {
-        drawIcon(c, r.x + 5, r.y + 5);
-        theme::font().drawCentered(r.x + 40, r.y + 5, SPEED_NAMES[th.speed]);
-    } else {
-        drawIcon(c, r.x + (r.w - 16) / 2, r.y + 5);
-    }
+    //(the icon at the left, the button or key that does it at the right)
+    const int iy = r.y + (r.h - 16) / 2;
+    if (c == SPEED)
+        theme::font().drawCentered(r.x + g_buttonPad + theme::font().getWidth("1/4x") / 2, r.y + (r.h - theme::font().getHeight()) / 2, SPEED_NAMES[th.speed]);
+    else
+        drawIconBigger(c, r.x + g_buttonPad, r.y + (r.h - BUTTON_ICON) / 2);
+    const ControlInfo& info = CONTROLS[static_cast<size_t>(c)];
+    prompts::drawPrompt(r.x + r.w - g_buttonPad - prompts::promptWidth(info.pad, info.key, ""), iy, info.pad, info.key, "");
 }
 
 void drawHelp()
@@ -918,47 +978,69 @@ void GameplayState::drawReplayOverlay()
     //are flags in the scoring team's color, the end a checkered flag; the
     //playhead a gold knob
     const int total = std::max(1, status.total);
-    const int done = TRACK_W * std::clamp(g_sim.tick, 0, total) / total;
-    theme::progressLine(TRACK_X - 4, TRACK_Y, TRACK_W + 8, static_cast<float>(std::clamp(g_sim.tick, 0, total)) / static_cast<float>(total));
-    int lastFlag = -100;
-    int lastKill = -100;
-    for (const replay::Marker& m : replay::markers()) {
-        const int mx = TRACK_X + TRACK_W * m.tick / total;
-        //(one flag in 10 pixels, one kill mark in 8: in some modes the score changes all the time)
-        if (m.delta > 0 && mx - lastFlag < 10)
-            continue;
-        if (m.delta < 0 && mx - lastKill < 8)
-            continue;
-        if (m.delta == 0) {
-            theme::modeIcon(mx - 3, TRACK_Y - 18, 13);
-        } else if (m.delta > 0) {
-            lastFlag = mx;
-            theme::flag(mx - 1, TRACK_Y - 14, teamColor(m.team));
-        } else {
-            //A kill: an outlined post in the team's color, standing on the line
-            lastKill = mx;
-            const SDL_Color c = teamColor(m.team);
-            prompts::art(mx - 3, TRACK_Y - 8, {
-                "###",
-                "#l#",
-                "#c#",
-                "#c#",
-                "#c#",
-                "###",
-            }, {{'#', {0, 0, 0, 255}}, {'c', c}, {'l', theme::shade(c, 150)}});
+    const int tick = std::clamp(g_sim.tick, 0, total);
+    const int done = TRACK_W * tick / total;
+    const std::string now = history::formatDuration(g_sim.tick);
+    const std::string end = history::formatDuration(status.total);
+    drawBigger({0, TIMELINE_Y, App::screenWidth, TIMELINE_H}, [&] {
+        //(in the row's coordinates: two thirds of the screen's)
+        const int tx = TRACK_X * 2 / 3;
+        const int tw = TRACK_W * 2 / 3;
+        const int ty = (TRACK_Y - TIMELINE_Y) * 2 / 3;    //(the line's middle: ty + 8)
+        theme::progressLine(tx - 4, ty, tw + 8, static_cast<float>(tick) / static_cast<float>(total));
+        //(in a long match the kills would be a fence: then they're small marks, further apart)
+        int kills = 0;
+        for (const replay::Marker& m : replay::markers())
+            kills += m.delta < 0 ? 1 : 0;
+        const bool crowded = kills * 10 > tw;
+        int lastFlag = -100;
+        int lastKill = -100;
+        for (const replay::Marker& m : replay::markers()) {
+            const int mx = tx + tw * m.tick / total;
+            //(one flag in 10 pixels, one kill mark in 8: in some modes the score changes all the time)
+            if (m.delta > 0 && mx - lastFlag < 10)
+                continue;
+            if (m.delta < 0 && mx - lastKill < (crowded ? 6 : 8))
+                continue;
+            if (m.delta == 0) {
+                theme::modeIcon(mx - 3, ty - 18, 13);
+            } else if (m.delta > 0) {
+                lastFlag = mx;
+                theme::flag(mx - 1, ty - 14, teamColor(m.team));
+            } else {
+                //A kill: an outlined post in the team's color, standing on the line
+                lastKill = mx;
+                const SDL_Color c = teamColor(m.team);
+                if (crowded) {
+                    //(a dot on the line)
+                    prompts::art(mx - 2, ty + 3, {
+                        "##",
+                        "##",
+                    }, {{'#', c}}, 1);
+                    continue;
+                }
+                prompts::art(mx - 3, ty - 8, {
+                    "###",
+                    "#l#",
+                    "#c#",
+                    "#c#",
+                    "#c#",
+                    "###",
+                }, {{'#', {0, 0, 0, 255}}, {'c', c}, {'l', theme::shade(c, 150)}});
+            }
         }
-    }
-    drawPlayhead(TRACK_X + done, TRACK_Y + 8, th.dragging || th.scrubbing);
+        drawPlayhead(tx + tw * tick / total, ty + 8, th.dragging || th.scrubbing);
+        //(the times: the status bar's timer)
+        //(clear of the playhead, at either end)
+        theme::font().draw(tx - 14 - theme::font().getWidth(now), ty, now);
+        theme::font().draw(tx + tw + 14, ty, end);
+    });
     //(the moment jumped to, or the time while scrubbing: over the playhead)
     if (th.scrubbing)
-        theme::tooltip(std::clamp(TRACK_X + done, 60, App::screenWidth - 60), TRACK_Y - 6, history::formatDuration(g_sim.tick));
+        theme::tooltip(std::clamp(TRACK_X + done, 60, App::screenWidth - 60), DOCK_Y - 12, history::formatDuration(g_sim.tick));
     else if (th.toastFrames > 0 && !th.toast.empty())
         theme::tooltip(std::clamp(TRACK_X + done, 40 + theme::font().getWidth(th.toast) / 2, App::screenWidth - 40 - theme::font().getWidth(th.toast) / 2),
-            th.paused || finished ? DOCK_Y - 50 : TRACK_Y - 6, th.toast);    //(over the paused banner)
-    //(the times: the status bar's timer)
-    const std::string now = history::formatDuration(g_sim.tick);
-    theme::timer(TRACK_X - 12 - theme::timerWidth(now), TRACK_Y, now);
-    theme::timer(TRACK_X + TRACK_W + 12, TRACK_Y, history::formatDuration(status.total));
+            th.paused || finished ? DOCK_Y - 50 : DOCK_Y - 12, th.toast);    //(over the paused banner)
 
     //The buttons, each with its controller button or key
     int hovered = -1;
@@ -969,14 +1051,12 @@ void GameplayState::drawReplayOverlay()
             hovered = c;
         const bool active = (c == FOLLOW && th.follow >= 0) || (c == HELP && th.help);
         drawButton(static_cast<Control>(c), r, hover, active);
-        const ControlInfo& info = CONTROLS[static_cast<size_t>(c)];
-        prompts::drawPrompt(r.x + r.w + 2, BUTTON_Y + 5, info.pad, info.key, "");
     }
 
     //(the mouse over the timeline: the time there)
     if (prompts::lastDevice() == prompts::Device::Keyboard && th.mouseY >= TRACK_Y - 10 && th.mouseY < TRACK_Y + TRACK_H + 6 &&
             th.mouseX >= TRACK_X && th.mouseX < TRACK_X + TRACK_W)
-        theme::tooltip(static_cast<int>(th.mouseX), TRACK_Y - 6, history::formatDuration(tickAt(th.mouseX)));
+        theme::tooltip(static_cast<int>(th.mouseX), DOCK_Y - 12, history::formatDuration(tickAt(th.mouseX)));
 
     //Paused, or the end: a banner over the dock (the mode, the map, when)
     const bool titled = th.paused || finished;
