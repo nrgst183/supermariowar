@@ -1,0 +1,117 @@
+name: Build - Xbox
+on: workflow_call
+
+# Original Xbox build with RXDK (https://github.com/Team-Resurgent/RXDK-Libs):
+# the RXDK clang/lld toolchain, the RXDK SDK (headers + Xbox libraries) and the
+# RXDK host tools (Rxdk.Cli, imagebld, xdvdfs, the CMake toolchain file), all
+# on Linux. SDL comes from the compatibility layer in platform/xbox.
+
+jobs:
+  xbox:
+    runs-on: ubuntu-24.04
+    name: Original Xbox (RXDK)
+    env:
+      RXDK_ROOT: ${{ github.workspace }}/.rxdk
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake ninja-build unzip zip
+
+      # Rxdk.Cli and imagebld are .NET 8 programs
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install RXDK
+        run: |
+          set -euo pipefail
+          mkdir -p "$RXDK_ROOT"
+          cd "$RXDK_ROOT"
+
+          echo "::group::Host tools (RXDK-Tools)"
+          curl -fsSL -o tools.zip \
+            https://github.com/Team-Resurgent/RXDK-Tools/releases/latest/download/rxdk-managed-linux-x64.zip
+          unzip -q tools.zip -d tools-pkg
+          cli="$(find tools-pkg -type f -name Rxdk.Cli | head -n 1)"
+          test -n "$cli"
+          mv "$(dirname "$cli")" tools
+          echo "::endgroup::"
+
+          echo "::group::xdvdfs (ISO packing)"
+          xdvdfs_url="$(gh api repos/Team-Resurgent/xdvdfs/releases/latest --jq \
+            '[.assets[] | select(.name | startswith("xdvdfs-linux-") and endswith(".zip"))
+                        | select(.name | test("arm64|aarch64|fsd") | not)][0].browser_download_url')"
+          echo "$xdvdfs_url"
+          curl -fsSL -o xdvdfs.zip "$xdvdfs_url"
+          unzip -q -o xdvdfs.zip -d xdvdfs-pkg
+          cp "$(find xdvdfs-pkg -type f -name xdvdfs | head -n 1)" tools/xdvdfs
+          echo "::endgroup::"
+
+          echo "::group::LLVM toolchain (clang/lld for the Xbox)"
+          curl -fsSL -o llvm.zip \
+            https://github.com/Team-Resurgent/llvm-project/releases/download/latest/xbox-linux-x64.zip
+          unzip -q llvm.zip -d llvm
+          clang="$(find llvm -type f -path '*/bin/clang' | head -n 1)"
+          test -n "$clang"
+          llvm_root="$(cd "$(dirname "$clang")/.." && pwd)"
+          echo "::endgroup::"
+
+          echo "::group::SDK (headers and Xbox libraries)"
+          git clone --depth 1 https://github.com/Team-Resurgent/RXDK-SDK sdk
+          echo "::endgroup::"
+
+          # Zip archives don't keep the executable bits
+          chmod +x tools/* "$llvm_root"/bin/*
+          rm -rf tools.zip tools-pkg xdvdfs.zip xdvdfs-pkg llvm.zip
+
+          {
+            echo "RXDK_STAGED_TOOLS=$RXDK_ROOT/tools"
+            echo "RXDK_STAGED_SDK=$RXDK_ROOT/sdk"
+            echo "RXDK_LLVM=$llvm_root"
+          } >> "$GITHUB_ENV"
+
+          echo "SDK: $(cat sdk/VERSION)"
+          "$llvm_root/bin/clang" --version | head -n 1
+
+      - name: Check the toolchain
+        run: |
+          "$RXDK_STAGED_TOOLS/Rxdk.Cli" toolchain-info
+
+      - name: Configure
+        run: cmake
+          -B build-xbox -G Ninja
+          -DCMAKE_TOOLCHAIN_FILE="$RXDK_STAGED_TOOLS/cmake/RxdkToolchain.cmake"
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build-xbox --verbose
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          # The .xbe is next to the other executables, the disc image under src/smw
+          out=build-xbox/src/smw
+          ls -l build-xbox/smw.xbe "$out"/XISO/supermariowar.iso
+
+          # A folder to copy to the hard disk (default.xbe + data), and the disc image
+          rm -rf dist && mkdir -p dist
+          cp -r "$out/Build/supermariowar" dist/supermariowar
+          rm -f dist/supermariowar/data/.git
+          (cd dist && zip -9 -q -r "supermariowar_$(date +%F)_xbox.zip" supermariowar)
+          cp "$out/XISO/supermariowar.iso" "dist/supermariowar_$(date +%F)_xbox.iso"
+          ls -l dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: xbox
+          path: |
+            dist/supermariowar_*_xbox.zip
+            dist/supermariowar_*_xbox.iso

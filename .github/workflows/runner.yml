@@ -43,6 +43,11 @@ jobs:
     name: Android
     uses: ./.github/workflows/build_android.yml
 
+  build-xbox:
+    if: *should-run
+    name: Xbox
+    uses: ./.github/workflows/build_xbox.yml
+
   # Publishes the build artifacts:
   #  - pushing a tag like `v2.1.0` creates the GitHub release "v2.1.0"
   #    (tags with a suffix such as `v2.1.0-beta.1` become pre-releases)
