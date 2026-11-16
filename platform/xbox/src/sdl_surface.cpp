@@ -440,8 +440,19 @@ Uint32 SDL_MapSurfaceRGBA(SDL_Surface* surface, Uint8 r, Uint8 g, Uint8 b, Uint8
 
 /* ---- Drawing ------------------------------------------------------------- */
 
+namespace {
+// Adds the time of a scope to a profiler counter
+struct ProfileScope {
+    volatile Uint64& counter;
+    Uint64 start;
+    explicit ProfileScope(volatile Uint64& c) : counter(c), start(sdlx_cycles()) {}
+    ~ProfileScope() { counter = counter + (sdlx_cycles() - start); }
+};
+} // namespace
+
 bool SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color)
 {
+    ProfileScope profile(g_sdlx_profile.fill);
     if (!checkSurface(dst, "dst"))
         return false;
 
@@ -465,12 +476,15 @@ bool SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color)
 
 bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst, const SDL_Rect* dstrect)
 {
+    ProfileScope profile(g_sdlx_profile.blit);
+    g_sdlx_profile.blits = g_sdlx_profile.blits + 1;
     if (!checkSurface(src, "src") || !checkSurface(dst, "dst"))
         return false;
 
     BlitArea area;
     if (!clipBlit(src, srcrect, dst, dstrect, area))
         return true;
+    g_sdlx_profile.blit_pixels = g_sdlx_profile.blit_pixels + static_cast<Uint32>(area.w * area.h);
 
     const PixelOp op = makePixelOp(src, dst);
 
@@ -522,6 +536,9 @@ bool SDL_BlitSurfaceScaled(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surfac
     // Same size: a normal blit
     if (sr.w == dr.w && sr.h == dr.h)
         return SDL_BlitSurface(src, &sr, dst, &dr);
+
+    ProfileScope profile(g_sdlx_profile.blit);
+    g_sdlx_profile.blits = g_sdlx_profile.blits + 1;
 
     const PixelOp op = makePixelOp(src, dst);
 

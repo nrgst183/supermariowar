@@ -43,3 +43,6 @@ to copy to the hard disk.
   X power-up, Start pause, Back cancel. The d-pad works like the left stick.
 - No online play, map editor or world editor on the Xbox.
 - To keep within 64 MB of RAM, only the 4 most recently used tilesets stay loaded.
+- Press both sticks in (L3 + R3) to show or hide a profiler: frame time split into blitting,
+  filling, the copy to the screen, the swap (vertical blank wait), the rest of the game, and the
+  audio thread's share of the CPU.

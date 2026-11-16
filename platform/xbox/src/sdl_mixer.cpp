@@ -264,6 +264,7 @@ void mixPacket(Sint16* dst)
 DWORD WINAPI mixerThread(LPVOID)
 {
     while (g_thread_running) {
+        const Uint64 start = sdlx_cycles();
         DirectSoundDoWork();
         for (int i = 0; i < k_packets; i++) {
             if (g_packet_status[i] == static_cast<DWORD>(XMEDIAPACKET_STATUS_PENDING))
@@ -281,6 +282,7 @@ DWORD WINAPI mixerThread(LPVOID)
             if (FAILED(IDirectSoundStream_Process(g_stream, &packet, NULL)))
                 g_packet_status[i] = 0;
         }
+        g_sdlx_profile.mixer = g_sdlx_profile.mixer + (sdlx_cycles() - start);
         Sleep(2);
     }
     return 0;

@@ -21,3 +21,22 @@ Uint64 sdlx_ticks_ns();
 
 // Debug output: the debugger/xbWatson log, and stdout
 void sdlx_log(const char* fmt, ...);
+
+// Profiler: where the frame time goes, shown on screen (L3 + R3 toggles it).
+// Times are CPU cycles (rdtsc), summed until the overlay takes them each second.
+struct SdlxProfile {
+    volatile Uint64 blit = 0;      // SDL_BlitSurface / SDL_BlitSurfaceScaled
+    volatile Uint64 fill = 0;      // SDL_FillSurfaceRect
+    volatile Uint64 copy = 0;      // frame copy into the back buffer
+    volatile Uint64 swap = 0;      // D3D swap (includes the wait for the vertical blank)
+    volatile Uint64 mixer = 0;     // audio mixing and decoding (mixer thread)
+    volatile Uint32 blits = 0;
+    volatile Uint32 blit_pixels = 0;
+};
+extern SdlxProfile g_sdlx_profile;
+extern bool g_sdlx_overlay;
+
+inline Uint64 sdlx_cycles()
+{
+    return __builtin_ia32_rdtsc();
+}

@@ -172,6 +172,10 @@ void updatePort(int port, const XINPUT_GAMEPAD* pad)
     for (Sint16& axis : axes)
         axis = static_cast<Sint16>(axis & ~0xFF);
 
+    // L3 + R3 (both sticks pressed in) toggles the profiler overlay
+    if (buttons[10] && buttons[11] && !(state.buttons[10] && state.buttons[11]))
+        g_sdlx_overlay = !g_sdlx_overlay;
+
     for (int i = 0; i < k_buttons; i++) {
         if (buttons[i] != state.buttons[i]) {
             state.buttons[i] = buttons[i];
