@@ -114,7 +114,16 @@ struct Theater {
     prompts::PadState pad;
     prompts::PadState lastPad;
 
+    //The controller's extras: the moments (d-pad), scrubbing (left stick), leaving (asks first)
+    int holdPrev = 0;
+    int holdNext = 0;
+    bool scrubbing = false;
+    bool confirmLeave = false;
+    std::string toast;         // what was jumped to (over the playhead)
+    int toastFrames = 0;
+
     //This frame's commands (keyboard and mouse events, then the controller)
+    int moment = 0;            // -1 the previous moment, +1 the next
     bool playPause = false;
     int skip = 0;              // -1 back, +1 forward
     int speedChange = 0;
@@ -177,6 +186,68 @@ int nextFollow(int slot)
             return k;
     }
     return -1;
+}
+
+// ---- the moments: the kills, the points and the end of the match, to jump to (a little before)
+
+constexpr int MOMENT_LEAD = 94;    // 1.5 seconds before it happens
+
+std::string teamName(int team)
+{
+    static const char* colors[] = {"Red", "Green", "Yellow", "Blue"};
+    if (team < 0 || team >= 4 || game_values.teamcounts[team] <= 0)
+        return "Team " + std::to_string(team + 1);
+    if (game_values.teamcounts[team] == 1)
+        return followName(game_values.teamids[team][0]);
+    const short id = game_values.colorids[game_values.teamids[team][0]];
+    return std::string(colors[std::clamp<int>(id, 0, 3)]) + " team";
+}
+
+std::string momentLabel(const replay::Marker& m)
+{
+    if (m.delta == 0)
+        return "The match is decided";
+    if (m.delta < 0)
+        return "A kill: " + teamName(m.team);
+    return teamName(m.team) + (m.delta == 1 ? " scores" : " scores " + std::to_string(m.delta));
+}
+
+void jumpToMoment(int direction)
+{
+    Theater& th = g_theater;
+    const int now = g_sim.tick;
+    const int total = replay::playbackStatus().total;
+    //(one in 1 second: some modes score all the time)
+    std::vector<const replay::Marker*> moments;
+    for (const replay::Marker& m : replay::markers()) {
+        if (moments.empty() || m.tick - moments.back()->tick >= 62)
+            moments.push_back(&m);
+    }
+    const replay::Marker* chosen = nullptr;
+    if (direction > 0) {
+        for (const replay::Marker* m : moments) {
+            if (std::max(0, m->tick - MOMENT_LEAD) > now + 5) {
+                chosen = m;
+                break;
+            }
+        }
+    } else {
+        for (auto it = moments.rbegin(); it != moments.rend(); ++it) {
+            //(just after jumping to one: the one before it)
+            if (std::max(0, (*it)->tick - MOMENT_LEAD) < now - 40) {
+                chosen = *it;
+                break;
+            }
+        }
+    }
+    if (chosen) {
+        seekTo(std::max(0, chosen->tick - MOMENT_LEAD));
+        th.toast = momentLabel(*chosen);
+    } else {
+        seekTo(direction > 0 ? total : 0);
+        th.toast = direction > 0 ? "The end" : "The start";
+    }
+    th.toastFrames = 75;
 }
 
 bool inside(const SDL_Rect& r, float x, float y)
@@ -356,9 +427,9 @@ void drawButton(Control c, const SDL_Rect& r, bool hover, bool active)
 void drawHelp()
 {
     const int w = 580;
-    const int h = 332;
+    const int h = 376;
     const int x = (App::screenWidth - w) / 2;
-    const int y = 58;
+    const int y = 46;
     theme::panel(x, y, w, h);
     //(its title: an announcement, like the match's)
     theme::announce(App::screenWidth / 2, y - 26, "Theater", [](int ix, int iy) { theme::clapperboard(ix, iy); });
@@ -375,14 +446,15 @@ void drawHelp()
     const Row rows[] = {
         {PLAY, "Play / pause", {Pad::A}, {"Space"}},
         {FORWARD5, "Back / forward 5 s", {Pad::LB, Pad::RB}, {"Left", "Right"}},
-        {CONTROL_COUNT, "  paused: one frame", {Pad::Left, Pad::Right}, {"Left", "Right"}},
+        {CONTROL_COUNT, "  paused: one frame", {Pad::LB, Pad::RB}, {"Left", "Right"}},
+        {CONTROL_COUNT, "Previous / next moment", {Pad::Left, Pad::Right}, {"PgUp", "PgDn"}},
         {BACK5, "Rewind / fast fwd (hold)", {Pad::LT, Pad::RT}, {"Shift", "Left", "Right"}},
         {SPEED, "Slower / faster", {Pad::Down, Pad::Up}, {"Down", "Up"}},
         {FOLLOW, "Follow a player", {Pad::X}, {"F"}},
         {HIDE, "Hide the bar", {Pad::Y}, {"H"}},
         {HELP, "These controls", {Pad::Back}, {"F1"}},
         {LEAVE, "Leave", {Pad::B}, {"Esc"}},
-        {CONTROL_COUNT, "Jump in the replay", {}, {}},
+        {CONTROL_COUNT, "Jump in the replay", {Pad::LStick}, {}},
     };
     int ry = y + 64;
     bool odd = false;
@@ -392,7 +464,7 @@ void drawHelp()
         odd = !odd;
         if (row.icon != CONTROL_COUNT)
             drawIcon(row.icon, x + 20, ry + 1);
-        else if (row.pads.empty())
+        else if (row.keys.empty())
             drawPlayhead(x + 28, ry + 9, false);
         theme::font().draw(x + 44, ry + 1, row.what);
         int px = padX;
@@ -401,13 +473,26 @@ void drawHelp()
         int kx = keyX;
         for (const std::string& k : row.keys)
             kx += prompts::drawKey(kx, ry + 1, k) + 3;
-        if (row.pads.empty()) {
-            prompts::drawMouse(padX, ry + 1, true, false);
-            theme::font().draw(padX + 22, ry + 2, "click or drag on the meter");
+        if (row.keys.empty()) {
+            prompts::drawMouse(keyX, ry + 1, true, false);
+            theme::font().draw(keyX + 22, ry + 2, "drag the meter");
         }
         ry += 22;
     }
-    theme::font().drawCentered(App::screenWidth / 2, y + h - 32, "Close: the same button again");
+    theme::font().drawCentered(App::screenWidth / 2, y + h - 32, "A moment: a kill, a point or the end (jumps just before it)");
+}
+
+// "Leave the replay?" (a controller's B: a press too many shouldn't end it)
+void drawConfirmLeave()
+{
+    const std::vector<prompts::Prompt> row = {{{Pad::A}, {}, "leave"}, {{Pad::B}, {}, "keep watching"}};
+    const int w = std::max(theme::font().getWidth("Leave the replay?") + 60, prompts::promptsWidth(row, 16) + 48);
+    const int h = 86;
+    const int x = (App::screenWidth - w) / 2;
+    const int y = 150;
+    theme::panel(x, y, w, h);
+    theme::font().drawCentered(App::screenWidth / 2, y + 22, "Leave the replay?");
+    prompts::drawPrompts(App::screenWidth / 2, y + 50, row, 16);
 }
 
 void showUi()
@@ -456,6 +541,10 @@ void GameplayState::theaterEvent(const SDL_Event& event)
                 th.toggleHelp = true;
             else if (key == SDLK_ESCAPE || key == SDLK_BACKSPACE)
                 th.leave = true;
+            else if (key == SDLK_PAGEUP || key == SDLK_COMMA)
+                th.moment = -1;
+            else if (key == SDLK_PAGEDOWN || key == SDLK_PERIOD)
+                th.moment = 1;
             else if (key == SDLK_HOME)
                 seekTo(0);
             else if (key == SDLK_END)
@@ -543,22 +632,45 @@ void GameplayState::updateReplay()
         prompts::setLastDevice(prompts::Device::Controller);
         showUi();
     }
-    if (padPressed(prompts::A) || padPressed(prompts::START))
-        th.playPause = true;
-    if (padPressed(prompts::B))
-        th.leave = true;
-    if (padPressed(prompts::X))
-        th.followNext = true;
-    if (padPressed(prompts::Y))
-        th.toggleHide = true;
-    if (padPressed(prompts::BACK))
-        th.toggleHelp = true;
-    if (padPressed(prompts::UP))
-        th.speedChange = 1;
-    if (padPressed(prompts::DOWN))
-        th.speedChange = -1;
+    if (th.confirmLeave) {
+        //"Leave the replay?": A leaves, B (or Back) stays
+        if (padPressed(prompts::A) || padPressed(prompts::START))
+            th.leave = true;
+        else if (padPressed(prompts::B) || padPressed(prompts::BACK))
+            th.confirmLeave = false;
+        th.playPause = th.followNext = th.toggleHide = th.toggleHelp = false;
+        th.skip = th.speedChange = th.moment = 0;
+        if (th.leave) {
+            leaveReplay();
+            return;
+        }
+    } else {
+        if (padPressed(prompts::A) || padPressed(prompts::START))
+            th.playPause = true;
+        //(B asks first, unless the replay is over or the help is open)
+        if (padPressed(prompts::B)) {
+            if (th.help || replay::playbackStatus().finished)
+                th.leave = true;
+            else
+                th.confirmLeave = true;
+        }
+        if (padPressed(prompts::X))
+            th.followNext = true;
+        if (padPressed(prompts::Y))
+            th.toggleHide = true;
+        if (padPressed(prompts::BACK))
+            th.toggleHelp = true;
+        if (padPressed(prompts::UP))
+            th.speedChange = 1;
+        if (padPressed(prompts::DOWN))
+            th.speedChange = -1;
+    }
 
     //The help: the same button closes it (and B / Escape)
+    if (th.confirmLeave && th.leave && !padPressed(prompts::A) && !padPressed(prompts::START)) {
+        th.leave = false;
+        th.confirmLeave = false;
+    }
     if (th.help && th.leave) {
         th.leave = false;
         th.toggleHelp = true;
@@ -599,13 +711,37 @@ void GameplayState::updateReplay()
     };
     const bool* keys = SDL_GetKeyboardState(nullptr);
     const bool shift = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
-    const bool padBack = th.pad.buttons[prompts::LB] || th.pad.buttons[prompts::LEFT];
-    const bool padForward = th.pad.buttons[prompts::RB] || th.pad.buttons[prompts::RIGHT];
+    const bool asking = th.confirmLeave;
+    const bool padBack = !asking && th.pad.buttons[prompts::LB];
+    const bool padForward = !asking && th.pad.buttons[prompts::RB];
     const bool back = repeat(th.holdBack, padBack) || th.skip < 0;
     const bool forward = repeat(th.holdForward, padForward) || th.skip > 0;
     if (back || forward) {
         const int amount = th.paused ? 1 : SKIP_TICKS;
         seekTo(g_sim.tick + (forward ? amount : -amount));
+        showUi();
+    }
+
+    //The moments: the d-pad's left / right (held: repeats), PgUp / PgDn
+    const bool prevMoment = repeat(th.holdPrev, !asking && th.pad.buttons[prompts::LEFT]) || th.moment < 0;
+    const bool nextMoment = repeat(th.holdNext, !asking && th.pad.buttons[prompts::RIGHT]) || th.moment > 0;
+    if (prevMoment || nextMoment) {
+        jumpToMoment(nextMoment ? 1 : -1);
+        lastUpdateTicked = false;
+        showUi();
+    }
+
+    //Scrubbing: the left stick moves the playhead (across the whole match in about 2 seconds, pushed all the way)
+    th.scrubbing = false;
+    if (!asking && std::fabs(th.pad.lx) > 0.0f) {
+        const int total = std::max(1, replay::playbackStatus().total);
+        const float push = th.pad.lx * std::fabs(th.pad.lx);
+        const int step = static_cast<int>(std::lround(push * std::max(4.0f, total / 120.0f)));
+        if (step != 0) {
+            seekTo(std::clamp(g_sim.tick + step, 0, total));
+            lastUpdateTicked = false;
+        }
+        th.scrubbing = true;
         showUi();
     }
 
@@ -620,7 +756,7 @@ void GameplayState::updateReplay()
 
     //Play
     th.speedNow = 0;
-    if (!th.paused && !status.finished && rewind <= 0.05f) {
+    if (!th.paused && !status.finished && rewind <= 0.05f && !th.scrubbing) {
         const float speed = fastForward > 0.05f ? std::max(SPEEDS[static_cast<size_t>(th.speed)], 2.0f + 6.0f * fastForward)
                                                 : SPEEDS[static_cast<size_t>(th.speed)];
         th.speedNow = speed;
@@ -646,12 +782,15 @@ void GameplayState::updateReplay()
         static int demo = 0;
         ++demo;
         if (demo == 30) { th.follow = nextFollow(-1); showUi(); }
+        if (demo == 108) { prompts::setLastDevice(prompts::Device::Controller); jumpToMoment(1); showUi(); }
+        if (demo == 172) { th.confirmLeave = true; prompts::setLastDevice(prompts::Device::Controller); }
+        if (demo == 177) { th.confirmLeave = false; prompts::setLastDevice(prompts::Device::Keyboard); }
         if (demo == 140) { th.paused = true; prompts::setLastDevice(prompts::Device::Controller); }
         if (demo == 155) th.help = true;
         if (demo == 165) { th.help = false; prompts::setLastDevice(prompts::Device::Keyboard); }
         if (demo == 180) { seekTo(status.total - 90); th.paused = false; th.speed = 3; showUi(); }
-        g_theaterShot = demo == 100 ? "t1_playing_following" : demo == 150 ? "t2_paused_controller" : demo == 160 ? "t4_help" :
-                        demo == 170 ? "t5_paused_keyboard" : "";
+        g_theaterShot = demo == 100 ? "t1_playing_following" : demo == 114 ? "t1b_next_moment" : demo == 150 ? "t2_paused_controller" :
+                        demo == 160 ? "t4_help" : demo == 170 ? "t5_paused_keyboard" : demo == 175 ? "t6_leave_asks" : "";
     }
 
     //--at-replay-seeks N: a random jump every N frames (the checksums after it must match)
@@ -669,6 +808,9 @@ void GameplayState::updateReplay()
     }
 
     th.playPause = false;
+    th.moment = 0;
+    if (th.toastFrames > 0)
+        th.toastFrames--;
     th.skip = 0;
     th.speedChange = 0;
     th.followNext = false;
@@ -760,6 +902,12 @@ void GameplayState::drawReplayOverlay()
         prompts::drawPrompt(App::screenWidth - w + 3, App::screenHeight - 24, Pad::Back, "F1", "Replay");
         if (th.help)
             drawHelp();
+        if (th.confirmLeave)
+            drawConfirmLeave();
+        if (!g_theaterShot.empty()) {
+            gfx_save_screenshot(cmd::g_autotest.shotsDir + "/" + g_theaterShot + ".png");
+            g_theaterShot.clear();
+        }
         return;
     }
 
@@ -800,7 +948,13 @@ void GameplayState::drawReplayOverlay()
             }, {{'#', {0, 0, 0, 255}}, {'c', c}, {'l', theme::shade(c, 150)}});
         }
     }
-    drawPlayhead(TRACK_X + done, TRACK_Y + 8, th.dragging);
+    drawPlayhead(TRACK_X + done, TRACK_Y + 8, th.dragging || th.scrubbing);
+    //(the moment jumped to, or the time while scrubbing: over the playhead)
+    if (th.scrubbing)
+        theme::tooltip(std::clamp(TRACK_X + done, 60, App::screenWidth - 60), TRACK_Y - 6, history::formatDuration(g_sim.tick));
+    else if (th.toastFrames > 0 && !th.toast.empty())
+        theme::tooltip(std::clamp(TRACK_X + done, 40 + theme::font().getWidth(th.toast) / 2, App::screenWidth - 40 - theme::font().getWidth(th.toast) / 2),
+            th.paused || finished ? DOCK_Y - 50 : TRACK_Y - 6, th.toast);    //(over the paused banner)
     //(the times: the status bar's timer)
     const std::string now = history::formatDuration(g_sim.tick);
     theme::timer(TRACK_X - 12 - theme::timerWidth(now), TRACK_Y, now);
@@ -886,6 +1040,8 @@ void GameplayState::drawReplayOverlay()
     }
     if (th.help)
         drawHelp();
+    if (th.confirmLeave)
+        drawConfirmLeave();
 
     if (!g_theaterShot.empty()) {
         gfx_save_screenshot(cmd::g_autotest.shotsDir + "/" + g_theaterShot + ".png");

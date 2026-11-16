@@ -809,12 +809,15 @@ int editor_edit()
 				}
 			}
 
+			//(in the game, the overlay shows these: EditorInput.cpp)
+#ifndef SMW_EMBEDDED_EDITOR
 			rm->menu_font_small.draw(0, 0, szEditModes[edit_mode]);
 
 			if (fAutoPaint)
 				rm->menu_font_small.draw(0, 16, "Auto Paint");
 
                         rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
+#endif
 
 
             if (--g_musiccategorydisplaytimer > 0) {

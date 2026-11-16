@@ -124,6 +124,7 @@ enum MenuCodeEnum {
     MENU_CODE_HOST_LEVEL_EDITOR,        // editing together (editors/CoEdit.h)
     MENU_CODE_HOST_WORLD_EDITOR,
     MENU_CODE_JOIN_EDITOR,
+    MENU_CODE_EDITORS_ACTION,          // the editors menu's own buttons (UI_EditorsMenu::Act)
 };
 
 enum class MenuNavDirection : unsigned char {

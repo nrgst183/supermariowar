@@ -8,6 +8,7 @@
 #define SMW_EMBEDDED_EDITOR
 #include "CoEdit.h"
 #include "Version.h"
+#include "WorldShell.h"
 #include "../../worldeditor/WorldEditorState.h"
 
 namespace worldeditor {
@@ -238,4 +239,34 @@ std::unique_ptr<editors::coedit::Document> makeCoeditDocument()
 {
     return std::make_unique<CoeditDocument>();
 }
+// ---- the overlay's view of the editor (WorldShell.h)
+
+namespace shell {
+
+bool inMapView()
+{
+    return state == EDITOR_EDIT;
+}
+
+std::string modeName()
+{
+    std::string name = edit_mode >= 0 && edit_mode < 10 ? szEditModes[edit_mode] : "";
+    const std::string suffix = " Mode";
+    if (name.size() > suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0)
+        name.resize(name.size() - suffix.size());
+    return name;
+}
+
+bool autoPaint()
+{
+    return fAutoPaint;
+}
+
+std::string worldName()
+{
+    return worldlist ? worldlist->currentPath().stem().string() : std::string();
+}
+
+} // namespace shell
+
 } // namespace worldeditor

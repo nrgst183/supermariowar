@@ -1,6 +1,9 @@
 #pragma once
 
+#include <SDL3/SDL_keycode.h>
+
 #include <string>
+#include <vector>
 
 // What the editor window (EditorInput.cpp) needs of the level editor: its
 // current mode and selection, read and set directly (the same variables the
@@ -50,5 +53,27 @@ bool drawTiles(int x, int y, int size);
 // The eyedropper: the selection becomes what is at the cell (the block there in
 // block mode, else the tile of the active layer, else the block)
 void pick(int col, int row);
+
+// ---- the editor's other screens (the tilesets, warps, platforms...): how a
+// controller works them
+
+// One of the screen's key commands
+struct Command {
+    std::string label;
+    SDL_Keycode key = 0;
+    bool shift = false;
+};
+
+struct Screen {
+    std::string title;              // what the screen is (and what is in it now)
+    std::string a, b;               // what A (the left button) and B (the right button) do; empty: nothing
+    std::string shoulders;          // what LB / RB do (the keys lb and rb); empty: nothing
+    SDL_Keycode lb = 0, rb = 0;
+    SDL_Keycode xHold = 0, yHold = 0, rbHold = 0;    // keys held while X / Y / RB are (0: X and Y are Shift and Ctrl)
+    std::string holds;              // what those do
+    std::vector<Command> commands;  // the rest (the editor window lists them; Start)
+};
+// The screen showing now (when !inMapView())
+Screen currentScreen();
 
 }  // namespace leveleditor::shell

@@ -148,7 +148,7 @@ int editor_modeitems()
 				}
 			}
 
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Set Race Goal Locations - Press [2] for Flag Bases");
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Set Race Goal Locations - Press [2] for Flag Bases");
         } else if (modeitemmode == 1) {
             if (g_map->iNumFlagBases == 0) {
 				rm->menu_font_large.drawCentered(320, 200, "Flag bases are set to random.");
@@ -159,10 +159,10 @@ int editor_modeitems()
 				}
 			}
 
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Set Flag Base Locations - Press [1] for Race Goals");
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Set Flag Base Locations - Press [1] for Race Goals");
 		}
 
-		rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
+		if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
 
 		DrawMessage();
 		return EDITOR_MODEITEMS;

@@ -434,6 +434,184 @@ bool drawTiles(int x, int y, int size)
     return true;
 }
 
+int hazardType(int index)
+{
+    return index >= 0 && static_cast<size_t>(index) < g_map->maphazards.size() ? static_cast<int>(g_map->maphazards[static_cast<size_t>(index)].itype) : 0;
+}
+
+Screen currentScreen()
+{
+    Screen sc;
+    const Command done {"Done", SDLK_ESCAPE};
+    switch (state) {
+        case EDITOR_TILES:
+            sc.title = "Choose tiles: " + std::string(g_tilesetmanager->tileset(set_tile_tileset)->name());
+            sc.a = "take (drag: several)";
+            sc.shoulders = "tileset";
+            sc.lb = SDLK_PAGEUP;
+            sc.rb = SDLK_PAGEDOWN;
+            sc.commands = {{"Previous tileset", SDLK_PAGEUP}, {"Next tileset", SDLK_PAGEDOWN}, done};
+            break;
+        case EDITOR_TILETYPE:
+            sc.title = "Tile types";
+            sc.a = "take";
+            sc.commands = {done};
+            break;
+        case EDITOR_ANIMATION:
+            sc.title = "Animated tiles";
+            sc.a = "take (drag: several)";
+            sc.commands = {done};
+            break;
+        case EDITOR_WARP:
+            sc.title = "Warps: pick a color and a direction";
+            sc.a = "take";
+            sc.commands = {done};
+            break;
+        case EDITOR_EYECANDY:
+            sc.title = "Eyecandy, on each layer";
+            sc.a = "switch on / off";
+            sc.commands = {{"Done", SDLK_E}};
+            break;
+        case EDITOR_BACKGROUNDS:
+            sc.title = "Backgrounds";
+            sc.a = "take, with its music";
+            sc.b = "the picture only";
+            sc.shoulders = "page";
+            sc.lb = SDLK_PAGEUP;
+            sc.rb = SDLK_PAGEDOWN;
+            sc.commands = {{"Previous page", SDLK_PAGEUP}, {"Next page", SDLK_PAGEDOWN}, done};
+            break;
+        case EDITOR_BLOCKS:
+            sc.title = "Blocks";
+            sc.a = "take";
+            sc.commands = {done};
+            break;
+        case EDITOR_MAPITEMS:
+            sc.title = "Map items";
+            sc.a = "take";
+            sc.commands = {done};
+            break;
+        case EDITOR_PROPERTIES:
+            sc.title = "What the ? blocks give";
+            sc.a = "more";
+            sc.b = "less";
+            sc.holds = "LT: every block";
+            sc.commands = {{"Default", SDLK_D}, {"Every block: default", SDLK_D, true}, {"Random", SDLK_GRAVE}, {"Nothing", SDLK_0}, done};
+            break;
+        case EDITOR_MODEITEMS:
+            sc.title = modeitemmode == 0 ? "Race goals" : "Flag bases";
+            sc.a = "move (drag)";
+            sc.shoulders = "goals / bases";
+            sc.lb = SDLK_1;
+            sc.rb = SDLK_2;
+            sc.commands = {{"Race goals", SDLK_1}, {"Flag bases", SDLK_2}, {"Let the game place them", SDLK_R}, {"Save the map", SDLK_S}, done};
+            break;
+        case EDITOR_PLATFORM:
+            switch (iPlatformEditState) {
+                case PLATFORM_EDIT_STATE_SELECT:
+                    sc.title = "Platforms";
+                    sc.a = "edit one";
+                    sc.commands = {{"New platform", SDLK_N}, {"Try the paths", SDLK_C}, {"Save the map", SDLK_S}, done};
+                    break;
+                case PLATFORM_EDIT_STATE_PATH_TYPE:
+                case PLATFORM_EDIT_STATE_CHANGE_PATH_TYPE:
+                    sc.title = "Platform: its path's shape";
+                    sc.a = "choose";
+                    sc.commands = {done};
+                    break;
+                case PLATFORM_EDIT_STATE_PATH:
+                    sc.title = "Platform " + std::to_string(iEditPlatform + 1) + ": its path (" +
+                               szPathNames[static_cast<int>(g_Platforms[iEditPlatform].iPathType)] + ")";
+                    if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::Ellipse) {
+                        sc.a = "center";
+                        sc.b = "start angle";
+                        sc.xHold = SDLK_X;
+                        sc.yHold = SDLK_Z;
+                        sc.rbHold = SDLK_C;
+                        sc.holds = "hold X / Y / RB with A: width, height, circle";
+                    } else {
+                        sc.a = "start point";
+                        sc.b = g_Platforms[iEditPlatform].iPathType == PlatformPathType::Straight ? "end point" : "angle";
+                        sc.holds = "LT: snap";
+                    }
+                    sc.commands = {{"Path shape", SDLK_T}, done};
+                    break;
+                case PLATFORM_EDIT_STATE_TEST:
+                    sc.title = "Platforms: trying the paths";
+                    sc.commands = {done};
+                    break;
+                default:
+                    sc.title = "Platform " + std::to_string(iEditPlatform + 1);
+                    sc.a = "paint";
+                    sc.b = "erase";
+                    sc.shoulders = "slower / faster";
+                    sc.lb = SDLK_MINUS;
+                    sc.rb = SDLK_EQUALS;
+                    sc.commands = {{"Its tiles", SDLK_T}, {"Animated tiles", SDLK_A}, {"Tile types", SDLK_L}, {"Its path", SDLK_P},
+                        {"Draw layer", SDLK_Y}, {"Slower", SDLK_MINUS}, {"Faster", SDLK_EQUALS}, {"Delete it", SDLK_DELETE}, done};
+                    break;
+            }
+            break;
+        case EDITOR_MAPHAZARDS:
+            switch (iEditState) {
+                case MAPHAZARD_EDIT_STATE_SELECT:
+                    sc.title = "Hazards";
+                    sc.a = "edit one";
+                    sc.commands = {{"New hazard", SDLK_N}, done};
+                    break;
+                case MAPHAZARD_EDIT_STATE_TYPE:
+                    sc.title = "Hazard: what kind";
+                    sc.a = "choose";
+                    sc.commands = {done};
+                    break;
+                case MAPHAZARD_EDIT_STATE_LOCATION:
+                    sc.title = "Hazard: where it is";
+                    sc.a = "place";
+                    sc.commands = {{"Its settings", SDLK_P}, {"Delete it", SDLK_DELETE}, done};
+                    break;
+                default: {
+                    struct {
+                        MapHazardType itype;
+                    } hazard {static_cast<MapHazardType>(hazardType(iEditMapHazard))};
+                    sc.title = std::string("Hazard: ") + szHazardNames[static_cast<int>(hazard.itype)];
+                    sc.commands = {{"Where it is", SDLK_L}};
+                    if (hazard.itype == MapHazardType::FireBar || hazard.itype == MapHazardType::RotoDisc) {
+                        sc.a = "angle and size";
+                        sc.shoulders = "slower / faster";
+                        sc.lb = SDLK_MINUS;
+                        sc.rb = SDLK_EQUALS;
+                        sc.holds = "LT: snap the angle";
+                        sc.commands.push_back({"Slower", SDLK_MINUS});
+                        sc.commands.push_back({"Faster", SDLK_EQUALS});
+                        if (hazard.itype == MapHazardType::RotoDisc) {
+                            for (int k = 1; k <= 9; k++)
+                                sc.commands.push_back({std::to_string(k) + (k == 1 ? " disc" : " discs"), static_cast<SDL_Keycode>(SDLK_0 + k)});
+                        }
+                    } else {
+                        //([ fires more often, ] less)
+                        sc.shoulders = "more / less often";
+                        sc.lb = SDLK_LEFTBRACKET;
+                        sc.rb = SDLK_RIGHTBRACKET;
+                        sc.commands.push_back({"More often", SDLK_LEFTBRACKET});
+                        sc.commands.push_back({"Less often", SDLK_RIGHTBRACKET});
+                        sc.commands.push_back({"Direction", SDLK_D});
+                        if (hazard.itype == MapHazardType::BulletBill) {
+                            sc.commands.push_back({"Slower", SDLK_MINUS});
+                            sc.commands.push_back({"Faster", SDLK_EQUALS});
+                        }
+                    }
+                    sc.commands.push_back({"Delete it", SDLK_DELETE});
+                    sc.commands.push_back(done);
+                    break;
+                }
+            }
+            break;
+        default:
+            break;
+    }
+    return sc;
+}
+
 void pick(int col, int row)
 {
     if (col < 0 || col >= MAPWIDTH || row < 0 || row >= MAPHEIGHT)

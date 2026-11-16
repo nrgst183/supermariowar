@@ -44,7 +44,7 @@ int editor_warp()
         r.h = 480;
 
 		rm->spr_warps[0].draw(screen, r);
-		rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
+		if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
 
 		DrawMessage();
         return EDITOR_WARP;
@@ -134,7 +134,7 @@ int editor_eyecandy()
 			rm->menu_font_small.drawCentered(320, k * 65 + 62, szEyecandyNames[k]);
 		}
 
-		rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight(), "Eyecandy: [e] Exit, [LMB] Choose Eyecandy");
+		if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight(), "Eyecandy: [e] Exit, [LMB] Choose Eyecandy");
 		//rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
 
 		DrawMessage();

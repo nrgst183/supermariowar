@@ -56,6 +56,7 @@ void flip();
 struct TestInput {
     bool a = false, b = false, x = false, y = false, lb = false, rb = false, back = false, start = false;
     bool up = false, down = false, left = false, right = false;
+    bool lt = false, rt = false;    // the triggers
     float lx = 0, ly = 0, rx = 0, ry = 0;
     float px = -1, py = -1;    // >= 0: puts the pointer there
     SDL_Keycode key = 0;       // a key press
@@ -67,7 +68,8 @@ void setTestDriver(TestDriver driver, std::string shotDir, int pointers = 1);
 
 // While an editor asks for text (its dialog()): the on-screen keyboard
 struct TextEntry {
-    TextEntry();
+    // (the dialog's title, its line of instructions, and the text as typed: the keyboard shows them)
+    TextEntry(const char* title = nullptr, const char* prompt = nullptr, const char* text = nullptr);
     ~TextEntry();
 };
 

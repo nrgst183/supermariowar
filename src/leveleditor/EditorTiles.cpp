@@ -206,7 +206,7 @@ int editor_tiles()
 
         g_tilesetmanager->tileset(set_tile_tileset)->draw(DrawSize::Ingame, rectSrc, screen, r);
 		//rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
-                rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), tileset->name());
+                if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), tileset->name());
 
         int i, j;
         for (i = view_tileset_x; i < view_tileset_x + 20 && i < tileset->width(); i++) {
@@ -274,7 +274,7 @@ int editor_tiletype()
 
 		rm->spr_transparenttiles.draw(0, 0);
 
-		rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
+		if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
 
 		DrawMessage();
 		return EDITOR_TILETYPE;

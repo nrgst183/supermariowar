@@ -79,13 +79,6 @@ void init_editor_edit()
 }
 } // namespace
 
-// The editor's own text and layer icons on the map; built into the game, its
-// window and chip show the mode, the layer and the map instead (editors/EditorInput.cpp)
-#ifdef SMW_EMBEDDED_EDITOR
-constexpr bool OLD_HUD = false;
-#else
-constexpr bool OLD_HUD = true;
-#endif
 
 int editor_edit()
 {

@@ -170,9 +170,9 @@ int editor_animation()
 			}
 		}
 
-		rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
+		if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
 
-		rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Use Arrow Keys To Scroll");
+		if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Use Arrow Keys To Scroll");
 
 		DrawMessage();
 		return EDITOR_ANIMATION;

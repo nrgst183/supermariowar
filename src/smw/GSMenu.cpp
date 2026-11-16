@@ -540,6 +540,9 @@ void MenuState::update()
         //Online tournaments, tours and worlds: the host leads the menus (MenuOnlineSeries.cpp)
         if (MENU_CODE_NONE == code && !OnlineSeriesInput(code))
             code = mCurrentMenu->SendInput(&game_values.playerInput);
+        //(the editors menu's own buttons: what they lead to)
+        if (MENU_CODE_EDITORS_ACTION == code)
+            code = mEditorsMenu->Act();
 
         if (MENU_CODE_EXIT_APPLICATION == code) {
             Exit();
@@ -566,7 +569,7 @@ void MenuState::update()
                 return;
             }
         } else if (MENU_CODE_TO_EDITORS_MENU == code) {
-            mEditorsMenu->ResetMenu();
+            mEditorsMenu->Open();
             mCurrentMenu = mEditorsMenu.get();
         } else if (MENU_CODE_EDITORS_EXIT == code) {
             mCurrentMenu = mMainMenu.get();

@@ -52,14 +52,16 @@ works.
 | | Controller | Keyboard | Mouse |
 |---|---|---|---|
 | play / pause | A (or Start) | Space | the play button |
-| back / forward 5 s (paused: a frame) | LB / RB (d-pad left / right) | Left / Right | the arrow buttons |
+| back / forward 5 s (paused: a frame) | LB / RB | Left / Right | the arrow buttons |
+| the previous / next moment (a kill, a point, the end: just before it) | d-pad left / right | PgUp / PgDn | |
+| scrub (the playhead follows, faster the further it's pushed) | left stick | | click or drag on the meter |
 | rewind / fast forward (held) | LT / RT | Shift+Left / Shift+Right | |
 | slower / faster (1/4x to 8x) | d-pad down / up | Down / Up | the clock button (right click: slower) |
 | follow a player (their name, the buttons they hold) | X | F | the camera button |
 | hide the bar | Y | H | the eye button |
 | the controls | Back | F1 | the ? block |
-| leave | B | Escape | the warp pipe |
-| jump | | Home / End | click or drag on the meter |
+| leave | B (asks first: A leaves, B stays) | Escape | the warp pipe |
+| the start / the end | | Home / End | |
 
 When a replay starts it is simulated once without sound or effects (a few ms), keeping a
 snapshot every 4 seconds: jumping anywhere is instant.
@@ -82,23 +84,43 @@ into the game in their own namespaces; `smw-leveledit` and `smw-worldedit` still
 as before. The game's graphics, map lists and settings are set aside for a session and
 come back afterwards; maps and worlds saved in an editor show up in the game's lists.
 
-Game controllers work in them (`src/smw/editors/EditorInput.h`):
+Both editors can be used with only a controller (`src/smw/editors/EditorInput.h`). On the
+map:
 
 | Controller | |
 |---|---|
-| Left stick | pointer (faster the further it's pushed) |
-| D-pad | pointer, one tile per press |
-| A / B | place / remove (left / right click; hold A to paint) |
-| X / Y (held) | Shift / Ctrl |
+| Left stick | the cursor (faster the further it's pushed) |
+| D-pad | the cursor, one tile per press |
+| A / B | place / remove (left / right click; hold to paint) |
+| X | map editor: take the block, item or tiles under the cursor (world editor: Shift) |
+| Y | map editor: the next layer (world editor: Ctrl) |
+| LB / RB | map editor: the previous / next block, item or tile type |
+| LT / RT (held) | Shift / Ctrl |
 | Right stick | arrow keys (scrolls the world) |
-| RB | Enter |
 | Back | Escape (in the main mode: asks to quit; A on Yes) |
-| Start | the action menu: every mode and command of the editor |
-| LB | hide or show the buttons' bar |
+| Start | the editor window |
 
-On a keyboard, Tab opens the action menu too; it lists each command's key, and the mouse
-can click its entries. The bar along the bottom shows the controller's buttons (or, for a
-few seconds, Tab, F1 and Esc), and every cursor marks the tile it edits.
+In the editor's other screens (the tilesets, warps, platforms...) and the world editor,
+RB is Enter and LB hides or shows the buttons' bar.
+
+**The editor window** (Start, or Tab on a keyboard) docks at the side of the screen away
+from the cursor: the tools, the layers, and a page per kind of thing (blocks, items, tile
+types, zones, warps, platforms, hazards, game-mode objects, the look, the file). Opened
+with a controller, a white frame marks one entry: the d-pad or the left stick moves it
+(the page scrolls along), A chooses, LB / RB turn the page, B closes. Choosing a block,
+an item, a tile type or a tool goes straight back to the map with it. The mouse, and the
+other controllers' cursors, click in it as well. With the window closed, the map editor's
+chip (bottom left) shows what is selected, the layer and the cell, and the buttons.
+
+The map editor's other screens (the tilesets, warps, platforms, hazards, race goals,
+backgrounds, eyecandy...) show a strip with the screen's name and what the buttons do
+there: A and B are the mouse's buttons, LB / RB do what the screen needs (the next
+tileset or page, faster or slower, more or less often), and Start lists the screen's
+commands (New, Delete, its path...) to choose with the d-pad. Back leaves the screen.
+Every cursor, the mouse's too, is a white glove with a cuff in its player's color.
+
+On a keyboard, every command keeps its key; the window lists them. Every cursor marks the
+tile it edits with a frame in its player's color.
 
 When an editor asks for a name, an on-screen keyboard opens (A types, B deletes,
 X shift, Y space, Start done, Back cancel; with the mouse: click the keys).

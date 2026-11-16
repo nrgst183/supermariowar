@@ -282,6 +282,14 @@ extern short iOldStageId;
 extern int g_iNumGameModeSettings[GAMEMODE_LAST];
 extern SDL_Rect rItemDst[NUM_WORLD_ITEMS];
 
+// The editor's own file name on its screens; built into the game, the overlay
+// shows the world instead (editors/EditorInput.cpp)
+#ifdef SMW_EMBEDDED_EDITOR
+constexpr bool OLD_HUD = false;
+#else
+constexpr bool OLD_HUD = true;
+#endif
+
 #ifdef SMW_EMBEDDED_EDITOR
 } // namespace worldeditor
 #endif

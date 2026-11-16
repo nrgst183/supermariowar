@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <xmmintrin.h>
+
 namespace {
 bool isSupportedFormat(SDL_PixelFormat format)
 {
@@ -95,6 +97,14 @@ inline Uint32 blendRgb(Uint32 s, Uint32 d, Uint32 a)
     return rb | g;
 }
 
+// x / 255, rounded to nearest (same as (x + 127) / 255 for 0..65535),
+// without a division
+inline Uint32 div255(Uint32 x)
+{
+    x += 128;
+    return (x + (x >> 8)) >> 8;
+}
+
 // How a source pixel is written; decided once per blit
 struct PixelOp {
     bool colorkey;
@@ -120,7 +130,7 @@ struct PixelOp {
 
         Uint32 sa = s >> 24;
         if (alpha_mod != 255)
-            sa = (sa * alpha_mod + 127) / 255;
+            sa = div255(sa * alpha_mod);
 
         if (sa == 0)
             return;
@@ -134,7 +144,7 @@ struct PixelOp {
         Uint32 da = 0xFFu;
         if (dst_alpha) {
             const Uint32 dstA = dv >> 24;
-            da = sa + (dstA * (255 - sa) + 127) / 255;
+            da = sa + div255(dstA * (255 - sa));
         }
         *d = rgb | (da << 24);
     }
@@ -466,9 +476,19 @@ bool SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color)
     if (x1 <= x0 || y1 <= y0)
         return true;
 
+    // 16 bytes (4 pixels) per store with SSE (moves keep the bits; SSE1 has
+    // no integer stores, so the color goes through a float register)
+    float colorBits;
+    memcpy(&colorBits, &color, sizeof(colorBits));
+    const __m128 color4 = _mm_set1_ps(colorBits);
     for (int y = y0; y < y1; y++) {
         Uint32* d = rowPtr(dst, y) + x0;
-        for (int x = x0; x < x1; x++)
+        Uint32* const end = d + (x1 - x0);
+        while (d < end && (reinterpret_cast<uintptr_t>(d) & 15))
+            *d++ = color;
+        for (; end - d >= 4; d += 4)
+            _mm_store_ps(reinterpret_cast<float*>(d), color4);
+        while (d < end)
             *d++ = color;
     }
     return true;
@@ -507,6 +527,34 @@ bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst
                 const Uint32 p = s[x];
                 if ((p & RGB_MASK) != op.key)
                     d[x] = p;
+            }
+        }
+        return true;
+    }
+
+    // An alpha modulation without a color key (the screen fades and the menu
+    // shade: opaque images drawn half see-through): the opaque pixels all get
+    // the same alpha, worked out once
+    if (op.blend && !op.colorkey && op.alpha_mod != 255) {
+        const Uint32 sa = op.alpha_mod;
+        if (sa == 0)
+            return true;
+        const Uint32 a256 = sa + (sa >> 7);
+        Uint8 dstAlpha[256];
+        for (Uint32 i = 0; i < 256; i++)
+            dstAlpha[i] = static_cast<Uint8>(sa + div255(i * (255 - sa)));
+        for (int y = 0; y < area.h; y++) {
+            const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(src), area.sy + y) + area.sx;
+            Uint32* d = rowPtr(dst, area.dy + y) + area.dx;
+            for (int x = 0; x < area.w; x++) {
+                const Uint32 p = s[x];
+                if (!op.src_alpha || (p >> 24) == 0xFF) {
+                    const Uint32 dv = d[x];
+                    const Uint32 da = op.dst_alpha ? dstAlpha[dv >> 24] : 0xFFu;
+                    d[x] = blendRgb(p, dv, a256) | (da << 24);
+                } else {
+                    op.apply(p, d + x);
+                }
             }
         }
         return true;

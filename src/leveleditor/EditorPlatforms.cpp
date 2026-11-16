@@ -525,8 +525,8 @@ int editor_platforms()
 
             rm->menu_font_small.drawCentered(320, r.y + 18, "Platforms");
 
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Platform Mode: [esc] Exit  [c] Check Paths, [1-8] Select, [n] New");
-			rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Platform Mode: [esc] Exit  [c] Check Paths, [1-8] Select, [n] New");
+			if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
 
 			for (int iPlatform = 0; iPlatform < g_iNumPlatforms; iPlatform++)
 				s_platform.draw(g_Platforms[iPlatform].rIcon[0], screen, g_Platforms[iPlatform].rIcon[1]);
@@ -556,11 +556,11 @@ int editor_platforms()
 				rm->menu_font_large.draw(rTypeButton[iType][1].x + 36, rTypeButton[iType][1].y + 6, szPathNames[iType]);
 			}
 
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Path Type");
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Path Type");
         } else if (PLATFORM_EDIT_STATE_EDIT == iPlatformEditState || PLATFORM_EDIT_STATE_ANIMATED == iPlatformEditState || PLATFORM_EDIT_STATE_TILETYPE == iPlatformEditState) {
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 3, "Edit Platform");
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 2, "[esc] Exit  [t] Tiles  [a] Animation [l] Types [del] Delete  [p] Path");
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[+/-] Velocity  [y] Draw Layer");
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 3, "Edit Platform");
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 2, "[esc] Exit  [t] Tiles  [a] Animation [l] Types [del] Delete  [p] Path");
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[+/-] Velocity  [y] Draw Layer");
 			draw_platform(iEditPlatform, PLATFORM_EDIT_STATE_TILETYPE == iPlatformEditState);
 
             if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::Ellipse) {
@@ -594,22 +594,22 @@ int editor_platforms()
 				MapPlatform * platform = &g_Platforms[iEditPlatform];
 				DrawPlatform(platform->iPathType, g_map->platforms[iEditPlatform]->iTileData, platform->iStartX, platform->iStartY, platform->iEndX, platform->iEndY, platform->fAngle, platform->fRadiusX, platform->fRadiusY, 0, iPlatformWidth, iPlatformHeight, false, true, blitdest);
 
-				rm->menu_font_small.draw(0, 480 - (rm->menu_font_small.getHeight() << 1), "Edit Path");
-				rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[esc] Exit  [LMB] Set Start Point  [RMB] Set End Point [t] Path Type");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - (rm->menu_font_small.getHeight() << 1), "Edit Path");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[esc] Exit  [LMB] Set Start Point  [RMB] Set End Point [t] Path Type");
             } else if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::StraightContinuous) {
 				MapPlatform * platform = &g_Platforms[iEditPlatform];
 				DrawPlatform(platform->iPathType, g_map->platforms[iEditPlatform]->iTileData, platform->iStartX, platform->iStartY, platform->iEndX, platform->iEndY, platform->fAngle, platform->fRadiusX, platform->fRadiusY, 0, iPlatformWidth, iPlatformHeight, false, true, blitdest);
 
-				rm->menu_font_small.draw(0, 480 - (rm->menu_font_small.getHeight() << 1), "Edit Path: [esc] Exit  [LMB] Set Start Point  [RMB] Set Angle");
-				rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[SHIFT + LMB] Location Snap [SHIFT + RMB] Angle Snap [t] Path Type");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - (rm->menu_font_small.getHeight() << 1), "Edit Path: [esc] Exit  [LMB] Set Start Point  [RMB] Set Angle");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[SHIFT + LMB] Location Snap [SHIFT + RMB] Angle Snap [t] Path Type");
             } else if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::Ellipse) {
 				MapPlatform * platform = &g_Platforms[iEditPlatform];
 				DrawPlatform(platform->iPathType, g_map->platforms[iEditPlatform]->iTileData, platform->iStartX, platform->iStartY, platform->iEndX, platform->iEndY, platform->fAngle, platform->fRadiusX, platform->fRadiusY, 0, iPlatformWidth, iPlatformHeight, false, true, blitdest);
 
-				rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 4, "Edit Path: [esc] Exit  [LMB] Set Center [SHIFT + LMB] Center Snap");
-				rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 3, "[X + LMB] Set X Radius [SHIFT + X + LMB] X Radius Snap");
-				rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 2, "[Z + LMB] Set Y Radius [SHIFT + Z + LMB] Y Radius Snap");
-				rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[C + LMB] Set Circular Radius [SHIFT + C + LMB] Circular Radius Snap [t] Path Type");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 4, "Edit Path: [esc] Exit  [LMB] Set Center [SHIFT + LMB] Center Snap");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 3, "[X + LMB] Set X Radius [SHIFT + X + LMB] X Radius Snap");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 2, "[Z + LMB] Set Y Radius [SHIFT + Z + LMB] Y Radius Snap");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[C + LMB] Set Circular Radius [SHIFT + C + LMB] Circular Radius Snap [t] Path Type");
 			}
         } else if (PLATFORM_EDIT_STATE_TEST == iPlatformEditState) {
 			g_map->updatePlatforms();
@@ -617,7 +617,7 @@ int editor_platforms()
 			//Platforms are drawn inside drawmap(...)
 			drawmap(false, TILESIZE, true);
 
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Check Paths: [esc] Exit");
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Check Paths: [esc] Exit");
 		}
 
 		DrawMessage();

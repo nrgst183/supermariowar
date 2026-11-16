@@ -380,7 +380,7 @@ int editor_maphazards()
         if (MAPHAZARD_EDIT_STATE_SELECT == iEditState) {
 			s_platform.draw(rBackground[0], screen, rBackground[1]);
 
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Map Hazard Mode: [esc] Exit");
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Map Hazard Mode: [esc] Exit");
 
 			for (size_t iMapHazard = 0; iMapHazard < g_map->maphazards.size(); iMapHazard++)
 				s_platform.draw(rIconRects[iMapHazard][0], screen, rIconRects[iMapHazard][1]);
@@ -400,13 +400,13 @@ int editor_maphazards()
 				rm->menu_font_large.draw(rTypeButton[iType][1].x + 36, rTypeButton[iType][1].y + 6, szHazardNames[iType]);
 			}
 
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Choose Hazard Type");
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Choose Hazard Type");
         } else if (MAPHAZARD_EDIT_STATE_LOCATION == iEditState) {
 			const MapHazard& hazard = g_map->maphazards[iEditMapHazard];
 			DrawMapHazard(hazard, 0, true, blitdest);
 			DrawMapHazardControls(hazard);
 
-			rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Location: [esc] Exit, [p] Properties, [LMB] Set Location");
+			if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Location: [esc] Exit, [p] Properties, [LMB] Set Location");
         } else if (MAPHAZARD_EDIT_STATE_PROPERTIES == iEditState) {
             const MapHazard& hazard = g_map->maphazards[iEditMapHazard];
             DrawMapHazard(hazard, 0, true, blitdest);
@@ -415,18 +415,18 @@ int editor_maphazards()
             switch (hazard.itype) {
                 case MapHazardType::FireBar:
                 case MapHazardType::RotoDisc:
-                    rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 3, "Properties");
-                    rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 2, "[esc] Exit, [l] Location, [+/-] Velocity, [LMB] Angle and Radius");
+                    if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 3, "Properties");
+                    if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight() * 2, "[esc] Exit, [l] Location, [+/-] Velocity, [LMB] Angle and Radius");
 
-                    if (hazard.itype == MapHazardType::RotoDisc)
+                    if (OLD_HUD && hazard.itype == MapHazardType::RotoDisc)
                         rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[Shift + LMB] Snap To Angle, [1-9] Number of Rotodiscs");
-                    else
+                    else if (OLD_HUD)
                         rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[Shift + LMB] Snap To Angle");
                     break;
 
                 case MapHazardType::BulletBill:
-                    rm->menu_font_small.draw(0, 480 - (rm->menu_font_small.getHeight() << 1), "Properties: [esc] Exit, [l] Location, [d] Direction");
-                    rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[-/+] Velocity, [[/]] or [</>] Frequency");
+                    if (OLD_HUD) rm->menu_font_small.draw(0, 480 - (rm->menu_font_small.getHeight() << 1), "Properties: [esc] Exit, [l] Location, [d] Direction");
+                    if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[-/+] Velocity, [[/]] or [</>] Frequency");
                     break;
 
                 case MapHazardType::FlameCannon:
@@ -434,17 +434,17 @@ int editor_maphazards()
                 case MapHazardType::PirhanaRed:
                 case MapHazardType::PirhanaTall:
                 case MapHazardType::PirhanaShort:
-                    rm->menu_font_small.draw(0, 480 - (rm->menu_font_small.getHeight() << 1), "Properties: [esc] Exit, [l] Location");
-                    rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[[/]] or [</>] Frequency, [d] direction");
+                    if (OLD_HUD) rm->menu_font_small.draw(0, 480 - (rm->menu_font_small.getHeight() << 1), "Properties: [esc] Exit, [l] Location");
+                    if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[[/]] or [</>] Frequency, [d] direction");
                     break;
 
                 default:
-                    rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Properties: [esc] Exit, [l] Location");
+                    if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Properties: [esc] Exit, [l] Location");
                     break;
             }
         }
 
-        rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
+        if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
 
         DrawMessage();
         return EDITOR_MAPHAZARDS;

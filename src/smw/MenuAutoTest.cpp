@@ -395,44 +395,47 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             if (f >= 20 && f < 45) { t.lx = 0.8f; t.ly = 0.5f; }
             t.a = (f >= 50 && f < 75);              //paint a stroke
             if (f >= 55 && f < 75) t.lx = 1.0f;
+            if (f == 52) t.shot = "e2a_level_painting";    //(the glove pressing)
             if (f == 80) t.shot = "e2_level_painted";
-            //The editor window (it opens at the left: the pointer is at the right)
+            //The editor window (it opens at the left: the pointer is at the right), with the d-pad
             t.start = tap(f, 90);
             if (f == 100) t.shot = "e3_level_window";
-            if (f >= 104 && f < 120) { t.px = 124; t.py = 213; }    //(the ? block)
-            if (f == 110) t.shot = "e3a_level_window_hover";
-            t.a = t.a || tap(f, 114);
-            if (f >= 120 && f < 135) { t.px = 33; t.py = 90; }      //(Terrain)
-            t.a = t.a || tap(f, 122);
-            if (f == 130) t.shot = "e3b_level_terrain";
-            if (f >= 135 && f < 150) { t.px = 33; t.py = 183; }     //(Types)
-            t.a = t.a || tap(f, 137);
-            if (f == 145) t.shot = "e3c_level_types";
-            if (f >= 150 && f < 165) { t.px = 264; t.py = 22; }     //(to the other side)
-            t.a = t.a || tap(f, 152);
-            if (f == 160) t.shot = "e3d_level_window_right";
-            t.start = t.start || tap(f, 166);
-            //A ? block on the map, then the chip
-            if (f >= 172 && f < 186) { t.px = 176; t.py = 336; }
-            t.a = t.a || tap(f, 176);
-            if (f == 184) t.shot = "e3e_level_chip";
-            //"Save as...": Shift (X) and S
-            t.x = f >= 188 && f < 200;
-            if (f == 192) t.key = SDLK_S;
-            if (f == 235) t.shot = "e5_level_keyboard";
-            t.down = t.down || tap(f, 240);
-            t.right = t.right || tap(f, 245) || tap(f, 249);
-            t.a = t.a || tap(f, 255) || tap(f, 259);
-            if (f == 270) t.shot = "e6_level_typed";
-            t.back = tap(f, 275);
-            if (f == 295) t.shot = "e7_level_back_in_editor";
-            t.back = t.back || tap(f, 305) || tap(f, 311);    //(the first only leaves block mode)
-            if (f == 320) t.shot = "e8_level_exit_prompt";
-            if (f >= 325) { t.px = 282; t.py = 266; }
-            t.a = t.a || tap(f, 330);
+            t.right = tap(f, 104);
+            t.down = tap(f, 108) || tap(f, 111) || tap(f, 114) || tap(f, 117) || tap(f, 120) || tap(f, 123);    //(the page scrolls)
+            if (f == 127) t.shot = "e3a_level_window_hover";
+            t.a = t.a || tap(f, 130);                            //(takes it, back to the map)
+            t.start = t.start || tap(f, 138);
+            t.lb = tap(f, 142);                                  //(Terrain)
+            if (f == 148) t.shot = "e3b_level_terrain";
+            t.rb = tap(f, 152) || tap(f, 156) || tap(f, 160);    //(Types)
+            if (f == 166) t.shot = "e3c_level_types";
+            //The pointer into the window: it clicks there
+            if (f >= 170 && f < 184) { t.px = 264; t.py = 22; }  //(to the other side)
+            t.a = t.a || tap(f, 172);
+            if (f == 178) t.shot = "e3d_level_window_right";
+            t.start = t.start || tap(f, 182);
+            //A block on the map, the next one (RB), then the chip
+            if (f >= 188 && f < 202) { t.px = 176; t.py = 336; }
+            t.a = t.a || tap(f, 192);
+            t.rb = t.rb || tap(f, 198);
+            if (f == 204) t.shot = "e3e_level_chip";
+            //"Save as...": Shift (LT) and S
+            t.lt = f >= 208 && f < 220;
+            if (f == 212) t.key = SDLK_S;
+            if (f == 245) t.shot = "e5_level_keyboard";
+            t.down = t.down || tap(f, 250);
+            t.right = t.right || tap(f, 255) || tap(f, 259);
+            t.a = t.a || tap(f, 265) || tap(f, 269);
+            if (f == 280) t.shot = "e6_level_typed";
+            t.back = tap(f, 285);
+            if (f == 305) t.shot = "e7_level_back_in_editor";
+            t.back = t.back || tap(f, 315) || tap(f, 321);    //(the first only leaves block mode)
+            if (f == 330) t.shot = "e8_level_exit_prompt";
+            if (f >= 335) { t.px = 282; t.py = 266; }
+            t.a = t.a || tap(f, 340);
             //(still here: try again)
-            if (f > 360 && f % 40 == 0) t.back = true;
-            if (f > 360 && f % 40 == 20) t.a = true;
+            if (f > 370 && f % 40 == 0) t.back = true;
+            if (f > 370 && f % 40 == 20) t.a = true;
             return t;
         };
         auto worldScript = [tap](editors::Editor, int f, int) {
@@ -462,7 +465,26 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                     return MENU_CODE_TO_EDITORS_MENU;
                 if (t == 15)
                     shot("e0_editors_menu");
-                if (t == 18)
+                //Maps: on this computer or online (joining an address), then back
+                if (t == 18) {
+                    mEditorsMenu->Want(UI_EditorsMenu::Action::Maps);
+                    return MENU_CODE_EDITORS_ACTION;
+                }
+                if (t == 26)
+                    shot("e0a_editors_maps");
+                if (t == 28) {
+                    mEditorsMenu->Want(UI_EditorsMenu::Action::Online);
+                    return MENU_CODE_EDITORS_ACTION;
+                }
+                if (t == 30) {
+                    mEditorsMenu->Want(UI_EditorsMenu::Action::Join);
+                    return MENU_CODE_EDITORS_ACTION;
+                }
+                if (t == 38)
+                    shot("e0b_editors_online");
+                if (t == 40)
+                    return MENU_CODE_EDITORS_ACTION;    //(back)
+                if (t == 44)
                     next();
                 return MENU_CODE_NONE;
             case 2:

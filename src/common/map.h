@@ -211,6 +211,7 @@ namespace shell {           // the editor window (src/smw/editors/LevelShell.h)
 void setBlock(int block, bool on);
 bool switchOn(int color);
 void pick(int col, int row);
+int hazardType(int index);
 }
 } // namespace leveleditor
 
@@ -476,6 +477,7 @@ class CMap
 		friend void leveleditor::shell::setBlock(int, bool);
 		friend bool leveleditor::shell::switchOn(int);
 		friend void leveleditor::shell::pick(int, int);
+		friend int leveleditor::shell::hazardType(int);
 		friend class leveleditor::CoeditDocument;
 
 		friend class B_BreakableBlock;

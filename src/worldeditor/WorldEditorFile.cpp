@@ -139,7 +139,7 @@ bool dialog(const char * title, const char * instructions, char * input, int inp
 {
 #ifdef SMW_EMBEDDED_EDITOR
     //(a controller: the on-screen keyboard)
-    ::editors::input::TextEntry textEntry;
+    ::editors::input::TextEntry textEntry(title, instructions, input);
 #endif
 	unsigned int currentChar = 0;
 
@@ -148,7 +148,7 @@ bool dialog(const char * title, const char * instructions, char * input, int inp
 	spr_dialog.draw(224, 176, {0, 0, 192, 128});
 	rm->menu_font_large.drawCentered(320, 200, title);
 	rm->menu_font_small.draw(240, 235, instructions);
-    rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
+    if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
 	gfx_flipscreen();
 
     while (true) {
@@ -177,7 +177,7 @@ bool dialog(const char * title, const char * instructions, char * input, int inp
 							rm->menu_font_large.drawCentered(320, 200, title);
 							rm->menu_font_small.draw(240, 235, instructions);
 							rm->menu_font_small.draw(240, 255, input);
-                        rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
+                        if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
 							gfx_flipscreen();
 
 							currentChar--;
@@ -229,7 +229,7 @@ bool dialog(const char * title, const char * instructions, char * input, int inp
 							rm->menu_font_large.drawCentered(320, 200, title);
 							rm->menu_font_small.draw(240, 235, instructions);
 							rm->menu_font_small.draw(240, 255, input);
-                        rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
+                        if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
 							gfx_flipscreen();
 						}
 					}

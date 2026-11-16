@@ -2,6 +2,8 @@
 
 #include "CoEdit.h"
 #include "LevelShell.h"
+#include "ui/MI_MenuPanel.h"
+#include "WorldShell.h"
 #include "ui/InputPrompts.h"
 #include "ui/SmwTheme.h"
 #include "gfx.h"
@@ -14,6 +16,7 @@
 #include <cmath>
 #include <cstdio>
 #include <deque>
+#include <map>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -91,14 +94,10 @@ std::string keyName(const Action& action)
 
 // ---- the on-screen keyboard (the characters the editors' name dialogs take)
 
-const std::array<const char*, 4> OSK_ROWS = {"1234567890", "qwertyuiop", "asdfghjkl-", "zxcvbnm_= "};
-const std::array<const char*, 5> OSK_KEYS = {"Shift", "Space", "Delete", "Done", "Cancel"};
-constexpr int OSK_COLS = 10;
-constexpr int OSK_TEXT_ROWS = 4;
 
 // ---- the controllers
 
-enum Button { A, B, X, Y, LB, RB, BACK, START, UP, DOWN, LEFT, RIGHT, BUTTON_COUNT };
+enum Button { A, B, X, Y, LB, RB, BACK, START, UP, DOWN, LEFT, RIGHT, LT, RT, BUTTON_COUNT };
 
 struct Pad {
     std::array<bool, BUTTON_COUNT> buttons {};
@@ -147,12 +146,15 @@ struct Controllers {
         std::vector<Pad> pads;
         for (SDL_Gamepad* pad : gamepads) {
             Pad p;
-            const std::array<SDL_GamepadButton, BUTTON_COUNT> map = {SDL_GAMEPAD_BUTTON_SOUTH, SDL_GAMEPAD_BUTTON_EAST, SDL_GAMEPAD_BUTTON_WEST,
+            const std::array<SDL_GamepadButton, RIGHT + 1> map = {SDL_GAMEPAD_BUTTON_SOUTH, SDL_GAMEPAD_BUTTON_EAST, SDL_GAMEPAD_BUTTON_WEST,
                 SDL_GAMEPAD_BUTTON_NORTH, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, SDL_GAMEPAD_BUTTON_BACK,
                 SDL_GAMEPAD_BUTTON_START, SDL_GAMEPAD_BUTTON_DPAD_UP, SDL_GAMEPAD_BUTTON_DPAD_DOWN, SDL_GAMEPAD_BUTTON_DPAD_LEFT,
                 SDL_GAMEPAD_BUTTON_DPAD_RIGHT};
-            for (int b = 0; b < BUTTON_COUNT; b++)
+            for (int b = 0; b <= RIGHT; b++)
                 p.buttons[b] = SDL_GetGamepadButton(pad, map[b]);
+            //(the triggers: pulled halfway)
+            p.buttons[LT] = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > 16000;
+            p.buttons[RT] = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > 16000;
             p.lx = axis(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX));
             p.ly = axis(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY));
             p.rx = axis(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTX));
@@ -232,6 +234,7 @@ struct State {
     float cy = SCREEN_H / 2.0f;
     bool cursorWasVisible = true;
     bool mouseUsed = false;
+    float mouseX = -1, mouseY = -1;    // the real mouse (drawn as a glove: the system cursor is hidden)
 
     //Keys the controllers hold (on top of the keyboard's)
     std::array<bool, SDL_SCANCODE_COUNT> keys {};
@@ -241,18 +244,29 @@ struct State {
     Overlay overlay = Overlay::None;
     int overlayOwner = 0;              // the controller that opened it (-1: keyboard / mouse)
     int hoverKey = -1;                 // the on-screen keyboard's key under the mouse
+    int oskKey = 0;                    // its selected key (the d-pad's)
+    int oskPressedKey = -1;            // a key just pressed (drawn down for a moment)
+    Uint64 oskPressedMs = 0;
     bool hints = true;                 // the controller's button bar (LB)
     Uint64 startMs = 0;
     int actionIndex = 0;
     int textEntries = 0;
-    int oskCol = 0;
-    int oskRow = 0;
     bool oskShift = false;
+    bool oskCaps = false;
+    const char* oskTitle = nullptr;    // the dialog's title, instructions and text (TextEntry)
+    const char* oskPrompt = nullptr;
+    const char* oskText = nullptr;
+    bool oskTyped = false;             // (its text shows once something is typed: until then the buffer is the dialog's own)
 
     //The editor window (Tab / Start)
     int category = 1;                  // its page (Blocks first)
     bool dockLeft = false;             // at the left of the screen (else the right)
     int hover = -1;                    // the widget under the pointer
+    SDL_Rect hoverRect {};             // (its place: the widgets are laid out again each frame)
+    bool nav = false;                  // a controller moves a highlight through the window (its d-pad, A, B)
+    leveleditor::shell::Screen screen; // the level editor's other screen showing now (title empty: none, or the map)
+    SDL_Rect focusRect {};             // the highlighted widget
+    bool focusValid = false;           // (else: the page's selected item, or its first)
     std::string tip;                   // what the widget under the pointer is
     int tool = 0;                      // Tool (level editor)
     int paintMode = 0;                 // the editor's mode before Move
@@ -333,6 +347,8 @@ void pushKey(SDL_Keycode key, bool down)
 {
     SDL_Event e {};
     e.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+    if (down && s.textEntries > 0)
+        s.oskTyped = true;
     e.key.windowID = windowId();
     e.key.key = key;
     e.key.scancode = SDL_GetScancodeFromKey(key, nullptr);
@@ -369,25 +385,6 @@ void holdKey(SDL_Keycode key, Repeat& repeat, bool down, bool& anyDown)
 
 // ---- the overlays' input (the controller that opened it)
 
-void moveInGrid(Pointer& p, int& col, int& row, int cols, int rows)
-{
-    //The d-pad, or the left stick pushed
-    const bool up = p.pad.buttons[UP] || p.pad.ly < -0.6f;
-    const bool down = p.pad.buttons[DOWN] || p.pad.ly > 0.6f;
-    const bool left = p.pad.buttons[LEFT] || p.pad.lx < -0.6f;
-    const bool right = p.pad.buttons[RIGHT] || p.pad.lx > 0.6f;
-    if (p.up.fire(up))
-        row = (row + rows - 1) % rows;
-    if (p.down.fire(down))
-        row = (row + 1) % rows;
-    if (p.left.fire(left))
-        col = (col + cols - 1) % cols;
-    if (p.right.fire(right))
-        col = (col + 1) % cols;
-    if (up || down || left || right)
-        s.overlayDirty = true;
-}
-
 // The action menu's layout: headings and actions in three columns
 // ---- the editor window (Tab / Start): the editor's tools, palettes and commands
 //
@@ -402,10 +399,17 @@ constexpr int RAIL_W = 54;
 enum Tool { TOOL_PAINT, TOOL_ERASE, TOOL_MOVE, TOOL_PICK, TOOL_COUNT };
 
 // A clickable part of the window (laid out while it is drawn)
+enum Zone { ZONE_TITLE, ZONE_TOOLS, ZONE_RAIL, ZONE_PAGE };
+
 struct Widget {
     SDL_Rect r {};
     std::function<void()> act;
     std::string tip;
+    SDL_Rect hit {};          // its visible part (the page scrolls)
+    bool visible = true;
+    Zone zone = ZONE_PAGE;
+    bool selected = false;    // what is in use (where the highlight starts)
+    bool pick = false;        // choosing it with the d-pad goes back to the map
 };
 std::vector<Widget> g_widgets;
 
@@ -425,8 +429,9 @@ bool inWindow(float x, float y)
 int widgetAt(float x, float y)
 {
     for (int k = static_cast<int>(g_widgets.size()) - 1; k >= 0; k--) {
-        const SDL_Rect& r = g_widgets[static_cast<size_t>(k)].r;
-        if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
+        const Widget& w = g_widgets[static_cast<size_t>(k)];
+        const SDL_Rect& r = w.hit;
+        if (w.visible && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
             return k;
     }
     return -1;
@@ -437,6 +442,7 @@ void hoverAt(float x, float y)
     const int at = widgetAt(x, y);
     if (at != s.hover) {
         s.hover = at;
+        s.hoverRect = at >= 0 ? g_widgets[static_cast<size_t>(at)].r : SDL_Rect {};
         s.overlayDirty = true;
     }
 }
@@ -502,6 +508,9 @@ void openWindow(int owner)
     s.overlay = Overlay::Window;
     s.overlayOwner = owner;
     s.hover = -1;
+    //(opened with a controller: its d-pad moves a highlight; the pointer stays on the map)
+    s.nav = owner >= 0;
+    s.focusValid = false;
     s.overlayDirty = true;
 }
 
@@ -518,6 +527,7 @@ void turnPage(int delta)
     s.category = ((s.category + delta) % n + n) % n;
     s.scroll = 0;
     s.hover = -1;
+    s.focusValid = false;
     s.overlayDirty = true;
 }
 
@@ -530,69 +540,292 @@ void runKey(SDL_Keycode key, bool shift = false, bool ctrl = false, bool keepOpe
 }
 
 
-// The on-screen keyboard's keys: index row * OSK_COLS + col (the last row: 5 wide keys)
-constexpr int OSK_KEY_W = 38;
-constexpr int OSK_KEY_H = 24;
-SDL_Rect oskKeyRect(int row, int col)
+// The on-screen keyboard (the original Xbox dashboard's, in the game's look): a panel with the
+// dialog's title and the text typed; a column of pipes (Done, Shift, Caps Lock, Clear,
+// Cancel) beside an alphabetical grid of block keys; Space and Backspace pipes under it
+enum OskKind { OSK_CHAR, OSK_SHIFT, OSK_CAPS, OSK_CLEAR, OSK_SPACE, OSK_BACKSPACE, OSK_ENTER, OSK_CANCEL };
+struct OskKey {
+    SDL_Rect r;
+    OskKind kind;
+    char ch;
+};
+constexpr int OSK_PANEL_W = 600;
+constexpr int OSK_PANEL_H = 360;
+constexpr int OSK_PANEL_X = (SCREEN_W - OSK_PANEL_W) / 2;
+constexpr int OSK_PANEL_Y = SCREEN_H - OSK_PANEL_H - 6;
+constexpr int OSK_ROW = 40;                         // the rows' pitch
+constexpr int OSK_TOP = OSK_PANEL_Y + 104;          // the first row
+constexpr int OSK_LEFT_X = OSK_PANEL_X + 20;        // the column of pipes
+constexpr int OSK_LEFT_W = 150;
+constexpr int OSK_GRID_X = OSK_PANEL_X + 184;       // the keys
+constexpr int OSK_COL = 39;
+
+const std::vector<OskKey>& oskKeys()
 {
-    const int w = OSK_COLS * OSK_KEY_W + 24;
-    const int h = (OSK_TEXT_ROWS + 1) * OSK_KEY_H + 56;
-    const int x = (SCREEN_W - w) / 2;
-    const int y = SCREEN_H - h - 10;
-    const bool special = row == OSK_TEXT_ROWS;
-    const int c = special ? col / 2 * 2 : col;
-    return SDL_Rect {x + 12 + c * OSK_KEY_W, y + 10 + row * OSK_KEY_H, special ? OSK_KEY_W * 2 - 4 : OSK_KEY_W - 4, OSK_KEY_H - 4};
+    static const std::vector<OskKey> keys = [] {
+        std::vector<OskKey> k;
+        const OskKind left[] = {OSK_ENTER, OSK_SHIFT, OSK_CAPS, OSK_CLEAR, OSK_CANCEL};
+        for (int row = 0; row < 5; row++)
+            k.push_back({{OSK_LEFT_X, OSK_TOP + row * OSK_ROW, OSK_LEFT_W, 32}, left[row], 0});
+        const char* rows[] = {"1234567890", "abcdefghij", "klmnopqrst", "uvwxyz-_="};
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; rows[row][col]; col++)
+                k.push_back({{OSK_GRID_X + col * OSK_COL, OSK_TOP + row * OSK_ROW - 1, OSK_COL - 4, 34}, OSK_CHAR, rows[row][col]});
+        }
+        k.push_back({{OSK_GRID_X, OSK_TOP + 4 * OSK_ROW, 6 * OSK_COL - 4, 32}, OSK_SPACE, ' '});
+        k.push_back({{OSK_GRID_X + 6 * OSK_COL, OSK_TOP + 4 * OSK_ROW, 4 * OSK_COL - 4, 32}, OSK_BACKSPACE, 0});
+        return k;
+    }();
+    return keys;
 }
 
 int oskKeyAt(float x, float y)
 {
-    for (int row = 0; row <= OSK_TEXT_ROWS; row++) {
-        for (int col = 0; col < OSK_COLS; col++) {
-            const SDL_Rect r = oskKeyRect(row, col);
-            if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
-                return row * OSK_COLS + col;
-        }
+    const std::vector<OskKey>& keys = oskKeys();
+    for (size_t i = 0; i < keys.size(); i++) {
+        const SDL_Rect& r = keys[i].r;
+        if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
+            return static_cast<int>(i);
     }
     return -1;
 }
 
-void oskPress(int row, int col)
+void oskPress(int index)
 {
-    auto typeChar = [](char c) {
-        const bool letter = c >= 'a' && c <= 'z';
-        tapKey(static_cast<SDL_Keycode>(c), s.oskShift && letter);
-    };
-    if (row < OSK_TEXT_ROWS) {
-        typeChar(OSK_ROWS[static_cast<size_t>(row)][col]);
-    } else {
-        switch (col / 2) {
-            case 0: s.oskShift = !s.oskShift; break;
-            case 1: typeChar(' '); break;
-            case 2: tapKey(SDLK_BACKSPACE); break;
-            case 3: tapKey(SDLK_RETURN); break;
-            default: tapKey(SDLK_ESCAPE); break;
+    const std::vector<OskKey>& keys = oskKeys();
+    if (index < 0 || index >= static_cast<int>(keys.size()))
+        return;
+    const OskKey& k = keys[static_cast<size_t>(index)];
+    s.oskTyped = true;
+    s.oskPressedKey = index;
+    s.oskPressedMs = SDL_GetTicks();
+    switch (k.kind) {
+        case OSK_CHAR:
+        case OSK_SPACE: {
+            const bool letter = k.ch >= 'a' && k.ch <= 'z';
+            tapKey(static_cast<SDL_Keycode>(k.ch), (s.oskShift != s.oskCaps) && letter);
+            //(Shift: for one letter)
+            if (letter)
+                s.oskShift = false;
+            break;
         }
+        case OSK_SHIFT: s.oskShift = !s.oskShift; break;
+        case OSK_CAPS: s.oskCaps = !s.oskCaps; break;
+        case OSK_CLEAR:
+            for (int n = 0; n < 64; n++)
+                pushKey(SDLK_BACKSPACE, true), pushKey(SDLK_BACKSPACE, false);
+            break;
+        case OSK_BACKSPACE: tapKey(SDLK_BACKSPACE); break;
+        case OSK_ENTER: tapKey(SDLK_RETURN); break;
+        case OSK_CANCEL: tapKey(SDLK_ESCAPE); break;
     }
     s.overlayDirty = true;
 }
 
-void updateKeyboard(Pointer& p)
+// A key pressed some other way (the controller's B / Y / Start, the keyboard): drawn down too
+void oskShowPressed(OskKind kind, char ch = 0)
 {
-    moveInGrid(p, s.oskCol, s.oskRow, OSK_COLS, OSK_TEXT_ROWS + 1);
-    if (p.pressed(A))
-        oskPress(s.oskRow, s.oskCol);
-    if (p.pressed(B))
-        tapKey(SDLK_BACKSPACE);
-    if (p.pressed(X)) {
-        s.oskShift = !s.oskShift;
+    const std::vector<OskKey>& keys = oskKeys();
+    for (size_t i = 0; i < keys.size(); i++) {
+        if (keys[i].kind == kind && (kind != OSK_CHAR || keys[i].ch == ch)) {
+            s.oskPressedKey = static_cast<int>(i);
+            s.oskPressedMs = SDL_GetTicks();
+            s.overlayDirty = true;
+            return;
+        }
+    }
+}
+
+// The d-pad: to the nearest key that way (around at the edges)
+void oskMove(int dx, int dy)
+{
+    const std::vector<OskKey>& keys = oskKeys();
+    const SDL_Rect& a = keys[static_cast<size_t>(s.oskKey)].r;
+    const float ax = a.x + a.w / 2.0f;
+    const float ay = a.y + a.h / 2.0f;
+    int best = -1;
+    float bestScore = 1e9f;
+    for (int pass = 0; pass < 2 && best < 0; pass++) {
+        for (size_t i = 0; i < keys.size(); i++) {
+            if (static_cast<int>(i) == s.oskKey)
+                continue;
+            const SDL_Rect& b = keys[i].r;
+            float bx = b.x + b.w / 2.0f;
+            float by = b.y + b.h / 2.0f;
+            //(the second pass: around, as if the keyboard repeated beyond its edge)
+            if (pass == 1) {
+                if (dx > 0) bx += 2000;
+                if (dx < 0) bx -= 2000;
+                if (dy > 0) by += 2000;
+                if (dy < 0) by -= 2000;
+            }
+            const float along = dx != 0 ? (bx - ax) * static_cast<float>(dx) : (by - ay) * static_cast<float>(dy);
+            if (along <= 4.0f)
+                continue;
+            const float across = dx != 0 ? std::fabs(by - ay) : std::fabs(bx - ax);
+            if (dx != 0 && across > 8.0f)
+                continue;    //(left and right stay in the row)
+            const float score = along + across * 2.0f;
+            if (score < bestScore) {
+                bestScore = score;
+                best = static_cast<int>(i);
+            }
+        }
+    }
+    if (best >= 0) {
+        s.oskKey = best;
         s.overlayDirty = true;
     }
-    if (p.pressed(Y))
+}
+
+void updateKeyboard(Pointer& p)
+{
+    const bool up = p.pad.buttons[UP] || p.pad.ly < -0.6f;
+    const bool down = p.pad.buttons[DOWN] || p.pad.ly > 0.6f;
+    const bool left = p.pad.buttons[LEFT] || p.pad.lx < -0.6f;
+    const bool right = p.pad.buttons[RIGHT] || p.pad.lx > 0.6f;
+    if (p.up.fire(up))
+        oskMove(0, -1);
+    if (p.down.fire(down))
+        oskMove(0, 1);
+    if (p.left.fire(left))
+        oskMove(-1, 0);
+    if (p.right.fire(right))
+        oskMove(1, 0);
+    if (p.pressed(A))
+        oskPress(s.oskKey);
+    if (p.pressed(B)) {
+        tapKey(SDLK_BACKSPACE);
+        oskShowPressed(OSK_BACKSPACE);
+    }
+    if (p.pressed(X)) {
+        s.oskShift = !s.oskShift;
+        oskShowPressed(OSK_SHIFT);
+    }
+    if (p.pressed(Y)) {
         tapKey(SDLK_SPACE);
-    if (p.pressed(START) || p.pressed(RB))
+        oskShowPressed(OSK_SPACE);
+    }
+    if (p.pressed(START) || p.pressed(RB)) {
         tapKey(SDLK_RETURN);
+        oskShowPressed(OSK_ENTER);
+    }
     if (p.pressed(BACK))
         tapKey(SDLK_ESCAPE);
+}
+
+// ---- the level editor's quick palette (LB and RB on the map): the blocks, the items, the tile types
+
+struct Quick {
+    int kind;    // 0 a block, 1 an item, 2 a tile type
+    int id;
+    bool on;
+};
+
+std::vector<Quick> quickPalette()
+{
+    std::vector<Quick> q;
+    for (int id : {0, 1, 2, 3, 4, 5, 6, 15, 16, 17, 18, 19})
+        q.push_back({0, id, true});
+    for (int c = 0; c < 4; c++) {
+        q.push_back({0, 7 + c, true});
+        q.push_back({0, 7 + c, false});
+    }
+    for (int c = 0; c < 4; c++) {
+        q.push_back({0, 11 + c, true});
+        q.push_back({0, 11 + c, false});
+    }
+    for (int id = 20; id < 30; id++)
+        q.push_back({0, id, true});
+    for (int id = 0; id < 6; id++)
+        q.push_back({1, id, true});
+    for (int id = 1; id <= 18; id++)
+        q.push_back({2, id, true});
+    return q;
+}
+
+void quickStep(int delta)
+{
+    namespace sh = leveleditor::shell;
+    const std::vector<Quick> q = quickPalette();
+    const int n = static_cast<int>(q.size());
+    int at = -1;
+    for (int k = 0; k < n && at < 0; k++) {
+        const Quick& e = q[static_cast<size_t>(k)];
+        if (e.kind == 0 && sh::mode() == 0 && sh::block() == e.id) {
+            const bool on = e.id >= 11 && e.id <= 14 ? sh::switchBlockOn() : e.id >= 7 && e.id <= 10 ? sh::switchOn(e.id - 7) : true;
+            if (on == e.on)
+                at = k;
+        } else if (e.kind == 1 && sh::mode() == 7 && sh::item() == e.id) {
+            at = k;
+        } else if (e.kind == 2 && sh::mode() == 6 && sh::tileType() == e.id) {
+            at = k;
+        }
+    }
+    at = at < 0 ? (delta > 0 ? 0 : n - 1) : ((at + delta) % n + n) % n;
+    const Quick& e = q[static_cast<size_t>(at)];
+    if (e.kind == 0)
+        sh::setBlock(e.id, e.on);
+    else if (e.kind == 1)
+        sh::setItem(e.id);
+    else
+        sh::setTileType(e.id);
+    if (currentTool() != TOOL_ERASE)
+        setTool(TOOL_PAINT);
+    s.overlayDirty = true;
+}
+
+// ---- the window's highlight: the controller that opened it
+
+int focusIndex();
+void moveFocus(int dx, int dy);
+
+void updateWindowNav(Pointer& p)
+{
+    const bool up = p.pad.buttons[UP] || p.pad.ly < -0.6f;
+    const bool down = p.pad.buttons[DOWN] || p.pad.ly > 0.6f;
+    const bool left = p.pad.buttons[LEFT] || p.pad.lx < -0.6f;
+    const bool right = p.pad.buttons[RIGHT] || p.pad.lx > 0.6f;
+    if (p.up.fire(up))
+        moveFocus(0, -1);
+    if (p.down.fire(down))
+        moveFocus(0, 1);
+    if (p.left.fire(left))
+        moveFocus(-1, 0);
+    if (p.right.fire(right))
+        moveFocus(1, 0);
+    if (p.pressed(A)) {
+        const int k = focusIndex();
+        if (k >= 0 && g_widgets[static_cast<size_t>(k)].act) {
+            const Widget w = g_widgets[static_cast<size_t>(k)];
+            w.act();
+            //(a block, an item, a tool: back to the map with it)
+            if (w.pick)
+                closeWindow();
+        }
+        s.overlayDirty = true;
+    }
+    if (p.pressed(B) || p.pressed(START) || p.pressed(BACK))
+        closeWindow();
+    if (p.pressed(RB))
+        turnPage(1);
+    if (p.pressed(LB))
+        turnPage(-1);
+}
+
+// A key held as long as a button is (an editor screen's X / Y / RB)
+void holdButton(Pointer& p, Button b, SDL_Keycode key)
+{
+    if (!key)
+        return;
+    const SDL_Scancode code = SDL_GetScancodeFromKey(key, nullptr);
+    if (p.pressed(b)) {
+        s.keys[code] = true;
+        pushKey(key, true);
+    } else if (p.released(b) && s.keys[code]) {
+        s.keys[code] = false;
+        pushKey(key, false);
+    }
 }
 
 // ---- the pointers
@@ -600,6 +833,10 @@ void updateKeyboard(Pointer& p)
 void updatePointer(int index)
 {
     Pointer& p = s.pointers[static_cast<size_t>(index)];
+    if (s.overlay == Overlay::Window && s.nav && index == s.overlayOwner) {
+        updateWindowNav(p);
+        return;
+    }
     float dx = 0;
     float dy = 0;
     //The stick: faster the further it's pushed
@@ -656,10 +893,41 @@ void updatePointer(int index)
             pushButton(index, SDL_BUTTON_RIGHT, true);
         else if (p.released(B) && (p.buttons & SDL_BUTTON_RMASK))
             pushButton(index, SDL_BUTTON_RIGHT, false);
+        //The level editor's map: X takes what is under the reticle, Y the next layer
+        if (levelMap() && s.overlay == Overlay::None) {
+            namespace sh = leveleditor::shell;
+            if (p.pressed(X)) {
+                p.shown = true;
+                sh::pick(static_cast<int>(p.x) / TILE, static_cast<int>(p.y) / TILE);
+                if (currentTool() != TOOL_ERASE)
+                    setTool(TOOL_PAINT);
+                s.overlayDirty = true;
+            }
+            if (p.pressed(Y)) {
+                sh::setLayer((sh::layer() + 1) % 4);
+                s.overlayDirty = true;
+            }
+        }
     }
 
+    //(on the level editor's map, the shoulders go through the blocks, items and tile types)
+    const bool quick = levelMap() && s.overlay == Overlay::None;
+    //(on the level editor's other screens: what they want of the shoulders, and keys held with X, Y, RB)
+    const leveleditor::shell::Screen& sc = s.screen;
+    const bool onScreen = s.overlay == Overlay::None && !sc.title.empty();
+    if (onScreen) {
+        holdButton(p, X, sc.xHold);
+        holdButton(p, Y, sc.yHold);
+        holdButton(p, RB, sc.rbHold);
+    }
     if (p.pressed(RB) && s.overlay == Overlay::Window)
         turnPage(1);
+    else if (p.pressed(RB) && quick)
+        quickStep(1);
+    else if (p.pressed(RB) && onScreen && sc.rbHold)
+        ;
+    else if (p.pressed(RB) && onScreen && sc.rb)
+        tapKey(sc.rb);
     else if (p.pressed(RB))
         tapKey(SDLK_RETURN);
     if (p.pressed(BACK)) {
@@ -677,6 +945,10 @@ void updatePointer(int index)
     if (p.pressed(LB)) {
         if (s.overlay == Overlay::Window) {
             turnPage(-1);
+        } else if (quick) {
+            quickStep(-1);
+        } else if (onScreen && sc.lb) {
+            tapKey(sc.lb);
         } else {
             s.hints = !s.hints;
             s.overlayDirty = true;
@@ -691,14 +963,16 @@ void updateKeys()
     bool ctrl = s.ctrlFrames > 0;
     bool up = false, down = false, left = false, right = false;
     for (Pointer& p : s.pointers) {
-        const bool free = s.overlay != Overlay::Keyboard && !inWindow(p.x, p.y);
-        if (inWindow(p.x, p.y) && std::fabs(p.pad.ry) > 0.3f) {
+        const bool navigating = s.overlay == Overlay::Window && s.nav && &p == &s.pointers[static_cast<size_t>(std::max(0, s.overlayOwner))];
+        const bool free = s.overlay != Overlay::Keyboard && !inWindow(p.x, p.y) && !navigating;
+        if ((inWindow(p.x, p.y) || navigating) && std::fabs(p.pad.ry) > 0.3f) {
             s.scroll = std::clamp(s.scroll + static_cast<int>(p.pad.ry * 10.0f), 0, s.scrollMax);
             s.overlayDirty = true;
         }
         if (free) {
-            shift = shift || p.pad.buttons[X];
-            ctrl = ctrl || p.pad.buttons[Y];
+            //(the triggers; X and Y too, except on the level editor's map where they pick and change the layer)
+            shift = shift || p.pad.buttons[LT] || (p.pad.buttons[X] && !levelMap() && !s.screen.xHold);
+            ctrl = ctrl || p.pad.buttons[RT] || (p.pad.buttons[Y] && !levelMap() && !s.screen.yHold);
         }
         holdKey(SDLK_UP, p.arrowUp, free && p.pad.ry < -0.5f, up);
         holdKey(SDLK_DOWN, p.arrowDown, free && p.pad.ry > 0.5f, down);
@@ -722,47 +996,83 @@ void fill(int x, int y, int w, int h, SDL_Color c)
 }
 
 // A panel around an area
-void frameBox(int x, int y, int w, int h)
-{
-    theme::panel(x - 10, y - 10, w + 26, h + 26);
-}
+// A cursor: a white glove pointing up and left (Mario Paint's), its cuff in the player's color;
+// the fingertip is the hot spot
+// A glove's animation: when it last moved, and its button (held, and when it was pressed)
+struct Glove {
+    float x = -1, y = -1;
+    Uint64 movedMs = 0;
+    Uint64 pressMs = 0;
+    bool down = false;
+};
+std::map<int, Glove> g_gloves;    // (by pointer: the controllers 0.., the mouse -1, the others online 1000..)
 
-void drawArrow(float fx, float fy, SDL_Color color, const std::string& label)
+// A cursor: a white glove pointing up and left (Mario Paint's), its cuff in the player's color;
+// the fingertip is the hot spot. Still for a moment, it bobs; its button held, the finger bends
+// and the hand dips; a press, a little burst at the fingertip.
+void drawArrow(float fx, float fy, SDL_Color color, const std::string& label, int id = -2, bool down = false)
 {
-    //An arrow: outline (#) and fill (.)
-    static const char* ARROW[] = {
-        "#",
-        "##",
-        "#.#",
-        "#..#",
-        "#...#",
-        "#....#",
-        "#.....#",
-        "#......#",
-        "#.......#",
-        "#........#",
-        "#.....#####",
-        "#..#..#",
-        "#.# #..#",
-        "##  #..#",
-        "     #..#",
-        "     ####",
-    };
     const int x0 = static_cast<int>(fx);
     const int y0 = static_cast<int>(fy);
-    for (int row = 0; row < 16; row++) {
-        for (int col = 0; ARROW[row][col]; col++) {
-            const char c = ARROW[row][col];
-            if (c == '#')
-                fill(x0 + col, y0 + row, 1, 1, {0, 0, 0, 255});
-            else if (c == '.')
-                fill(x0 + col, y0 + row, 1, 1, color);
+    const Uint64 now = SDL_GetTicks();
+    Glove dummy;
+    Glove& g = id == -2 ? dummy : g_gloves[id];
+    if (g.x != fx || g.y != fy) {
+        g.x = fx;
+        g.y = fy;
+        g.movedMs = now;
+    }
+    if (down && !g.down)
+        g.pressMs = now;
+    g.down = down;
+    const bool idle = !down && now - g.movedMs > 700;
+    const int bob = idle ? static_cast<int>(((now - g.movedMs) / 350) % 2) * 2 : 0;
+    static const std::vector<const char*> GLOVE = {
+        "..##.........",
+        ".#ww#........",
+        ".#ww#........",
+        ".#ww#........",
+        ".#ww####.....",
+        ".#ww#ww####..",
+        "##ww#ww#ww##.",
+        "#w#wwwwwwwgw#",
+        "#ww#wwwwwwww#",
+        "#wwwwwwwwwgw#",
+        ".#wwwwwwwgw#.",
+        "..#wwwwwgg#..",
+        "..#ccccccc#..",
+        "..#CCCCCCC#..",
+        "...#######...",
+    };
+    const std::vector<prompts::Ink> inks = {{'#', {0, 0, 0, 255}}, {'w', {255, 255, 255, 255}}, {'g', {184, 184, 200, 255}}, {'c', color},
+        {'C', theme::shade(color, 70)}};
+    if (down) {
+        //(pressing: the finger bent down to the spot, the hand lower)
+        std::vector<const char*> pressed = {"..##.........", ".#ww#........"};
+        pressed.insert(pressed.end(), GLOVE.begin() + 4, GLOVE.end());
+        prompts::art(x0 - 5, y0 + 3, pressed, inks, 2);
+    } else {
+        prompts::art(x0 - 5, y0 - 1 + bob, GLOVE, inks, 2);
+    }
+    //A press: a burst of short white lines around the fingertip
+    if (now - g.pressMs < 180 && g.pressMs > 0) {
+        const int r = 6 + static_cast<int>((now - g.pressMs) / 40);
+        const SDL_Color black {0, 0, 0, 255};
+        const SDL_Color white {255, 255, 255, 255};
+        const int dirs[][2] = {{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}};
+        for (const auto& d : dirs) {
+            const int px = x0 + d[0] * r;
+            const int py = y0 + d[1] * r;
+            fill(px - 2, py - 2, 4, 4, black);
+            fill(px - 1, py - 1, 2, 2, white);
         }
     }
+    if (idle || now - g.pressMs < 200)
+        s.overlayDirty = true;    //(it moves by itself)
     if (!label.empty()) {
         const int w = rm->menu_font_small.getWidth(label) + 6;
-        const int lx = std::min(x0 + 12, SCREEN_W - w);
-        const int ly = std::min(y0 + 16, SCREEN_H - 16);
+        const int lx = std::min(x0 + 22, SCREEN_W - w);
+        const int ly = std::min(y0 + 26, SCREEN_H - 16);
         fill(lx + 2, ly, w - 4, 16, {0, 0, 0, 255});
         fill(lx, ly + 2, w, 12, {0, 0, 0, 255});
         fill(lx + 2, ly + 2, w - 4, 12, color);
@@ -870,21 +1180,129 @@ struct Layout {
 
 // While the page is drawn: its visible part (widgets outside it can't be clicked)
 SDL_Rect g_clip {0, 0, SCREEN_W, SCREEN_H};
+SDL_Rect g_pageView {};    // the scrolling part of the page (the last frame's)
 
-void addWidget(const SDL_Rect& r, std::function<void()> act, std::string tip)
+// (widgets scrolled out of the page stay in the list: the d-pad can go to them, and the page scrolls)
+void addWidget(const SDL_Rect& r, std::function<void()> act, std::string tip, Zone zone = ZONE_PAGE, bool selected = false, bool pick = false)
 {
-    SDL_Rect visible {};
-    if (!SDL_GetRectIntersection(&r, &g_clip, &visible))
-        return;
-    g_widgets.push_back(Widget {r, std::move(act), std::move(tip)});
+    Widget w;
+    w.r = r;
+    w.act = std::move(act);
+    w.tip = std::move(tip);
+    w.visible = SDL_GetRectIntersection(&r, &g_clip, &w.hit);
+    w.zone = zone;
+    w.selected = selected;
+    w.pick = pick;
+    g_widgets.push_back(std::move(w));
+}
+
+bool sameRect(const SDL_Rect& a, const SDL_Rect& b)
+{
+    return a.x == b.x && a.y == b.y && a.w == b.w && a.h == b.h;
 }
 
 bool hovered(const SDL_Rect& r)
 {
-    if (s.hover < 0 || s.hover >= static_cast<int>(g_widgets.size()))
-        return false;
-    const SDL_Rect& h = g_widgets[static_cast<size_t>(s.hover)].r;
-    return h.x == r.x && h.y == r.y && h.w == r.w && h.h == r.h;
+    return s.hover >= 0 && sameRect(s.hoverRect, r);
+}
+
+// ---- the highlight (a controller's d-pad in the window)
+
+int focusIndex()
+{
+    if (!s.focusValid)
+        return -1;
+    for (size_t k = 0; k < g_widgets.size(); k++) {
+        if (sameRect(g_widgets[k].r, s.focusRect))
+            return static_cast<int>(k);
+    }
+    return -1;
+}
+
+// The page scrolled so the highlight shows
+void scrollToFocus()
+{
+    const int k = focusIndex();
+    if (k < 0 || g_widgets[static_cast<size_t>(k)].zone != ZONE_PAGE || g_pageView.h <= 0)
+        return;
+    const SDL_Rect& r = g_widgets[static_cast<size_t>(k)].r;
+    int delta = 0;
+    if (r.y < g_pageView.y)
+        delta = r.y - g_pageView.y - 4;
+    else if (r.y + r.h > g_pageView.y + g_pageView.h)
+        delta = r.y + r.h - (g_pageView.y + g_pageView.h) + 4;
+    const int scroll = std::clamp(s.scroll + delta, 0, s.scrollMax);
+    s.focusRect.y -= scroll - s.scroll;
+    s.scroll = scroll;
+}
+
+void focusOn(int k)
+{
+    s.focusRect = g_widgets[static_cast<size_t>(k)].r;
+    s.focusValid = true;
+    scrollToFocus();
+    s.hover = k;
+    s.hoverRect = s.focusRect;
+    s.overlayDirty = true;
+}
+
+// Once the window is laid out: the highlight on a widget (the page's selected item, else its first)
+void settleFocus()
+{
+    if (focusIndex() >= 0) {
+        s.hover = focusIndex();
+        s.hoverRect = s.focusRect;
+        return;
+    }
+    int best = -1;
+    for (int pass = 0; pass < 4 && best < 0; pass++) {
+        for (size_t k = 0; k < g_widgets.size() && best < 0; k++) {
+            const Widget& w = g_widgets[k];
+            const bool ok = pass == 0 ? w.zone == ZONE_PAGE && w.selected
+                          : pass == 1 ? w.zone == ZONE_PAGE
+                          : pass == 2 ? w.zone == ZONE_RAIL && w.selected
+                                      : true;
+            if (ok)
+                best = static_cast<int>(k);
+        }
+    }
+    if (best >= 0)
+        focusOn(best);
+}
+
+// The highlight to the nearest widget that way
+void moveFocus(int dx, int dy)
+{
+    const int from = focusIndex();
+    if (from < 0)
+        return;
+    const SDL_Rect& a = g_widgets[static_cast<size_t>(from)].r;
+    const float ax = a.x + a.w / 2.0f;
+    const float ay = a.y + a.h / 2.0f;
+    int best = -1;
+    float bestScore = 1e9f;
+    for (size_t k = 0; k < g_widgets.size(); k++) {
+        if (static_cast<int>(k) == from)
+            continue;
+        const SDL_Rect& b = g_widgets[k].r;
+        //(beyond the highlight's edge that way)
+        const bool beyond = dx > 0 ? b.x >= a.x + a.w - 2 : dx < 0 ? b.x + b.w <= a.x + 2 : dy > 0 ? b.y >= a.y + a.h - 2 : b.y + b.h <= a.y + 2;
+        if (!beyond)
+            continue;
+        const float bx = b.x + b.w / 2.0f;
+        const float by = b.y + b.h / 2.0f;
+        const float along = dx != 0 ? (bx - ax) * static_cast<float>(dx) : (by - ay) * static_cast<float>(dy);
+        //(how far off the line: rows and columns that overlap count as on it)
+        const float across = dx != 0 ? std::max(0.0f, std::max(static_cast<float>(a.y - (b.y + b.h)), static_cast<float>(b.y - (a.y + a.h))))
+                                     : std::max(0.0f, std::max(static_cast<float>(a.x - (b.x + b.w)), static_cast<float>(b.x - (a.x + a.w))));
+        const float score = along + across * 4.0f;
+        if (score < bestScore) {
+            bestScore = score;
+            best = static_cast<int>(k);
+        }
+    }
+    if (best >= 0)
+        focusOn(best);
 }
 
 // Text wrapped to a width (at most maxLines lines: the last one ends in "..." if cut); returns the height used
@@ -929,7 +1347,7 @@ void cell(const SDL_Rect& r, bool selected, const std::function<void(int, int)>&
     const bool hover = hovered(r);
     theme::block(r.x, r.y, r.w, r.h, selected ? theme::Tone::Gold : hover ? theme::Tone::Green : theme::Tone::Dark);
     picture(r.x + (r.w - 32) / 2, r.y + (r.h - 32) / 2);
-    addWidget(r, std::move(act), tip);
+    addWidget(r, std::move(act), tip, ZONE_PAGE, selected, true);
 }
 
 // A button with a label (and an icon)
@@ -948,7 +1366,7 @@ void button(const SDL_Rect& r, const std::string& label, bool selected, std::fun
         const int kw = std::max(16, theme::font().getWidth(key) + 8);
         prompts::drawKey(r.x + r.w - kw - 4, r.y + (r.h - 16) / 2, key);
     }
-    addWidget(r, std::move(act), tip);
+    addWidget(r, std::move(act), tip, ZONE_PAGE, selected);
 }
 
 // A small labelled heading in the page
@@ -1229,6 +1647,31 @@ void drawSelection(int x, int y)
     }
 }
 
+// A key's short name (for a key cap)
+std::string keyCap(SDL_Keycode key, bool shift)
+{
+    std::string name = key == SDLK_ESCAPE ? "Esc" : key == SDLK_PAGEUP ? "PgUp" : key == SDLK_PAGEDOWN ? "PgDn" : key == SDLK_DELETE ? "Del"
+                     : key == SDLK_GRAVE ? "~" : SDL_GetKeyName(key);
+    return shift ? "Shift+" + name : name;
+}
+
+// The level editor's other screens: what the buttons do there, and its commands
+void screenPage(Layout& l)
+{
+    const leveleditor::shell::Screen& sc = s.screen;
+    l.y += drawWrapped(l.x, l.y, l.w, sc.title) + 6;
+    for (const leveleditor::shell::Command& c : sc.commands) {
+        const std::string cap = keyCap(c.key, c.shift);
+        const SDL_Keycode key = c.key;
+        const bool shift = c.shift;
+        pageButton(l, c.label, [key, shift] { runKey(key, shift); }, c.label + " (" + cap + ")");
+        const int kw = std::max(16, theme::font().getWidth(cap) + 8);
+        prompts::drawKey(l.x + l.w - kw - 4, l.y - 27 + 4, cap);
+    }
+    if (!sc.holds.empty())
+        l.y += drawWrapped(l.x, l.y + 4, l.w, sc.holds) + 8;
+}
+
 void drawWindow()
 {
     g_widgets.clear();
@@ -1252,16 +1695,19 @@ void drawWindow()
         const SDL_Rect swap {win.x + win.w - 56, win.y + 8, 24, 22};
         theme::block(swap.x, swap.y, swap.w, swap.h, hovered(swap) ? theme::Tone::Green : theme::Tone::Gray);
         drawArt(swap.x + 4, swap.y + 3, ART_SWAP);
-        addWidget(swap, [] { s.dockLeft = !s.dockLeft; s.overlayDirty = true; }, "Move the window to the other side");
+        addWidget(swap, [] { s.dockLeft = !s.dockLeft; s.overlayDirty = true; s.focusValid = false; }, "Move the window to the other side", ZONE_TITLE);
         const SDL_Rect close {win.x + win.w - 30, win.y + 8, 22, 22};
         theme::block(close.x, close.y, close.w, close.h, hovered(close) ? theme::Tone::Red : theme::Tone::Gray);
         drawArt(close.x + 3, close.y + 3, ART_CLOSE);
-        addWidget(close, [] { closeWindow(); }, "Close (Tab)");
+        addWidget(close, [] { closeWindow(); }, "Close (Tab)", ZONE_TITLE);
     }
+
+    //(on one of the level editor's other screens: just its commands)
+    const bool screenMode = level && !sh::inMapView() && !s.screen.title.empty();
 
     //Tools: paint, erase, move, pick; the layer; what is shown
     int ty = win.y + 40;
-    if (level) {
+    if (level && !screenMode) {
         static const Art* toolArt[] = {&ART_BRUSH, &ART_ERASER, &ART_MOVE, &ART_PICK};
         static const char* toolTip[] = {"Paint: click or drag to place what is selected (the right button removes)",
             "Erase: click or drag to remove", "Select and move: drag over cells, then drag them somewhere else (M)",
@@ -1271,7 +1717,7 @@ void drawWindow()
             const SDL_Rect r {x, ty, 26, 26};
             theme::block(r.x, r.y, r.w, r.h, hovered(r) ? theme::Tone::Green : currentTool() == t ? theme::Tone::Gold : theme::Tone::Gray);
             drawArt(r.x + 5, r.y + 5, *toolArt[t]);
-            addWidget(r, [t] { setTool(t); }, toolTip[t]);
+            addWidget(r, [t] { setTool(t); }, toolTip[t], ZONE_TOOLS, currentTool() == t, true);
             x += 28;
         }
         x += 8;
@@ -1282,21 +1728,22 @@ void drawWindow()
             const SDL_Rect r {x, ty + 5, 20, 21};
             theme::block(r.x, r.y, r.w, r.h, hovered(r) ? theme::Tone::Green : sh::layer() == layer ? theme::Tone::Gold : theme::Tone::Gray);
             theme::font().drawCentered(r.x + 10, r.y + 3, std::to_string(layer + 1));
-            addWidget(r, [layer] { sh::setLayer(layer); }, "Paint on layer " + std::to_string(layer + 1) + " of 4 (Y goes through them)");
+            addWidget(r, [layer] { sh::setLayer(layer); }, "Paint on layer " + std::to_string(layer + 1) + " of 4 (Y goes through them)", ZONE_TOOLS,
+                sh::layer() == layer);
             x += 22;
         }
         x += 6;
         const SDL_Rect only {x, ty, 26, 26};
         theme::block(only.x, only.y, only.w, only.h, hovered(only) ? theme::Tone::Green : sh::othersHidden() ? theme::Tone::Gold : theme::Tone::Gray);
         drawArt(only.x + 5, only.y + 5, ART_EYE);
-        addWidget(only, [] { sh::setOthersHidden(!sh::othersHidden()); }, "Show only the active layer (U)");
+        addWidget(only, [] { sh::setOthersHidden(!sh::othersHidden()); }, "Show only the active layer (U)", ZONE_TOOLS);
         x += 28;
         const SDL_Rect blocks {x, ty, 26, 26};
         theme::block(blocks.x, blocks.y, blocks.w, blocks.h, hovered(blocks) ? theme::Tone::Green : sh::blocksShown() ? theme::Tone::Gray : theme::Tone::Gold);
         theme::icon(blocks.x + 5, blocks.y + 5, theme::Icon::QuestionBlock);
         if (!sh::blocksShown())
             fill(blocks.x + 4, blocks.y + 12, 18, 2, {216, 40, 32, 255});
-        addWidget(blocks, [] { sh::setBlocksShown(!sh::blocksShown()); }, "Hide the blocks, to see the tiles under them (V)");
+        addWidget(blocks, [] { sh::setBlocksShown(!sh::blocksShown()); }, "Hide the blocks, to see the tiles under them (V)", ZONE_TOOLS);
         ty += 32;
     }
 
@@ -1307,7 +1754,7 @@ void drawWindow()
     const int count = pageCount();
     const int itemH = std::min(36, (bodyBottom - bodyTop) / count);
     const std::vector<std::string> groups = level ? std::vector<std::string>() : worldGroups();
-    for (int k = 0; k < count; k++) {
+    for (int k = 0; k < count && !screenMode; k++) {
         const SDL_Rect r {win.x + 8, bodyTop + k * itemH, RAIL_W - 6, itemH - 2};
         const bool sel = s.category == k;
         theme::block(r.x, r.y, r.w, r.h, sel ? theme::Tone::Gold : hovered(r) ? theme::Tone::Green : theme::Tone::Dark);
@@ -1321,30 +1768,37 @@ void drawWindow()
         const int lw = prompts::tinyWidth(caps, 1);
         prompts::tinyText(r.x + (r.w - lw) / 2 + 1, iconY + 19, caps, {0, 0, 0, 255}, 1);
         prompts::tinyText(r.x + (r.w - lw) / 2, iconY + 18, caps, {255, 255, 255, 255}, 1);
-        addWidget(r, [k] { s.category = k; s.scroll = 0; s.hover = -1; s.overlayDirty = true; }, label);
+        addWidget(r, [k] { s.category = k; s.scroll = 0; s.hover = -1; s.focusValid = false; s.overlayDirty = true; }, label, ZONE_RAIL, sel);
     }
 
     Layout l;
     l.win = win;
-    l.x = win.x + RAIL_W + 10;
+    l.x = screenMode ? win.x + 14 : win.x + RAIL_W + 10;
     l.w = win.x + win.w - 16 - l.x;
     l.y = bodyTop + 2;
-    const std::string title = level ? LEVEL_PAGES[std::clamp(s.category, 0, count - 1)].name : groups[static_cast<size_t>(std::clamp(s.category, 0, count - 1))];
+    const std::string title = screenMode ? std::string("This screen")
+                            : level      ? LEVEL_PAGES[std::clamp(s.category, 0, count - 1)].name
+                                         : groups[static_cast<size_t>(std::clamp(s.category, 0, count - 1))];
     theme::bigFont().draw(l.x, l.y - 2, title);
     l.y += theme::bigFont().getHeight() + 2;
     //The page below the title scrolls (the wheel, or the right stick over the window)
     const int viewTop = l.y;
     const int viewH = bodyBottom - 4 - viewTop;
     g_clip = SDL_Rect {l.x - 2, viewTop, l.w + 4, viewH};
+    g_pageView = g_clip;
     SDL_SetSurfaceClipRect(screen, &g_clip);
     l.y -= s.scroll;
     const int contentTop = l.y;
-    if (level)
-        l.y += drawWrapped(l.x, l.y, l.w, LEVEL_PAGES[s.category].about) + 8;
-    if (level)
-        levelPage(l);
-    else
-        worldPage(l);
+    if (screenMode) {
+        screenPage(l);
+    } else {
+        if (level)
+            l.y += drawWrapped(l.x, l.y, l.w, LEVEL_PAGES[s.category].about) + 8;
+        if (level)
+            levelPage(l);
+        else
+            worldPage(l);
+    }
     SDL_SetSurfaceClipRect(screen, nullptr);
     g_clip = SDL_Rect {0, 0, SCREEN_W, SCREEN_H};
     s.scrollMax = std::max(0, l.y - contentTop - viewH);
@@ -1362,17 +1816,47 @@ void drawWindow()
     //Footer: what is under the pointer, and how to close
     const int fy = win.y + win.h - footH + 4;
     theme::inset(win.x + 8, fy, win.w - 16, footH - 12);
-    const std::string tip = s.hover >= 0 && s.hover < static_cast<int>(g_widgets.size()) ? g_widgets[static_cast<size_t>(s.hover)].tip
-                                                                                           : (level ? "Selected: " + selectionName() : std::string("Click a command"));
+    std::string tip = level ? "Selected: " + selectionName() : std::string(s.nav ? "Choose a command" : "Click a command");
+    if (s.hover >= 0) {
+        for (const Widget& w : g_widgets) {
+            if (sameRect(w.r, s.hoverRect))
+                tip = w.tip;
+        }
+    }
     drawWrapped(win.x + 14, fy + 4, win.w - 28, tip, 2);
     const bool controller = prompts::lastDevice() == prompts::Device::Controller;
     std::vector<prompts::Prompt> row;
-    if (controller)
+    if (controller && s.nav)
+        row = {{{prompts::Pad::DPad}, {}, ""}, {{prompts::Pad::A}, {}, "choose"}, {{prompts::Pad::LB, prompts::Pad::RB}, {}, "pages"},
+            {{prompts::Pad::B}, {}, "close"}};
+    else if (controller)
         row = {{{prompts::Pad::A}, {}, "pick"}, {{prompts::Pad::LB, prompts::Pad::RB}, {}, "pages"}, {{prompts::Pad::Start}, {}, "close"}};
     else
         row = {{{}, {"Tab"}, "close"}, {{}, {"F1"}, "help"}};
     const int pw = prompts::promptsWidth(row, 14);
     prompts::drawPrompts(win.x + win.w - 14 - pw / 2, fy + footH - 33, row);
+    if (s.nav) {
+        settleFocus();
+        //The highlight: a white frame (inside the page's view, for the page's widgets)
+        const int k = focusIndex();
+        if (k >= 0) {
+            const Widget& w = g_widgets[static_cast<size_t>(k)];
+            if (w.zone == ZONE_PAGE)
+                SDL_SetSurfaceClipRect(screen, &g_pageView);
+            const SDL_Rect r = w.r;
+            const SDL_Color black {0, 0, 0, 255};
+            const SDL_Color white {255, 255, 255, 255};
+            fill(r.x - 4, r.y - 4, r.w + 8, 4, black);
+            fill(r.x - 4, r.y + r.h, r.w + 8, 4, black);
+            fill(r.x - 4, r.y, 4, r.h, black);
+            fill(r.x + r.w, r.y, 4, r.h, black);
+            fill(r.x - 3, r.y - 3, r.w + 6, 2, white);
+            fill(r.x - 3, r.y + r.h + 1, r.w + 6, 2, white);
+            fill(r.x - 3, r.y - 1, 2, r.h + 2, white);
+            fill(r.x + r.w + 1, r.y - 1, 2, r.h + 2, white);
+            SDL_SetSurfaceClipRect(screen, nullptr);
+        }
+    }
 }
 
 // A player's reticle on the cell it points at: corner brackets in its color, and its tag
@@ -1410,7 +1894,8 @@ void reticle(float px, float py, SDL_Color c, const std::string& tag)
     }
 }
 
-// The level editor's chip when the window is closed: what is selected, the layer, the cell
+// The level editor's chip when the window is closed: what is selected, the layer, the cell; with a
+// controller, its buttons on the map below
 void drawChip()
 {
     namespace sh = leveleditor::shell;
@@ -1421,13 +1906,16 @@ void drawChip()
     const bool controller = prompts::lastDevice() == prompts::Device::Controller;
     const std::vector<prompts::Prompt> row1 = controller ? std::vector<prompts::Prompt> {{{prompts::Pad::Start}, {}, "editor"}}
                                                          : std::vector<prompts::Prompt> {{{}, {"Tab"}, "editor"}};
+    const std::vector<prompts::Prompt> buttons = {{{prompts::Pad::A}, {}, "place"}, {{prompts::Pad::B}, {}, "remove"},
+        {{prompts::Pad::X}, {}, "take"}, {{prompts::Pad::Y}, {}, "layer"}, {{prompts::Pad::LB, prompts::Pad::RB}, {}, "swap"}};
     const int pw = prompts::promptsWidth(row1, 14);
-    const int w = 46 + std::max(theme::font().getWidth(name), theme::font().getWidth(info)) + 16 + pw + 10;
-    const int h = 46;
+    const int bw = controller && s.hints ? prompts::promptsWidth(buttons, 10) : 0;
+    const int w = std::max(46 + std::max(theme::font().getWidth(name), theme::font().getWidth(info)) + 16 + pw + 10, bw + 20);
+    const int h = bw > 0 ? 70 : 46;
     //(bottom left; at the top while a pointer is down there)
-    bool low = s.cy > SCREEN_H - 90 && s.cx < w + 30;
+    bool low = s.cy > SCREEN_H - h - 44 && s.cx < w + 30;
     for (const Pointer& p : s.pointers)
-        low = low || (p.shown && p.y > SCREEN_H - 90 && p.x < w + 30);
+        low = low || (p.shown && p.y > SCREEN_H - h - 44 && p.x < w + 30);
     const int x = 6;
     const int y = low ? 6 : SCREEN_H - h - 6;
     theme::strip(x, y, w, h);
@@ -1436,65 +1924,178 @@ void drawChip()
     theme::font().draw(x + 46, y + 7, name);
     theme::font().draw(x + 46, y + 24, info);
     prompts::drawPrompts(x + w - pw / 2 - 8, y + 14, row1);
+    if (bw > 0)
+        prompts::drawPrompts(x + 10 + bw / 2, y + 47, buttons, 10);
+}
+
+// The world editor's chip: the mode, the world, and (with a controller) its buttons
+void drawWorldChip()
+{
+    namespace sh = worldeditor::shell;
+    const std::string name = sh::modeName() + (sh::autoPaint() ? "  (auto paint)" : "");
+    const std::string info = sh::worldName() + "   " + std::to_string(static_cast<int>(s.cx) / TILE) + "," +
+                             std::to_string(static_cast<int>(s.cy) / TILE);
+    const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+    const std::vector<prompts::Prompt> row1 = controller ? std::vector<prompts::Prompt> {{{prompts::Pad::Start}, {}, "editor"}}
+                                                         : std::vector<prompts::Prompt> {{{}, {"Tab"}, "editor"}};
+    const std::vector<prompts::Prompt> buttons = {{{prompts::Pad::A}, {}, "place"}, {{prompts::Pad::B}, {}, "remove"},
+        {{prompts::Pad::LT, prompts::Pad::RT}, {}, "shift/ctrl"}, {{prompts::Pad::Back}, {}, "back"}};
+    const int pw = prompts::promptsWidth(row1, 14);
+    const int bw = controller && s.hints ? prompts::promptsWidth(buttons, 10) : 0;
+    const int w = std::max(46 + std::max(theme::font().getWidth(name), theme::font().getWidth(info)) + 16 + pw + 10, bw + 20);
+    const int h = bw > 0 ? 70 : 46;
+    bool low = s.cy > SCREEN_H - h - 44 && s.cx < w + 30;
+    for (const Pointer& p : s.pointers)
+        low = low || (p.shown && p.y > SCREEN_H - h - 44 && p.x < w + 30);
+    const int x = 6;
+    const int y = low ? 6 : SCREEN_H - h - 6;
+    theme::strip(x, y, w, h);
+    theme::inset(x + 6, y + 6, 34, 34);
+    theme::icon(x + 15, y + 15, theme::Icon::Star);
+    theme::font().draw(x + 46, y + 7, name);
+    theme::font().draw(x + 46, y + 24, info);
+    prompts::drawPrompts(x + w - pw / 2 - 8, y + 14, row1);
+    if (bw > 0)
+        prompts::drawPrompts(x + 10 + bw / 2, y + 47, buttons, 10);
 }
 
 
 void drawKeyboard()
 {
-    const SDL_Rect first = oskKeyRect(0, 0);
-    const int w = OSK_COLS * OSK_KEY_W + 24;
-    const int h = (OSK_TEXT_ROWS + 1) * OSK_KEY_H + 56;
-    //(wide enough for the buttons' row too)
-    int rowW = 0;
-    if (prompts::lastDevice() == prompts::Device::Controller) {
-        for (prompts::Pad pad : {prompts::Pad::A, prompts::Pad::B, prompts::Pad::X, prompts::Pad::Y, prompts::Pad::Start, prompts::Pad::Back})
-            rowW += prompts::padWidth(pad) + 13;
-        rowW += theme::font().getWidth("typedeleteshiftspacedonecancel");
-    }
-    const int bw = std::max(w, rowW + 24);
-    frameBox(SCREEN_W / 2 - bw / 2, first.y - 10, bw, h);
-    for (int row = 0; row <= OSK_TEXT_ROWS; row++) {
-        for (int col = 0; col < OSK_COLS; col++) {
-            const bool special = row == OSK_TEXT_ROWS;
-            if (special && col % 2)
-                continue;
-            const SDL_Rect r = oskKeyRect(row, col);
-            const bool selected = s.oskRow == row && (special ? s.oskCol / 2 == col / 2 : s.oskCol == col);
-            const bool hover = s.hoverKey == row * OSK_COLS + col || (special && s.hoverKey == row * OSK_COLS + col + 1);
-            const bool lit = special && col / 2 == 0 && s.oskShift;
-            theme::Tone tone = theme::Tone::Gray;
-            if (lit)
-                tone = theme::Tone::Gold;
-            if (hover || (selected && prompts::lastDevice() == prompts::Device::Controller))
-                tone = theme::Tone::Green;
-            theme::block(r.x, r.y, r.w, r.h, tone);
-            std::string label;
-            if (special) {
-                label = OSK_KEYS[static_cast<size_t>(col / 2)];
-            } else {
-                char ch = OSK_ROWS[static_cast<size_t>(row)][col];
-                if (s.oskShift && ch >= 'a' && ch <= 'z')
-                    ch = static_cast<char>(ch - 32);
-                label = ch == ' ' ? std::string("spc") : std::string(1, ch);
-            }
-            theme::font().drawCentered(r.x + r.w / 2, r.y + 2, label);
+    const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+    const int px = OSK_PANEL_X;
+    const int py = OSK_PANEL_Y;
+    //The panel (over the dialog: it shows the dialog's title and text itself)
+    menupanel::box(px - 4, py - 4, OSK_PANEL_W + 8, OSK_PANEL_H + 8);
+    theme::bigFont().drawCentered(SCREEN_W / 2, py + 10, s.oskTitle ? s.oskTitle : "Type");
+    if (s.oskPrompt)
+        rm->menu_font_small.drawCentered(SCREEN_W / 2, py + 40, s.oskPrompt);
+    //The text so far, in a field, with a blinking cursor
+    const SDL_Rect field {px + 20, py + 60, OSK_PANEL_W - 40, 36};
+    theme::inset(field.x, field.y, field.w, field.h);
+    const std::string text = s.oskTyped && s.oskText ? s.oskText : std::string();
+    const int tw = theme::bigFont().getWidth(text);
+    const int tx = field.x + 12 + std::min(0, field.w - 36 - tw);
+    SDL_Rect clip {field.x + 4, field.y, field.w - 8, field.h};
+    SDL_SetSurfaceClipRect(screen, &clip);
+    theme::bigFont().draw(tx, field.y + 6, text);
+    if ((SDL_GetTicks() / 400) % 2 == 0)
+        fill(tx + tw + 2, field.y + 7, 3, field.h - 14, {255, 255, 255, 255});
+    SDL_SetSurfaceClipRect(screen, nullptr);
+    s.overlayDirty = true;    //(the cursor blinks)
+
+    //The keys: the pipes (light green selected; Done green, Shift and Caps Lock green while on), the blocks
+    //(gray; the selected one gold, a ? block's, in a white frame); a key pressed is drawn down for a moment
+    const std::vector<OskKey>& keys = oskKeys();
+    const bool justPressed = s.oskPressedKey >= 0 && SDL_GetTicks() - s.oskPressedMs < 140;
+    //(drawn here: the game's menu graphics are put away while an editor runs)
+    struct PipeColors {
+        SDL_Color light, mid, dark, darker;
+    };
+    auto pipe = [](const SDL_Rect& r, const PipeColors& c) {
+        const SDL_Color black {0, 0, 0, 255};
+        //The body, between its lips: a light band on top, shade underneath
+        const int bx = r.x + 8;
+        const int bw = r.w - 16;
+        fill(bx, r.y + 3, bw, 26, black);
+        fill(bx, r.y + 4, bw, 24, c.mid);
+        fill(bx, r.y + 6, bw, 4, c.light);
+        fill(bx, r.y + 20, bw, 4, c.dark);
+        fill(bx, r.y + 24, bw, 4, c.darker);
+        //The lips at both ends: a little taller and wider
+        for (const int lx : {r.x, r.x + r.w - 12}) {
+            fill(lx, r.y, 12, 32, black);
+            fill(lx + 1, r.y + 1, 10, 30, c.mid);
+            fill(lx + 1, r.y + 1, 3, 30, c.light);
+            fill(lx + 8, r.y + 1, 3, 30, c.dark);
+            fill(lx + 1, r.y + 27, 10, 4, c.darker);
         }
+    };
+    static const PipeColors GRAY {{176, 192, 192, 255}, {144, 160, 160, 255}, {112, 128, 128, 255}, {53, 64, 64, 255}};
+    static const PipeColors LIGHT_GRAY {{216, 228, 228, 255}, {184, 200, 200, 255}, {144, 160, 160, 255}, {80, 96, 96, 255}};
+    static const PipeColors GREEN {{107, 203, 0, 255}, {57, 154, 0, 255}, {40, 128, 0, 255}, {9, 60, 0, 255}};
+    static const PipeColors LIGHT_GREEN {{180, 255, 64, 255}, {148, 243, 0, 255}, {107, 203, 0, 255}, {16, 113, 0, 255}};
+    for (size_t i = 0; i < keys.size(); i++) {
+        const OskKey& k = keys[i];
+        const bool selected = (controller && s.oskKey == static_cast<int>(i)) || (!controller && s.hoverKey == static_cast<int>(i));
+        const bool down = justPressed && s.oskPressedKey == static_cast<int>(i);
+        SDL_Rect r = k.r;
+        if (down)
+            r.y += 2;
+        if (k.kind == OSK_CHAR) {
+            theme::block(r.x, r.y, r.w, r.h, selected ? theme::Tone::Gold : down ? theme::Tone::Green : theme::Tone::Gray);
+            char ch = k.ch;
+            if ((s.oskShift != s.oskCaps) && ch >= 'a' && ch <= 'z')
+                ch = static_cast<char>(ch - 32);
+            theme::bigFont().drawCentered(r.x + r.w / 2, r.y + (r.h - theme::bigFont().getHeight()) / 2 + 1, std::string(1, ch));
+            if (selected) {
+                const SDL_Color white {255, 255, 255, 255};
+                fill(r.x - 3, r.y - 3, r.w + 6, 2, white);
+                fill(r.x - 3, r.y + r.h + 1, r.w + 6, 2, white);
+                fill(r.x - 3, r.y - 1, 2, r.h + 2, white);
+                fill(r.x + r.w + 1, r.y - 1, 2, r.h + 2, white);
+            }
+            continue;
+        }
+        const bool on = (k.kind == OSK_SHIFT && s.oskShift) || (k.kind == OSK_CAPS && s.oskCaps);
+        pipe(r, selected ? LIGHT_GREEN : (k.kind == OSK_ENTER || on) ? GREEN : down ? LIGHT_GRAY : GRAY);
+        static const char* labels[] = {"", "SHIFT", "CAPS LOCK", "CLEAR", "SPACE", "BACKSPACE", "DONE", "CANCEL"};
+        //(between the lips: the small font if the large one doesn't fit)
+        const bool fits = rm->menu_font_large.getWidth(labels[k.kind]) <= r.w - 30;
+        gfxFont& font = fits ? rm->menu_font_large : rm->menu_font_small;
+        font.drawCentered(r.x + r.w / 2, r.y + (32 - font.getHeight()) / 2, labels[k.kind]);
     }
-    //The buttons, with the device in use
-    const int fy = first.y - 10 + h - 24;
-    std::vector<std::tuple<prompts::Pad, std::string, std::string>> row = {
-        {prompts::Pad::A, "", "type"}, {prompts::Pad::B, "", "delete"}, {prompts::Pad::X, "", "shift"},
-        {prompts::Pad::Y, "", "space"}, {prompts::Pad::Start, "", "done"}, {prompts::Pad::Back, "", "cancel"}};
-    if (prompts::lastDevice() == prompts::Device::Controller) {
-        int tw = 0;
-        for (const auto& [pad, key, label] : row)
-            tw += prompts::promptWidth(pad, key, label) + 10;
-        int x = SCREEN_W / 2 - tw / 2;
-        for (const auto& [pad, key, label] : row)
-            x += prompts::drawPrompt(x, fy, pad, key, label) + 10;
+    if (justPressed)
+        s.overlayDirty = true;    //(it comes up again)
+
+    //The buttons, for the device in use
+    std::vector<prompts::Prompt> row;
+    if (controller)
+        row = {{{prompts::Pad::A}, {}, "type"}, {{prompts::Pad::B}, {}, "delete"}, {{prompts::Pad::X}, {}, "shift"},
+            {{prompts::Pad::Y}, {}, "space"}, {{prompts::Pad::Start}, {}, "done"}, {{prompts::Pad::Back}, {}, "cancel"}};
+    else
+        row = {{{}, {"Enter"}, "done"}, {{}, {"Esc"}, "cancel"}};
+    prompts::drawPrompts(SCREEN_W / 2, py + OSK_PANEL_H - 26, row, 14);
+    if (!controller)
+        rm->menu_font_small.drawCentered(SCREEN_W / 2, py + OSK_PANEL_H - 44, "Type, or click the keys");
+}
+
+// The level editor's other screens: a strip with the screen's name and what the buttons do
+void drawScreenStrip()
+{
+    const leveleditor::shell::Screen& sc = s.screen;
+    const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+    std::vector<prompts::Prompt> row;
+    if (controller) {
+        if (!sc.a.empty())
+            row.push_back({{prompts::Pad::A}, {}, sc.a});
+        if (!sc.b.empty())
+            row.push_back({{prompts::Pad::B}, {}, sc.b});
+        if (!sc.shoulders.empty())
+            row.push_back({{prompts::Pad::LB, prompts::Pad::RB}, {}, sc.shoulders});
+        row.push_back({{prompts::Pad::Start}, {}, "more"});
+        row.push_back({{prompts::Pad::Back}, {}, "done"});
     } else {
-        theme::font().drawCentered(SCREEN_W / 2, fy, "Type, or click the keys");
+        row.push_back({{}, {"Tab"}, "commands"});
+        row.push_back({{}, {"Esc"}, "done"});
     }
+    //(a long row: closer together)
+    const int gap = prompts::promptsWidth(row, 12) > SCREEN_W - 40 ? 6 : 12;
+    const int pw = prompts::promptsWidth(row, gap);
+    const std::string hold = controller ? sc.holds : std::string();
+    const int w = std::min(SCREEN_W - 12, std::max({pw + 24, theme::font().getWidth(sc.title) + 24, theme::font().getWidth(hold) + 24}));
+    const int h = hold.empty() ? 48 : 66;
+    //(at the bottom; at the top while a cursor is down there)
+    bool low = s.cy > SCREEN_H - h - 30;
+    for (const Pointer& p : s.pointers)
+        low = low || (p.shown && p.y > SCREEN_H - h - 30);
+    const int x = (SCREEN_W - w) / 2;
+    const int y = low ? 6 : SCREEN_H - h - 6;
+    theme::strip(x, y, w, h);
+    theme::font().drawCentered(SCREEN_W / 2, y + 6, sc.title);
+    prompts::drawPrompts(SCREEN_W / 2, y + 26, row, gap);
+    if (!hold.empty())
+        theme::font().drawCentered(SCREEN_W / 2, y + 46, hold);
 }
 
 // Where the hint bar is: shown, and its top
@@ -1586,7 +2187,7 @@ void drawSession()
 
 bool overlayWanted()
 {
-    if (s.overlay != Overlay::None || coedit::active() || !coedit::notice().empty() || levelMap() || s.mouseUsed)
+    if (s.overlay != Overlay::None || coedit::active() || !coedit::notice().empty() || levelMap() || s.mouseUsed || !s.screen.title.empty())
         return true;
     if (prompts::lastDevice() == prompts::Device::Controller ? s.hints && !s.pointers.empty() : SDL_GetTicks() - s.startMs < 8000)
         return true;
@@ -1622,6 +2223,10 @@ void drawOverlay()
     if (s.overlay == Overlay::None) {
         if (levelMap())
             drawChip();
+        else if (s.editor == Editor::World && worldeditor::shell::inMapView())
+            drawWorldChip();
+        else if (!s.screen.title.empty())
+            drawScreenStrip();
         else
             drawHints();
     }
@@ -1632,14 +2237,17 @@ void drawOverlay()
         drawKeyboard();
     //The cursors on top (the controllers' drawn pointers; the others' online)
     for (const coedit::Cursor& c : remote)
-        drawArrow(c.x, c.y, c.color, mapView ? std::string() : c.name);
+        drawArrow(c.x, c.y, c.color, mapView ? std::string() : c.name, 1000 + static_cast<int>(&c - remote.data()));
     if (!keyboard) {
         for (size_t k = 0; k < s.pointers.size(); k++) {
             const Pointer& p = s.pointers[k];
             if (p.shown)
-                drawArrow(p.x, p.y, pointerColor(static_cast<int>(k)), std::string());
+                drawArrow(p.x, p.y, pointerColor(static_cast<int>(k)), std::string(), static_cast<int>(k), p.pad.buttons[A] || p.pad.buttons[B]);
         }
     }
+    //The mouse: a glove too, on top
+    if (s.mouseUsed && s.mouseX >= 0)
+        drawArrow(s.mouseX, s.mouseY, pointerColor(0), std::string(), -1, (SDL_GetMouseState(nullptr, nullptr) & (SDL_BUTTON_LMASK | SDL_BUTTON_RMASK)) != 0);
 }
 
 // Presents the frame with the overlay; the screen keeps the editor's frame
@@ -1672,7 +2280,7 @@ void present()
 Pad fromTest(const TestInput& t)
 {
     Pad p;
-    p.buttons = {t.a, t.b, t.x, t.y, t.lb, t.rb, t.back, t.start, t.up, t.down, t.left, t.right};
+    p.buttons = {t.a, t.b, t.x, t.y, t.lb, t.rb, t.back, t.start, t.up, t.down, t.left, t.right, t.lt, t.rt};
     p.lx = t.lx;
     p.ly = t.ly;
     p.rx = t.rx;
@@ -1695,6 +2303,16 @@ void update()
     if (s.ctrlFrames > 0)
         s.ctrlFrames--;
 
+    //The level editor's other screen showing now (what the buttons do there)
+    {
+        leveleditor::shell::Screen screen;
+        if (s.editor == Editor::Level && !leveleditor::shell::inMapView())
+            screen = leveleditor::shell::currentScreen();
+        if (screen.title != s.screen.title || screen.a != s.screen.a)
+            s.overlayDirty = true;
+        s.screen = std::move(screen);
+    }
+
     //The controllers (or the test's), one pointer each
     std::vector<Pad> pads = s.controllers.any() ? s.controllers.read() : std::vector<Pad>();
     if (g_testDriver) {
@@ -1707,6 +2325,9 @@ void update()
                 p.x = t.px;
                 p.y = t.py;
                 p.shown = true;
+                //(pointing into the window: the pointer clicks there, no highlight)
+                if (k == s.overlayOwner && inWindow(p.x, p.y))
+                    s.nav = false;
                 if (s.owner == k || p.buttons)
                     moveMouseTo(k);
             }
@@ -1768,7 +2389,8 @@ void update()
     bool shown = false;
     for (const Pointer& p : s.pointers)
         shown = shown || p.shown;
-    if (shown && !s.mouseUsed && SDL_CursorVisible())
+    (void)shown;
+    if (SDL_CursorVisible())
         SDL_HideCursor();
 
     //An editor waiting in a dialog only draws when something changes: show
@@ -1799,6 +2421,7 @@ void begin(Editor editor)
     s.controllers.open();
     s.startMs = SDL_GetTicks();
     s.cursorWasVisible = SDL_CursorVisible();
+    SDL_HideCursor();
     float mx = 0;
     float my = 0;
     gfx_mousestate(&mx, &my);
@@ -1872,12 +2495,13 @@ bool pollEvent(SDL_Event* event)
                 s.cx = mx;
                 s.cy = my;
                 s.owner = -1;
-                if (!s.mouseUsed) {
-                    s.mouseUsed = true;
-                    SDL_ShowCursor();
-                }
-                if (motion)
+                s.mouseUsed = true;
+                s.mouseX = mx;
+                s.mouseY = my;
+                if (motion) {
+                    s.nav = false;
                     hoverAt(mx, my);
+                }
                 else if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && event->button.button == SDL_BUTTON_LEFT)
                     clickAt(mx, my);
                 s.overlayDirty = true;
@@ -1930,7 +2554,7 @@ bool pollEvent(SDL_Event* event)
             } else if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && event->button.button == SDL_BUTTON_LEFT) {
                 const int key = oskKeyAt(event->button.x, event->button.y);
                 if (key >= 0) {
-                    oskPress(key / OSK_COLS, key % OSK_COLS);
+                    oskPress(key);
                     continue;
                 }
             }
@@ -1952,14 +2576,28 @@ bool pollEvent(SDL_Event* event)
                 s.cx = std::clamp(event->motion.x, 0.0f, SCREEN_W - 1.0f);
                 s.cy = std::clamp(event->motion.y, 0.0f, SCREEN_H - 1.0f);
                 s.owner = -1;
-                if (!s.mouseUsed) {
-                    s.mouseUsed = true;
-                    SDL_ShowCursor();
-                }
+                s.mouseUsed = true;
+                s.mouseX = s.cx;
+                s.mouseY = s.cy;
+                s.overlayDirty = true;
                 return true;
             case SDL_EVENT_KEY_DOWN:
                 if (coedit::blockedKey(event->key.key, event->key.mod))
                     continue;
+                if (s.textEntries > 0) {
+                    s.oskTyped = true;    //(the dialog's text: from now on what is typed)
+                    const SDL_Keycode k = event->key.key;
+                    if (k == SDLK_BACKSPACE)
+                        oskShowPressed(OSK_BACKSPACE);
+                    else if (k == SDLK_RETURN || k == SDLK_KP_ENTER)
+                        oskShowPressed(OSK_ENTER);
+                    else if (k == SDLK_SPACE)
+                        oskShowPressed(OSK_SPACE);
+                    else if (k == SDLK_LSHIFT || k == SDLK_RSHIFT)
+                        oskShowPressed(OSK_SHIFT);
+                    else if (k < 128)
+                        oskShowPressed(OSK_CHAR, static_cast<char>(k));
+                }
                 return true;
             default:
                 if (event->type >= SDL_EVENT_JOYSTICK_AXIS_MOTION && event->type < SDL_EVENT_FINGER_DOWN)
@@ -2026,14 +2664,27 @@ void flip()
     present();
 }
 
-TextEntry::TextEntry()
+TextEntry::TextEntry(const char* title, const char* prompt, const char* text)
 {
     s.textEntries++;
+    s.oskTitle = title;
+    s.oskPrompt = prompt;
+    s.oskText = text;
+    s.oskTyped = false;
+    s.oskShift = false;
+    s.oskCaps = false;
+    //(the highlight starts on the a, the dashboard's way)
+    const std::vector<OskKey>& keys = oskKeys();
+    for (size_t i = 0; i < keys.size(); i++) {
+        if (keys[i].kind == OSK_CHAR && keys[i].ch == 'a')
+            s.oskKey = static_cast<int>(i);
+    }
 }
 
 TextEntry::~TextEntry()
 {
     s.textEntries = std::max(0, s.textEntries - 1);
+    s.oskTitle = s.oskPrompt = s.oskText = nullptr;
 }
 
 } // namespace editors::input

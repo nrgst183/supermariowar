@@ -164,11 +164,11 @@ int editor_properties(short iBlockCol, short iBlockRow)
 
 			iHiddenCheckboxY = 365;
 
-			rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight() * 3, "Block Property Mode");
-			rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight() * 2, "[~, 0-9] Set Value [LMB] Increase [RMB] Decrease [D] Default");
-			rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight(), "[Shift] + [0-9 or D] Set All To Value");
+			if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight() * 3, "Block Property Mode");
+			if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight() * 2, "[~, 0-9] Set Value [LMB] Increase [RMB] Decrease [D] Default");
+			if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight(), "[Shift] + [0-9 or D] Set All To Value");
         } else if (iBlockType == 4 || iBlockType == 5 || iBlockType == 17 || iBlockType == 18 || iBlockType == 3) {
-			rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight(), "Block Property Mode");
+			if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight(), "Block Property Mode");
 			iHiddenCheckboxY = 214;
 		}
 
@@ -196,7 +196,7 @@ int editor_properties(short iBlockCol, short iBlockRow)
 		}
 
 
-		rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
+		if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
 
 		DrawMessage();
 		FPSLimiter::instance().beforeFlip();
@@ -285,7 +285,7 @@ int editor_blocks()
 
 		rm->spr_blocks[0].draw(rBlocksRow3Src, screen, rBlocksRow3Dst);
 
-		rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
+		if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
 
 		DrawMessage();
 		return EDITOR_BLOCKS;
@@ -333,8 +333,8 @@ int editor_mapitems()
 
 		rm->spr_mapitems[0].draw(0, 0, {0, 0, 192, 32});
 
-		rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
-		rm->menu_font_small.drawRightJustified(0, 480 - rm->menu_font_small.getHeight(), "Map Items");
+		if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
+		if (OLD_HUD) rm->menu_font_small.drawRightJustified(0, 480 - rm->menu_font_small.getHeight(), "Map Items");
 
 		DrawMessage();
 		return EDITOR_MAPITEMS;

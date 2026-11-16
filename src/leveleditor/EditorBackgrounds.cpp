@@ -121,13 +121,13 @@ int editor_backgrounds()
 			sBackgrounds[iBackground].draw(rSrc, screen, rDst[iBackground]);
 		}
 
-		rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight() * 2, "[Page Up] next page, [Page Down] previous page");
-		rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight(), "[LMB] choose background with music category, [RMB] choose just background");
+		if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight() * 2, "[Page Up] next page, [Page Down] previous page");
+		if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight(), "[LMB] choose background with music category, [RMB] choose just background");
 
 		int iID = mouse_x / 160 + mouse_y / 120 * 4 + iPage * 16;
 
         if (iID < static_cast<int>(backgroundlist->count()))
-            rm->menu_font_small.draw(0, 0, backgroundlist->at(iID).string());
+            if (OLD_HUD) rm->menu_font_small.draw(0, 0, backgroundlist->at(iID).string());
 
 		DrawMessage();
 		return EDITOR_BACKGROUNDS;

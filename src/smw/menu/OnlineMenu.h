@@ -9,7 +9,7 @@ class MI_Image;
 class MI_Text;
 class MI_TextField;
 class MI_WrappedText;
-class MI_PromptRow;
+class MI_PromptStrip;
 
 /*
     The entry of the online (rollback netplay) mode: your nickname, hosting a lobby on a port and
@@ -41,8 +41,6 @@ private:
     MI_Image* miLeftHeaderBar;
     MI_Image* miRightHeaderBar;
     MI_Text* miHeaderText;
-    MI_Text* miHostLabel;
-    MI_Text* miJoinLabel;
     MI_WrappedText* miMessage;
-    MI_PromptRow* miPrompts;
+    MI_PromptStrip* miPrompts;
 };

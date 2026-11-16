@@ -309,6 +309,14 @@ extern SDL_Rect rTypeButton[8][4];
 extern short view_tileset_repeat_direction;
 extern short view_tileset_repeat_timer;
 
+// The editor's own help text, mode names and file name on its screens; built
+// into the game, the overlay shows them instead (editors/EditorInput.cpp)
+#ifdef SMW_EMBEDDED_EDITOR
+constexpr bool OLD_HUD = false;
+#else
+constexpr bool OLD_HUD = true;
+#endif
+
 #ifdef SMW_EMBEDDED_EDITOR
 } // namespace leveleditor
 #endif

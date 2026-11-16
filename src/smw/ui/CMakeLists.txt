@@ -15,6 +15,8 @@ target_sources(smw PRIVATE
     InputPrompts.cpp
     InputPrompts.h
     MI_MatchHistory.cpp
+    MI_MenuPanel.cpp
+    MI_MenuPanel.h
     MI_MatchHistory.h
     MI_MapFilterScroll.h
     MI_PacksField.cpp
