@@ -556,6 +556,117 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
 #endif
 
 #ifdef SMW_HAS_EDITORS
+    //--at-role edtools: the editors' controller tools (rectangles, undo, copy, paste, fill, the
+    //last things picked, the whole map, the tileset screen)
+    if (at.shotsRole == "edtools") {
+        using editors::input::TestInput;
+        auto tap = [](int f, int from) { return f >= from && f < from + 2; };
+        auto levelScript = [tap](editors::Editor, int f, int) {
+            TestInput t;
+            //A rectangle of blocks: A held from one cell to another
+            if (f >= 5 && f < 26) { t.px = 80; t.py = 240; }
+            t.a = f >= 20 && f < 45;
+            if (f >= 26 && f < 45) { t.px = 240; t.py = 304; }
+            if (f == 38) t.shot = "x1_rect_drag";
+            if (f == 50) t.shot = "x2_rect_filled";
+            //The tools: undo (the menu stays), then redo
+            t.rs = tap(f, 55);
+            if (f == 62) t.shot = "x3_tools";
+            t.a = t.a || tap(f, 66);
+            if (f == 72) t.shot = "x4_undone";
+            t.down = tap(f, 76);
+            t.a = t.a || tap(f, 80);
+            t.b = tap(f, 86);
+            //Copy an area
+            t.rs = t.rs || tap(f, 92);
+            t.down = t.down || tap(f, 96) || tap(f, 100);
+            t.a = t.a || tap(f, 104);
+            if (f >= 108 && f < 118) { t.px = 80; t.py = 240; }
+            t.a = t.a || (f >= 112 && f < 128);
+            if (f >= 118 && f < 128) { t.px = 176; t.py = 272; }
+            if (f == 124) t.shot = "x5_copy_drag";
+            //Paste it
+            t.rs = t.rs || tap(f, 134);
+            t.down = t.down || tap(f, 138) || tap(f, 142) || tap(f, 146);
+            t.a = t.a || tap(f, 150);
+            if (f >= 154 && f < 176) { t.px = 400; t.py = 96; }
+            if (f == 160) t.shot = "x6_paste_preview";
+            t.a = t.a || tap(f, 164);
+            t.b = t.b || tap(f, 170);
+            if (f == 178) t.shot = "x7_pasted";
+            //The ground's tile taken (X), then the rectangle's tiles filled with it
+            if (f >= 180 && f < 188) { t.px = 16; t.py = 464; }
+            t.x = tap(f, 183);
+            t.rs = t.rs || tap(f, 188);
+            t.down = t.down || tap(f, 192) || tap(f, 196) || tap(f, 200) || tap(f, 204);
+            t.a = t.a || tap(f, 208);
+            if (f >= 212 && f < 230) { t.px = 112; t.py = 272; }
+            if (f == 216) t.shot = "x8_fill_ready";
+            t.a = t.a || tap(f, 220);
+            if (f == 228) t.shot = "x9_filled";
+            //The last things picked: LB and RB go through them
+            t.rb = t.rb || tap(f, 234);
+            t.lb = tap(f, 240);
+            if (f >= 236 && f < 250) { t.px = 560; t.py = 160; }
+            if (f == 246) t.shot = "x10_recents";
+            //The whole map (the left stick held), with the window open
+            t.start = tap(f, 252);
+            t.ls = f >= 262 && f < 276;
+            if (f == 270) t.shot = "x11_whole_map";
+            if (f == 280) t.shot = "x12_window";
+            t.start = t.start || tap(f, 286);
+            //The tileset screen: the d-pad tile by tile, the tileset scrolls at the edge
+            if (f == 292) t.key = SDLK_T;
+            if (f >= 298 && f < 302) { t.px = 48; t.py = 48; }
+            t.down = t.down || tap(f, 304) || tap(f, 308);
+            if (f == 314) t.shot = "x13_tile_picker";
+            for (int k = 0; k < 24; k++)
+                t.right = t.right || tap(f, 318 + k * 4);
+            if (f == 418) t.shot = "x14_tile_picker_scrolled";
+            t.a = t.a || tap(f, 422);
+            //Out
+            t.back = tap(f, 440) || tap(f, 450) || tap(f, 460);
+            if (f >= 470) { t.px = 282; t.py = 266; }
+            t.a = t.a || tap(f, 474);
+            if (f > 490 && f % 40 == 0) t.back = true;
+            if (f > 490 && f % 40 == 20) t.a = true;
+            return t;
+        };
+        auto worldScript = [tap](editors::Editor, int f, int) {
+            TestInput t;
+            if (f >= 5 && f < 10) { t.px = 300; t.py = 200; }
+            t.ls = f >= 12 && f < 30;
+            if (f == 22) t.shot = "x15_whole_world";
+            t.back = tap(f, 40) || tap(f, 55) || tap(f, 70);
+            if (f >= 80) { t.px = 282; t.py = 266; }
+            t.a = tap(f, 84);
+            if (f > 100 && f % 40 == 0) t.back = true;
+            if (f > 100 && f % 40 == 20) t.a = true;
+            return t;
+        };
+        switch (step) {
+            case 1:
+                if (t == 1) {
+                    editors::input::setTestDriver(levelScript, at.shotsDir);
+                    return MENU_CODE_RUN_LEVEL_EDITOR;
+                }
+                if (t == 8)
+                    next();
+                return MENU_CODE_NONE;
+            case 2:
+                if (t == 1) {
+                    editors::input::setTestDriver(worldScript, at.shotsDir);
+                    return MENU_CODE_RUN_WORLD_EDITOR;
+                }
+                if (t == 8) {
+                    editors::input::setTestDriver(nullptr, {});
+                    step = 1000;
+                    t = 0;
+                }
+                return MENU_CODE_NONE;
+        }
+    }
+
     //--at-role colocal: two controllers in one level editor, painting at the same time
     if (at.shotsRole == "colocal") {
         auto script = [](editors::Editor, int f, int pointer) {
@@ -926,6 +1037,11 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                 return MENU_CODE_NONE;
 
             case 5:
+                //Everyone on a team of their own
+                if (t == 2 && lobby) {
+                    for (int slot = 0; slot < 4; slot++)
+                        lobby->setSlotTeam(slot, slot);
+                }
                 if (t == 10)
                     shot("05_team_host_everyone_ready");
                 if (t == 12) {
@@ -987,6 +1103,13 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                 return MENU_CODE_NONE;
 
             case 9: {
+                //Everyone on a team of their own (once the joiner has made its choices)
+                if (t == 1 && lobby) {
+                    for (int slot = 0; slot < 4; slot++)
+                        lobby->setSlotTeam(slot, slot);
+                }
+                if (t < 10)
+                    return MENU_CODE_NONE;
                 std::string why;
                 if (lobby && lobby->canStart(why)) {
                     next();

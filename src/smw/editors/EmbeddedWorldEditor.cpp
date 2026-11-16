@@ -267,6 +267,32 @@ std::string worldName()
     return worldlist ? worldlist->currentPath().stem().string() : std::string();
 }
 
+void worldSize(int* cols, int* rows)
+{
+    *cols = g_worldmap.getWidth();
+    *rows = g_worldmap.getHeight();
+}
+
+void viewOrigin(int* x, int* y)
+{
+    *x = draw_offset_col * TILESIZE - draw_offset_x;
+    *y = draw_offset_row * TILESIZE - draw_offset_y;
+}
+
+SDL_Surface* drawWhole()
+{
+    const int w = g_worldmap.getWidth() * TILESIZE;
+    const int h = g_worldmap.getHeight() * TILESIZE;
+    if (w <= 0 || h <= 0 || !screen)
+        return nullptr;
+    SDL_Surface* surface = SDL_CreateSurface(w, h, screen->format);
+    if (!surface)
+        return nullptr;
+    SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGB(surface, 0, 0, 0));
+    g_worldmap.DrawMapToSurface(surface);
+    return surface;
+}
+
 } // namespace shell
 
 } // namespace worldeditor

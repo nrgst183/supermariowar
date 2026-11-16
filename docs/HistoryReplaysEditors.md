@@ -91,20 +91,34 @@ map:
 |---|---|
 | Left stick | the cursor (faster the further it's pushed) |
 | D-pad | the cursor, one tile per press |
-| A / B | place / remove (left / right click; hold to paint) |
+| A / B | place / remove; held while the cursor moves, the whole rectangle (map editor; world editor: hold to paint) |
 | X | map editor: take the block, item or tiles under the cursor (world editor: Shift) |
 | Y | map editor: the next layer (world editor: Ctrl) |
-| LB / RB | map editor: the previous / next block, item or tile type |
+| LB / RB | map editor: back and forth through the last 8 things picked (before that: the blocks, items and tile types) |
 | LT / RT (held) | Shift / Ctrl |
 | Right stick | arrow keys (scrolls the world) |
+| Right stick pressed | the tools: undo, redo; on a map, copy an area, paste, fill |
+| Left stick held | the whole map (the world: all of it, small), with everyone's cursor |
 | Back | Escape (in the main mode: asks to quit; A on Yes) |
 | Start | the editor window |
+
+**The tools** (the right stick pressed, or the mouse's middle button): **Undo** and
+**Redo** (also Ctrl+Z and Ctrl+Y) work in both editors, for every change: a stroke or a
+rectangle is one undo, and online only your own changes are undone (a cell someone else
+changed since keeps theirs). In the map editor, **Copy an area** takes every layer's tiles,
+the blocks, warps and zones of the rectangle drawn with A; **Paste** then puts it down where
+A is pressed, as often as wanted, until B; **Fill** paints the cells joined to the one
+pressed that are the same as it (the same block, or tile on the active layer, or tile type).
+
+The **tileset screen** works tile by tile: the d-pad moves a gold frame one tile at a time and
+scrolls the tileset at the screen's edge, the stick's cursor settles on a tile when let go,
+A held with the d-pad takes several tiles, LB / RB change the tileset.
 
 In the editor's other screens (the tilesets, warps, platforms...) and the world editor,
 RB is Enter and LB hides or shows the buttons' bar.
 
 **The editor window** (Start, or Tab on a keyboard) docks at the side of the screen away
-from the cursor: the tools, the layers, and a page per kind of thing (blocks, items, tile
+from the cursor: the tools, the layers (L1 to L4), the last things picked, and a page per kind of thing (blocks, items, tile
 types, zones, warps, platforms, hazards, game-mode objects, the look, the file). Opened
 with a controller, a white frame marks one entry: the d-pad or the left stick moves it
 (the page scrolls along), A chooses, LB / RB turn the page, B closes. Choosing a block,

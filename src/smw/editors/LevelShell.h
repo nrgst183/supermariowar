@@ -54,6 +54,57 @@ bool drawTiles(int x, int y, int size);
 // block mode, else the tile of the active layer, else the block)
 void pick(int col, int row);
 
+// ---- painting many cells at once (the controller's rectangles, the fill, copy and paste)
+
+constexpr int MAP_COLS = 20;
+constexpr int MAP_ROWS = 15;
+
+// The mode paints cells one by one (blocks, tiles, warps, zones, tile types, animated
+// tiles): a rectangle of them can be painted at once
+bool paintsCells();
+// The cells from c0,r0 to c1,r1 (any corners): painted with what is selected, as
+// clicking each would (the selected tiles repeat across it), or cleared (`erase`)
+void fillRect(int c0, int r0, int c1, int r1, bool erase);
+// The cells joined to this one (up, down, left, right) that are the same as it, in
+// what the mode paints (the block, the active layer's tile, the tile type...): painted
+void floodFill(int col, int row);
+// Copy: the cells (every layer's tiles, the tile type, the block, the warp, the zones)
+void copyArea(int c0, int r0, int c1, int r1);
+// What was copied: its size (false: nothing)
+bool clipboard(int* cols, int* rows);
+// Pasted with its top left at the cell (what falls off the map is left out)
+void paste(int col, int row);
+
+// ---- what is selected, to come back to (the recently used)
+
+struct Brush {
+    int mode = -1;    // 0 a block, 1 tiles, 6 a tile type, 7 a map item (-1: none)
+    int id = 0;       // the block, the item, the tile type; the tileset
+    bool on = true;   // (a switch, a switch block: how it starts)
+    int x = 0, y = 0, cols = 1, rows = 1;    // (tiles: where in the tileset)
+    bool operator==(const Brush& o) const
+    {
+        return mode == o.mode && id == o.id && on == o.on && x == o.x && y == o.y && cols == o.cols && rows == o.rows;
+    }
+    bool operator!=(const Brush& o) const { return !(*this == o); }
+};
+// What is selected now (mode -1 if it is nothing to come back to)
+Brush brush();
+void setBrush(const Brush& brush);
+// Tiles' picture (at most 3x3 of them) in a square of `size` pixels at x, y (the overlay draws the rest)
+bool drawBrushTiles(const Brush& brush, int x, int y, int size);
+
+// ---- the tileset screen (choosing tiles): what it shows
+
+struct TilePicker {
+    int viewCol = 0, viewRow = 0;    // the tileset's cell at the screen's top left
+    int cols = 0, rows = 0;          // the tileset's size, in tiles
+    int index = 0, count = 0;        // which tileset, of how many
+    std::string name;
+};
+// False when the tileset screen isn't showing
+bool tilePicker(TilePicker* picker);
+
 // ---- the editor's other screens (the tilesets, warps, platforms...): how a
 // controller works them
 

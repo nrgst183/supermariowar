@@ -33,7 +33,7 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 
 ### Online multiplayer
 
-![The online lobby: the host, a joiner playing with two players on one computer, and a CPU; a joiner downloading the host's map](docs/gfx/fork/online.png)
+![The online lobby (Kooper hosting, Pixie playing with two players on one computer, and a CPU, each on a team of their own), and the match they play on Sky of Fragrant Souls](docs/gfx/fork/online.png)
 
 - **Rollback netcode** for up to four players: everybody connects directly to each other, no server. Inputs that arrive late are predicted and corrected, so the game stays responsive with lag.
 - **A full online lobby**: pick your character and team, see everyone's ping, add CPU players, and play tournaments, tours and worlds online. Missing maps and custom skins are sent to the players who don't have them.
@@ -48,7 +48,7 @@ See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 
 ![The world editor](docs/gfx/fork/world_editor.png)
 
-- **Make and edit maps and worlds right in the game** (**Main menu, Editors**), with a mouse and keyboard or a controller.
+- **Make and edit maps and worlds right in the game** (**Main menu, Editors**), with a mouse and keyboard or a controller: rectangles, fill, copy and paste, and undo.
 - **Edit together**: one player hosts a map or a world, the others join and edit it with them at the same time, online or on one computer.
 
 ### Theater: replays of every match
@@ -62,12 +62,10 @@ See [docs/HistoryReplaysEditors.md](docs/HistoryReplaysEditors.md).
 
 ### Improvements
 
-![Four CPU players with random skins on Boo's Mansion, The Arctic, Airshipz and Mushroom Valley](docs/gfx/fork/gameplay.png)
+![Four CPU players on Boo's Mansion, The Arctic, Airshipz and Mushroom Valley](docs/gfx/fork/gameplay.png)
 
 - **Smarter CPU players** that find their way around a map: running jumps, warp pipes, ? blocks and power-ups, and better fighting.
-- **50 more classic community maps**, random skins per player, and smooth motion between frames.
-- **A Super Mario Bros. 3 style interface**, refreshed menus, and controller prompts for Xbox controllers, including the original Xbox controller.
-- The game simulation is deterministic and runs on a fixed tick, which is what makes rollback, replays and the theater possible. GitHub Actions builds every push for Linux, macOS, Windows, the web and the original Xbox, and checks that online play and replays stay in sync.
+- **50 more classic community maps**.
 
 
 ## History

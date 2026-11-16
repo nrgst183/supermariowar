@@ -24,6 +24,13 @@
 //   Back             Escape (leaves a mode; in the main mode, asks to quit)
 //   Start            the action menu: every mode and command of the editor
 //                    (the keyboard shortcuts), picked with the d-pad and A
+//   right stick press  the tools: undo, redo, copy an area, paste, fill
+//   left stick press   (held) the whole map, with everyone's gloves
+//
+// On the level editor's map, A or B held while the cursor moves paints (or
+// clears) the rectangle between where it was pressed and where it is let go;
+// LB / RB go through the last things picked. Ctrl+Z / Ctrl+Y undo and redo
+// (the mouse's middle button opens the tools).
 //
 // When an editor asks for a name (save as, find), an on-screen keyboard
 // opens: d-pad / left stick to pick, A types, B deletes, X shift, Y space,
@@ -57,6 +64,7 @@ struct TestInput {
     bool a = false, b = false, x = false, y = false, lb = false, rb = false, back = false, start = false;
     bool up = false, down = false, left = false, right = false;
     bool lt = false, rt = false;    // the triggers
+    bool ls = false, rs = false;    // the sticks pressed
     float lx = 0, ly = 0, rx = 0, ry = 0;
     float px = -1, py = -1;    // >= 0: puts the pointer there
     SDL_Keycode key = 0;       // a key press

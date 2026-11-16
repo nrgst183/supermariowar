@@ -412,13 +412,13 @@ std::string mapName()
     return maplist ? maplist->currentShortmapname() : std::string();
 }
 
-bool drawTiles(int x, int y, int size)
+bool drawBrushTiles(const Brush& b, int x, int y, int size)
 {
-    if (set_tile_tileset < 0 || static_cast<size_t>(set_tile_tileset) >= g_tilesetmanager->count() || set_tile_cols < 1 || set_tile_rows < 1)
+    if (b.mode != 1 || b.id < 0 || static_cast<size_t>(b.id) >= g_tilesetmanager->count() || b.cols < 1 || b.rows < 1)
         return false;
     //(the top left of the selection, at most 3x3 tiles, 16 pixels each: shrunk to fit)
-    const int cols = std::min(set_tile_cols, 3);
-    const int rows = std::min(set_tile_rows, 3);
+    const int cols = std::min(b.cols, 3);
+    const int rows = std::min(b.rows, 3);
     const int cell = std::max(4, size / std::max(cols, rows) / 8 * 8);
     const DrawSize drawSize = cell >= 32 ? DrawSize::Ingame : cell >= 16 ? DrawSize::Preview : DrawSize::Thumbnail;
     const int px = drawSize == DrawSize::Ingame ? 32 : drawSize == DrawSize::Preview ? 16 : 8;
@@ -427,10 +427,312 @@ bool drawTiles(int x, int y, int size)
     for (int c = 0; c < cols; c++) {
         for (int r = 0; r < rows; r++) {
             const SDL_Rect dst {ox + c * px, oy + r * px, px, px};
-            g_tilesetmanager->tileset(set_tile_tileset)->draw(drawSize,
-                CTilesetManager::rect(drawSize, static_cast<size_t>(set_tile_start_x + c), static_cast<size_t>(set_tile_start_y + r)), screen, dst);
+            g_tilesetmanager->tileset(b.id)->draw(drawSize,
+                CTilesetManager::rect(drawSize, static_cast<size_t>(b.x + c), static_cast<size_t>(b.y + r)), screen, dst);
         }
     }
+    return true;
+}
+
+bool drawTiles(int x, int y, int size)
+{
+    Brush b;
+    b.mode = 1;
+    b.id = set_tile_tileset;
+    b.x = set_tile_start_x;
+    b.y = set_tile_start_y;
+    b.cols = set_tile_cols;
+    b.rows = set_tile_rows;
+    return drawBrushTiles(b, x, y, size);
+}
+
+// ---- many cells at once
+
+bool paintsCells()
+{
+    return edit_mode == 0 || edit_mode == 1 || edit_mode == 2 || edit_mode == 4 || edit_mode == 5 || edit_mode == 6 || edit_mode == 8;
+}
+
+namespace {
+// The clipboard: a rectangle of whole cells
+struct Copied {
+    TilesetTile tiles[MAPLAYERS];
+    TileType top;
+    MapBlock block;
+    Warp warp;
+    bool nospawn[NUMSPAWNAREATYPES];
+};
+std::vector<Copied> g_copied;
+int g_copiedCols = 0;
+int g_copiedRows = 0;
+} // namespace
+
+// (the map's cells: a friend of CMap)
+class Cells {
+public:
+// One cell painted (or cleared), as a click there would; (ox, oy): where it is in the
+// selected tiles' pattern
+static void paint(int x, int y, bool erase, int ox, int oy)
+{
+    if (x < 0 || x >= MAPWIDTH || y < 0 || y >= MAPHEIGHT)
+        return;
+    const short cx = static_cast<short>(x);
+    const short cy = static_cast<short>(y);
+    switch (edit_mode) {
+        case 0:
+            if (erase) {
+                g_map->objectdata[x][y].iType = -1;
+                break;
+            }
+            g_map->objectdata[x][y].iType = set_block;
+            g_map->objectdata[x][y].fHidden = false;
+            if (set_block == 1 || set_block == 15) {
+                for (short iSetting = 0; iSetting < NUM_BLOCK_SETTINGS; iSetting++)
+                    g_map->objectdata[x][y].iSettings[iSetting] = defaultPowerupSetting(0, iSetting);
+            } else if (set_block >= 11 && set_block <= 14) {
+                g_map->objectdata[x][y].iSettings[0] = set_block_switch_on;
+            }
+            AdjustMapItems(cx, cy);
+            break;
+        case 1:
+        case 8: {
+            const bool fNeedUpdate = !TileTypeIsModified(cx, cy);
+            if (erase)
+                g_map->mapdata[x][y][selected_layer].iID = TILESETNONE;
+            else if (edit_mode == 1)
+                SetTilesetTile(&g_map->mapdata[x][y][selected_layer], set_tile_tileset, set_tile_start_x + ox % std::max(1, set_tile_cols),
+                    set_tile_start_y + oy % std::max(1, set_tile_rows));
+            else
+                SetTilesetTile(&g_map->mapdata[x][y][selected_layer], TILESETANIMATED, set_tile_start_y + oy % std::max(1, set_tile_rows),
+                    set_tile_start_x + ox % std::max(1, set_tile_cols));
+            if (fNeedUpdate)
+                UpdateTileType(cx, cy);
+            AdjustMapItems(cx, cy);
+            break;
+        }
+        case 2:
+            g_map->warpdata[x][y].direction = erase ? WARP_UNDEFINED : static_cast<WarpEnterDirection>(set_direction);
+            g_map->warpdata[x][y].connection = erase ? -1 : set_connection;
+            break;
+        case 4:
+            SetNoSpawn(static_cast<short>(nospawn_mode), cx, cy, !erase);
+            break;
+        case 5:
+            g_map->nospawn[5][x][y] = !erase;
+            break;
+        case 6:
+            g_map->mapdatatop[x][y] = erase ? TileType::NonSolid : set_tiletype;
+            AdjustMapItems(cx, cy);
+            break;
+        default:
+            break;
+    }
+}
+
+// What the mode paints at a cell, to compare cells for the fill
+static std::string value(int x, int y)
+{
+    std::string v;
+    auto add = [&v](int n) { v += std::to_string(n) + ","; };
+    switch (edit_mode) {
+        case 0: add(g_map->objectdata[x][y].iType); break;
+        case 1:
+        case 8: {
+            const TilesetTile& t = g_map->mapdata[x][y][selected_layer];
+            add(t.iID);
+            if (t.iID != TILESETNONE) {
+                add(t.iCol);
+                add(t.iRow);
+            }
+            break;
+        }
+        case 2: add(static_cast<int>(g_map->warpdata[x][y].direction)); add(g_map->warpdata[x][y].connection); break;
+        case 4: add(g_map->nospawn[nospawn_mode][x][y]); break;
+        case 5: add(g_map->nospawn[5][x][y]); break;
+        case 6: add(static_cast<int>(g_map->mapdatatop[x][y])); break;
+        default: break;
+    }
+    return v;
+}
+
+static void copy(int x0, int y0, int x1, int y1)
+{
+    g_copied.clear();
+    g_copiedCols = x1 - x0 + 1;
+    g_copiedRows = y1 - y0 + 1;
+    for (int y = y0; y <= y1; y++) {
+        for (int x = x0; x <= x1; x++) {
+            Copied c;
+            for (short layer = 0; layer < MAPLAYERS; layer++)
+                c.tiles[layer] = g_map->mapdata[x][y][layer];
+            c.top = g_map->mapdatatop[x][y];
+            c.block = g_map->objectdata[x][y];
+            c.warp = g_map->warpdata[x][y];
+            for (short type = 0; type < NUMSPAWNAREATYPES; type++)
+                c.nospawn[type] = g_map->nospawn[type][x][y];
+            g_copied.push_back(c);
+        }
+    }
+}
+
+static void paste(int col, int row)
+{
+    for (int dy = 0; dy < g_copiedRows; dy++) {
+        for (int dx = 0; dx < g_copiedCols; dx++) {
+            const int x = col + dx;
+            const int y = row + dy;
+            if (x < 0 || x >= MAPWIDTH || y < 0 || y >= MAPHEIGHT)
+                continue;
+            const Copied& c = g_copied[static_cast<size_t>(dy * g_copiedCols + dx)];
+            for (short layer = 0; layer < MAPLAYERS; layer++)
+                g_map->mapdata[x][y][layer] = c.tiles[layer];
+            g_map->mapdatatop[x][y] = c.top;
+            g_map->objectdata[x][y] = c.block;
+            g_map->warpdata[x][y] = c.warp;
+            for (short type = 0; type < NUMSPAWNAREATYPES; type++)
+                g_map->nospawn[type][x][y] = c.nospawn[type];
+            AdjustMapItems(static_cast<short>(x), static_cast<short>(y));
+        }
+    }
+}
+};
+
+void fillRect(int c0, int r0, int c1, int r1, bool erase)
+{
+    if (!paintsCells())
+        return;
+    const int x0 = std::clamp(std::min(c0, c1), 0, MAPWIDTH - 1);
+    const int x1 = std::clamp(std::max(c0, c1), 0, MAPWIDTH - 1);
+    const int y0 = std::clamp(std::min(r0, r1), 0, MAPHEIGHT - 1);
+    const int y1 = std::clamp(std::max(r0, r1), 0, MAPHEIGHT - 1);
+    for (int x = x0; x <= x1; x++) {
+        for (int y = y0; y <= y1; y++)
+            Cells::paint(x, y, erase, x - x0, y - y0);
+    }
+}
+
+void floodFill(int col, int row)
+{
+    if (!paintsCells() || col < 0 || col >= MAPWIDTH || row < 0 || row >= MAPHEIGHT)
+        return;
+    const std::string from = Cells::value(col, row);
+    std::vector<std::pair<int, int>> cells;
+    std::vector<bool> seen(static_cast<size_t>(MAPWIDTH * MAPHEIGHT), false);
+    std::vector<std::pair<int, int>> todo {{col, row}};
+    seen[static_cast<size_t>(row * MAPWIDTH + col)] = true;
+    while (!todo.empty()) {
+        const std::pair<int, int> at = todo.back();
+        todo.pop_back();
+        cells.push_back(at);
+        const int dirs[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (const auto& d : dirs) {
+            const int x = at.first + d[0];
+            const int y = at.second + d[1];
+            if (x < 0 || x >= MAPWIDTH || y < 0 || y >= MAPHEIGHT || seen[static_cast<size_t>(y * MAPWIDTH + x)])
+                continue;
+            seen[static_cast<size_t>(y * MAPWIDTH + x)] = true;
+            if (Cells::value(x, y) == from)
+                todo.push_back({x, y});
+        }
+    }
+    //(painted after: painting changes what the cells are; the selected tiles' pattern from the cell filled from)
+    const int cols = std::max(1, set_tile_cols);
+    const int rows = std::max(1, set_tile_rows);
+    for (const std::pair<int, int>& c : cells)
+        Cells::paint(c.first, c.second, false, ((c.first - col) % cols + cols) % cols, ((c.second - row) % rows + rows) % rows);
+}
+
+void copyArea(int c0, int r0, int c1, int r1)
+{
+    Cells::copy(std::clamp(std::min(c0, c1), 0, MAPWIDTH - 1), std::clamp(std::min(r0, r1), 0, MAPHEIGHT - 1),
+        std::clamp(std::max(c0, c1), 0, MAPWIDTH - 1), std::clamp(std::max(r0, r1), 0, MAPHEIGHT - 1));
+}
+
+bool clipboard(int* cols, int* rows)
+{
+    if (cols)
+        *cols = g_copiedCols;
+    if (rows)
+        *rows = g_copiedRows;
+    return !g_copied.empty();
+}
+
+void paste(int col, int row)
+{
+    Cells::paste(col, row);
+}
+
+// ---- the recently used
+
+Brush brush()
+{
+    Brush b;
+    switch (edit_mode) {
+        case 0:
+            b.mode = 0;
+            b.id = set_block;
+            b.on = set_block >= 11 && set_block <= 14 ? set_block_switch_on : set_block >= 7 && set_block <= 10 ? switchOn(set_block - 7) : true;
+            break;
+        case 1:
+            if (set_tile_tileset < 0 || set_tile_cols < 1 || set_tile_rows < 1)
+                break;
+            b.mode = 1;
+            b.id = set_tile_tileset;
+            b.x = set_tile_start_x;
+            b.y = set_tile_start_y;
+            b.cols = set_tile_cols;
+            b.rows = set_tile_rows;
+            break;
+        case 6:
+            b.mode = 6;
+            b.id = static_cast<int>(set_tiletype);
+            break;
+        case 7:
+            b.mode = 7;
+            b.id = set_mapitem;
+            break;
+        default:
+            break;
+    }
+    return b;
+}
+
+void setBrush(const Brush& b)
+{
+    switch (b.mode) {
+        case 0: setBlock(b.id, b.on); break;
+        case 1:
+            if (b.id < 0 || static_cast<size_t>(b.id) >= g_tilesetmanager->count())
+                return;
+            set_tile_tileset = b.id;
+            set_tile_start_x = b.x;
+            set_tile_start_y = b.y;
+            set_tile_end_x = b.x + b.cols - 1;
+            set_tile_end_y = b.y + b.rows - 1;
+            set_tile_cols = b.cols;
+            set_tile_rows = b.rows;
+            edit_mode = 1;
+            break;
+        case 6: setTileType(b.id); break;
+        case 7: setItem(b.id); break;
+        default: break;
+    }
+}
+
+// ---- the tileset screen
+
+bool tilePicker(TilePicker* picker)
+{
+    if (state != EDITOR_TILES || set_tile_tileset < 0 || static_cast<size_t>(set_tile_tileset) >= g_tilesetmanager->count())
+        return false;
+    CTileset* ts = g_tilesetmanager->tileset(set_tile_tileset);
+    picker->viewCol = view_tileset_x;
+    picker->viewRow = view_tileset_y;
+    picker->cols = ts->width();
+    picker->rows = ts->height();
+    picker->index = set_tile_tileset;
+    picker->count = static_cast<int>(g_tilesetmanager->count());
+    picker->name = ts->name();
     return true;
 }
 
@@ -445,8 +747,9 @@ Screen currentScreen()
     const Command done {"Done", SDLK_ESCAPE};
     switch (state) {
         case EDITOR_TILES:
-            sc.title = "Choose tiles: " + std::string(g_tilesetmanager->tileset(set_tile_tileset)->name());
-            sc.a = "take (drag: several)";
+            sc.title = "Tileset " + std::to_string(set_tile_tileset + 1) + " of " + std::to_string(g_tilesetmanager->count()) + ": " +
+                       g_tilesetmanager->tileset(set_tile_tileset)->name();
+            sc.a = "take (held, with the d-pad: several)";
             sc.shoulders = "tileset";
             sc.lb = SDLK_PAGEUP;
             sc.rb = SDLK_PAGEDOWN;

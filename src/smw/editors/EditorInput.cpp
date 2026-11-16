@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
 
 extern CResourceManager* rm;
@@ -97,7 +98,7 @@ std::string keyName(const Action& action)
 
 // ---- the controllers
 
-enum Button { A, B, X, Y, LB, RB, BACK, START, UP, DOWN, LEFT, RIGHT, LT, RT, BUTTON_COUNT };
+enum Button { A, B, X, Y, LB, RB, BACK, START, UP, DOWN, LEFT, RIGHT, LT, RT, LS, RS, BUTTON_COUNT };
 
 struct Pad {
     std::array<bool, BUTTON_COUNT> buttons {};
@@ -155,6 +156,8 @@ struct Controllers {
             //(the triggers: pulled halfway)
             p.buttons[LT] = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > 16000;
             p.buttons[RT] = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > 16000;
+            p.buttons[LS] = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_LEFT_STICK);
+            p.buttons[RS] = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_RIGHT_STICK);
             p.lx = axis(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX));
             p.ly = axis(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY));
             p.rx = axis(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTX));
@@ -167,6 +170,11 @@ struct Controllers {
             const int buttons = SDL_GetNumJoystickButtons(joy);
             for (int b = 0; b < 8 && b < buttons; b++)
                 p.buttons[b] = SDL_GetJoystickButton(joy, b);
+            //(the sticks pressed: XInput's 8 and 9)
+            if (buttons > 9) {
+                p.buttons[LS] = SDL_GetJoystickButton(joy, 8);
+                p.buttons[RS] = SDL_GetJoystickButton(joy, 9);
+            }
             if (SDL_GetNumJoystickHats(joy) > 0) {
                 const Uint8 hat = SDL_GetJoystickHat(joy, 0);
                 p.buttons[UP] = hat & SDL_HAT_UP;
@@ -213,12 +221,22 @@ struct Pointer {
     SDL_MouseButtonFlags buttons = 0;   // the mouse buttons it holds
     Repeat up, down, left, right;       // d-pad (cursor, overlays)
     Repeat arrowUp, arrowDown, arrowLeft, arrowRight;    // right stick (arrow keys)
+    int drag = -1;                      // a rectangle being drawn: the button (A, B), and its first cell
+    int dragCol = 0, dragRow = 0;
 
     bool pressed(Button b) const { return pad.buttons[b] && !last.buttons[b]; }
     bool released(Button b) const { return !pad.buttons[b] && last.buttons[b]; }
 };
 
-enum class Overlay { None, Window, Keyboard };
+enum class Overlay { None, Window, Keyboard, Tools };
+
+// A tool waiting for the next click on the map (chosen in the tools menu)
+enum class Armed { None, Copy, Paste, Fill };
+
+// One undo: each value of the document that changed, before and after
+struct UndoStep {
+    std::vector<std::tuple<uint32_t, coedit::Bytes, coedit::Bytes>> changes;
+};
 
 struct State {
     bool active = false;
@@ -273,6 +291,37 @@ struct State {
     bool pickRelease = false;
     int scroll = 0;                    // the page scrolled down by this many pixels
     int scrollMax = 0;                 // (as far as it goes, from the last frame's layout)          // the mouse button that picked: its release isn't the editor's
+
+    //Undo: the document as it was after the last change, and the changes
+    std::unique_ptr<coedit::Document> undoDoc;
+    std::unordered_map<uint32_t, coedit::Bytes> undoBase;
+    std::string undoTitle;             // (another map or world: the history starts over)
+    std::vector<UndoStep> undos, redos;
+    bool undoWasHeld = false;          // (a button held: one undo for the whole stroke)
+    bool undoFresh = false;
+    uint64_t undoApplied = 0;          // (others' changes online: not ours to undo)
+
+    //The tools menu (the right stick pressed), and the tool it armed
+    int toolsIndex = 0;
+    Uint64 toolsOpenedMs = 0;
+    bool toolsMoved = false;
+    float toolsX = 0, toolsY = 0;      // (beside the pointer that opened it)
+    Armed armed = Armed::None;
+    bool mouseDrag = false;            // (the mouse drawing the area to copy)
+    int mouseDragCol = 0, mouseDragRow = 0;
+
+    //The last things picked (LB / RB on the level editor's map)
+    std::vector<leveleditor::shell::Brush> recents;
+    leveleditor::shell::Brush lastBrush;
+    leveleditor::shell::Brush stepped;    // (picked again with LB / RB: it keeps its place)
+
+    //A short message at the top (undone, copied...)
+    std::string toast;
+    Uint64 toastMs = 0;
+
+    //The whole map (the left stick held)
+    bool preview = false;
+    SDL_Surface* worldPicture = nullptr;
 
     //The editor's latest frame, without the overlay (redrawn while it waits)
     SDL_Surface* frame = nullptr;
@@ -381,6 +430,149 @@ void holdKey(SDL_Keycode key, Repeat& repeat, bool down, bool& anyDown)
         pushKey(key, true);
     else if (repeat.held == 0 && s.keys[code] && !down)
         pushKey(key, false);
+}
+
+// ---- messages
+
+void toast(const std::string& text)
+{
+    s.toast = text;
+    s.toastMs = SDL_GetTicks();
+    s.overlayDirty = true;
+}
+
+bool toastShown()
+{
+    return !s.toast.empty() && SDL_GetTicks() - s.toastMs < 1600;
+}
+
+// ---- undo and redo
+//
+// The editor's document (the keyed values of CoEdit.h) is compared once a frame
+// with how it was: what changed is one undo (while a button is held, a stroke or a
+// rectangle, all of it). Undoing puts the values back, where nobody has changed them
+// since; online, that goes out to the others as any change does.
+
+bool anyHeld()
+{
+    for (const Pointer& p : s.pointers) {
+        if (p.buttons || p.drag >= 0)
+            return true;
+    }
+    return s.mouseDrag || (SDL_GetMouseState(nullptr, nullptr) & (SDL_BUTTON_LMASK | SDL_BUTTON_RMASK)) != 0;
+}
+
+std::unique_ptr<coedit::Document> makeDocument()
+{
+    return s.editor == Editor::Level ? leveleditor::makeCoeditDocument() : worldeditor::makeCoeditDocument();
+}
+
+// Each frame (before its changes go out online): what changed since the last
+void undoTrack()
+{
+    if (!s.undoDoc)
+        s.undoDoc = makeDocument();
+    std::unordered_map<uint32_t, coedit::Bytes> now;
+    s.undoDoc->capture(now);
+    const std::string title = s.undoDoc->title();
+    if (title != s.undoTitle) {
+        //(another map or world: its own history)
+        s.undoTitle = title;
+        s.undos.clear();
+        s.redos.clear();
+        s.undoBase = std::move(now);
+        return;
+    }
+    UndoStep step;
+    for (const auto& kv : now) {
+        auto it = s.undoBase.find(kv.first);
+        if (it == s.undoBase.end())
+            step.changes.emplace_back(kv.first, coedit::Bytes(), kv.second);
+        else if (it->second != kv.second)
+            step.changes.emplace_back(kv.first, it->second, kv.second);
+    }
+    for (const auto& kv : s.undoBase) {
+        if (!now.count(kv.first))
+            step.changes.emplace_back(kv.first, kv.second, coedit::Bytes());
+    }
+    const bool held = anyHeld();
+    if (held && !s.undoWasHeld)
+        s.undoFresh = true;
+    if (!step.changes.empty()) {
+        if ((held || s.undoWasHeld) && !s.undoFresh && !s.undos.empty()) {
+            //(the same stroke: into its undo; each value as it was before the stroke)
+            UndoStep& last = s.undos.back();
+            for (auto& c : step.changes) {
+                auto it = std::find_if(last.changes.begin(), last.changes.end(),
+                    [&c](const std::tuple<uint32_t, coedit::Bytes, coedit::Bytes>& o) { return std::get<0>(o) == std::get<0>(c); });
+                if (it != last.changes.end())
+                    std::get<2>(*it) = std::get<2>(c);
+                else
+                    last.changes.push_back(std::move(c));
+            }
+        } else {
+            s.undos.push_back(std::move(step));
+            if (s.undos.size() > 100)
+                s.undos.erase(s.undos.begin());
+        }
+        s.undoFresh = false;
+        s.redos.clear();
+    }
+    s.undoWasHeld = held;
+    s.undoBase = std::move(now);
+}
+
+// The document changed by others (online): their changes are not ours to undo
+void undoRebase()
+{
+    if (!s.undoDoc || coedit::stats().opsApplied == s.undoApplied)
+        return;
+    s.undoApplied = coedit::stats().opsApplied;
+    s.undoBase.clear();
+    s.undoDoc->capture(s.undoBase);
+}
+
+void undoApply(bool redo)
+{
+    std::vector<UndoStep>& from = redo ? s.redos : s.undos;
+    if (!s.undoDoc || from.empty()) {
+        toast(redo ? "Nothing to redo" : "Nothing to undo");
+        return;
+    }
+    UndoStep step = std::move(from.back());
+    from.pop_back();
+    std::unordered_map<uint32_t, coedit::Bytes> now;
+    s.undoDoc->capture(now);
+    //(the sections first, as when joining)
+    std::sort(step.changes.begin(), step.changes.end(),
+        [](const std::tuple<uint32_t, coedit::Bytes, coedit::Bytes>& a, const std::tuple<uint32_t, coedit::Bytes, coedit::Bytes>& b) {
+            return std::get<0>(a) < std::get<0>(b);
+        });
+    int kept = 0;
+    for (const auto& c : step.changes) {
+        const coedit::Bytes& is = redo ? std::get<1>(c) : std::get<2>(c);
+        const coedit::Bytes& back = redo ? std::get<2>(c) : std::get<1>(c);
+        auto it = now.find(std::get<0>(c));
+        const coedit::Bytes empty;
+        //(changed since, by someone else: theirs stays)
+        if ((it == now.end() ? empty : it->second) != is) {
+            kept++;
+            continue;
+        }
+        s.undoDoc->apply(std::get<0>(c), back);
+    }
+    s.undoDoc->applied();
+    (redo ? s.undos : s.redos).push_back(std::move(step));
+    s.undoBase.clear();
+    s.undoDoc->capture(s.undoBase);
+    s.undoWasHeld = false;
+    const size_t left = redo ? s.redos.size() : s.undos.size();
+    std::string text = redo ? "Redone" : "Undone";
+    if (left > 0)
+        text += " (" + std::to_string(left) + " more)";
+    if (kept > 0)
+        text += ": others changed some of it since";
+    toast(text);
 }
 
 // ---- the overlays' input (the controller that opened it)
@@ -507,6 +699,7 @@ void openWindow(int owner)
     s.dockLeft = px >= SCREEN_W / 2;
     s.overlay = Overlay::Window;
     s.overlayOwner = owner;
+    s.toast.clear();
     s.hover = -1;
     //(opened with a controller: its d-pad moves a highlight; the pointer stays on the map)
     s.nav = owner >= 0;
@@ -775,6 +968,162 @@ void quickStep(int delta)
     s.overlayDirty = true;
 }
 
+// ---- the last things picked (LB / RB on the level editor's map)
+
+// Each frame: what is selected now goes first (unless LB / RB just went to it)
+void trackRecent()
+{
+    if (!levelMap())
+        return;
+    const leveleditor::shell::Brush b = leveleditor::shell::brush();
+    if (b.mode < 0 || b == s.lastBrush)
+        return;
+    s.lastBrush = b;
+    if (b != s.stepped) {
+        s.recents.erase(std::remove(s.recents.begin(), s.recents.end(), b), s.recents.end());
+        s.recents.insert(s.recents.begin(), b);
+        if (s.recents.size() > 8)
+            s.recents.resize(8);
+        s.stepped = leveleditor::shell::Brush();
+    }
+    s.overlayDirty = true;
+}
+
+void recentStep(int delta)
+{
+    namespace sh = leveleditor::shell;
+    if (s.recents.size() < 2) {
+        //(nothing to go back to yet: through the blocks, items and tile types)
+        quickStep(delta);
+        return;
+    }
+    const sh::Brush now = sh::brush();
+    const int n = static_cast<int>(s.recents.size());
+    int at = static_cast<int>(std::find(s.recents.begin(), s.recents.end(), now) - s.recents.begin());
+    at = at >= n ? 0 : ((at + delta) % n + n) % n;
+    s.stepped = s.recents[static_cast<size_t>(at)];
+    sh::setBrush(s.stepped);
+    if (currentTool() != TOOL_ERASE)
+        setTool(TOOL_PAINT);
+    s.overlayDirty = true;
+}
+
+// ---- the tools menu (the right stick pressed): undo, redo, and on the level editor's map copy, paste, fill
+
+enum ToolItem { T_UNDO, T_REDO, T_COPY, T_PASTE, T_FILL, T_ITEM_COUNT };
+constexpr int TOOLS_W = 210;
+constexpr int TOOLS_ROW = 30;
+
+// The editor shows its map (the level's or the world's), not one of its other screens
+bool mapShown()
+{
+    return levelMap() || (s.editor == Editor::World && worldeditor::shell::inMapView());
+}
+
+int toolsCount()
+{
+    return levelMap() ? T_ITEM_COUNT : 2;
+}
+
+SDL_Rect toolsRect()
+{
+    const int h = 40 + toolsCount() * TOOLS_ROW + 32;
+    //(beside the pointer, on the screen)
+    const int x = std::clamp(static_cast<int>(s.toolsX) + 24, 6, SCREEN_W - TOOLS_W - 6);
+    const int y = std::clamp(static_cast<int>(s.toolsY) - 20, 6, SCREEN_H - h - 6);
+    return {x, y, TOOLS_W, h};
+}
+
+SDL_Rect toolsItemRect(int k)
+{
+    const SDL_Rect r = toolsRect();
+    return {r.x + 10, r.y + 38 + k * TOOLS_ROW, r.w - 20, TOOLS_ROW - 3};
+}
+
+// Whether it can be used now (else: why not)
+bool toolUsable(int item, std::string* why = nullptr)
+{
+    namespace sh = leveleditor::shell;
+    std::string reason;
+    switch (item) {
+        case T_UNDO: reason = s.undos.empty() ? "Nothing to undo" : ""; break;
+        case T_REDO: reason = s.redos.empty() ? "Nothing to redo" : ""; break;
+        case T_COPY: break;
+        case T_PASTE: reason = sh::clipboard(nullptr, nullptr) ? "" : "Copy an area first"; break;
+        case T_FILL: reason = sh::paintsCells() ? "" : "Pick blocks, tiles, tile types or zones to fill with"; break;
+        default: break;
+    }
+    if (why)
+        *why = reason;
+    return reason.empty();
+}
+
+void openTools(int owner)
+{
+    for (size_t k = 0; k < s.pointers.size(); k++) {
+        if (s.pointers[k].buttons & SDL_BUTTON_LMASK)
+            pushButton(static_cast<int>(k), SDL_BUTTON_LEFT, false);
+        if (s.pointers[k].buttons & SDL_BUTTON_RMASK)
+            pushButton(static_cast<int>(k), SDL_BUTTON_RIGHT, false);
+        s.pointers[k].drag = -1;
+    }
+    s.overlay = Overlay::Tools;
+    s.overlayOwner = owner;
+    s.toolsX = owner >= 0 && owner < static_cast<int>(s.pointers.size()) ? s.pointers[static_cast<size_t>(owner)].x : s.cx;
+    s.toolsY = owner >= 0 && owner < static_cast<int>(s.pointers.size()) ? s.pointers[static_cast<size_t>(owner)].y : s.cy;
+    s.toolsIndex = 0;
+    s.toolsOpenedMs = SDL_GetTicks();
+    s.toolsMoved = false;
+    s.overlayDirty = true;
+}
+
+void closeTools()
+{
+    s.overlay = Overlay::None;
+    s.overlayDirty = true;
+}
+
+void chooseTool(int item)
+{
+    std::string why;
+    if (!toolUsable(item, &why)) {
+        toast(why);
+        return;
+    }
+    switch (item) {
+        case T_UNDO: undoApply(false); return;    //(the menu stays: undo again)
+        case T_REDO: undoApply(true); return;
+        case T_COPY: s.armed = Armed::Copy; toast("Copy: hold A and drag over the cells"); break;
+        case T_PASTE: s.armed = Armed::Paste; toast("Paste: A puts it down, B stops"); break;
+        case T_FILL: s.armed = Armed::Fill; toast("Fill: A fills the cells joined to that one"); break;
+        default: break;
+    }
+    closeTools();
+}
+
+void updateTools(Pointer& p)
+{
+    const bool up = p.pad.buttons[UP] || p.pad.ly < -0.6f;
+    const bool down = p.pad.buttons[DOWN] || p.pad.ly > 0.6f;
+    const int n = toolsCount();
+    if (p.up.fire(up)) {
+        s.toolsIndex = (s.toolsIndex + n - 1) % n;
+        s.toolsMoved = true;
+        s.overlayDirty = true;
+    }
+    if (p.down.fire(down)) {
+        s.toolsIndex = (s.toolsIndex + 1) % n;
+        s.toolsMoved = true;
+        s.overlayDirty = true;
+    }
+    if (p.pressed(A))
+        chooseTool(s.toolsIndex);
+    else if (p.pressed(B) || p.pressed(BACK) || p.pressed(START) || p.pressed(RS))
+        closeTools();
+    else if (p.released(RS) && s.toolsMoved && SDL_GetTicks() - s.toolsOpenedMs > 300)
+        chooseTool(s.toolsIndex);    //(held, moved and let go: that one)
+}
+
 // ---- the window's highlight: the controller that opened it
 
 int focusIndex();
@@ -850,11 +1199,45 @@ void updatePointer(int index)
     const bool down = p.down.fire(p.pad.buttons[DOWN]);
     const bool left = p.left.fire(p.pad.buttons[LEFT]);
     const bool right = p.right.fire(p.pad.buttons[RIGHT]);
+    leveleditor::shell::TilePicker picker;
+    const bool picking = s.editor == Editor::Level && s.overlay == Overlay::None && leveleditor::shell::tilePicker(&picker);
     if (up || down || left || right) {
         const float mx = std::floor(p.x / TILE) * TILE + TILE / 2.0f;
         const float my = std::floor(p.y / TILE) * TILE + TILE / 2.0f;
-        dx += mx - p.x + (right ? TILE : 0) - (left ? TILE : 0);
-        dy += my - p.y + (down ? TILE : 0) - (up ? TILE : 0);
+        int stepX = (right ? 1 : 0) - (left ? 1 : 0);
+        int stepY = (down ? 1 : 0) - (up ? 1 : 0);
+        if (picking) {
+            //The tileset: tile by tile; at the screen's edge the tileset scrolls instead (the arrow keys)
+            const int c = static_cast<int>(p.x) / TILE;
+            const int r = static_cast<int>(p.y) / TILE;
+            const int lastCol = std::min(SCREEN_W / TILE, picker.cols - picker.viewCol) - 1;
+            const int lastRow = std::min(SCREEN_H / TILE, picker.rows - picker.viewRow) - 1;
+            if (stepX < 0 && c == 0) {
+                if (picker.viewCol > 0)
+                    tapKey(SDLK_LEFT);
+                stepX = 0;
+            } else if (stepX > 0 && c >= lastCol) {
+                if (picker.viewCol + SCREEN_W / TILE < picker.cols)
+                    tapKey(SDLK_RIGHT);
+                stepX = 0;
+            }
+            if (stepY < 0 && r == 0) {
+                if (picker.viewRow > 0)
+                    tapKey(SDLK_UP);
+                stepY = 0;
+            } else if (stepY > 0 && r >= lastRow) {
+                if (picker.viewRow + SCREEN_H / TILE < picker.rows)
+                    tapKey(SDLK_DOWN);
+                stepY = 0;
+            }
+            s.overlayDirty = true;
+        }
+        dx += mx - p.x + static_cast<float>(stepX * TILE);
+        dy += my - p.y + static_cast<float>(stepY * TILE);
+    } else if (picking && (p.last.lx != 0 || p.last.ly != 0) && p.pad.lx == 0 && p.pad.ly == 0) {
+        //(the stick let go: onto the middle of its tile)
+        dx += std::floor(p.x / TILE) * TILE + TILE / 2.0f - p.x;
+        dy += std::floor(p.y / TILE) * TILE + TILE / 2.0f - p.y;
     }
     if (dx != 0 || dy != 0) {
         p.x = std::clamp(p.x + dx, 0.0f, SCREEN_W - 1.0f);
@@ -878,21 +1261,66 @@ void updatePointer(int index)
             closeWindow();
     } else {
         //The buttons: the editor's mouse comes here first (the tools: erase is the right button, pick takes the cell)
+        namespace sh = leveleditor::shell;
         const int tool = currentTool();
+        const bool onMap = levelMap() && s.overlay != Overlay::Keyboard;
+        const int col = std::clamp(static_cast<int>(p.x) / TILE, 0, sh::MAP_COLS - 1);
+        const int row = std::clamp(static_cast<int>(p.y) / TILE, 0, sh::MAP_ROWS - 1);
+        //(a rectangle: held and moved, then let go; the area to copy, or what the mode paints cell by cell)
+        const bool rectangles = onMap && (s.armed == Armed::Copy || (s.armed == Armed::None && sh::paintsCells() && tool != TOOL_PICK));
         if (p.pressed(A) || p.pressed(B))
             p.shown = true;
-        if (p.pressed(A) && tool == TOOL_PICK && levelMap()) {
-            leveleditor::shell::pick(static_cast<int>(p.x) / TILE, static_cast<int>(p.y) / TILE);
+        if (onMap && s.armed != Armed::None && (p.pressed(B) || p.pressed(BACK))) {
+            //(B: the armed tool put away)
+            s.armed = Armed::None;
+            p.drag = -1;
+            toast("Stopped");
+            //(used up: not the editor's right button or Escape too)
+            p.last.buttons[B] = p.pad.buttons[B];
+            p.last.buttons[BACK] = p.pad.buttons[BACK];
+        } else if (onMap && s.armed == Armed::Paste && p.pressed(A)) {
+            sh::paste(col, row);
+        } else if (onMap && s.armed == Armed::Fill && p.pressed(A)) {
+            sh::floodFill(col, row);
+            s.armed = Armed::None;
+        } else if (rectangles && p.drag < 0 && (p.pressed(A) || p.pressed(B))) {
+            p.drag = p.pressed(A) ? A : B;
+            p.dragCol = col;
+            p.dragRow = row;
+            moveMouseTo(index);
+        } else if (p.drag >= 0) {
+            if (p.released(static_cast<Button>(p.drag))) {
+                const bool erase = p.drag == B || tool == TOOL_ERASE;
+                if (s.armed == Armed::Copy) {
+                    sh::copyArea(p.dragCol, p.dragRow, col, row);
+                    s.armed = Armed::None;
+                    int w = 0, h = 0;
+                    sh::clipboard(&w, &h);
+                    toast("Copied " + std::to_string(w) + " x " + std::to_string(h) + ": Paste is in the tools");
+                } else if (col == p.dragCol && row == p.dragRow) {
+                    //(one cell: a click, as the editor does it)
+                    pushButton(index, erase ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT, true);
+                    pushButton(index, erase ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT, false);
+                } else {
+                    sh::fillRect(p.dragCol, p.dragRow, col, row, erase);
+                }
+                p.drag = -1;
+                s.overlayDirty = true;
+            }
+        } else if (p.pressed(A) && tool == TOOL_PICK && levelMap()) {
+            sh::pick(col, row);
             setTool(TOOL_PAINT);
         } else if (p.pressed(A)) {
             pushButton(index, tool == TOOL_ERASE && levelMap() ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT, true);
         } else if (p.released(A) && (p.buttons & (SDL_BUTTON_LMASK | SDL_BUTTON_RMASK)) && !p.pad.buttons[B]) {
             pushButton(index, (p.buttons & SDL_BUTTON_LMASK) ? SDL_BUTTON_LEFT : SDL_BUTTON_RIGHT, false);
         }
-        if (p.pressed(B))
-            pushButton(index, SDL_BUTTON_RIGHT, true);
-        else if (p.released(B) && (p.buttons & SDL_BUTTON_RMASK))
-            pushButton(index, SDL_BUTTON_RIGHT, false);
+        if (p.drag < 0 && !rectangles && s.armed == Armed::None) {
+            if (p.pressed(B))
+                pushButton(index, SDL_BUTTON_RIGHT, true);
+            else if (p.released(B) && (p.buttons & SDL_BUTTON_RMASK))
+                pushButton(index, SDL_BUTTON_RIGHT, false);
+        }
         //The level editor's map: X takes what is under the reticle, Y the next layer
         if (levelMap() && s.overlay == Overlay::None) {
             namespace sh = leveleditor::shell;
@@ -923,7 +1351,7 @@ void updatePointer(int index)
     if (p.pressed(RB) && s.overlay == Overlay::Window)
         turnPage(1);
     else if (p.pressed(RB) && quick)
-        quickStep(1);
+        recentStep(1);
     else if (p.pressed(RB) && onScreen && sc.rbHold)
         ;
     else if (p.pressed(RB) && onScreen && sc.rb)
@@ -942,11 +1370,14 @@ void updatePointer(int index)
         else
             openWindow(index);
     }
+    //The right stick pressed: the tools (undo, copy, paste, fill)
+    if (p.pressed(RS) && s.overlay == Overlay::None && mapShown())
+        openTools(index);
     if (p.pressed(LB)) {
         if (s.overlay == Overlay::Window) {
             turnPage(-1);
         } else if (quick) {
-            quickStep(-1);
+            recentStep(-1);
         } else if (onScreen && sc.lb) {
             tapKey(sc.lb);
         } else {
@@ -1103,11 +1534,34 @@ const Art ART_FLAG = {"#.......", "#rrrr...", "#rrrrr..", "#rrrr...", "#......."
 const Art ART_LOOK = {"########", "#cccccc#", "#ccwccc#", "#cc.ccc#", "#c...cc#", "#.....c#", "#gggggg#", "########"};
 const Art ART_DISK = {"#######.", "#w###w##", "#w#.#ww#", "#wwwwww#", "#cccccc#", "#cwwwwc#", "#cwwwwc#", "########"};
 
-void drawArt(int x, int y, const Art& art)
+void drawArt(int x, int y, const Art& art, int scale = 2)
 {
     prompts::art(x, y, art, {{'#', {0, 0, 0, 255}}, {'w', {255, 255, 255, 255}}, {'b', {168, 96, 40, 255}}, {'d', {112, 56, 16, 255}},
                                 {'g', {56, 184, 48, 255}}, {'G', {152, 232, 88, 255}}, {'r', {216, 40, 32, 255}}, {'y', {248, 208, 48, 255}},
-                                {'c', {104, 168, 240, 255}}, {'s', {168, 168, 176, 255}}});
+                                {'c', {104, 168, 240, 255}}, {'s', {168, 168, 176, 255}}}, scale);
+}
+
+// Some 32 pixel drawing, at another size: drawn on the side, then scaled (as pixel art)
+template <typename Draw>
+void drawScaled(int x, int y, int size, Draw draw)
+{
+    static SDL_Surface* canvas = nullptr;
+    if (!canvas) {
+        canvas = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_ARGB8888);
+        if (!canvas)
+            return;
+        SDL_SetSurfaceBlendMode(canvas, SDL_BLENDMODE_BLEND);
+    }
+    SDL_FillSurfaceRect(canvas, nullptr, SDL_MapSurfaceRGBA(canvas, 0, 0, 0, 0));
+    SDL_Surface* const was = screen;
+    SDL_Surface* const wasDest = blitdest;
+    screen = canvas;
+    blitdest = canvas;
+    draw(0, 0);
+    screen = was;
+    blitdest = wasDest;
+    const SDL_Rect dst {x, y, size, size};
+    SDL_BlitSurfaceScaled(canvas, nullptr, screen, &dst, SDL_SCALEMODE_PIXELART);
 }
 
 // ---- the level editor's palettes
@@ -1436,17 +1890,22 @@ int pageCount()
     return s.editor == Editor::Level ? LEVEL_PAGE_COUNT : static_cast<int>(worldGroups().size());
 }
 
-void drawPageIcon(int x, int y, int page)
+void drawPageIcon(int x, int y, int page, int size = 16)
 {
+    //(the pixel art at a whole number of times its 8 pixels; the sprites scaled)
+    const int scale = std::max(2, size / 8);
+    const int pad = (size - 8 * scale) / 2;
     if (s.editor != Editor::Level) {
         static const Art* arts[] = {&ART_BRUSH, &ART_LOOK, &ART_DISK, &ART_CLOSE};
-        drawArt(x, y, *arts[std::min(page, 3)]);
+        drawArt(x + pad, y + pad, *arts[std::min(page, 3)], scale);
         return;
     }
     if (LEVEL_PAGES[page].art)
-        drawArt(x, y, *LEVEL_PAGES[page].art);
-    else
+        drawArt(x + pad, y + pad, *LEVEL_PAGES[page].art, scale);
+    else if (size == 16)
         theme::icon(x, y, theme::Icon::QuestionBlock);
+    else
+        drawScaled(x, y, size, [](int ix, int iy) { theme::icon(ix + 8, iy + 8, theme::Icon::QuestionBlock); });
 }
 
 void levelPage(Layout& l)
@@ -1647,6 +2106,46 @@ void drawSelection(int x, int y)
     }
 }
 
+// Something picked before (the recently used), 32 pixels
+void drawBrush(const leveleditor::shell::Brush& b, int x, int y)
+{
+    switch (b.mode) {
+        case 0: drawBlock(x, y, b.id, b.on); break;
+        case 1: leveleditor::shell::drawBrushTiles(b, x, y, 32); break;
+        case 6:
+            if (rm->spr_transparenttiles)
+                rm->spr_transparenttiles.draw(x, y, {(b.id - 1) * 32, 0, 32, 32});
+            break;
+        case 7:
+            if (rm->spr_mapitems[0])
+                rm->spr_mapitems[0].draw(x, y, {b.id * 32, 0, 32, 32});
+            break;
+        default: break;
+    }
+}
+
+std::string brushName(const leveleditor::shell::Brush& b)
+{
+    switch (b.mode) {
+        case 0:
+            for (const Entry& e : BLOCKS)
+                if (e.id == b.id)
+                    return e.name;
+            for (const Entry& e : BREAKABLE)
+                if (e.id == b.id)
+                    return e.name;
+            if (b.id >= 7 && b.id <= 10)
+                return std::string(COLORS[b.id - 7]) + " switch, " + (b.on ? "ON" : "OFF");
+            if (b.id >= 11 && b.id <= 14)
+                return std::string(COLORS[b.id - 11]) + " switch block, " + (b.on ? "solid" : "an outline");
+            return "A block";
+        case 1: return b.cols * b.rows > 1 ? std::to_string(b.cols) + " x " + std::to_string(b.rows) + " tiles" : "A tile";
+        case 6: return b.id >= 1 && b.id <= 18 ? TILE_TYPES[b.id - 1] : "A tile type";
+        case 7: return b.id >= 0 && b.id < 6 ? ITEMS[b.id].name : "A map item";
+        default: return {};
+    }
+}
+
 // A key's short name (for a key cap)
 std::string keyCap(SDL_Keycode key, bool shift)
 {
@@ -1720,19 +2219,17 @@ void drawWindow()
             addWidget(r, [t] { setTool(t); }, toolTip[t], ZONE_TOOLS, currentTool() == t, true);
             x += 28;
         }
-        x += 8;
-        //The layers: four buttons under a tiny label
-        prompts::tinyText(x + 1, ty - 1, "LAYER", {0, 0, 0, 255}, 1);
-        prompts::tinyText(x, ty - 2, "LAYER", {255, 255, 255, 255}, 1);
+        x += 4;
+        //The layers: L1 to L4
         for (int layer = 0; layer < 4; layer++) {
-            const SDL_Rect r {x, ty + 5, 20, 21};
+            const SDL_Rect r {x, ty, 25, 26};
             theme::block(r.x, r.y, r.w, r.h, hovered(r) ? theme::Tone::Green : sh::layer() == layer ? theme::Tone::Gold : theme::Tone::Gray);
-            theme::font().drawCentered(r.x + 10, r.y + 3, std::to_string(layer + 1));
-            addWidget(r, [layer] { sh::setLayer(layer); }, "Paint on layer " + std::to_string(layer + 1) + " of 4 (Y goes through them)", ZONE_TOOLS,
-                sh::layer() == layer);
-            x += 22;
+            theme::font().drawCentered(r.x + 13, r.y + (r.h - theme::font().getHeight()) / 2, "L" + std::to_string(layer + 1));
+            addWidget(r, [layer] { sh::setLayer(layer); }, "Layer " + std::to_string(layer + 1) + " of 4: where tiles are painted (Y goes through them)",
+                ZONE_TOOLS, sh::layer() == layer);
+            x += 26;
         }
-        x += 6;
+        x += 4;
         const SDL_Rect only {x, ty, 26, 26};
         theme::block(only.x, only.y, only.w, only.h, hovered(only) ? theme::Tone::Green : sh::othersHidden() ? theme::Tone::Gold : theme::Tone::Gray);
         drawArt(only.x + 5, only.y + 5, ART_EYE);
@@ -1745,6 +2242,26 @@ void drawWindow()
             fill(blocks.x + 4, blocks.y + 12, 18, 2, {216, 40, 32, 255});
         addWidget(blocks, [] { sh::setBlocksShown(!sh::blocksShown()); }, "Hide the blocks, to see the tiles under them (V)", ZONE_TOOLS);
         ty += 32;
+        //The last things picked (LB / RB on the map)
+        if (!s.recents.empty()) {
+            const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+            int rx = win.x + 8;
+            if (controller)
+                rx += prompts::drawPad(rx, ty + 7, prompts::Pad::LB) + 4;
+            const sh::Brush now = sh::brush();
+            for (const sh::Brush& b : s.recents) {
+                const SDL_Rect r {rx, ty, 28, 28};
+                const bool sel = b == now;
+                theme::block(r.x, r.y, r.w, r.h, hovered(r) ? theme::Tone::Green : sel ? theme::Tone::Gold : theme::Tone::Dark);
+                drawScaled(r.x + 2, r.y + 2, 24, [&b](int x, int y) { drawBrush(b, x, y); });
+                addWidget(r, [b] { s.stepped = b; sh::setBrush(b); if (currentTool() != TOOL_ERASE) setTool(TOOL_PAINT); },
+                    "Picked before: " + brushName(b), ZONE_TOOLS, sel, true);
+                rx += 30;
+            }
+            if (controller)
+                prompts::drawPad(rx + 2, ty + 7, prompts::Pad::RB);
+            ty += 34;
+        }
     }
 
     //The pages: a rail of icons, the page beside it
@@ -1759,16 +2276,11 @@ void drawWindow()
         const bool sel = s.category == k;
         theme::block(r.x, r.y, r.w, r.h, sel ? theme::Tone::Gold : hovered(r) ? theme::Tone::Green : theme::Tone::Dark);
         const std::string label = level ? LEVEL_PAGES[k].name : groups[static_cast<size_t>(k)];
-        //Its icon, and its name in small capitals (with a shadow)
-        std::string caps = label;
-        for (char& ch : caps)
-            ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
-        const int iconY = r.y + std::max(2, (r.h - 25) / 2);
-        drawPageIcon(r.x + (r.w - 16) / 2, iconY, k);
-        const int lw = prompts::tinyWidth(caps, 1);
-        prompts::tinyText(r.x + (r.w - lw) / 2 + 1, iconY + 19, caps, {0, 0, 0, 255}, 1);
-        prompts::tinyText(r.x + (r.w - lw) / 2, iconY + 18, caps, {255, 255, 255, 255}, 1);
-        addWidget(r, [k] { s.category = k; s.scroll = 0; s.hover = -1; s.focusValid = false; s.overlayDirty = true; }, label, ZONE_RAIL, sel);
+        //Its icon, big (its name: the page's title, and in the footer)
+        const int size = std::min(24, r.h - 4);
+        drawPageIcon(r.x + (r.w - size) / 2, r.y + (r.h - size) / 2, k, size);
+        addWidget(r, [k] { s.category = k; s.scroll = 0; s.hover = -1; s.focusValid = false; s.overlayDirty = true; },
+            level ? label + ": " + LEVEL_PAGES[k].about : label, ZONE_RAIL, sel);
     }
 
     Layout l;
@@ -1894,6 +2406,192 @@ void reticle(float px, float py, SDL_Color c, const std::string& tag)
     }
 }
 
+// Cells framed (a rectangle being drawn, the area to paste): a dashed frame in a color, and a tag
+void cellFrame(int c0, int r0, int c1, int r1, SDL_Color c, const std::string& tag)
+{
+    const int x = std::min(c0, c1) * TILE;
+    const int y = std::min(r0, r1) * TILE;
+    const int w = (std::abs(c1 - c0) + 1) * TILE;
+    const int h = (std::abs(r1 - r0) + 1) * TILE;
+    const SDL_Color black {0, 0, 0, 255};
+    fill(x - 1, y - 1, w + 2, 4, black);
+    fill(x - 1, y + h - 3, w + 2, 4, black);
+    fill(x - 1, y - 1, 4, h + 2, black);
+    fill(x + w - 3, y - 1, 4, h + 2, black);
+    //(dashes, marching)
+    const int phase = static_cast<int>((SDL_GetTicks() / 80) % 8);
+    for (int i = -phase; i < w; i += 8) {
+        fill(x + std::max(0, i), y, std::min(4, w - std::max(0, i)), 2, c);
+        fill(x + std::max(0, i), y + h - 2, std::min(4, w - std::max(0, i)), 2, c);
+    }
+    for (int i = -phase; i < h; i += 8) {
+        fill(x, y + std::max(0, i), 2, std::min(4, h - std::max(0, i)), c);
+        fill(x + w - 2, y + std::max(0, i), 2, std::min(4, h - std::max(0, i)), c);
+    }
+    s.overlayDirty = true;
+    if (!tag.empty()) {
+        const int tw = theme::font().getWidth(tag) + 8;
+        const int tx = std::clamp(x, 0, SCREEN_W - tw);
+        const int ty = y + h + 4 + 16 <= SCREEN_H ? y + h + 4 : std::max(0, y - 20);
+        fill(tx, ty, tw, 16, black);
+        fill(tx + 1, ty + 1, tw - 2, 14, c);
+        fill(tx + 1, ty + 1, tw - 2, 2, theme::shade(c, 140));
+        theme::font().draw(tx + 4, ty + 1, tag);
+    }
+}
+
+// The rectangles being drawn, the area about to be pasted, the fill's cell
+void drawCellTools()
+{
+    namespace sh = leveleditor::shell;
+    auto cellOf = [](float px, float py, int* c, int* r) {
+        *c = std::clamp(static_cast<int>(px) / TILE, 0, sh::MAP_COLS - 1);
+        *r = std::clamp(static_cast<int>(py) / TILE, 0, sh::MAP_ROWS - 1);
+    };
+    const SDL_Color red {216, 40, 32, 255};
+    for (size_t k = 0; k < s.pointers.size(); k++) {
+        const Pointer& p = s.pointers[k];
+        if (p.drag < 0)
+            continue;
+        int c = 0, r = 0;
+        cellOf(p.x, p.y, &c, &r);
+        const bool erase = p.drag == B || currentTool() == TOOL_ERASE;
+        const std::string size = std::to_string(std::abs(c - p.dragCol) + 1) + " x " + std::to_string(std::abs(r - p.dragRow) + 1);
+        cellFrame(p.dragCol, p.dragRow, c, r, s.armed == Armed::Copy ? SDL_Color {255, 255, 255, 255} : erase ? red : pointerColor(static_cast<int>(k)),
+            s.armed == Armed::Copy ? "Copy " + size : erase ? "Clear " + size : size);
+    }
+    if (s.mouseDrag) {
+        int c = 0, r = 0;
+        cellOf(s.cx, s.cy, &c, &r);
+        cellFrame(s.mouseDragCol, s.mouseDragRow, c, r, {255, 255, 255, 255}, "Copy");
+    }
+    if (s.armed == Armed::Paste) {
+        int w = 1, h = 1;
+        sh::clipboard(&w, &h);
+        int c = 0, r = 0;
+        cellOf(s.cx, s.cy, &c, &r);
+        cellFrame(c, r, std::min(c + w - 1, sh::MAP_COLS - 1), std::min(r + h - 1, sh::MAP_ROWS - 1), {255, 255, 255, 255}, "Paste here (A)");
+    } else if (s.armed == Armed::Fill) {
+        int c = 0, r = 0;
+        cellOf(s.cx, s.cy, &c, &r);
+        cellFrame(c, r, c, r, {255, 255, 255, 255}, "Fill from here (A)");
+    }
+}
+
+// The tools menu, beside the pointer that opened it
+void drawTools()
+{
+    const SDL_Rect r = toolsRect();
+    theme::panel(r.x, r.y, r.w, r.h);
+    theme::font().draw(r.x + 14, r.y + 14, "Tools");
+    static const char* LABELS[] = {"Undo", "Redo", "Copy an area", "Paste", "Fill"};
+    static const Art* ARTS[] = {nullptr, nullptr, &ART_MOVE, &ART_BRUSH, &ART_SPRING};
+    static const Art ART_UNDO = {"..#.....", ".##.....", "#######.", ".##....#", "..#....#", ".......#", "..#####.", "........"};
+    static const Art ART_REDO = {".....#..", ".....##.", ".#######", "#....##.", "#....#..", "#.......", ".#####..", "........"};
+    static const Art ART_FILL = {"...#....", "..#w#...", ".#www#..", "#wwwww#.", ".#www#c.", "..#w#.cc", "...#..cc", "......c."};
+    for (int k = 0; k < toolsCount(); k++) {
+        const SDL_Rect ir = toolsItemRect(k);
+        const bool sel = s.toolsIndex == k;
+        const bool usable = toolUsable(k);
+        theme::block(ir.x, ir.y, ir.w, ir.h, sel ? (usable ? theme::Tone::Gold : theme::Tone::Gray) : theme::Tone::Dark);
+        const Art* art = k == T_UNDO ? &ART_UNDO : k == T_REDO ? &ART_REDO : k == T_FILL ? &ART_FILL : ARTS[k];
+        drawArt(ir.x + 6, ir.y + (ir.h - 16) / 2, *art);
+        std::string label = LABELS[k];
+        if (k == T_UNDO && !s.undos.empty())
+            label += " (" + std::to_string(s.undos.size()) + ")";
+        if (k == T_REDO && !s.redos.empty())
+            label += " (" + std::to_string(s.redos.size()) + ")";
+        theme::font().draw(ir.x + 30, ir.y + (ir.h - theme::font().getHeight()) / 2, label);
+        if (!usable)
+            fill(ir.x + 28, ir.y + ir.h / 2, theme::font().getWidth(label) + 4, 2, {0, 0, 0, 255});
+    }
+    const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+    std::vector<prompts::Prompt> row;
+    if (controller)
+        row = {{{prompts::Pad::A}, {}, "use"}, {{prompts::Pad::B}, {}, "close"}};
+    else
+        row = {{{}, {"Ctrl+Z"}, "undo"}, {{}, {"Ctrl+Y"}, "redo"}};
+    prompts::drawPrompts(r.x + r.w / 2, r.y + r.h - 26, row, 10);
+}
+
+// The whole map, while a left stick is held: the level's (the screen, without the editor's
+// panels) or the world, small, with where everyone's glove is
+void drawPreview()
+{
+    const std::vector<coedit::Cursor> remote = coedit::remoteCursors();
+    if (s.editor == Editor::World && s.worldPicture) {
+        //(the world scaled to fit, over a dark screen)
+        fill(0, 0, SCREEN_W, SCREEN_H, {16, 16, 24, 255});
+        const int pw = s.worldPicture->w;
+        const int ph = s.worldPicture->h;
+        const float scale = std::min({1.0f, (SCREEN_W - 40.0f) / static_cast<float>(pw), (SCREEN_H - 90.0f) / static_cast<float>(ph)});
+        const int w = static_cast<int>(static_cast<float>(pw) * scale);
+        const int h = static_cast<int>(static_cast<float>(ph) * scale);
+        const int x = (SCREEN_W - w) / 2;
+        const int y = 50 + (SCREEN_H - 90 - h) / 2;
+        theme::panel(x - 8, y - 8, w + 16, h + 16);
+        const SDL_Rect dst {x, y, w, h};
+        SDL_BlitSurfaceScaled(s.worldPicture, nullptr, screen, &dst, SDL_SCALEMODE_LINEAR);
+        int ox = 0, oy = 0;
+        worldeditor::shell::viewOrigin(&ox, &oy);
+        //(the part on the screen now)
+        const int vx = x + static_cast<int>(static_cast<float>(ox) * scale);
+        const int vy = y + static_cast<int>(static_cast<float>(oy) * scale);
+        const int vw = static_cast<int>(SCREEN_W * scale);
+        const int vh = static_cast<int>(SCREEN_H * scale);
+        const SDL_Color white {255, 255, 255, 255};
+        fill(vx, vy, vw, 2, white);
+        fill(vx, vy + vh - 2, vw, 2, white);
+        fill(vx, vy, 2, vh, white);
+        fill(vx + vw - 2, vy, 2, vh, white);
+        auto mark = [&](float px, float py, SDL_Color c, const std::string& name, int id) {
+            drawArrow(static_cast<float>(x) + (px + static_cast<float>(ox)) * scale, static_cast<float>(y) + (py + static_cast<float>(oy)) * scale, c, name, id);
+        };
+        for (const coedit::Cursor& c : remote)
+            mark(c.x, c.y, c.color, c.name, 1000 + static_cast<int>(&c - remote.data()));
+        for (size_t k = 0; k < s.pointers.size(); k++) {
+            if (s.pointers[k].shown)
+                mark(s.pointers[k].x, s.pointers[k].y, pointerColor(static_cast<int>(k)), "P" + std::to_string(k + 1), static_cast<int>(k));
+        }
+    } else {
+        //(the level: the map is the screen; everyone's reticle and name on it)
+        for (const coedit::Cursor& c : remote)
+            reticle(c.x, c.y, c.color, c.name);
+        for (size_t k = 0; k < s.pointers.size(); k++) {
+            const Pointer& p = s.pointers[k];
+            if (p.shown)
+                reticle(p.x, p.y, pointerColor(static_cast<int>(k)), coedit::active() && k == 0 ? "You" : "P" + std::to_string(k + 1));
+        }
+    }
+    theme::announce(SCREEN_W / 2, 10, s.editor == Editor::World ? "The whole world" : "The whole map");
+}
+
+// The tileset screen: the tile under the cursor, framed, and which tileset it is
+void drawTilePicker(const leveleditor::shell::TilePicker& picker)
+{
+    for (size_t k = 0; k < s.pointers.size(); k++) {
+        const Pointer& p = s.pointers[k];
+        if (!p.shown)
+            continue;
+        const int c = static_cast<int>(p.x) / TILE;
+        const int r = static_cast<int>(p.y) / TILE;
+        if (c + picker.viewCol >= picker.cols || r + picker.viewRow >= picker.rows)
+            continue;
+        const int x = c * TILE;
+        const int y = r * TILE;
+        const SDL_Color black {0, 0, 0, 255};
+        const SDL_Color gold {248, 200, 24, 255};
+        fill(x - 3, y - 3, TILE + 6, 3, black);
+        fill(x - 3, y + TILE, TILE + 6, 3, black);
+        fill(x - 3, y, 3, TILE, black);
+        fill(x + TILE, y, 3, TILE, black);
+        fill(x - 2, y - 2, TILE + 4, 3, gold);
+        fill(x - 2, y + TILE - 1, TILE + 4, 3, gold);
+        fill(x - 2, y, 3, TILE, gold);
+        fill(x + TILE - 1, y, 3, TILE, gold);
+    }
+}
+
 // The level editor's chip when the window is closed: what is selected, the layer, the cell; with a
 // controller, its buttons on the map below
 void drawChip()
@@ -1906,12 +2604,24 @@ void drawChip()
     const bool controller = prompts::lastDevice() == prompts::Device::Controller;
     const std::vector<prompts::Prompt> row1 = controller ? std::vector<prompts::Prompt> {{{prompts::Pad::Start}, {}, "editor"}}
                                                          : std::vector<prompts::Prompt> {{{}, {"Tab"}, "editor"}};
-    const std::vector<prompts::Prompt> buttons = {{{prompts::Pad::A}, {}, "place"}, {{prompts::Pad::B}, {}, "remove"},
-        {{prompts::Pad::X}, {}, "take"}, {{prompts::Pad::Y}, {}, "layer"}, {{prompts::Pad::LB, prompts::Pad::RB}, {}, "swap"}};
+    //(the buttons; with a tool armed, what they do with it)
+    std::vector<prompts::Prompt> buttons;
+    if (s.armed == Armed::Copy)
+        buttons = {{{prompts::Pad::A}, {}, "hold and drag over the cells to copy"}, {{prompts::Pad::B}, {}, "stop"}};
+    else if (s.armed == Armed::Paste)
+        buttons = {{{prompts::Pad::A}, {}, "paste here"}, {{prompts::Pad::B}, {}, "stop pasting"}};
+    else if (s.armed == Armed::Fill)
+        buttons = {{{prompts::Pad::A}, {}, "fill from this cell"}, {{prompts::Pad::B}, {}, "stop"}};
+    else
+        buttons = {{{prompts::Pad::A}, {}, "place"}, {{prompts::Pad::B}, {}, "remove"}, {{prompts::Pad::X}, {}, "take"},
+            {{prompts::Pad::Y}, {}, "layer"}, {{prompts::Pad::RStick}, {}, "tools"}, {{prompts::Pad::LStick}, {}, "view"}};
     const int pw = prompts::promptsWidth(row1, 14);
     const int bw = controller && s.hints ? prompts::promptsWidth(buttons, 10) : 0;
-    const int w = std::max(46 + std::max(theme::font().getWidth(name), theme::font().getWidth(info)) + 16 + pw + 10, bw + 20);
-    const int h = bw > 0 ? 70 : 46;
+    //(the last things picked, with LB and RB at their ends)
+    const bool recents = controller && s.recents.size() >= 2;
+    const int recentW = recents ? static_cast<int>(s.recents.size()) * 26 + 2 * prompts::padWidth(prompts::Pad::LB) + 12 : 0;
+    const int w = std::max({46 + std::max(theme::font().getWidth(name), theme::font().getWidth(info)) + 16 + pw + 10, bw + 20, recentW + 20});
+    const int h = 46 + (recents ? 28 : 0) + (bw > 0 ? 24 : 0);
     //(bottom left; at the top while a pointer is down there)
     bool low = s.cy > SCREEN_H - h - 44 && s.cx < w + 30;
     for (const Pointer& p : s.pointers)
@@ -1924,8 +2634,24 @@ void drawChip()
     theme::font().draw(x + 46, y + 7, name);
     theme::font().draw(x + 46, y + 24, info);
     prompts::drawPrompts(x + w - pw / 2 - 8, y + 14, row1);
+    int by = y + 47;
+    if (recents) {
+        int rx = x + 10;
+        rx += prompts::drawPad(rx, by + 4, prompts::Pad::LB) + 4;
+        const leveleditor::shell::Brush now = sh::brush();
+        for (const leveleditor::shell::Brush& b : s.recents) {
+            if (b == now) {
+                fill(rx - 2, by - 2, 28, 28, {0, 0, 0, 255});
+                fill(rx - 1, by - 1, 26, 26, {248, 200, 24, 255});
+            }
+            drawScaled(rx, by, 24, [&b](int ix, int iy) { drawBrush(b, ix, iy); });
+            rx += 26;
+        }
+        prompts::drawPad(rx + 2, by + 4, prompts::Pad::RB);
+        by += 28;
+    }
     if (bw > 0)
-        prompts::drawPrompts(x + 10 + bw / 2, y + 47, buttons, 10);
+        prompts::drawPrompts(x + 10 + bw / 2, by, buttons, 10);
 }
 
 // The world editor's chip: the mode, the world, and (with a controller) its buttons
@@ -1939,7 +2665,7 @@ void drawWorldChip()
     const std::vector<prompts::Prompt> row1 = controller ? std::vector<prompts::Prompt> {{{prompts::Pad::Start}, {}, "editor"}}
                                                          : std::vector<prompts::Prompt> {{{}, {"Tab"}, "editor"}};
     const std::vector<prompts::Prompt> buttons = {{{prompts::Pad::A}, {}, "place"}, {{prompts::Pad::B}, {}, "remove"},
-        {{prompts::Pad::LT, prompts::Pad::RT}, {}, "shift/ctrl"}, {{prompts::Pad::Back}, {}, "back"}};
+        {{prompts::Pad::LT, prompts::Pad::RT}, {}, "shift/ctrl"}, {{prompts::Pad::RStick}, {}, "undo"}, {{prompts::Pad::LStick}, {}, "whole world"}};
     const int pw = prompts::promptsWidth(row1, 14);
     const int bw = controller && s.hints ? prompts::promptsWidth(buttons, 10) : 0;
     const int w = std::max(46 + std::max(theme::font().getWidth(name), theme::font().getWidth(info)) + 16 + pw + 10, bw + 20);
@@ -2187,7 +2913,8 @@ void drawSession()
 
 bool overlayWanted()
 {
-    if (s.overlay != Overlay::None || coedit::active() || !coedit::notice().empty() || levelMap() || s.mouseUsed || !s.screen.title.empty())
+    if (s.overlay != Overlay::None || coedit::active() || !coedit::notice().empty() || levelMap() || s.mouseUsed || !s.screen.title.empty() ||
+        s.preview || toastShown())
         return true;
     if (prompts::lastDevice() == prompts::Device::Controller ? s.hints && !s.pointers.empty() : SDL_GetTicks() - s.startMs < 8000)
         return true;
@@ -2205,6 +2932,25 @@ void drawOverlay()
     const bool mapView = s.editor != Editor::Level || leveleditor::shell::inMapView();
     const bool keyboard = s.overlay == Overlay::Keyboard;
     const std::vector<coedit::Cursor> remote = coedit::remoteCursors();
+    //The whole map: nothing else
+    if (s.preview && !keyboard) {
+        drawPreview();
+        if (s.editor == Editor::Level) {
+            for (const coedit::Cursor& c : remote)
+                drawArrow(c.x, c.y, c.color, std::string(), 1000 + static_cast<int>(&c - remote.data()));
+            for (size_t k = 0; k < s.pointers.size(); k++) {
+                if (s.pointers[k].shown)
+                    drawArrow(s.pointers[k].x, s.pointers[k].y, pointerColor(static_cast<int>(k)), std::string(), static_cast<int>(k));
+            }
+        }
+        return;
+    }
+    //The tileset screen: the tile under each cursor
+    leveleditor::shell::TilePicker picker;
+    if (s.editor == Editor::Level && !keyboard && leveleditor::shell::tilePicker(&picker))
+        drawTilePicker(picker);
+    if (levelMap() && !keyboard)
+        drawCellTools();
     //Where everyone edits: a reticle on each player's cell
     if (mapView && !keyboard) {
         const bool several = s.pointers.size() > 1 || coedit::active();
@@ -2235,6 +2981,10 @@ void drawOverlay()
         drawWindow();
     else if (keyboard)
         drawKeyboard();
+    else if (s.overlay == Overlay::Tools)
+        drawTools();
+    if (toastShown() && !keyboard)
+        theme::announce(SCREEN_W / 2, 36, s.toast);
     //The cursors on top (the controllers' drawn pointers; the others' online)
     for (const coedit::Cursor& c : remote)
         drawArrow(c.x, c.y, c.color, mapView ? std::string() : c.name, 1000 + static_cast<int>(&c - remote.data()));
@@ -2280,7 +3030,7 @@ void present()
 Pad fromTest(const TestInput& t)
 {
     Pad p;
-    p.buttons = {t.a, t.b, t.x, t.y, t.lb, t.rb, t.back, t.start, t.up, t.down, t.left, t.right, t.lt, t.rt};
+    p.buttons = {t.a, t.b, t.x, t.y, t.lb, t.rb, t.back, t.start, t.up, t.down, t.left, t.right, t.lt, t.rt, t.ls, t.rs};
     p.lx = t.lx;
     p.ly = t.ly;
     p.rx = t.rx;
@@ -2294,7 +3044,8 @@ void update()
     //Editing together: the network, and our document once the editor has loaded it
     coedit::pump();
     if (coedit::active() && !coedit::attached())
-        coedit::attach(s.editor == Editor::Level ? leveleditor::makeCoeditDocument() : worldeditor::makeCoeditDocument());
+        coedit::attach(makeDocument());
+    undoRebase();
     if (!coedit::notice().empty())
         s.overlayDirty = true;
 
@@ -2381,10 +3132,38 @@ void update()
             updateKeyboard(s.pointers[static_cast<size_t>(index)]);
         }
     } else {
-        for (size_t k = 0; k < s.pointers.size(); k++)
-            updatePointer(static_cast<int>(k));
+        for (size_t k = 0; k < s.pointers.size(); k++) {
+            if (s.overlay == Overlay::Tools && static_cast<int>(k) == s.overlayOwner)
+                updateTools(s.pointers[k]);
+            else
+                updatePointer(static_cast<int>(k));
+        }
     }
     updateKeys();
+    trackRecent();
+    //(the tools' menu, or an armed tool, where they can't be used any more)
+    if (!mapShown()) {
+        if (s.overlay == Overlay::Tools)
+            closeTools();
+        s.armed = Armed::None;
+    }
+
+    //The whole map, while a left stick is held down
+    bool preview = false;
+    for (const Pointer& p : s.pointers)
+        preview = preview || (p.pad.buttons[LS] && s.overlay != Overlay::Keyboard && mapShown());
+    if (preview != s.preview) {
+        s.preview = preview;
+        if (s.worldPicture) {
+            SDL_DestroySurface(s.worldPicture);
+            s.worldPicture = nullptr;
+        }
+        if (preview && s.editor == Editor::World)
+            s.worldPicture = worldeditor::shell::drawWhole();
+        s.overlayDirty = true;
+    }
+    if (toastShown())
+        s.overlayDirty = true;
 
     bool shown = false;
     for (const Pointer& p : s.pointers)
@@ -2436,6 +3215,8 @@ void end()
     s.controllers.close();
     if (s.frame)
         SDL_DestroySurface(s.frame);
+    if (s.worldPicture)
+        SDL_DestroySurface(s.worldPicture);
     if (s.cursorWasVisible)
         SDL_ShowCursor();
     s = State();
@@ -2522,6 +3303,85 @@ bool pollEvent(SDL_Event* event)
             openWindow(-1);
             continue;
         }
+        //Ctrl+Z, Ctrl+Y (Ctrl+Shift+Z): undo, redo
+        if (event->type == SDL_EVENT_KEY_DOWN && s.textEntries == 0 && (event->key.mod & SDL_KMOD_CTRL) &&
+            (event->key.key == SDLK_Z || event->key.key == SDLK_Y)) {
+            undoApply(event->key.key == SDLK_Y || (event->key.mod & SDL_KMOD_SHIFT));
+            continue;
+        }
+        //The tools: the middle button opens them; with them open, the mouse picks one
+        if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && event->button.button == SDL_BUTTON_MIDDLE && mapShown() &&
+            (s.overlay == Overlay::None || s.overlay == Overlay::Tools)) {
+            if (s.overlay == Overlay::Tools) {
+                closeTools();
+            } else {
+                s.cx = event->button.x;
+                s.cy = event->button.y;
+                openTools(-1);
+            }
+            continue;
+        }
+        if (s.overlay == Overlay::Tools && (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_MOTION)) {
+            const float mx = event->type == SDL_EVENT_MOUSE_MOTION ? event->motion.x : event->button.x;
+            const float my = event->type == SDL_EVENT_MOUSE_MOTION ? event->motion.y : event->button.y;
+            s.cx = mx;
+            s.cy = my;
+            s.owner = -1;
+            s.mouseUsed = true;
+            s.mouseX = mx;
+            s.mouseY = my;
+            int at = -1;
+            for (int k = 0; k < toolsCount(); k++) {
+                const SDL_Rect r = toolsItemRect(k);
+                if (mx >= r.x && mx < r.x + r.w && my >= r.y && my < r.y + r.h)
+                    at = k;
+            }
+            if (at >= 0)
+                s.toolsIndex = at;
+            if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                if (at >= 0 && event->button.button == SDL_BUTTON_LEFT)
+                    chooseTool(at);
+                else
+                    closeTools();
+            }
+            s.overlayDirty = true;
+            continue;
+        }
+        if (s.overlay == Overlay::Tools && event->type == SDL_EVENT_MOUSE_BUTTON_UP)
+            continue;
+        //An armed tool: the mouse uses it on the map (the right button puts it away)
+        if (levelMap() && s.armed != Armed::None && s.overlay != Overlay::Keyboard &&
+            (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP) && !inWindow(event->button.x, event->button.y)) {
+            namespace sh = leveleditor::shell;
+            const int col = std::clamp(static_cast<int>(event->button.x) / TILE, 0, sh::MAP_COLS - 1);
+            const int row = std::clamp(static_cast<int>(event->button.y) / TILE, 0, sh::MAP_ROWS - 1);
+            const bool down = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+            if (down && event->button.button == SDL_BUTTON_RIGHT) {
+                s.armed = Armed::None;
+                s.mouseDrag = false;
+                toast("Stopped");
+            } else if (event->button.button == SDL_BUTTON_LEFT) {
+                if (s.armed == Armed::Paste && down) {
+                    sh::paste(col, row);
+                } else if (s.armed == Armed::Fill && down) {
+                    sh::floodFill(col, row);
+                    s.armed = Armed::None;
+                } else if (s.armed == Armed::Copy && down) {
+                    s.mouseDrag = true;
+                    s.mouseDragCol = col;
+                    s.mouseDragRow = row;
+                } else if (s.armed == Armed::Copy && s.mouseDrag) {
+                    sh::copyArea(s.mouseDragCol, s.mouseDragRow, col, row);
+                    s.mouseDrag = false;
+                    s.armed = Armed::None;
+                    int w = 0, h = 0;
+                    sh::clipboard(&w, &h);
+                    toast("Copied " + std::to_string(w) + " x " + std::to_string(h) + ": Paste is in the tools");
+                }
+            }
+            s.overlayDirty = true;
+            continue;
+        }
         //The level editor's tools on the map: erase is the right button, pick takes the cell
         if (levelMap() && s.overlay != Overlay::Keyboard && (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP) &&
             event->button.button == SDL_BUTTON_LEFT) {
@@ -2541,6 +3401,9 @@ bool pollEvent(SDL_Event* event)
             if (tool == TOOL_ERASE)
                 event->button.button = SDL_BUTTON_RIGHT;
         }
+        //(an armed tool: the mouse held down isn't painting)
+        if (levelMap() && s.armed != Armed::None && event->type == SDL_EVENT_MOUSE_MOTION)
+            event->motion.state = 0;
         if (levelMap() && currentTool() == TOOL_ERASE && event->type == SDL_EVENT_MOUSE_MOTION && (event->motion.state & SDL_BUTTON_LMASK))
             event->motion.state = (event->motion.state & ~SDL_BUTTON_LMASK) | SDL_BUTTON_RMASK;
         //The on-screen keyboard: the mouse clicks its keys (typing goes to the editor as always)
@@ -2659,6 +3522,8 @@ void flip()
         gfx_flipscreen();
         return;
     }
+    //What changed this frame: an undo
+    undoTrack();
     //Editing together: this frame's changes go out
     coedit::afterFrame(s.cx, s.cy, true);
     present();
