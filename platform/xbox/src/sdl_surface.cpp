@@ -65,11 +65,12 @@ bool clipBlit(const SDL_Surface* src, const SDL_Rect* srcrect, const SDL_Surface
     if (sx + w > src->w) w = src->w - sx;
     if (sy + h > src->h) h = src->h - sy;
 
-    // Clip to the destination surface
-    if (dx < 0) { w += dx; sx -= dx; dx = 0; }
-    if (dy < 0) { h += dy; sy -= dy; dy = 0; }
-    if (dx + w > dst->w) w = dst->w - dx;
-    if (dy + h > dst->h) h = dst->h - dy;
+    // Clip to the destination's clip rect (inside the surface)
+    const SDL_Rect& clip = dst->clip_rect;
+    if (dx < clip.x) { const int c = clip.x - dx; w -= c; sx += c; dx = clip.x; }
+    if (dy < clip.y) { const int c = clip.y - dy; h -= c; sy += c; dy = clip.y; }
+    if (dx + w > clip.x + clip.w) w = clip.x + clip.w - dx;
+    if (dy + h > clip.y + clip.h) h = clip.y + clip.h - dy;
 
     if (w <= 0 || h <= 0)
         return false;
@@ -190,6 +191,7 @@ SDL_Surface* allocSurface(int width, int height, SDL_PixelFormat format)
     surface->colorkey = 0;
     surface->alpha_mod = 255;
     surface->blend_mode = hasAlpha(format) ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE;
+    surface->clip_rect = {0, 0, width, height};
     return surface;
 }
 } // namespace
@@ -460,18 +462,42 @@ struct ProfileScope {
 };
 } // namespace
 
+bool SDL_SetSurfaceClipRect(SDL_Surface* surface, const SDL_Rect* rect)
+{
+    if (!checkSurface(surface, "surface"))
+        return false;
+    // The rect kept is its part inside the surface (all of it with no rect)
+    SDL_Rect r {0, 0, surface->w, surface->h};
+    if (rect) {
+        const int x0 = SDL_max(rect->x, 0), y0 = SDL_max(rect->y, 0);
+        const int x1 = SDL_min(rect->x + rect->w, surface->w), y1 = SDL_min(rect->y + rect->h, surface->h);
+        r = {x0, y0, SDL_max(x1 - x0, 0), SDL_max(y1 - y0, 0)};
+    }
+    surface->clip_rect = r;
+    return r.w > 0 && r.h > 0;
+}
+
+bool SDL_GetSurfaceClipRect(SDL_Surface* surface, SDL_Rect* rect)
+{
+    if (!checkSurface(surface, "surface") || !rect)
+        return false;
+    *rect = surface->clip_rect;
+    return true;
+}
+
 bool SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color)
 {
     ProfileScope profile(g_sdlx_profile.fill);
     if (!checkSurface(dst, "dst"))
         return false;
 
-    int x0 = 0, y0 = 0, x1 = dst->w, y1 = dst->h;
+    const SDL_Rect& clip = dst->clip_rect;
+    int x0 = clip.x, y0 = clip.y, x1 = clip.x + clip.w, y1 = clip.y + clip.h;
     if (rect) {
-        x0 = SDL_max(rect->x, 0);
-        y0 = SDL_max(rect->y, 0);
-        x1 = SDL_min(rect->x + rect->w, dst->w);
-        y1 = SDL_min(rect->y + rect->h, dst->h);
+        x0 = SDL_max(rect->x, x0);
+        y0 = SDL_max(rect->y, y0);
+        x1 = SDL_min(rect->x + rect->w, x1);
+        y1 = SDL_min(rect->y + rect->h, y1);
     }
     if (x1 <= x0 || y1 <= y0)
         return true;
@@ -622,8 +648,9 @@ bool SDL_BlitSurfaceScaled(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surfac
 
     const PixelOp op = makePixelOp(src, dst);
 
-    const int dx0 = SDL_max(dr.x, 0), dy0 = SDL_max(dr.y, 0);
-    const int dx1 = SDL_min(dr.x + dr.w, dst->w), dy1 = SDL_min(dr.y + dr.h, dst->h);
+    const SDL_Rect& clip = dst->clip_rect;
+    const int dx0 = SDL_max(dr.x, clip.x), dy0 = SDL_max(dr.y, clip.y);
+    const int dx1 = SDL_min(dr.x + dr.w, clip.x + clip.w), dy1 = SDL_min(dr.y + dr.h, clip.y + clip.h);
     if (dx1 <= dx0 || dy1 <= dy0)
         return true;
 

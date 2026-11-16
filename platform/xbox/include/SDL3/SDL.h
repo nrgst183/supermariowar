@@ -181,6 +181,7 @@ typedef struct SDL_Surface {
     Uint32 colorkey;
     Uint8 alpha_mod;
     SDL_BlendMode blend_mode;
+    SDL_Rect clip_rect;  /* blits and fills into the surface stay inside it */
 } SDL_Surface;
 
 SDL_Surface* SDL_CreateSurface(int width, int height, SDL_PixelFormat format);
@@ -201,6 +202,8 @@ bool SDL_SetSurfaceBlendMode(SDL_Surface* surface, SDL_BlendMode blendMode);
 bool SDL_GetSurfaceBlendMode(SDL_Surface* surface, SDL_BlendMode* blendMode);
 Uint32 SDL_MapSurfaceRGB(SDL_Surface* surface, Uint8 r, Uint8 g, Uint8 b);
 Uint32 SDL_MapSurfaceRGBA(SDL_Surface* surface, Uint8 r, Uint8 g, Uint8 b, Uint8 a);
+bool SDL_SetSurfaceClipRect(SDL_Surface* surface, const SDL_Rect* rect);
+bool SDL_GetSurfaceClipRect(SDL_Surface* surface, SDL_Rect* rect);
 bool SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color);
 bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst, const SDL_Rect* dstrect);
 bool SDL_BlitSurfaceScaled(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst, const SDL_Rect* dstrect, SDL_ScaleMode scaleMode);
