@@ -11,9 +11,9 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 - [What's new in this fork](#whats-new-in-this-fork)
   - [Gameplay and bots](#gameplay-and-bots)
   - [Online play with rollback netcode](#online-play-with-rollback-netcode)
-  - [Theater: replays of every match](#theater-replays-of-every-match)
   - [Editors](#editors)
   - [Menus](#menus)
+  - [Theater: replays of every match](#theater-replays-of-every-match)
   - [Under the hood](#under-the-hood)
 - [History](#history)
 - [About](#about)
@@ -54,6 +54,32 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 
 See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 
+### Editors
+
+The **map and world editors** are inside the game (**Main menu, Editors**), with mouse, keyboard and full controller support. **Edit together**: one player hosts a map or a world, the others join and edit it at the same time.
+
+#### Map editor
+
+![The map editor: its window on the blocks and on the tile types; three players' gloves and the info chip; a screen's commands (platforms) and the tile picker; the on-screen keyboard](docs/gfx/fork/map_editor.png)
+
+- **The editor window** (Start or Tab) docks beside the map: tools (paint, erase, move, pick), layers, and palettes of blocks, items and tile types with a tip for each. With a controller, the d-pad moves a highlight through it and choosing a block takes you straight back to the map.
+- **Every player gets a glove**: each controller (and the mouse) has its own animated Mario Paint style glove in the player's color, with a frame on the tile it edits. On the map, X takes what's under the glove, Y changes the layer and LB / RB step through the blocks, items and tile types; the chip in the corner shows what's selected.
+- **Every screen works with a controller**: the tile picker, warps, platforms, hazards, race goals, backgrounds and the rest show what the buttons do there, and Start lists the screen's commands (new platform, its path, delete...).
+- **An on-screen keyboard** in the original Xbox dashboard's style, built from the game's pipes and blocks, for naming maps with a controller.
+
+#### World editor
+
+![The world editor: its window with the modes, and the world with its info chip](docs/gfx/fork/world_editor.png)
+
+- The same **editor window**, with the world editor's modes, world settings and file commands, driven by the d-pad or clicked with the mouse.
+- An **info chip** with the mode, the world and the cell under the cursor, and the controller's buttons.
+
+### Menus
+
+![The Editors menu and the Online menu](docs/gfx/fork/menus.png)
+
+- The **Editors** menu picks maps or worlds, then this computer or online (host or join), and the **Online** menu is laid out in the same rounded panels with pipe buttons, with prompts for the controller or the keys you're using.
+
 ### Theater: replays of every match
 
 ![The theater: jumping to the next kill, paused with a controller, the controls, and the leave prompt](docs/gfx/fork/theater.png)
@@ -63,23 +89,6 @@ See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 - **Fully playable with a controller**: the d-pad jumps to the previous or next *moment* (a kill, a point, the end of the match, landing just before it), the left stick scrubs through the replay, and B asks before it leaves.
 
 See [docs/HistoryReplaysEditors.md](docs/HistoryReplaysEditors.md).
-
-### Editors
-
-![The map editor's window with its palettes, players' gloves and the info chip; a screen's commands and the tile picker; the on-screen keyboard; the world editor](docs/gfx/fork/editors.png)
-
-- The **map and world editors** are inside the game (**Main menu, Editors**), with mouse, keyboard and full controller support.
-- **The editor window** (Start or Tab) docks beside the map: tools (paint, erase, move, pick), layers, and palettes of blocks, items and tile types with a tip for each. With a controller, the d-pad moves a highlight through it and choosing a block takes you straight back to the map.
-- **Every player gets a glove**: each controller (and the mouse) has its own animated Mario Paint style glove in the player's color, with a frame on the tile it edits. On the map, X takes what's under the glove, Y changes the layer and LB / RB step through the blocks, items and tile types.
-- **Every screen of the editor works with a controller**: the tile picker, warps, platforms, hazards, race goals, backgrounds and the rest show what the buttons do there, and Start lists the screen's commands (new platform, its path, delete...).
-- **An on-screen keyboard** in the original Xbox dashboard's style, built from the game's pipes and blocks, for naming maps and worlds with a controller.
-- **Edit together**: one player hosts a map or a world, the others join and edit it at the same time.
-
-### Menus
-
-![The Editors menu and the Online menu](docs/gfx/fork/menus.png)
-
-- The **Editors** menu picks maps or worlds, then this computer or online (host or join), and the **Online** menu is laid out in the same rounded panels with pipe buttons, with prompts for the controller or the keys you're using.
 
 ### Under the hood
 
