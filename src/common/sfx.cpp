@@ -15,8 +15,6 @@ namespace fs = std::filesystem;
 
 
 namespace {
-std::unique_ptr<class AudioSystem> s_audiosys;
-
 constexpr auto TAG_SFX = "sfx";
 
 
@@ -54,6 +52,11 @@ private:
     void playAudio(const MixAudioPtr& audio, const MixTrackPtr& track, long repeats);
     void stopAudioTrack(const MixTrackPtr& track) const;
 };
+
+
+// Declared after the class: a unique_ptr of an incomplete type doesn't compile
+// with C++23 (its destructor is constexpr there)
+std::unique_ptr<AudioSystem> s_audiosys;
 
 
 AudioSystem::SdlMixer::SdlMixer()
