@@ -29,6 +29,11 @@ std::string GetRootDirectory();
 #endif
 
 std::string GetNameFromFileName(const std::string& path, bool stripAuthor = false);
+
+// Where a map's thumbnail (for the map browser) is cached. On the Xbox it is
+// on the cache drive (Z:), as the data on the disc can't be written; its
+// folder is made when needed.
+std::string mapThumbnailPath(const std::string& mapFile);
 std::string stripCreatorAndExt(const std::string& filename);
 std::string stripPathAndExtension(const std::string& path);
 

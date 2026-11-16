@@ -39,6 +39,23 @@ std::string GetHomeDirectory()
 #endif
 }
 
+std::string mapThumbnailPath(const std::string& mapFile)
+{
+    const std::string name = GetNameFromFileName(mapFile) + ".png";
+#ifdef SMW_XBOX
+    //(on the cache drive: see SDL_XboxGetCachePath)
+    static const std::string dir = [] {
+        std::string d = std::string(SDL_XboxGetCachePath()) + "maps/cache/";
+        std::error_code ec;
+        fs::create_directories(d, ec);
+        return d;
+    }();
+    return dir + name;
+#else
+    return convertPath("maps/cache/" + name);
+#endif
+}
+
 std::string GetRootDirectory()
 {
 #if !defined(_WIN32)

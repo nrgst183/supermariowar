@@ -800,6 +800,22 @@ void SDL_XboxReturnToDashboard(void);
 // NULL if it isn't available (then use a normal surface).
 void* SDL_XboxGetScreenPixels(int w, int h, int* pitch);
 
+// The folder for the game's cache (files it can make again): the utility
+// drive Z:, which the system gives the title from the hard disk's three cache
+// partitions (X:, Y: and Z: in the dashboard's terms; which one is the
+// system's choice, and it can be wiped whenever another title needs it).
+// "T:/cache/" if the utility drive can't be mounted. Ends with '/'.
+const char* SDL_XboxGetCachePath(void);
+
+// Game saves on the hard disk (U:), as the dashboard's memory screen shows
+// them: each one is a folder, named `name` (ASCII; at most 127 characters).
+// Opens the save `name` (making it first if `create`), and returns its folder
+// (ending with '\\'; free it with SDL_free), or NULL.
+char* SDL_XboxOpenSaveGame(const char* name, bool create);
+bool SDL_XboxDeleteSaveGame(const char* name);
+// Calls `callback` with the name of each of the title's saves
+void SDL_XboxEnumerateSaveGames(void (*callback)(void* userdata, const char* name), void* userdata);
+
 #ifdef __cplusplus
 }
 #endif

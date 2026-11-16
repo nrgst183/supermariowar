@@ -95,6 +95,11 @@ bool readReplayFile(const std::string& path, Replay& replay, std::string& error)
 
 // The folder of the replays (settings folder + "replays/")
 std::string replayDir();
+// Where the replay `file` (a name as finishRecording returns it) is: in
+// replayDir(), or on the Xbox, in its own game save ("Film <date> <time>",
+// made if `create`)
+std::string replayPath(const std::string& file, bool create = false);
+bool replayExists(const std::string& file);
 
 // ---- recording (every match: local and online)
 

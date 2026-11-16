@@ -122,8 +122,7 @@ MenuCodeEnum MI_MatchHistory::SendInput(CPlayerInput* playerInput)
             if (m_entries.empty())
                 return MENU_CODE_NONE;
             const std::string file = selectedReplay();
-            std::error_code ec;
-            if (file.empty() || !std::filesystem::is_regular_file(replay::replayDir() + file, ec)) {
+            if (file.empty() || !replay::replayExists(file)) {
                 m_message = file.empty() ? "This match has no replay" : "Its replay was deleted (the newest 200 are kept)";
                 return MENU_CODE_NONE;
             }

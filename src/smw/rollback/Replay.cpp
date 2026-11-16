@@ -30,6 +30,10 @@
 #include <fstream>
 #include <iterator>
 
+#ifdef SMW_XBOX
+#include <SDL3/SDL.h>
+#endif
+
 extern CGameValues game_values;
 extern MapList* maplist;
 extern SkinList* skinlist;
@@ -217,6 +221,45 @@ void startRecording(Replay&& replay, bool online)
     }
 }
 
+#ifdef SMW_XBOX
+// On the Xbox, each saved film is a game save (the dashboard's memory screen
+// shows them, and can copy or delete them), named from its file name:
+// "2026-11-16_030912.smwr" is "Film 2026-11-16 03:09:12" ("_2": " (2)")
+constexpr char FILM_PREFIX[] = "Film ";
+constexpr char FILM_FILE[] = "film.smwr";
+
+std::string saveGameName(const std::string& file)
+{
+    std::string stem = file.ends_with(".smwr") ? file.substr(0, file.size() - 5) : file;
+    std::string name = FILM_PREFIX;
+    if (stem.size() >= 17 && stem[10] == '_') {
+        name += stem.substr(0, 10) + " " + stem.substr(11, 2) + ":" + stem.substr(13, 2) + ":" + stem.substr(15, 2);
+        if (stem.size() > 18 && stem[17] == '_')
+            name += " (" + stem.substr(18) + ")";
+        else
+            name += stem.substr(17);
+    } else {
+        name += stem;
+    }
+    return name;
+}
+
+// Keeps the newest MAX_REPLAYS films
+void pruneReplays()
+{
+    std::vector<std::string> films;
+    SDL_XboxEnumerateSaveGames([](void* list, const char* name) {
+        if (std::strncmp(name, FILM_PREFIX, sizeof(FILM_PREFIX) - 1) == 0)
+            static_cast<std::vector<std::string>*>(list)->push_back(name);
+    }, &films);
+    if (films.size() <= MAX_REPLAYS)
+        return;
+    //(the names have the date and time: oldest first)
+    std::sort(films.begin(), films.end());
+    for (size_t k = 0; k + MAX_REPLAYS < films.size(); k++)
+        SDL_XboxDeleteSaveGame(films[k].c_str());
+}
+#else
 // Keeps the newest MAX_REPLAYS replays
 void pruneReplays()
 {
@@ -234,6 +277,7 @@ void pruneReplays()
     for (size_t k = 0; k + MAX_REPLAYS < files.size(); k++)
         fs::remove(files[k], ec);
 }
+#endif
 
 // ---- playback
 
@@ -610,6 +654,28 @@ std::string replayDir()
     return GetHomeDirectory() + "replays/";
 }
 
+std::string replayPath(const std::string& file, bool create)
+{
+#ifdef SMW_XBOX
+    if (char* dir = SDL_XboxOpenSaveGame(saveGameName(file).c_str(), create)) {
+        std::string path = std::string(dir) + FILM_FILE;
+        SDL_free(dir);
+        return path;
+    }
+    //(no such save: an older build's film in the settings folder, or saves
+    // can't be made: the settings folder)
+#else
+    (void)create;
+#endif
+    return replayDir() + file;
+}
+
+bool replayExists(const std::string& file)
+{
+    std::error_code ec;
+    return !file.empty() && std::filesystem::is_regular_file(replayPath(file, false), ec);
+}
+
 // ---- recording
 
 void beginLocal(const std::string& mapPath)
@@ -762,11 +828,15 @@ std::string finishRecording()
 #endif
     std::strftime(stamp, sizeof(stamp), "%Y-%m-%d_%H%M%S", &local);
     std::string name = std::string(stamp) + ".smwr";
-    for (int n = 2; fs::exists(replayDir() + name, ec); n++)
+    for (int n = 2; replayExists(name); n++)
         name = std::string(stamp) + "_" + std::to_string(n) + ".smwr";
 
-    if (!writeReplayFile(replayDir() + name, replay)) {
-        printf("replay: can't write %s\n", (replayDir() + name).c_str());
+    const std::string path = replayPath(name, true);
+    if (!writeReplayFile(path, replay)) {
+        printf("replay: can't write %s\n", path.c_str());
+#ifdef SMW_XBOX
+        SDL_XboxDeleteSaveGame(saveGameName(name).c_str());
+#endif
         return {};
     }
     printf("replay: saved %s (%zu ticks)\n", name.c_str(), replay.ticks.size());
@@ -784,7 +854,7 @@ void cancelRecording()
 
 bool startPlayback(const std::string& file, std::string& error)
 {
-    const std::string path = file.find('/') == std::string::npos && file.find('\\') == std::string::npos ? replayDir() + file : file;
+    const std::string path = file.find('/') == std::string::npos && file.find('\\') == std::string::npos ? replayPath(file, false) : file;
     Replay replay;
     if (!readReplayFile(path, replay, error))
         return false;

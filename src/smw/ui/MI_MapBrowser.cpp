@@ -9,6 +9,8 @@
 #include "path.h"
 #include "ResourceManager.h"
 
+#include <SDL3_image/SDL_image.h>
+
 
 namespace {
 #ifndef __EMSCRIPTEN__
@@ -245,22 +247,27 @@ void MI_MapBrowser::LoadPage(short page, bool fUseFilters)
 
         std::map<std::string, MapListNode>::iterator itr = maplist->GetIteratorAt(iIndex, fUseFilters);
 
-               //See if we already have a thumbnail saved for this map
+        //See if we already have a thumbnail saved for this map
+        const std::string sConvertedPath = mapThumbnailPath((*itr).second.filename);
 
-        std::string szThumbnail("maps/cache/");
-        szThumbnail += GetNameFromFileName((*itr).second.filename.c_str());
-        szThumbnail += ".png";
-
-        std::string sConvertedPath = convertPath(szThumbnail);
-
-        if (!FileExists(sConvertedPath)) {
-            g_map->loadMap((*itr).second.filename, read_type_preview);
-            smallDelay();  //Sleeps to help the music from skipping
-            g_map->saveThumbnail(sConvertedPath, false);
-            smallDelay();
+        bool fLoaded = false;
+        if (FileExists(sConvertedPath)) {
+            try {
+                mapSurfaces[iMap] = ImageLoader(sConvertedPath.c_str()).withoutColorKey().create();
+                fLoaded = true;
+            } catch (...) {
+                //A broken cache file: make the thumbnail again
+            }
         }
 
-        mapSurfaces[iMap] = ImageLoader(sConvertedPath.c_str()).withoutColorKey().create();
+        if (!fLoaded) {
+            g_map->loadMap((*itr).second.filename, read_type_preview);
+            smallDelay();  //Sleeps to help the music from skipping
+            gfxSprite thumbnail = g_map->createThumbnailSurface(false);
+            IMG_SavePNG(thumbnail.getSurface(), sConvertedPath.c_str());  //(if it can't be saved, it is just made again next time)
+            mapSurfaces[iMap] = std::move(thumbnail);
+            smallDelay();
+        }
         mapListNodes[iMap] = &(*itr).second;
         mapNames[iMap] = (*itr).first.c_str();
         mapListItr[iMap] = itr;

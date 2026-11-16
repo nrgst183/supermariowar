@@ -209,6 +209,91 @@ char* SDL_GetPrefPath(const char* org, const char* app)
 }
 
 
+/* ---- Cache drive and game saves ----------------------------------------- */
+
+const char* SDL_XboxGetCachePath(void)
+{
+    static const char* path = nullptr;
+    if (!path) {
+        // Maps Z: to the title's cache partition (keeping what it had when it
+        // was this title's last time)
+        if (XMountUtilityDrive(FALSE)) {
+            path = "Z:/";
+        } else {
+            sdlx_log("[xbox] Couldn't mount the utility drive; the cache goes on T:\n");
+            CreateDirectoryA("T:\\cache", NULL);
+            path = "T:/cache/";
+        }
+    }
+    return path;
+}
+
+namespace {
+constexpr char SAVE_ROOT[] = "U:\\";
+
+void toWide(const char* name, WCHAR (&out)[MAX_GAMENAME])
+{
+    size_t k = 0;
+    for (; name[k] && k + 1 < MAX_GAMENAME; k++)
+        out[k] = static_cast<unsigned char>(name[k]) < 0x80 ? static_cast<WCHAR>(name[k]) : L'?';
+    out[k] = 0;
+}
+} // namespace
+
+char* SDL_XboxOpenSaveGame(const char* name, bool create)
+{
+    if (!name || !*name)
+        return nullptr;
+    WCHAR wname[MAX_GAMENAME];
+    toWide(name, wname);
+    CHAR dir[MAX_PATH];
+    const DWORD result = XCreateSaveGame(SAVE_ROOT, wname, create ? OPEN_ALWAYS : OPEN_EXISTING, 0, dir, MAX_PATH);
+    if (result != ERROR_SUCCESS && result != ERROR_ALREADY_EXISTS) {
+        if (create)
+            sdlx_log("[xbox] Couldn't make the save \"%s\" (error %lu)\n", name, static_cast<unsigned long>(result));
+        return nullptr;
+    }
+    const size_t length = strlen(dir);
+    char* out = static_cast<char*>(malloc(length + 2));
+    if (!out)
+        return nullptr;
+    memcpy(out, dir, length + 1);
+    if (length == 0 || out[length - 1] != '\\') {
+        out[length] = '\\';
+        out[length + 1] = 0;
+    }
+    return out;
+}
+
+bool SDL_XboxDeleteSaveGame(const char* name)
+{
+    if (!name || !*name)
+        return false;
+    WCHAR wname[MAX_GAMENAME];
+    toWide(name, wname);
+    return XDeleteSaveGame(SAVE_ROOT, wname) == ERROR_SUCCESS;
+}
+
+void SDL_XboxEnumerateSaveGames(void (*callback)(void* userdata, const char* name), void* userdata)
+{
+    if (!callback)
+        return;
+    XGAME_FIND_DATA data;
+    HANDLE find = XFindFirstSaveGame(SAVE_ROOT, &data);
+    if (find == INVALID_HANDLE_VALUE)
+        return;
+    do {
+        char name[MAX_GAMENAME];
+        size_t k = 0;
+        for (; data.szSaveGameName[k] && k + 1 < MAX_GAMENAME; k++)
+            name[k] = data.szSaveGameName[k] < 0x80 ? static_cast<char>(data.szSaveGameName[k]) : '?';
+        name[k] = 0;
+        callback(userdata, name);
+    } while (XFindNextSaveGame(find, &data));
+    XFindClose(find);
+}
+
+
 /* ---- Message boxes ------------------------------------------------------- */
 
 bool SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags flags, const char* title, const char* message, SDL_Window* window)
