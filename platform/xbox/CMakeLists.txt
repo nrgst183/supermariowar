@@ -34,6 +34,7 @@ add_library(SDL3_mixer::SDL3_mixer ALIAS sdl3_xbox)
 set(_rxdk_d "$<$<CONFIG:Debug>:d>")
 target_link_libraries(sdl3_xbox INTERFACE
     libd3d8${_rxdk_d}
+    libxgraphics${_rxdk_d}
     libdsound${_rxdk_d}
     libxapi${_rxdk_d}
     libc${_rxdk_d}

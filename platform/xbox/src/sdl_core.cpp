@@ -45,6 +45,17 @@ void sdlx_log(const char* fmt, ...)
 }
 
 
+void sdlx_set_fpu_precision()
+{
+    unsigned short cw = 0;
+    __asm__ volatile("fnstcw %0" : "=m"(cw));
+    // Precision control (bits 8-9): 10b = 53 bits
+    const unsigned short wanted = static_cast<unsigned short>((cw & ~0x0300u) | 0x0200u);
+    if (wanted != cw)
+        __asm__ volatile("fldcw %0" : : "m"(wanted));
+}
+
+
 /* ---- Basics ------------------------------------------------------------- */
 
 bool SDL_Init(SDL_InitFlags flags)

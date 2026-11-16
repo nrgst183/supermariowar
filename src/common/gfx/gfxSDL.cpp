@@ -80,6 +80,15 @@ SDL_Renderer* createRenderer(SDL_Window* window)
 
 SDL_Surface* createScreenSurface()
 {
+#ifdef SMW_XBOX
+    // On the Xbox, draw straight into memory the GPU displays: no copy of the
+    // frame when presenting
+    int pitch = 0;
+    if (void* pixels = SDL_XboxGetScreenPixels(GFX_SCREEN_W, GFX_SCREEN_H, &pitch)) {
+        if (SDL_Surface* surface = SDL_CreateSurfaceFrom(GFX_SCREEN_W, GFX_SCREEN_H, SDL_PIXELFORMAT_ARGB8888, pixels, pitch))
+            return surface;
+    }
+#endif
     SDL_Surface* surface = SDL_CreateSurface(GFX_SCREEN_W, GFX_SCREEN_H, SDL_PIXELFORMAT_ARGB8888);
     if (!surface)
         throw_error("Couldn't create video buffer: {}", SDL_GetError());

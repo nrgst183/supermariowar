@@ -8,6 +8,9 @@
 #include <cmath>
 #include <cctype>
 #include <cstdlib>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 extern CResourceManager* rm;
 
@@ -95,6 +98,109 @@ void note(const SDL_Event& event)
 
 // ---- shapes
 
+// ---- the glyph sheet
+//
+// The shapes and the pixel art below are drawn once each (per color and size)
+// into a sprite sheet built at run time, and from then on blitted from it: one
+// blit per glyph instead of a fill per row or pixel (thousands a frame on the
+// theater's screens).
+
+namespace {
+
+class GlyphSheet {
+public:
+    struct Glyph {
+        SDL_Surface* page = nullptr;
+        SDL_Rect rect {};
+    };
+
+    ~GlyphSheet() { clear(); }
+
+    const Glyph* find(const std::string& key) const
+    {
+        const auto it = m_glyphs.find(key);
+        return it != m_glyphs.end() ? &it->second : nullptr;
+    }
+
+    // A transparent w x h area for a new glyph (nullptr if it doesn't fit a page)
+    const Glyph* add(const std::string& key, int w, int h)
+    {
+        if (w <= 0 || h <= 0 || w > PAGE_W || h > PAGE_H)
+            return nullptr;
+        if (m_x + w > PAGE_W) {    // next row
+            m_x = 0;
+            m_y += m_rowHeight;
+            m_rowHeight = 0;
+        }
+        if (m_pages.empty() || m_y + h > PAGE_H) {    // next page
+            if (m_pages.size() >= MAX_PAGES)
+                clear();    // (only if something keeps making new glyphs)
+            SDL_Surface* page = SDL_CreateSurface(PAGE_W, PAGE_H, SDL_PIXELFORMAT_ARGB8888);
+            if (!page)
+                return nullptr;
+            SDL_FillSurfaceRect(page, nullptr, SDL_MapSurfaceRGBA(page, 0, 0, 0, 0));
+            SDL_SetSurfaceBlendMode(page, SDL_BLENDMODE_BLEND);
+            m_pages.push_back(page);
+            m_x = 0;
+            m_y = 0;
+            m_rowHeight = 0;
+        }
+        Glyph glyph {m_pages.back(), {m_x, m_y, w, h}};
+        m_x += w + 1;
+        m_rowHeight = std::max(m_rowHeight, h + 1);
+        return &(m_glyphs[key] = glyph);
+    }
+
+private:
+    static constexpr int PAGE_W = 512;
+    static constexpr int PAGE_H = 256;
+    static constexpr size_t MAX_PAGES = 8;
+
+    std::unordered_map<std::string, Glyph> m_glyphs;
+    std::vector<SDL_Surface*> m_pages;
+    int m_x = 0;
+    int m_y = 0;
+    int m_rowHeight = 0;
+
+    void clear()
+    {
+        m_glyphs.clear();
+        for (SDL_Surface* page : m_pages)
+            SDL_DestroySurface(page);
+        m_pages.clear();
+    }
+};
+
+GlyphSheet& glyphSheet()
+{
+    static GlyphSheet sheet;
+    return sheet;
+}
+
+void appendColor(std::string& key, SDL_Color c)
+{
+    key += static_cast<char>(c.r);
+    key += static_cast<char>(c.g);
+    key += static_cast<char>(c.b);
+}
+
+// A solid rectangle inside a glyph's area of the sheet
+void plot(const GlyphSheet::Glyph& glyph, int x, int y, int w, int h, SDL_Color c)
+{
+    const SDL_Rect rect {glyph.rect.x + x, glyph.rect.y + y, w, h};
+    SDL_FillSurfaceRect(glyph.page, &rect, SDL_MapSurfaceRGBA(glyph.page, c.r, c.g, c.b, 255));
+}
+
+void blitGlyph(const GlyphSheet::Glyph& glyph, int x, int y)
+{
+    if (!blitdest)
+        return;
+    const SDL_Rect dst {x, y, glyph.rect.w, glyph.rect.h};
+    SDL_BlitSurface(glyph.page, &glyph.rect, blitdest, &dst);
+}
+
+} // namespace
+
 void fill(int x, int y, int w, int h, SDL_Color c)
 {
     if (!blitdest || w <= 0 || h <= 0)
@@ -111,19 +217,43 @@ void frame(int x, int y, int w, int h, SDL_Color border, SDL_Color inside)
 
 void disc(int cx, int cy, int r, SDL_Color c)
 {
-    for (int dy = -r; dy <= r; dy++) {
-        const int half = static_cast<int>(std::sqrt(static_cast<float>(r * r - dy * dy)) + 0.35f);
-        fill(cx - half, cy + dy, 2 * half + 1, 1, c);
+    if (r < 0)
+        return;
+    std::string key = "disc";
+    key += std::to_string(r);
+    appendColor(key, c);
+    const GlyphSheet::Glyph* glyph = glyphSheet().find(key);
+    if (!glyph) {
+        glyph = glyphSheet().add(key, 2 * r + 1, 2 * r + 1);
+        if (!glyph)
+            return;
+        for (int dy = -r; dy <= r; dy++) {
+            const int half = static_cast<int>(std::sqrt(static_cast<float>(r * r - dy * dy)) + 0.35f);
+            plot(*glyph, r - half, r + dy, 2 * half + 1, 1, c);
+        }
     }
+    blitGlyph(*glyph, cx - r, cy - r);
 }
 
 void triangle(int x, int y, int w, int h, bool right, SDL_Color c)
 {
-    for (int row = 0; row < h; row++) {
-        const int fromMiddle = std::abs(2 * row - (h - 1));
-        const int len = std::max(1, w * (h - fromMiddle) / h);
-        fill(right ? x : x + w - len, y + row, len, 1, c);
+    if (w <= 0 || h <= 0)
+        return;
+    std::string key = right ? "tri>" : "tri<";
+    key += std::to_string(w) + "x" + std::to_string(h);
+    appendColor(key, c);
+    const GlyphSheet::Glyph* glyph = glyphSheet().find(key);
+    if (!glyph) {
+        glyph = glyphSheet().add(key, w, h);
+        if (!glyph)
+            return;
+        for (int row = 0; row < h; row++) {
+            const int fromMiddle = std::abs(2 * row - (h - 1));
+            const int len = std::max(1, w * (h - fromMiddle) / h);
+            plot(*glyph, right ? 0 : w - len, row, len, 1, c);
+        }
     }
+    blitGlyph(*glyph, x, y);
 }
 
 void line(int x0, int y0, int x1, int y1, int thickness, SDL_Color c)
@@ -140,26 +270,50 @@ void line(int x0, int y0, int x1, int y1, int thickness, SDL_Color c)
 
 void art(int x, int y, const std::vector<const char*>& rows, const std::vector<Ink>& inks, int scale)
 {
-    auto colorOf = [&inks](char c) -> const SDL_Color* {
-        for (const Ink& ink : inks) {
-            if (ink.c == c)
-                return &ink.color;
-        }
-        return nullptr;
-    };
-    for (size_t row = 0; row < rows.size(); row++) {
-        const char* line = rows[row];
-        //(runs of one color as one rectangle)
-        for (int col = 0; line[col];) {
-            const SDL_Color* c = colorOf(line[col]);
-            int run = 1;
-            while (line[col + run] && line[col + run] == line[col])
-                run++;
-            if (c)
-                fill(x + col * scale, y + static_cast<int>(row) * scale, run * scale, scale, *c);
-            col += run;
+    if (rows.empty() || scale <= 0)
+        return;
+
+    //The key: the size, the inks and the picture
+    std::string key = "art";
+    key += static_cast<char>('0' + scale);
+    for (const Ink& ink : inks) {
+        key += ink.c;
+        appendColor(key, ink.color);
+    }
+    int columns = 0;
+    for (const char* line : rows) {
+        key += '|';
+        key += line;
+        columns = std::max(columns, static_cast<int>(std::char_traits<char>::length(line)));
+    }
+
+    const GlyphSheet::Glyph* glyph = glyphSheet().find(key);
+    if (!glyph) {
+        glyph = glyphSheet().add(key, columns * scale, static_cast<int>(rows.size()) * scale);
+        if (!glyph)
+            return;
+        auto colorOf = [&inks](char c) -> const SDL_Color* {
+            for (const Ink& ink : inks) {
+                if (ink.c == c)
+                    return &ink.color;
+            }
+            return nullptr;
+        };
+        for (size_t row = 0; row < rows.size(); row++) {
+            const char* line = rows[row];
+            //(runs of one color as one rectangle)
+            for (int col = 0; line[col];) {
+                const SDL_Color* c = colorOf(line[col]);
+                int run = 1;
+                while (line[col + run] && line[col + run] == line[col])
+                    run++;
+                if (c)
+                    plot(*glyph, col * scale, static_cast<int>(row) * scale, run * scale, scale, *c);
+                col += run;
+            }
         }
     }
+    blitGlyph(*glyph, x, y);
 }
 
 namespace {
@@ -226,12 +380,24 @@ int tinyText(int x, int y, const std::string& s, SDL_Color c, int scale)
     int cx = x;
     for (char ch : s) {
         if (const TinyChar* t = tinyChar(ch)) {
-            for (int row = 0; row < 5; row++) {
-                for (int col = 0; col < 3; col++) {
-                    if (t->rows[row][col] == '#')
-                        fill(cx + col * scale, y + row * scale, scale, scale, c);
+            std::string key = "tiny";
+            key += ch;
+            key += static_cast<char>('0' + scale);
+            appendColor(key, c);
+            const GlyphSheet::Glyph* glyph = glyphSheet().find(key);
+            if (!glyph && scale > 0) {
+                glyph = glyphSheet().add(key, 3 * scale, 5 * scale);
+                if (glyph) {
+                    for (int row = 0; row < 5; row++) {
+                        for (int col = 0; col < 3; col++) {
+                            if (t->rows[row][col] == '#')
+                                plot(*glyph, col * scale, row * scale, scale, scale, c);
+                        }
+                    }
                 }
             }
+            if (glyph)
+                blitGlyph(*glyph, cx, y);
         }
         cx += 4 * scale;
     }

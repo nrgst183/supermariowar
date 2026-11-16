@@ -790,6 +790,13 @@ typedef Uint32 SDL_AudioDeviceID;
 // Leaves the game and goes back to the dashboard. Doesn't return.
 void SDL_XboxReturnToDashboard(void);
 
+// Memory for the game's screen surface that the GPU displays directly (no copy
+// per frame): w*h 32-bit pixels, *pitch bytes per row. Create the screen
+// surface on it with SDL_CreateSurfaceFrom, after creating the renderer, and
+// present it with SDL_UpdateTexture(texture, NULL, pixels, pitch) as usual.
+// NULL if it isn't available (then use a normal surface).
+void* SDL_XboxGetScreenPixels(int w, int h, int* pitch);
+
 #ifdef __cplusplus
 }
 #endif

@@ -14,6 +14,8 @@ int main(void)
     static char arg0[] = "D:\\default.xbe";
     char* argv[] = {arg0, nullptr};
 
+    sdlx_set_fpu_precision();
+
     const int result = SDL_main(1, argv);
     sdlx_log("[xbox] The game exited with %d\n", result);
 

@@ -8,6 +8,7 @@
 // ~170 ms per frame).
 
 #include <xtl.h>
+#include <xgraphics.h>
 
 #include "sdl_internal.h"
 
@@ -52,6 +53,12 @@ constexpr int k_screen_h = 480;
 SDL_Window* g_window = nullptr;
 D3DTexture* g_frame_textures[2] = {nullptr, nullptr};
 int g_frame_index = 0;
+
+// The game's screen surface, in memory the GPU reads as a texture (see
+// SDL_XboxGetScreenPixels): presenting it needs no copy
+void* g_screen_pixels = nullptr;
+int g_screen_pitch = 0;
+D3DTexture g_screen_texture;
 
 struct QuadVertex {
     float x, y, z, rhw;
@@ -283,13 +290,49 @@ void updateOverlayStats()
     g_overlay.window_start_cycles = now_cycles;
 }
 
-void presentTexture(const SDL_Texture* texture)
+void drawQuad(D3DTexture* texture)
 {
-    D3DTexture* frame = g_frame_textures[g_frame_index];
-    g_frame_index ^= 1;
+    // One quad over the screen; -0.5 lines the texels up with the pixels
+    const float x0 = -0.5f, y0 = -0.5f;
+    const float x1 = k_screen_w - 0.5f, y1 = k_screen_h - 0.5f;
+    const float u1 = static_cast<float>(k_screen_w), v1 = static_cast<float>(k_screen_h);
+    const QuadVertex quad[4] = {
+        {x0, y0, 0.0f, 1.0f, 0.0f, 0.0f},
+        {x1, y0, 0.0f, 1.0f, u1, 0.0f},
+        {x1, y1, 0.0f, 1.0f, u1, v1},
+        {x0, y1, 0.0f, 1.0f, 0.0f, v1},
+    };
 
+    D3DDevice_BeginScene();
+    D3DDevice_SetTexture(0, reinterpret_cast<D3DBaseTexture*>(texture));
+    D3DDevice_DrawVerticesUP(D3DPT_QUADLIST, 4, quad, sizeof(QuadVertex));
+    D3DDevice_SetTexture(0, NULL);
+    D3DDevice_EndScene();
+}
+
+// Draws the frame; returns a fence to wait on before the game may draw into
+// the frame's memory again (0: none needed)
+DWORD presentTexture(const SDL_Texture* texture)
+{
     const Uint8* src = texture->source ? static_cast<const Uint8*>(texture->source) : reinterpret_cast<const Uint8*>(texture->pixels);
     const int src_pitch = texture->source ? texture->source_pitch : texture->pitch;
+
+    // The game drew straight into the screen texture: no copy
+    if (g_screen_pixels && src == g_screen_pixels && texture->w == k_screen_w && texture->h == k_screen_h) {
+        if (g_sdlx_overlay) {
+            for (int i = 0; i < 6; i++)
+                drawText(static_cast<Uint8*>(g_screen_pixels), g_screen_pitch, 40, 40 + i * 20, g_overlay.lines[i]);
+        }
+        // The memory is cached (fast for the CPU's drawing, which also reads it
+        // to blend), and the GPU doesn't see the CPU's caches: write them back
+        __asm__ volatile("wbinvd" ::: "memory");
+        drawQuad(&g_screen_texture);
+        return D3DDevice_InsertFence();
+    }
+
+    // Otherwise copy the frame into one of the frame textures (used in turns)
+    D3DTexture* frame = g_frame_textures[g_frame_index];
+    g_frame_index ^= 1;
 
     // Waits if the GPU still draws from this texture (two frames ago)
     D3DLOCKED_RECT locked;
@@ -312,22 +355,8 @@ void presentTexture(const SDL_Texture* texture)
     }
     D3DTexture_UnlockRect(frame, 0);
 
-    // One quad over the screen; -0.5 lines the texels up with the pixels
-    const float x0 = -0.5f, y0 = -0.5f;
-    const float x1 = k_screen_w - 0.5f, y1 = k_screen_h - 0.5f;
-    const float u1 = static_cast<float>(k_screen_w), v1 = static_cast<float>(k_screen_h);
-    const QuadVertex quad[4] = {
-        {x0, y0, 0.0f, 1.0f, 0.0f, 0.0f},
-        {x1, y0, 0.0f, 1.0f, u1, 0.0f},
-        {x1, y1, 0.0f, 1.0f, u1, v1},
-        {x0, y1, 0.0f, 1.0f, 0.0f, v1},
-    };
-
-    D3DDevice_BeginScene();
-    D3DDevice_SetTexture(0, reinterpret_cast<D3DBaseTexture*>(frame));
-    D3DDevice_DrawVerticesUP(D3DPT_QUADLIST, 4, quad, sizeof(QuadVertex));
-    D3DDevice_SetTexture(0, NULL);
-    D3DDevice_EndScene();
+    drawQuad(frame);
+    return 0;
 }
 } // namespace
 
@@ -508,13 +537,19 @@ bool SDL_RenderPresent(SDL_Renderer* renderer)
     updateOverlayStats();
 
     const Uint64 copy_start = sdlx_cycles();
+    DWORD fence = 0;
     if (renderer->pending) {
-        presentTexture(renderer->pending);
+        fence = presentTexture(renderer->pending);
     } else {
         D3DDevice_Clear(0, NULL, D3DCLEAR_TARGET, renderer->clear_color, 1.0f, 0);
     }
     const Uint64 swap_start = sdlx_cycles();
     D3DDevice_Swap(0);
+    // The game draws the next frame into the memory the GPU just showed: wait
+    // until the GPU has read it (this is also where the wait for the vertical
+    // blank ends up)
+    if (fence)
+        D3DDevice_BlockOnFence(fence);
     const Uint64 swap_end = sdlx_cycles();
     g_sdlx_profile.copy = g_sdlx_profile.copy + (swap_start - copy_start);
     g_sdlx_profile.swap = g_sdlx_profile.swap + (swap_end - swap_start);
@@ -534,6 +569,38 @@ bool SDL_ConvertEventToRenderCoordinates(SDL_Renderer* renderer, SDL_Event* even
     (void)renderer;
     (void)event;
     return true;
+}
+
+
+/* ---- The screen in GPU-visible memory ----------------------------------- */
+
+void* SDL_XboxGetScreenPixels(int w, int h, int* pitch)
+{
+    if (w != k_screen_w || h != k_screen_h || !g_renderer)
+        return nullptr;
+
+    if (!g_screen_pixels) {
+        // Linear textures need a pitch that's a multiple of 64 bytes
+        const int row = ((w * 4) + 63) & ~63;
+        // Physically contiguous (the GPU has no virtual memory), cached
+        void* memory = XPhysicalAlloc(static_cast<SIZE_T>(row) * h, MAXULONG_PTR, 4096, PAGE_READWRITE);
+        if (!memory) {
+            sdlx_log("[gfx] Couldn't allocate the screen texture; copying frames instead\n");
+            return nullptr;
+        }
+        memset(memory, 0, static_cast<size_t>(row) * h);
+
+        memset(&g_screen_texture, 0, sizeof(g_screen_texture));
+        XGSetTextureHeader(w, h, 1, 0, D3DFMT_LIN_X8R8G8B8, D3DPOOL_DEFAULT, &g_screen_texture, 0, row);
+        D3DResource_Register(reinterpret_cast<D3DResource*>(&g_screen_texture), memory);
+
+        g_screen_pixels = memory;
+        g_screen_pitch = row;
+    }
+
+    if (pitch)
+        *pitch = g_screen_pitch;
+    return g_screen_pixels;
 }
 
 

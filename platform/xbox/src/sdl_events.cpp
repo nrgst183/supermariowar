@@ -272,6 +272,7 @@ void SDL_PumpEvents(void)
 
 bool SDL_PollEvent(SDL_Event* event)
 {
+    sdlx_set_fpu_precision();
     sdlx_mixer_dispatch_callbacks();
 
     // Read the controllers once per drain of the queue: the game calls this

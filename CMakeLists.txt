@@ -21,6 +21,12 @@ if(XBOXOG)
 	set(NO_NETWORK ON CACHE BOOL "Disable all network communication" FORCE)
 	set(BUILD_TESTS OFF CACHE BOOL "Build the unit tests" FORCE)
 	set(SMW_INSTALL_PORTABLE ON CACHE BOOL "Install to a single directory" FORCE)
+	# Float maths on SSE, like the PC builds: exact single precision, so the
+	# simulation gives the same results every time (replays, rollback). The x87
+	# keeps intermediate results in 80 bits, rounded differently depending on how
+	# the compiler kept them in registers. (Doubles stay on the x87, the Pentium
+	# III has no SSE2; the SDL layer sets it to 53-bit precision.)
+	add_compile_options(-mfpmath=sse)
 endif()
 
 #
