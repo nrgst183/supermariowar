@@ -5,6 +5,7 @@
 // window, the screen surfaces, the stand-ins for gameplay code).
 #define SMW_EMBEDDED_EDITOR
 #include "CoEdit.h"
+#include "LevelShell.h"
 #include "../../leveleditor/LevelEditorState.h"
 
 namespace leveleditor {
@@ -309,4 +310,150 @@ std::unique_ptr<editors::coedit::Document> makeCoeditDocument()
 {
     return std::make_unique<CoeditDocument>();
 }
+
+// ---- the editor window's view of the editor (LevelShell.h)
+
+namespace shell {
+
+bool inMapView()
+{
+    return state == EDITOR_EDIT;
+}
+
+int mode()
+{
+    return edit_mode;
+}
+
+void setMode(int mode)
+{
+    edit_mode = mode;
+}
+
+int block()
+{
+    return set_block;
+}
+
+void setBlock(int block, bool on)
+{
+    set_block = block;
+    if (block >= 7 && block <= 10)
+        g_map->iSwitches[block - 7] = on ? 1 : 0;
+    else if (block >= 11 && block <= 14)
+        set_block_switch_on = on;
+    edit_mode = 0;
+}
+
+bool switchOn(int color)
+{
+    return color >= 0 && color < 4 && g_map->iSwitches[color] != 0;
+}
+
+bool switchBlockOn()
+{
+    return set_block_switch_on;
+}
+
+int item()
+{
+    return set_mapitem;
+}
+
+void setItem(int item)
+{
+    set_mapitem = item;
+    edit_mode = 7;
+}
+
+int tileType()
+{
+    return static_cast<int>(set_tiletype);
+}
+
+void setTileType(int type)
+{
+    set_tiletype = static_cast<TileType>(type);
+    edit_mode = 6;
+}
+
+int layer()
+{
+    return selected_layer;
+}
+
+void setLayer(int layer)
+{
+    selected_layer = std::clamp(layer, 0, MAPLAYERS - 1);
+}
+
+bool othersHidden()
+{
+    return view_only_layer;
+}
+
+void setOthersHidden(bool hidden)
+{
+    view_only_layer = hidden;
+}
+
+bool blocksShown()
+{
+    return viewblocks;
+}
+
+void setBlocksShown(bool shown)
+{
+    viewblocks = shown;
+}
+
+std::string mapName()
+{
+    return maplist ? maplist->currentShortmapname() : std::string();
+}
+
+bool drawTiles(int x, int y, int size)
+{
+    if (set_tile_tileset < 0 || static_cast<size_t>(set_tile_tileset) >= g_tilesetmanager->count() || set_tile_cols < 1 || set_tile_rows < 1)
+        return false;
+    //(the top left of the selection, at most 3x3 tiles, 16 pixels each: shrunk to fit)
+    const int cols = std::min(set_tile_cols, 3);
+    const int rows = std::min(set_tile_rows, 3);
+    const int cell = std::max(4, size / std::max(cols, rows) / 8 * 8);
+    const DrawSize drawSize = cell >= 32 ? DrawSize::Ingame : cell >= 16 ? DrawSize::Preview : DrawSize::Thumbnail;
+    const int px = drawSize == DrawSize::Ingame ? 32 : drawSize == DrawSize::Preview ? 16 : 8;
+    const int ox = x + (size - cols * px) / 2;
+    const int oy = y + (size - rows * px) / 2;
+    for (int c = 0; c < cols; c++) {
+        for (int r = 0; r < rows; r++) {
+            const SDL_Rect dst {ox + c * px, oy + r * px, px, px};
+            g_tilesetmanager->tileset(set_tile_tileset)->draw(drawSize,
+                CTilesetManager::rect(drawSize, static_cast<size_t>(set_tile_start_x + c), static_cast<size_t>(set_tile_start_y + r)), screen, dst);
+        }
+    }
+    return true;
+}
+
+void pick(int col, int row)
+{
+    if (col < 0 || col >= MAPWIDTH || row < 0 || row >= MAPHEIGHT)
+        return;
+    const short blockType = g_map->objectdata[col][row].iType;
+    const TilesetTile& tile = g_map->mapdata[col][row][selected_layer];
+    if ((edit_mode == 0 || tile.iID < 0) && blockType >= 0) {
+        set_block = blockType;
+        edit_mode = 0;
+    } else if (tile.iID >= 0) {
+        set_tile_tileset = tile.iID;
+        set_tile_start_x = tile.iCol;
+        set_tile_start_y = tile.iRow;
+        set_tile_end_x = tile.iCol;
+        set_tile_end_y = tile.iRow;
+        set_tile_cols = 1;
+        set_tile_rows = 1;
+        edit_mode = 1;
+    }
+}
+
+}  // namespace shell
 } // namespace leveleditor

@@ -9,43 +9,6 @@ env:
     -DSMW_INSTALL_PORTABLE=ON
 
 jobs:
-  mingw-cross:
-    name: MinGW
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: 'recursive'
-          fetch-depth: 0
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake g++-mingw-w64-x86-64-posix ninja-build
-          curl -L https://github.com/mmatyas/supermariowar/releases/download/v2.0-beta.0/smwlibs-sdl3-mingw64.tar.xz | tar xJf - -C /tmp/
-          cmake --version
-
-      - name: Configure
-        run: cmake $COMMON_CMAKE_ARGS
-          -DCMAKE_TOOLCHAIN_FILE=../.github/workflows/mingw_toolchain.cmake
-          -DBUILD_TESTS=OFF
-      - name: Build
-        run: cmake --build build --verbose
-
-      - name: Package
-        run: |
-          cmake --install build --prefix supermariowar --strip
-          rm -rf supermariowar/include supermariowar/lib
-          cp /usr/lib/gcc/x86_64-w64-mingw32/13-posix/{libgcc_s_seh-1,libstdc++-6}.dll supermariowar/
-          cp /usr/x86_64-w64-mingw32/lib/libwinpthread-1.dll supermariowar/
-          cp /tmp/smwlibs/bin/{SDL3,SDL3_image,SDL3_mixer}.dll supermariowar/
-          zip -9 -r "supermariowar_$(date +%F)_windows.zip" supermariowar
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: supermariowar_windows
-          path: supermariowar_*_windows.zip
-
   msvc:
     name: MSVC
     runs-on: windows-latest
@@ -88,13 +51,13 @@ jobs:
           cmake --install build --prefix supermariowar --strip --config Release
           rm -rf supermariowar/include supermariowar/lib
           cp libs/lib/x64/*.dll supermariowar/
-          7z a "supermariowar_$(date +%F)_windows-msvc.zip" supermariowar
+          7z a "supermariowar_$(date +%F)_windows.zip" supermariowar
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: supermariowar_windows-msvc
-          path: supermariowar_*_windows-msvc.zip
+          name: supermariowar_windows
+          path: supermariowar_*_windows.zip
 
   vs-solution:
     name: Visual Studio solution

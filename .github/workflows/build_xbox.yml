@@ -111,7 +111,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: xbox
+          name: supermariowar_xbox
           path: |
             dist/supermariowar_*_xbox.zip
             dist/supermariowar_*_xbox.iso

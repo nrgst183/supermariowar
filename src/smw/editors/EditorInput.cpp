@@ -1,6 +1,7 @@
 #include "EditorInput.h"
 
 #include "CoEdit.h"
+#include "LevelShell.h"
 #include "ui/InputPrompts.h"
 #include "ui/SmwTheme.h"
 #include "gfx.h"
@@ -9,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <deque>
@@ -214,7 +216,7 @@ struct Pointer {
     bool released(Button b) const { return !pad.buttons[b] && last.buttons[b]; }
 };
 
-enum class Overlay { None, Actions, Keyboard };
+enum class Overlay { None, Window, Keyboard };
 
 struct State {
     bool active = false;
@@ -247,6 +249,17 @@ struct State {
     int oskRow = 0;
     bool oskShift = false;
 
+    //The editor window (Tab / Start)
+    int category = 1;                  // its page (Blocks first)
+    bool dockLeft = false;             // at the left of the screen (else the right)
+    int hover = -1;                    // the widget under the pointer
+    std::string tip;                   // what the widget under the pointer is
+    int tool = 0;                      // Tool (level editor)
+    int paintMode = 0;                 // the editor's mode before Move
+    bool pickRelease = false;
+    int scroll = 0;                    // the page scrolled down by this many pixels
+    int scrollMax = 0;                 // (as far as it goes, from the last frame's layout)          // the mouse button that picked: its release isn't the editor's
+
     //The editor's latest frame, without the overlay (redrawn while it waits)
     SDL_Surface* frame = nullptr;
     Uint64 lastPresentMs = 0;
@@ -259,23 +272,18 @@ int g_testPointers = 1;
 int g_testFrame = 0;
 std::string g_pendingShot;
 
-const std::vector<Action>& actions()
-{
-    return s.editor == Editor::Level ? LEVEL_ACTIONS : WORLD_ACTIONS;
-}
-
 SDL_WindowID windowId()
 {
     SDL_Window* window = SDL_GetKeyboardFocus();
     return window ? SDL_GetWindowID(window) : 0;
 }
 
-// The colors of the local cursors (the first: ours online)
+// The players' colors (the first: ours online): P1 red, P2 green, P3 yellow, P4 blue, like the teams
 SDL_Color pointerColor(int index)
 {
     if (index == 0)
-        return coedit::active() ? coedit::ourColor() : SDL_Color {255, 255, 255, 255};
-    static const SDL_Color colors[] = {{40, 184, 56, 255}, {48, 112, 232, 255}, {248, 200, 24, 255}, {176, 72, 216, 255}};
+        return coedit::active() ? coedit::ourColor() : SDL_Color {232, 56, 40, 255};
+    static const SDL_Color colors[] = {{40, 184, 56, 255}, {248, 200, 24, 255}, {48, 112, 232, 255}, {176, 72, 216, 255}};
     return colors[static_cast<size_t>((index - 1) % 4)];
 }
 
@@ -381,108 +389,103 @@ void moveInGrid(Pointer& p, int& col, int& row, int cols, int rows)
 }
 
 // The action menu's layout: headings and actions in three columns
-struct MenuEntry {
-    int action = -1;    // -1: a heading
-    const char* text = "";
-    int col = 0;
-    int x = 0, y = 0, w = 0;
-};
-constexpr int MENU_W = 616;
-constexpr int MENU_LINE = 17;
-constexpr int MENU_COLS = 3;
+// ---- the editor window (Tab / Start): the editor's tools, palettes and commands
+//
+// Docked at one side of the screen, over the map (the map stays 640x480, one
+// screen pixel a map pixel); it opens at the side away from the pointer, and
+// the map at its other side can be edited while it is open. Every pointer
+// clicks in it: the mouse, and each controller's cursor with A.
 
-struct MenuLayout {
-    std::vector<MenuEntry> entries;
-    int x = 0, y = 0, h = 0;
-};
+constexpr int WIN_W = 300;
+constexpr int RAIL_W = 54;
 
-MenuLayout menuLayout()
+enum Tool { TOOL_PAINT, TOOL_ERASE, TOOL_MOVE, TOOL_PICK, TOOL_COUNT };
+
+// A clickable part of the window (laid out while it is drawn)
+struct Widget {
+    SDL_Rect r {};
+    std::function<void()> act;
+    std::string tip;
+};
+std::vector<Widget> g_widgets;
+
+SDL_Rect windowRect()
 {
-    const std::vector<Action>& list = actions();
-    //(lines: a heading before every group)
-    std::vector<MenuEntry> lines;
-    for (int k = 0; k < static_cast<int>(list.size()); k++) {
-        if (list[static_cast<size_t>(k)].group[0])
-            lines.push_back(MenuEntry {-1, list[static_cast<size_t>(k)].group});
-        lines.push_back(MenuEntry {k, list[static_cast<size_t>(k)].label});
-    }
-    const int perCol = (static_cast<int>(lines.size()) + MENU_COLS - 1) / MENU_COLS;
-    MenuLayout layout;
-    layout.h = perCol * MENU_LINE + 92;
-    layout.x = (SCREEN_W - MENU_W) / 2;
-    layout.y = std::max(6, (SCREEN_H - layout.h) / 2);
-    const int colW = (MENU_W - 16) / MENU_COLS;
-    for (size_t k = 0; k < lines.size(); k++) {
-        MenuEntry e = lines[k];
-        int index = static_cast<int>(k);
-        e.col = index / perCol;
-        //(a heading doesn't end a column)
-        if (e.action < 0 && index % perCol == perCol - 1)
-            e.col++;
-        e.x = layout.x + 10 + e.col * colW;
-        e.w = colW - 8;
-        layout.entries.push_back(e);
-    }
-    //The rows of each column
-    std::array<int, MENU_COLS + 1> rows {};
-    for (MenuEntry& e : layout.entries) {
-        const int col = std::min(e.col, MENU_COLS);
-        e.y = layout.y + 34 + rows[static_cast<size_t>(col)] * MENU_LINE;
-        rows[static_cast<size_t>(col)]++;
-    }
-    return layout;
+    return SDL_Rect {s.dockLeft ? 4 : SCREEN_W - WIN_W - 4, 4, WIN_W, SCREEN_H - 8};
 }
 
-// The action next to `index` in a direction (dx: column, dy: row)
-int menuNeighbor(int index, int dx, int dy)
+bool inWindow(float x, float y)
 {
-    const MenuLayout layout = menuLayout();
-    const MenuEntry* current = nullptr;
-    for (const MenuEntry& e : layout.entries) {
-        if (e.action == index)
-            current = &e;
-    }
-    if (!current)
-        return 0;
-    const int count = static_cast<int>(actions().size());
-    if (dy != 0)
-        return (index + dy + count) % count;
-    //Left / right: the nearest action in the next column
-    const int col = (current->col + dx + MENU_COLS) % MENU_COLS;
-    int best = index;
-    int bestDistance = 1 << 30;
-    for (const MenuEntry& e : layout.entries) {
-        if (e.action < 0 || e.col != col)
-            continue;
-        const int d = std::abs(e.y - current->y);
-        if (d < bestDistance) {
-            bestDistance = d;
-            best = e.action;
-        }
-    }
-    return best;
+    if (s.overlay != Overlay::Window)
+        return false;
+    const SDL_Rect r = windowRect();
+    return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 }
 
-int menuActionAt(float x, float y)
+int widgetAt(float x, float y)
 {
-    for (const MenuEntry& e : menuLayout().entries) {
-        if (e.action >= 0 && x >= e.x - 4 && x < e.x + e.w && y >= e.y - 2 && y < e.y + MENU_LINE - 2)
-            return e.action;
+    for (int k = static_cast<int>(g_widgets.size()) - 1; k >= 0; k--) {
+        const SDL_Rect& r = g_widgets[static_cast<size_t>(k)].r;
+        if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)
+            return k;
     }
     return -1;
 }
 
-void runAction(int index)
+void hoverAt(float x, float y)
 {
-    if (index < 0 || index >= static_cast<int>(actions().size()))
-        return;
-    const Action& action = actions()[static_cast<size_t>(index)];
-    s.overlay = Overlay::None;
-    s.overlayDirty = true;
-    tapKey(action.key, action.shift, action.ctrl);
+    const int at = widgetAt(x, y);
+    if (at != s.hover) {
+        s.hover = at;
+        s.overlayDirty = true;
+    }
 }
 
-void openActions(int owner)
+void clickAt(float x, float y)
+{
+    const int at = widgetAt(x, y);
+    if (at >= 0 && g_widgets[static_cast<size_t>(at)].act) {
+        //(a copy: the action may change the widgets)
+        const std::function<void()> act = g_widgets[static_cast<size_t>(at)].act;
+        act();
+    }
+    s.overlayDirty = true;
+}
+
+bool levelMap()
+{
+    return s.editor == Editor::Level && leveleditor::shell::inMapView();
+}
+
+void setTool(int tool)
+{
+    if (s.editor != Editor::Level)
+        return;
+    namespace sh = leveleditor::shell;
+    if (tool == TOOL_MOVE && sh::mode() != 3) {
+        s.paintMode = sh::mode();
+        tapKey(SDLK_M);
+    } else if (tool != TOOL_MOVE && sh::mode() == 3) {
+        sh::setMode(s.paintMode == 3 ? 0 : s.paintMode);
+    }
+    s.tool = tool;
+    s.overlayDirty = true;
+}
+
+// The tool in use, as the editor's mode shows it (Move is the editor's mode 3)
+int currentTool()
+{
+    if (s.editor != Editor::Level)
+        return TOOL_PAINT;
+    if (leveleditor::shell::mode() == 3)
+        return TOOL_MOVE;
+    return s.tool == TOOL_MOVE ? TOOL_PAINT : s.tool;
+}
+
+// The window's pages
+int pageCount();
+
+void openWindow(int owner)
 {
     //(let go of anything held first)
     for (size_t k = 0; k < s.pointers.size(); k++) {
@@ -491,65 +494,41 @@ void openActions(int owner)
         if (s.pointers[k].buttons & SDL_BUTTON_RMASK)
             pushButton(static_cast<int>(k), SDL_BUTTON_RIGHT, false);
     }
-    s.overlay = Overlay::Actions;
+    //(at the side away from the pointer)
+    float px = s.cx;
+    if (owner >= 0 && owner < static_cast<int>(s.pointers.size()))
+        px = s.pointers[static_cast<size_t>(owner)].x;
+    s.dockLeft = px >= SCREEN_W / 2;
+    s.overlay = Overlay::Window;
     s.overlayOwner = owner;
+    s.hover = -1;
     s.overlayDirty = true;
 }
 
-void updateActions(Pointer& p)
+void closeWindow()
 {
-    const bool up = p.pad.buttons[UP] || p.pad.ly < -0.6f;
-    const bool down = p.pad.buttons[DOWN] || p.pad.ly > 0.6f;
-    const bool left = p.pad.buttons[LEFT] || p.pad.lx < -0.6f;
-    const bool right = p.pad.buttons[RIGHT] || p.pad.lx > 0.6f;
-    if (p.up.fire(up))
-        s.actionIndex = menuNeighbor(s.actionIndex, 0, -1);
-    if (p.down.fire(down))
-        s.actionIndex = menuNeighbor(s.actionIndex, 0, 1);
-    if (p.left.fire(left))
-        s.actionIndex = menuNeighbor(s.actionIndex, -1, 0);
-    if (p.right.fire(right))
-        s.actionIndex = menuNeighbor(s.actionIndex, 1, 0);
-    if (up || down || left || right)
-        s.overlayDirty = true;
-
-    if (p.pressed(B) || p.pressed(START) || p.pressed(BACK)) {
-        s.overlay = Overlay::None;
-        s.overlayDirty = true;
-    } else if (p.pressed(A)) {
-        runAction(s.actionIndex);
-    }
-}
-
-// The keyboard and the mouse in the action menu (the editor doesn't get them)
-void actionsEvent(const SDL_Event& e)
-{
+    s.overlay = Overlay::None;
+    s.hover = -1;
     s.overlayDirty = true;
-    if (e.type == SDL_EVENT_KEY_DOWN) {
-        switch (e.key.key) {
-            case SDLK_UP: s.actionIndex = menuNeighbor(s.actionIndex, 0, -1); break;
-            case SDLK_DOWN: s.actionIndex = menuNeighbor(s.actionIndex, 0, 1); break;
-            case SDLK_LEFT: s.actionIndex = menuNeighbor(s.actionIndex, -1, 0); break;
-            case SDLK_RIGHT: s.actionIndex = menuNeighbor(s.actionIndex, 1, 0); break;
-            case SDLK_RETURN:
-            case SDLK_KP_ENTER:
-            case SDLK_SPACE: runAction(s.actionIndex); break;
-            case SDLK_ESCAPE:
-            case SDLK_TAB: s.overlay = Overlay::None; break;
-            default: break;
-        }
-    } else if (e.type == SDL_EVENT_MOUSE_MOTION) {
-        const int at = menuActionAt(e.motion.x, e.motion.y);
-        if (at >= 0)
-            s.actionIndex = at;
-    } else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-        const int at = menuActionAt(e.button.x, e.button.y);
-        if (e.button.button == SDL_BUTTON_LEFT && at >= 0)
-            runAction(at);
-        else
-            s.overlay = Overlay::None;    //(a click elsewhere, or the right button)
-    }
 }
+
+void turnPage(int delta)
+{
+    const int n = pageCount();
+    s.category = ((s.category + delta) % n + n) % n;
+    s.scroll = 0;
+    s.hover = -1;
+    s.overlayDirty = true;
+}
+
+// A command of the editor: its key, with the window left open unless it opens a screen of its own
+void runKey(SDL_Keycode key, bool shift = false, bool ctrl = false, bool keepOpen = false)
+{
+    if (!keepOpen)
+        closeWindow();
+    tapKey(key, shift, ctrl);
+}
+
 
 // The on-screen keyboard's keys: index row * OSK_COLS + col (the last row: 5 wide keys)
 constexpr int OSK_KEY_W = 38;
@@ -645,32 +624,63 @@ void updatePointer(int index)
         p.y = std::clamp(p.y + dy, 0.0f, SCREEN_H - 1.0f);
         p.shown = true;
         s.overlayDirty = true;
-        //The editor's mouse follows it if it has it, or if it is painting
-        if (s.owner == index || p.buttons)
+        //The editor's mouse follows it if it has it, or if it is painting (not into the window)
+        if ((s.owner == index || p.buttons) && !inWindow(p.x, p.y))
             moveMouseTo(index);
     }
 
-    //The buttons: the editor's mouse comes here first
-    if (p.pressed(A) || p.pressed(B))
-        p.shown = true;
-    if (p.pressed(A))
-        pushButton(index, SDL_BUTTON_LEFT, true);
-    else if (p.released(A) && (p.buttons & SDL_BUTTON_LMASK))
-        pushButton(index, SDL_BUTTON_LEFT, false);
-    if (p.pressed(B))
-        pushButton(index, SDL_BUTTON_RIGHT, true);
-    else if (p.released(B) && (p.buttons & SDL_BUTTON_RMASK))
-        pushButton(index, SDL_BUTTON_RIGHT, false);
+    //Over the window: its widgets get the buttons, not the editor
+    if (inWindow(p.x, p.y)) {
+        if (p.shown)
+            hoverAt(p.x, p.y);
+        if (p.pressed(A) || p.pressed(B))
+            p.shown = true;
+        if (p.pressed(A))
+            clickAt(p.x, p.y);
+        if (p.pressed(B))
+            closeWindow();
+    } else {
+        //The buttons: the editor's mouse comes here first (the tools: erase is the right button, pick takes the cell)
+        const int tool = currentTool();
+        if (p.pressed(A) || p.pressed(B))
+            p.shown = true;
+        if (p.pressed(A) && tool == TOOL_PICK && levelMap()) {
+            leveleditor::shell::pick(static_cast<int>(p.x) / TILE, static_cast<int>(p.y) / TILE);
+            setTool(TOOL_PAINT);
+        } else if (p.pressed(A)) {
+            pushButton(index, tool == TOOL_ERASE && levelMap() ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT, true);
+        } else if (p.released(A) && (p.buttons & (SDL_BUTTON_LMASK | SDL_BUTTON_RMASK)) && !p.pad.buttons[B]) {
+            pushButton(index, (p.buttons & SDL_BUTTON_LMASK) ? SDL_BUTTON_LEFT : SDL_BUTTON_RIGHT, false);
+        }
+        if (p.pressed(B))
+            pushButton(index, SDL_BUTTON_RIGHT, true);
+        else if (p.released(B) && (p.buttons & SDL_BUTTON_RMASK))
+            pushButton(index, SDL_BUTTON_RIGHT, false);
+    }
 
-    if (p.pressed(RB))
+    if (p.pressed(RB) && s.overlay == Overlay::Window)
+        turnPage(1);
+    else if (p.pressed(RB))
         tapKey(SDLK_RETURN);
-    if (p.pressed(BACK))
-        tapKey(SDLK_ESCAPE);
-    if (p.pressed(START))
-        openActions(index);
+    if (p.pressed(BACK)) {
+        if (s.overlay == Overlay::Window)
+            closeWindow();
+        else
+            tapKey(SDLK_ESCAPE);
+    }
+    if (p.pressed(START)) {
+        if (s.overlay == Overlay::Window)
+            closeWindow();
+        else
+            openWindow(index);
+    }
     if (p.pressed(LB)) {
-        s.hints = !s.hints;
-        s.overlayDirty = true;
+        if (s.overlay == Overlay::Window) {
+            turnPage(-1);
+        } else {
+            s.hints = !s.hints;
+            s.overlayDirty = true;
+        }
     }
 }
 
@@ -681,14 +691,19 @@ void updateKeys()
     bool ctrl = s.ctrlFrames > 0;
     bool up = false, down = false, left = false, right = false;
     for (Pointer& p : s.pointers) {
-        if (s.overlay == Overlay::None) {
+        const bool free = s.overlay != Overlay::Keyboard && !inWindow(p.x, p.y);
+        if (inWindow(p.x, p.y) && std::fabs(p.pad.ry) > 0.3f) {
+            s.scroll = std::clamp(s.scroll + static_cast<int>(p.pad.ry * 10.0f), 0, s.scrollMax);
+            s.overlayDirty = true;
+        }
+        if (free) {
             shift = shift || p.pad.buttons[X];
             ctrl = ctrl || p.pad.buttons[Y];
         }
-        holdKey(SDLK_UP, p.arrowUp, s.overlay == Overlay::None && p.pad.ry < -0.5f, up);
-        holdKey(SDLK_DOWN, p.arrowDown, s.overlay == Overlay::None && p.pad.ry > 0.5f, down);
-        holdKey(SDLK_LEFT, p.arrowLeft, s.overlay == Overlay::None && p.pad.rx < -0.5f, left);
-        holdKey(SDLK_RIGHT, p.arrowRight, s.overlay == Overlay::None && p.pad.rx > 0.5f, right);
+        holdKey(SDLK_UP, p.arrowUp, free && p.pad.ry < -0.5f, up);
+        holdKey(SDLK_DOWN, p.arrowDown, free && p.pad.ry > 0.5f, down);
+        holdKey(SDLK_LEFT, p.arrowLeft, free && p.pad.rx < -0.5f, left);
+        holdKey(SDLK_RIGHT, p.arrowRight, free && p.pad.rx > 0.5f, right);
     }
     s.keys[SDL_SCANCODE_LSHIFT] = shift;
     s.keys[SDL_SCANCODE_LCTRL] = ctrl;
@@ -756,54 +771,673 @@ void drawArrow(float fx, float fy, SDL_Color color, const std::string& label)
     }
 }
 
-void drawActions()
+// ---- the window's look
+
+// 8x8 pixel art at twice the size: the tools' and the pages' icons
+using Art = std::vector<const char*>;
+const Art ART_BRUSH = {"......#.", ".....#w#", "....#ww#", "...#ww#.", "..#bb#..", ".#bbb#..", "#bbb#...", "###....."};
+const Art ART_ERASER = {"....###.", "...#www#", "..#www#.", ".#rrw#..", "#rrr#...", "#rr#....", ".##.....", "........"};
+const Art ART_MOVE = {"#.#.#.#.", "........", "#...###.", "....#ww#", "#...#ww#", ".....##.", "#.#.#.#.", "........"};
+const Art ART_PICK = {"......##", ".....#ww", "....#ww#", "...#ww#.", "..#bw#..", ".#bb#...", ".##.....", "#......."};
+const Art ART_EYE = {"........", "..####..", ".#wwww#.", "#ww##ww#", "#ww##ww#", ".#wwww#.", "..####..", "........"};
+const Art ART_SWAP = {"..#.....", ".##.....", "#######.", ".##.....", "..#..#..", ".....##.", "#######.", ".....#.."};
+const Art ART_CLOSE = {"........", ".##..##.", "..####..", "...##...", "..####..", ".##..##.", "........", "........"};
+const Art ART_GROUND = {"gggggggg", "gGgGgGgg", "bbbbbbbb", "bdbbbdbb", "bbbbbbbb", "bbbdbbbd", "bbbbbbbb", "dbbbbdbb"};
+const Art ART_SPRING = {"..####..", ".#gggg#.", "..#..#..", ".#.##.#.", "..#..#..", ".#.##.#.", "..#..#..", ".######."};
+const Art ART_TYPES = {"########", "#ww#cccc", "#ww#cccc", "########", "#rr#ssss", "#rr#ssss", "########", "........"};
+const Art ART_ZONE = {"..####..", ".#rrrr#.", "#rr..rr#", "#r..rrr#", "#r.rr.r#", "#rrr..r#", ".#rrrr#.", "..####.."};
+const Art ART_PIPE = {"########", "#ggGggg#", "########", ".#gGgg#.", ".#gGgg#.", ".#gGgg#.", ".#gGgg#.", ".######."};
+const Art ART_PLATFORM = {"........", "........", "########", "#bbdbbd#", "########", "...##...", "...##...", "..####.."};
+const Art ART_FIRE = {"...#....", "..#r#...", ".#rr#.#.", ".#ryr##.", "#ryyyr#.", "#ryyyr#.", ".#rrr#..", "..###..."};
+const Art ART_FLAG = {"#.......", "#rrrr...", "#rrrrr..", "#rrrr...", "#.......", "#.......", "#.......", "##......"};
+const Art ART_LOOK = {"########", "#cccccc#", "#ccwccc#", "#cc.ccc#", "#c...cc#", "#.....c#", "#gggggg#", "########"};
+const Art ART_DISK = {"#######.", "#w###w##", "#w#.#ww#", "#wwwwww#", "#cccccc#", "#cwwwwc#", "#cwwwwc#", "########"};
+
+void drawArt(int x, int y, const Art& art)
 {
-    const MenuLayout layout = menuLayout();
-    frameBox(layout.x, layout.y, MENU_W, layout.h);
-    //(its title: SMB3's status bar and an item card)
-    theme::announce(SCREEN_W / 2, std::max(0, layout.y - 34), s.editor == Editor::Level ? "Level Editor" : "World Editor",
-        [](int ix, int iy) { theme::icon(ix + 8, iy + 8, s.editor == Editor::Level ? theme::Icon::QuestionBlock : theme::Icon::Star); });
-    for (const MenuEntry& e : layout.entries) {
-        if (e.action < 0) {
-            //A heading: the menus' gray pipe, an item (SMB3's power-ups) for each group
-            theme::block(e.x - 4, e.y - 1, e.w + 4, MENU_LINE, theme::Tone::Gray);
-            static const std::pair<const char*, int> items[] = {
-                {"Modes", 5}, {"Layers", 12}, {"Look", 6}, {"File", 26}, {"Other", 9}, {"World", 25}};
-            int item = 27;
-            for (const auto& [name, index] : items) {
-                if (std::string(e.text) == name)
-                    item = index;
-            }
-            if (theme::res().spr_storedpowerupsmall)
-                theme::res().spr_storedpowerupsmall.draw(e.x - 1, e.y - 1, {item * 16, 0, 16, 16});
-            theme::font().draw(e.x + 18, e.y - 1, e.text);
-            continue;
-        }
-        const Action& action = actions()[static_cast<size_t>(e.action)];
-        const bool selected = e.action == s.actionIndex;
-        if (selected)
-            theme::block(e.x - 4, e.y - 2, e.w + 4, MENU_LINE + 1, theme::Tone::Green);
-        theme::font().draw(e.x + 2, e.y - 1, action.label);
-        //(its key, right-aligned)
-        const std::string key = keyName(action);
-        const int kw = std::max(16, theme::font().getWidth(key) + 8);
-        if (theme::font().getWidth(action.label) + kw + 8 < e.w)
-            prompts::drawKey(e.x + e.w - kw - 2, e.y - 1, key);
-    }
-    //How to use it, with the device in use
-    const int fy = layout.y + layout.h - 40;
-    std::vector<std::tuple<prompts::Pad, std::string, std::string>> row1 = {
-        {prompts::Pad::DPad, "Arrows", "choose"}, {prompts::Pad::A, "Enter", "do it"}, {prompts::Pad::B, "Esc", "close"}};
-    int w = 0;
-    for (const auto& [pad, key, label] : row1)
-        w += prompts::promptWidth(pad, key, label) + 18;
-    theme::inset(SCREEN_W / 2 - w / 2 - 8, fy - 4, w + 8, 24);
-    int x = SCREEN_W / 2 - w / 2;
-    for (const auto& [pad, key, label] : row1)
-        x += prompts::drawPrompt(x, fy, pad, key, label) + 18;
-    const char* tip = prompts::lastDevice() == prompts::Device::Controller ? "Or press the keys shown, on a keyboard" : "Or click one; the keys work in the editor too";
-    theme::font().drawCentered(SCREEN_W / 2, fy + 22, tip);
+    prompts::art(x, y, art, {{'#', {0, 0, 0, 255}}, {'w', {255, 255, 255, 255}}, {'b', {168, 96, 40, 255}}, {'d', {112, 56, 16, 255}},
+                                {'g', {56, 184, 48, 255}}, {'G', {152, 232, 88, 255}}, {'r', {216, 40, 32, 255}}, {'y', {248, 208, 48, 255}},
+                                {'c', {104, 168, 240, 255}}, {'s', {168, 168, 176, 255}}});
 }
+
+// ---- the level editor's palettes
+
+struct Entry {
+    int id;
+    const char* name;
+    const char* tip;
+};
+
+const Entry BLOCKS[] = {
+    {0, "Brick block", "breaks when a big player hits it from below"},
+    {1, "? block", "gives a power-up when hit; point at one and press K to choose what comes out"},
+    {2, "Donut block", "falls a moment after a player stands on it"},
+    {3, "Flip block", "spins when hit: players fall through it while it spins"},
+    {4, "Bounce block", "bounces a player that hits it from below"},
+    {5, "Note block", "bounces players that land on it"},
+    {6, "Throw block", "pick it up with run and throw it"},
+    {15, "View block", "a ? block that shows what is in it"},
+    {16, "Red throw block", "pick it up with run and throw it"},
+    {17, "Red note block", "a note block: a big bounce"},
+    {18, "Blue note block", "a note block: a small bounce"},
+    {19, "Gray throw block", "pick it up with run and throw it"},
+};
+const Entry BREAKABLE[] = {
+    {20, "Fireball block", "only a fireball breaks it"}, {21, "Feather block", "only a feather's spin breaks it"},
+    {22, "Shell block", "only a thrown shell breaks it"}, {23, "Bob-omb block", "only a Bob-omb's blast breaks it"},
+    {24, "Boomerang block", "only a boomerang breaks it"}, {25, "Hammer block", "only a hammer breaks it"},
+    {26, "Kuribo's shoe block", "only a Kuribo's shoe breaks it"}, {27, "P-wings block", "only a player with P-wings breaks it"},
+    {28, "Star block", "only a player with a star breaks it"}, {29, "Leaf block", "only a leaf's tail breaks it"},
+};
+const char* COLORS[] = {"Red", "Green", "Yellow", "Blue"};
+const Entry ITEMS[] = {
+    {0, "Spring", "bounces whoever stands on it; can be carried"}, {1, "Spike", "hurts whoever touches it"},
+    {2, "Kuribo's shoe", "jump in to stomp everything"}, {3, "Gold spring", "a spring with a much bigger bounce"},
+    {4, "Sticky Kuribo's shoe", "a Kuribo's shoe you can't get out of"}, {5, "Throw box", "pick it up and throw it: it breaks on impact"},
+};
+const char* TILE_TYPES[] = {"Solid", "Solid on top", "Ice", "Death", "Death on top", "Death on bottom", "Death on left", "Death on right",
+    "Ice on top", "Ice, death on bottom", "Ice, death on left", "Ice, death on right", "Super death", "Super death on top",
+    "Super death on bottom", "Super death on left", "Super death on right", "Player death"};
+
+// Where a block is in the block sheet (32 pixels a block)
+SDL_Rect blockSrc(int id, bool on)
+{
+    if (id >= 0 && id <= 6)
+        return {id * 32, 0, 32, 32};
+    if (id >= 15 && id <= 19)
+        return {(id - 15) * 32, 32, 32, 32};
+    if (id >= 7 && id <= 10)
+        return {224 + (id - 7) * 32, on ? 0 : 32, 32, 32};
+    if (id >= 11 && id <= 14)
+        return {352 + (id - 11) * 32, on ? 0 : 32, 32, 32};
+    return {(id - 20) * 32, 64, 32, 32};
+}
+
+void drawBlock(int x, int y, int id, bool on)
+{
+    if (rm->spr_blocks[0])
+        rm->spr_blocks[0].draw(x, y, blockSrc(id, on));
+}
+
+// ---- laying out and drawing the window: every widget drawn is also clickable
+
+struct Layout {
+    SDL_Rect win {};
+    int x = 0;      // the page's left
+    int w = 0;      // and width
+    int y = 0;      // where the next thing goes
+};
+
+// While the page is drawn: its visible part (widgets outside it can't be clicked)
+SDL_Rect g_clip {0, 0, SCREEN_W, SCREEN_H};
+
+void addWidget(const SDL_Rect& r, std::function<void()> act, std::string tip)
+{
+    SDL_Rect visible {};
+    if (!SDL_GetRectIntersection(&r, &g_clip, &visible))
+        return;
+    g_widgets.push_back(Widget {r, std::move(act), std::move(tip)});
+}
+
+bool hovered(const SDL_Rect& r)
+{
+    if (s.hover < 0 || s.hover >= static_cast<int>(g_widgets.size()))
+        return false;
+    const SDL_Rect& h = g_widgets[static_cast<size_t>(s.hover)].r;
+    return h.x == r.x && h.y == r.y && h.w == r.w && h.h == r.h;
+}
+
+// Text wrapped to a width (at most maxLines lines: the last one ends in "..." if cut); returns the height used
+int drawWrapped(int x, int y, int w, const std::string& text, int maxLines = 99)
+{
+    gfxFont& f = theme::font();
+    const int lineH = f.getHeight();
+    std::vector<std::string> lines;
+    std::string line;
+    size_t pos = 0;
+    while (pos <= text.size()) {
+        size_t space = text.find(' ', pos);
+        if (space == std::string::npos)
+            space = text.size();
+        const std::string word = text.substr(pos, space - pos);
+        const std::string trial = line.empty() ? word : line + " " + word;
+        if (!line.empty() && f.getWidth(trial) > w) {
+            lines.push_back(line);
+            line = word;
+        } else {
+            line = trial;
+        }
+        pos = space + 1;
+    }
+    if (!line.empty())
+        lines.push_back(line);
+    if (static_cast<int>(lines.size()) > maxLines) {
+        lines.resize(static_cast<size_t>(maxLines));
+        std::string& last = lines.back();
+        while (!last.empty() && f.getWidth(last + "...") > w)
+            last.pop_back();
+        last += "...";
+    }
+    for (size_t k = 0; k < lines.size(); k++)
+        f.draw(x, y + static_cast<int>(k) * lineH, lines[k]);
+    return static_cast<int>(lines.size()) * lineH;
+}
+
+// A palette cell (a 32 pixel picture, framed): gold when selected, green under the pointer
+void cell(const SDL_Rect& r, bool selected, const std::function<void(int, int)>& picture, std::function<void()> act, const std::string& tip)
+{
+    const bool hover = hovered(r);
+    theme::block(r.x, r.y, r.w, r.h, selected ? theme::Tone::Gold : hover ? theme::Tone::Green : theme::Tone::Dark);
+    picture(r.x + (r.w - 32) / 2, r.y + (r.h - 32) / 2);
+    addWidget(r, std::move(act), tip);
+}
+
+// A button with a label (and an icon)
+void button(const SDL_Rect& r, const std::string& label, bool selected, std::function<void()> act, const std::string& tip,
+    const Art* icon = nullptr, const char* key = nullptr)
+{
+    const bool hover = hovered(r);
+    theme::block(r.x, r.y, r.w, r.h, hover ? theme::Tone::Green : selected ? theme::Tone::Gold : theme::Tone::Gray);
+    int tx = r.x + 8;
+    if (icon) {
+        drawArt(r.x + 5, r.y + (r.h - 16) / 2, *icon);
+        tx = r.x + 26;
+    }
+    theme::font().draw(tx, r.y + (r.h - theme::font().getHeight()) / 2, label);
+    if (key) {
+        const int kw = std::max(16, theme::font().getWidth(key) + 8);
+        prompts::drawKey(r.x + r.w - kw - 4, r.y + (r.h - 16) / 2, key);
+    }
+    addWidget(r, std::move(act), tip);
+}
+
+// A small labelled heading in the page
+void section(Layout& l, const char* title)
+{
+    theme::font().draw(l.x, l.y, title);
+    fill(l.x, l.y + theme::font().getHeight() + 1, l.w, 1, theme::shade(theme::scheme().edge.a ? theme::scheme().edge : theme::scheme().rim, 70));
+    l.y += theme::font().getHeight() + 5;
+}
+
+// A grid of palette cells
+template <typename F>
+void grid(Layout& l, int count, F each, int wantCols = 0)
+{
+    const int size = 36;
+    const int cols = wantCols > 0 ? wantCols : std::max(1, (l.w + 2) / (size + 2));
+    for (int k = 0; k < count; k++) {
+        const SDL_Rect r {l.x + (k % cols) * (size + 2), l.y + (k / cols) * (size + 2), size, size};
+        each(k, r);
+    }
+    l.y += ((count + cols - 1) / cols) * (size + 2) + 6;
+}
+
+void pageButton(Layout& l, const std::string& label, std::function<void()> act, const std::string& tip, const Art* icon = nullptr,
+    const char* key = nullptr, bool selected = false)
+{
+    button({l.x, l.y, l.w, 24}, label, selected, std::move(act), tip, icon, key);
+    l.y += 27;
+}
+
+// ---- the pages
+
+struct Page {
+    const char* name;
+    const Art* art;           // its icon (or a sprite, see drawPageIcon)
+    const char* about;        // what it is
+};
+
+const Page LEVEL_PAGES[] = {
+    {"Terrain", &ART_GROUND, "The ground, walls and scenery: tiles from the tilesets, painted on one of 4 layers."},
+    {"Blocks", nullptr, "Things players can bump, break, bounce on and flip. Pick one, then click on the map."},
+    {"Items", &ART_SPRING, "Springs, spikes, shoes and boxes that start on the map."},
+    {"Types", &ART_TYPES, "How the tiles behave: solid, solid on top, ice, or deadly. Painted over the tiles."},
+    {"Zones", &ART_ZONE, "Where nobody starts, or no item appears: paint the cells."},
+    {"Warps", &ART_PIPE, "Pipes and doors that take players to another warp of the same color."},
+    {"Platforms", &ART_PLATFORM, "Moving platforms: their tiles, path and speed."},
+    {"Hazards", &ART_FIRE, "Fireballs, rotodiscs, bullet bills and other things that move on their own."},
+    {"Modes", &ART_FLAG, "What some game modes need: race goals and flag bases."},
+    {"Look", &ART_LOOK, "The background, the eyecandy and the music of the map."},
+    {"File", &ART_DISK, "Maps: new, open, save, and leaving the editor."},
+};
+constexpr int LEVEL_PAGE_COUNT = static_cast<int>(sizeof(LEVEL_PAGES) / sizeof(LEVEL_PAGES[0]));
+
+// The world editor's pages: its commands, by group
+std::vector<std::string> worldGroups()
+{
+    std::vector<std::string> groups;
+    for (const Action& a : WORLD_ACTIONS) {
+        if (a.group[0])
+            groups.push_back(a.group);
+    }
+    return groups;
+}
+
+int pageCount()
+{
+    return s.editor == Editor::Level ? LEVEL_PAGE_COUNT : static_cast<int>(worldGroups().size());
+}
+
+void drawPageIcon(int x, int y, int page)
+{
+    if (s.editor != Editor::Level) {
+        static const Art* arts[] = {&ART_BRUSH, &ART_LOOK, &ART_DISK, &ART_CLOSE};
+        drawArt(x, y, *arts[std::min(page, 3)]);
+        return;
+    }
+    if (LEVEL_PAGES[page].art)
+        drawArt(x, y, *LEVEL_PAGES[page].art);
+    else
+        theme::icon(x, y, theme::Icon::QuestionBlock);
+}
+
+void levelPage(Layout& l)
+{
+    namespace sh = leveleditor::shell;
+    const int mode = sh::mode();
+    switch (s.category) {
+        case 0: {    //Terrain
+            section(l, "Selected tiles");
+            const SDL_Rect box {l.x, l.y, 72, 72};
+            theme::inset(box.x, box.y, box.w, box.h);
+            if (!sh::drawTiles(box.x + 4, box.y + 4, 64))
+                theme::font().drawCentered(box.x + 36, box.y + 28, "none");
+            theme::font().draw(l.x + 82, l.y + 4, mode == 1 ? "In use," : "Not in use");
+            theme::font().draw(l.x + 82, l.y + 20, "layer " + std::to_string(sh::layer() + 1));
+            l.y += 80;
+            pageButton(l, "Choose tiles", [] { runKey(SDLK_T); }, "Opens the tilesets: drag over tiles to take several", &ART_GROUND, "T",
+                mode == 1);
+            pageButton(l, "Animated tiles", [] { runKey(SDLK_A); }, "Tiles that move: water, lava, coins...", &ART_LOOK, "A", mode == 8);
+            pageButton(l, "Use the tiles", [] { sh::setMode(1); }, "Back to painting the selected tiles", &ART_BRUSH, nullptr, false);
+            break;
+        }
+        case 1: {    //Blocks
+            section(l, "Blocks");
+            grid(l, 12, [&](int k, const SDL_Rect& r) {
+                const Entry& e = BLOCKS[k];
+                cell(r, mode == 0 && sh::block() == e.id, [&](int x, int y) { drawBlock(x, y, e.id, true); },
+                    [id = e.id] { sh::setBlock(id, true); }, std::string(e.name) + ": " + e.tip);
+            });
+            section(l, "ON/OFF switches");
+            grid(l, 8, [&](int k, const SDL_Rect& r) {
+                const int color = k % 4;
+                const bool on = k < 4;
+                const int id = 7 + color;
+                cell(r, mode == 0 && sh::block() == id && sh::switchOn(color) == on, [&](int x, int y) { drawBlock(x, y, id, on); },
+                    [id, on] { sh::setBlock(id, on); },
+                    std::string(COLORS[color]) + " switch, starts " + (on ? "ON" : "OFF") + ": hitting it flips every " + COLORS[color] + " switch block");
+            }, 4);
+            section(l, "Switch blocks");
+            grid(l, 8, [&](int k, const SDL_Rect& r) {
+                const int color = k % 4;
+                const bool on = k < 4;
+                const int id = 11 + color;
+                cell(r, mode == 0 && sh::block() == id && sh::switchBlockOn() == on, [&](int x, int y) { drawBlock(x, y, id, on); },
+                    [id, on] { sh::setBlock(id, on); },
+                    std::string(COLORS[color]) + " switch block, " + (on ? "solid" : "an outline") + " at the start: the " + COLORS[color] + " switches flip it");
+            }, 4);
+            section(l, "Breakable only by...");
+            grid(l, 10, [&](int k, const SDL_Rect& r) {
+                const Entry& e = BREAKABLE[k];
+                cell(r, mode == 0 && sh::block() == e.id, [&](int x, int y) { drawBlock(x, y, e.id, true); },
+                    [id = e.id] { sh::setBlock(id, true); }, std::string(e.name) + ": " + e.tip);
+            });
+            break;
+        }
+        case 2:    //Items
+            section(l, "Map items");
+            grid(l, 6, [&](int k, const SDL_Rect& r) {
+                const Entry& e = ITEMS[k];
+                cell(r, mode == 7 && sh::item() == e.id,
+                    [&](int x, int y) {
+                        if (rm->spr_mapitems[0])
+                            rm->spr_mapitems[0].draw(x, y, {e.id * 32, 0, 32, 32});
+                    },
+                    [id = e.id] { sh::setItem(id); }, std::string(e.name) + ": " + e.tip);
+            });
+            break;
+        case 3:    //Types
+            section(l, "Tile types");
+            grid(l, 18, [&](int k, const SDL_Rect& r) {
+                cell(r, mode == 6 && sh::tileType() == k + 1,
+                    [&](int x, int y) {
+                        if (rm->spr_transparenttiles)
+                            rm->spr_transparenttiles.draw(x, y, {k * 32, 0, 32, 32});
+                    },
+                    [k] { sh::setTileType(k + 1); }, TILE_TYPES[k]);
+            });
+            l.y += drawWrapped(l.x, l.y, l.w, "Delete clears every tile type of the map.") + 6;
+            break;
+        case 4:    //Zones
+            pageButton(l, "No player starts", [] { runKey(SDLK_X, false, false, true); }, "Cells where no player appears at the start or after dying",
+                &ART_ZONE, "X", mode == 4);
+            pageButton(l, "No items", [] { runKey(SDLK_Z, false, false, true); }, "Cells where no item appears", &ART_ZONE, "Z", mode == 5);
+            l.y += 4;
+            l.y += drawWrapped(l.x, l.y, l.w, "Click or drag on the map to mark cells, the right button clears them.") + 6;
+            if (mode == 4)
+                l.y += drawWrapped(l.x, l.y, l.w, "Keys: X everyone, 1-4 a team's own zone; A all cells, N none, I invert.") + 6;
+            break;
+        case 5:    //Warps
+            pageButton(l, "Warps", [] { runKey(SDLK_W); }, "Pick a warp's color and direction, then click its cells", &ART_PIPE, "W", mode == 2);
+            break;
+        case 6:    //Platforms
+            pageButton(l, "Platforms", [] { runKey(SDLK_P); }, "Draw a platform's tiles, then set its path and speed", &ART_PLATFORM, "P");
+            break;
+        case 7:    //Hazards
+            pageButton(l, "Hazards", [] { runKey(SDLK_H); }, "Add, move and set up the hazards", &ART_FIRE, "H");
+            break;
+        case 8:    //Modes
+            pageButton(l, "Race goals, flag bases", [] { runKey(SDLK_J); }, "Where the race goals and the flag bases are", &ART_FLAG, "J");
+            pageButton(l, "? block contents", [] { closeWindow(); }, "Point at a ? block on the map and press K to choose what comes out of it",
+                nullptr, "K");
+            break;
+        case 9:    //Look
+            pageButton(l, "Background", [] { runKey(SDLK_G); }, "Pick the map's background picture", &ART_LOOK, "G");
+            pageButton(l, "Eyecandy", [] { runKey(SDLK_E); }, "Clouds, ghosts, leaves, snow, bubbles...", &ART_LOOK, "E");
+            pageButton(l, "Music", [] { runKey(SDLK_R, false, false, true); }, "Which music plays: changes the category", &ART_LOOK, "R");
+            pageButton(l, "Thumbnails", [] { runKey(SDLK_B); }, "The pictures of the map in the menus", &ART_LOOK, "B");
+            break;
+        default: {    //File
+            bool file = false;
+            for (const Action& a : LEVEL_ACTIONS) {
+                if (a.group[0])
+                    file = std::string(a.group) == "File" || std::string(a.group) == "Other";
+                if (!file)
+                    continue;
+                const std::string key = keyName(a);
+                pageButton(l, a.label, [&a] { runKey(a.key, a.shift, a.ctrl); }, a.label, nullptr, nullptr);
+                //(its key, drawn over the button's right end)
+                const int kw = std::max(16, theme::font().getWidth(key) + 8);
+                prompts::drawKey(l.x + l.w - kw - 4, l.y - 27 + 4, key);
+            }
+            break;
+        }
+    }
+}
+
+void worldPage(Layout& l)
+{
+    const std::vector<std::string> groups = worldGroups();
+    const std::string group = groups[static_cast<size_t>(std::clamp(s.category, 0, static_cast<int>(groups.size()) - 1))];
+    bool in = false;
+    for (const Action& a : WORLD_ACTIONS) {
+        if (a.group[0])
+            in = group == a.group;
+        if (!in)
+            continue;
+        const std::string key = keyName(a);
+        pageButton(l, a.label, [&a] { runKey(a.key, a.shift, a.ctrl); }, a.label);
+        const int kw = std::max(16, theme::font().getWidth(key) + 8);
+        prompts::drawKey(l.x + l.w - kw - 4, l.y - 27 + 4, key);
+    }
+}
+
+// What is selected now, small (the window's title row, the chip)
+std::string selectionName()
+{
+    if (s.editor != Editor::Level)
+        return {};
+    namespace sh = leveleditor::shell;
+    switch (sh::mode()) {
+        case 0:
+            for (const Entry& e : BLOCKS)
+                if (e.id == sh::block())
+                    return e.name;
+            for (const Entry& e : BREAKABLE)
+                if (e.id == sh::block())
+                    return e.name;
+            if (sh::block() >= 7 && sh::block() <= 10)
+                return std::string(COLORS[sh::block() - 7]) + " switch";
+            if (sh::block() >= 11 && sh::block() <= 14)
+                return std::string(COLORS[sh::block() - 11]) + " switch block";
+            return "Blocks";
+        case 1: return "Tiles";
+        case 2: return "Warps";
+        case 3: return "Select and move";
+        case 4: return "No player starts";
+        case 5: return "No items";
+        case 6: return sh::tileType() >= 1 && sh::tileType() <= 18 ? TILE_TYPES[sh::tileType() - 1] : "Tile types";
+        case 7: return sh::item() >= 0 && sh::item() < 6 ? ITEMS[sh::item()].name : "Items";
+        case 8: return "Animated tiles";
+        default: return {};
+    }
+}
+
+void drawSelection(int x, int y)
+{
+    namespace sh = leveleditor::shell;
+    switch (sh::mode()) {
+        case 0: drawBlock(x, y, sh::block(), sh::block() >= 11 && sh::block() <= 14 ? sh::switchBlockOn() : (sh::block() >= 7 && sh::block() <= 10 ? sh::switchOn(sh::block() - 7) : true)); break;
+        case 1:
+        case 8:
+            if (!sh::drawTiles(x, y, 32))
+                drawArt(x + 8, y + 8, ART_GROUND);
+            break;
+        case 2: drawArt(x + 8, y + 8, ART_PIPE); break;
+        case 3: drawArt(x + 8, y + 8, ART_MOVE); break;
+        case 4:
+        case 5: drawArt(x + 8, y + 8, ART_ZONE); break;
+        case 6:
+            if (rm->spr_transparenttiles)
+                rm->spr_transparenttiles.draw(x, y, {(sh::tileType() - 1) * 32, 0, 32, 32});
+            break;
+        case 7:
+            if (rm->spr_mapitems[0])
+                rm->spr_mapitems[0].draw(x, y, {sh::item() * 32, 0, 32, 32});
+            break;
+        default: break;
+    }
+}
+
+void drawWindow()
+{
+    g_widgets.clear();
+    const SDL_Rect win = windowRect();
+    theme::panel(win.x - 6, win.y - 6, win.w + 12, win.h + 12);
+    const bool level = s.editor == Editor::Level;
+    namespace sh = leveleditor::shell;
+
+    //Title: the editor, the map, and the window's own buttons
+    theme::strip(win.x + 4, win.y + 4, win.w - 8, 30);
+    theme::icon(win.x + 12, win.y + 11, level ? theme::Icon::QuestionBlock : theme::Icon::Star);
+    theme::font().draw(win.x + 32, win.y + 12, level ? "Level Editor" : "World Editor");
+    if (level) {
+        std::string name = sh::mapName();
+        const int room = win.w - 150 - theme::font().getWidth("Level Editor");
+        while (!name.empty() && theme::font().getWidth(name) > room)
+            name.pop_back();
+        theme::font().drawRightJustified(win.x + win.w - 62, win.y + 12, name);
+    }
+    {
+        const SDL_Rect swap {win.x + win.w - 56, win.y + 8, 24, 22};
+        theme::block(swap.x, swap.y, swap.w, swap.h, hovered(swap) ? theme::Tone::Green : theme::Tone::Gray);
+        drawArt(swap.x + 4, swap.y + 3, ART_SWAP);
+        addWidget(swap, [] { s.dockLeft = !s.dockLeft; s.overlayDirty = true; }, "Move the window to the other side");
+        const SDL_Rect close {win.x + win.w - 30, win.y + 8, 22, 22};
+        theme::block(close.x, close.y, close.w, close.h, hovered(close) ? theme::Tone::Red : theme::Tone::Gray);
+        drawArt(close.x + 3, close.y + 3, ART_CLOSE);
+        addWidget(close, [] { closeWindow(); }, "Close (Tab)");
+    }
+
+    //Tools: paint, erase, move, pick; the layer; what is shown
+    int ty = win.y + 40;
+    if (level) {
+        static const Art* toolArt[] = {&ART_BRUSH, &ART_ERASER, &ART_MOVE, &ART_PICK};
+        static const char* toolTip[] = {"Paint: click or drag to place what is selected (the right button removes)",
+            "Erase: click or drag to remove", "Select and move: drag over cells, then drag them somewhere else (M)",
+            "Pick: click the map to take the block or tile there"};
+        int x = win.x + 8;
+        for (int t = 0; t < TOOL_COUNT; t++) {
+            const SDL_Rect r {x, ty, 26, 26};
+            theme::block(r.x, r.y, r.w, r.h, hovered(r) ? theme::Tone::Green : currentTool() == t ? theme::Tone::Gold : theme::Tone::Gray);
+            drawArt(r.x + 5, r.y + 5, *toolArt[t]);
+            addWidget(r, [t] { setTool(t); }, toolTip[t]);
+            x += 28;
+        }
+        x += 8;
+        //The layers: four buttons under a tiny label
+        prompts::tinyText(x + 1, ty - 1, "LAYER", {0, 0, 0, 255}, 1);
+        prompts::tinyText(x, ty - 2, "LAYER", {255, 255, 255, 255}, 1);
+        for (int layer = 0; layer < 4; layer++) {
+            const SDL_Rect r {x, ty + 5, 20, 21};
+            theme::block(r.x, r.y, r.w, r.h, hovered(r) ? theme::Tone::Green : sh::layer() == layer ? theme::Tone::Gold : theme::Tone::Gray);
+            theme::font().drawCentered(r.x + 10, r.y + 3, std::to_string(layer + 1));
+            addWidget(r, [layer] { sh::setLayer(layer); }, "Paint on layer " + std::to_string(layer + 1) + " of 4 (Y goes through them)");
+            x += 22;
+        }
+        x += 6;
+        const SDL_Rect only {x, ty, 26, 26};
+        theme::block(only.x, only.y, only.w, only.h, hovered(only) ? theme::Tone::Green : sh::othersHidden() ? theme::Tone::Gold : theme::Tone::Gray);
+        drawArt(only.x + 5, only.y + 5, ART_EYE);
+        addWidget(only, [] { sh::setOthersHidden(!sh::othersHidden()); }, "Show only the active layer (U)");
+        x += 28;
+        const SDL_Rect blocks {x, ty, 26, 26};
+        theme::block(blocks.x, blocks.y, blocks.w, blocks.h, hovered(blocks) ? theme::Tone::Green : sh::blocksShown() ? theme::Tone::Gray : theme::Tone::Gold);
+        theme::icon(blocks.x + 5, blocks.y + 5, theme::Icon::QuestionBlock);
+        if (!sh::blocksShown())
+            fill(blocks.x + 4, blocks.y + 12, 18, 2, {216, 40, 32, 255});
+        addWidget(blocks, [] { sh::setBlocksShown(!sh::blocksShown()); }, "Hide the blocks, to see the tiles under them (V)");
+        ty += 32;
+    }
+
+    //The pages: a rail of icons, the page beside it
+    const int bodyTop = ty;
+    const int footH = 66;
+    const int bodyBottom = win.y + win.h - footH;
+    const int count = pageCount();
+    const int itemH = std::min(36, (bodyBottom - bodyTop) / count);
+    const std::vector<std::string> groups = level ? std::vector<std::string>() : worldGroups();
+    for (int k = 0; k < count; k++) {
+        const SDL_Rect r {win.x + 8, bodyTop + k * itemH, RAIL_W - 6, itemH - 2};
+        const bool sel = s.category == k;
+        theme::block(r.x, r.y, r.w, r.h, sel ? theme::Tone::Gold : hovered(r) ? theme::Tone::Green : theme::Tone::Dark);
+        const std::string label = level ? LEVEL_PAGES[k].name : groups[static_cast<size_t>(k)];
+        //Its icon, and its name in small capitals (with a shadow)
+        std::string caps = label;
+        for (char& ch : caps)
+            ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+        const int iconY = r.y + std::max(2, (r.h - 25) / 2);
+        drawPageIcon(r.x + (r.w - 16) / 2, iconY, k);
+        const int lw = prompts::tinyWidth(caps, 1);
+        prompts::tinyText(r.x + (r.w - lw) / 2 + 1, iconY + 19, caps, {0, 0, 0, 255}, 1);
+        prompts::tinyText(r.x + (r.w - lw) / 2, iconY + 18, caps, {255, 255, 255, 255}, 1);
+        addWidget(r, [k] { s.category = k; s.scroll = 0; s.hover = -1; s.overlayDirty = true; }, label);
+    }
+
+    Layout l;
+    l.win = win;
+    l.x = win.x + RAIL_W + 10;
+    l.w = win.x + win.w - 16 - l.x;
+    l.y = bodyTop + 2;
+    const std::string title = level ? LEVEL_PAGES[std::clamp(s.category, 0, count - 1)].name : groups[static_cast<size_t>(std::clamp(s.category, 0, count - 1))];
+    theme::bigFont().draw(l.x, l.y - 2, title);
+    l.y += theme::bigFont().getHeight() + 2;
+    //The page below the title scrolls (the wheel, or the right stick over the window)
+    const int viewTop = l.y;
+    const int viewH = bodyBottom - 4 - viewTop;
+    g_clip = SDL_Rect {l.x - 2, viewTop, l.w + 4, viewH};
+    SDL_SetSurfaceClipRect(screen, &g_clip);
+    l.y -= s.scroll;
+    const int contentTop = l.y;
+    if (level)
+        l.y += drawWrapped(l.x, l.y, l.w, LEVEL_PAGES[s.category].about) + 8;
+    if (level)
+        levelPage(l);
+    else
+        worldPage(l);
+    SDL_SetSurfaceClipRect(screen, nullptr);
+    g_clip = SDL_Rect {0, 0, SCREEN_W, SCREEN_H};
+    s.scrollMax = std::max(0, l.y - contentTop - viewH);
+    if (s.scroll > s.scrollMax)
+        s.scroll = s.scrollMax;
+    if (s.scrollMax > 0) {
+        //A scroll bar at the page's right edge
+        const int barX = l.x + l.w + 3;
+        fill(barX, viewTop, 3, viewH, {0, 0, 0, 255});
+        const int thumbH = std::max(16, viewH * viewH / (viewH + s.scrollMax));
+        const int thumbY = viewTop + (viewH - thumbH) * s.scroll / s.scrollMax;
+        fill(barX, thumbY, 3, thumbH, {255, 255, 255, 255});
+    }
+
+    //Footer: what is under the pointer, and how to close
+    const int fy = win.y + win.h - footH + 4;
+    theme::inset(win.x + 8, fy, win.w - 16, footH - 12);
+    const std::string tip = s.hover >= 0 && s.hover < static_cast<int>(g_widgets.size()) ? g_widgets[static_cast<size_t>(s.hover)].tip
+                                                                                           : (level ? "Selected: " + selectionName() : std::string("Click a command"));
+    drawWrapped(win.x + 14, fy + 4, win.w - 28, tip, 2);
+    const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+    std::vector<prompts::Prompt> row;
+    if (controller)
+        row = {{{prompts::Pad::A}, {}, "pick"}, {{prompts::Pad::LB, prompts::Pad::RB}, {}, "pages"}, {{prompts::Pad::Start}, {}, "close"}};
+    else
+        row = {{{}, {"Tab"}, "close"}, {{}, {"F1"}, "help"}};
+    const int pw = prompts::promptsWidth(row, 14);
+    prompts::drawPrompts(win.x + win.w - 14 - pw / 2, fy + footH - 33, row);
+}
+
+// A player's reticle on the cell it points at: corner brackets in its color, and its tag
+void reticle(float px, float py, SDL_Color c, const std::string& tag)
+{
+    const int x = static_cast<int>(px) / TILE * TILE;
+    const int y = static_cast<int>(py) / TILE * TILE;
+    const SDL_Color black {0, 0, 0, 255};
+    const int len = 10;
+    //Each corner: black under, the color on top
+    auto corner = [&](int cx, int cy, int dx, int dy) {
+        const int hx = dx > 0 ? cx : cx - len + 1;
+        const int vy = dy > 0 ? cy : cy - len + 1;
+        fill(hx - 1, cy - 1 - (dy < 0 ? 2 : 0), len + 2, 5, black);
+        fill((dx > 0 ? cx : cx - 2) - 1 - (dx < 0 ? 0 : 0), vy - 1, 5, len + 2, black);
+        fill(hx, dy > 0 ? cy : cy - 2, len, 3, c);
+        fill(dx > 0 ? cx : cx - 2, vy, 3, len, c);
+    };
+    corner(x - 2, y - 2, 1, 1);
+    corner(x + TILE + 1, y - 2, -1, 1);
+    corner(x - 2, y + TILE + 1, 1, -1);
+    corner(x + TILE + 1, y + TILE + 1, -1, -1);
+    //The center: a small dot
+    fill(x + TILE / 2 - 2, y + TILE / 2 - 2, 4, 4, black);
+    fill(x + TILE / 2 - 1, y + TILE / 2 - 1, 2, 2, c);
+    if (!tag.empty()) {
+        //The tag on the top left corner (inside the screen)
+        const int w = theme::font().getWidth(tag) + 8;
+        const int tx = std::clamp(x - 2, 0, SCREEN_W - w);
+        const int ty = y - 20 >= 0 ? y - 20 : y + TILE + 4;
+        fill(tx, ty, w, 16, black);
+        fill(tx + 1, ty + 1, w - 2, 14, c);
+        fill(tx + 1, ty + 1, w - 2, 2, theme::shade(c, 140));
+        theme::font().draw(tx + 4, ty + 1, tag);
+    }
+}
+
+// The level editor's chip when the window is closed: what is selected, the layer, the cell
+void drawChip()
+{
+    namespace sh = leveleditor::shell;
+    const std::string name = selectionName();
+    const int col = static_cast<int>(s.cx) / TILE;
+    const int row = static_cast<int>(s.cy) / TILE;
+    const std::string info = "Layer " + std::to_string(sh::layer() + 1) + "   " + std::to_string(col) + "," + std::to_string(row);
+    const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+    const std::vector<prompts::Prompt> row1 = controller ? std::vector<prompts::Prompt> {{{prompts::Pad::Start}, {}, "editor"}}
+                                                         : std::vector<prompts::Prompt> {{{}, {"Tab"}, "editor"}};
+    const int pw = prompts::promptsWidth(row1, 14);
+    const int w = 46 + std::max(theme::font().getWidth(name), theme::font().getWidth(info)) + 16 + pw + 10;
+    const int h = 46;
+    //(bottom left; at the top while a pointer is down there)
+    bool low = s.cy > SCREEN_H - 90 && s.cx < w + 30;
+    for (const Pointer& p : s.pointers)
+        low = low || (p.shown && p.y > SCREEN_H - 90 && p.x < w + 30);
+    const int x = 6;
+    const int y = low ? 6 : SCREEN_H - h - 6;
+    theme::strip(x, y, w, h);
+    theme::inset(x + 6, y + 6, 34, 34);
+    drawSelection(x + 7, y + 7);
+    theme::font().draw(x + 46, y + 7, name);
+    theme::font().draw(x + 46, y + 24, info);
+    prompts::drawPrompts(x + w - pw / 2 - 8, y + 14, row1);
+}
+
 
 void drawKeyboard()
 {
@@ -863,27 +1497,6 @@ void drawKeyboard()
     }
 }
 
-// A tile's outline (where a cursor edits)
-void tileOutline(float px, float py, SDL_Color c)
-{
-    const int x = static_cast<int>(px) / TILE * TILE;
-    const int y = static_cast<int>(py) / TILE * TILE;
-    //(black around, so it shows on any tile)
-    const SDL_Color black {0, 0, 0, 255};
-    fill(x - 2, y - 2, TILE + 4, 2, black);
-    fill(x - 2, y + TILE, TILE + 4, 2, black);
-    fill(x - 2, y, 2, TILE, black);
-    fill(x + TILE, y, 2, TILE, black);
-    fill(x + 2, y + 2, TILE - 4, 2, black);
-    fill(x + 2, y + TILE - 4, TILE - 4, 2, black);
-    fill(x + 2, y + 4, 2, TILE - 8, black);
-    fill(x + TILE - 4, y + 4, 2, TILE - 8, black);
-    fill(x, y, TILE, 2, c);
-    fill(x, y + TILE - 2, TILE, 2, c);
-    fill(x, y, 2, TILE, c);
-    fill(x + TILE - 2, y, 2, TILE, c);
-}
-
 // Where the hint bar is: shown, and its top
 bool hintsShown(int* top)
 {
@@ -908,10 +1521,10 @@ void drawHints()
     std::vector<std::tuple<prompts::Pad, std::string, std::string>> items;
     if (controller)
         items = {{prompts::Pad::A, "", "place"}, {prompts::Pad::B, "", "remove"}, {prompts::Pad::X, "", "shift"},
-            {prompts::Pad::Y, "", "ctrl"}, {prompts::Pad::RB, "", "ok"}, {prompts::Pad::Start, "", "menu"},
+            {prompts::Pad::Y, "", "ctrl"}, {prompts::Pad::RB, "", "ok"}, {prompts::Pad::Start, "", "editor"},
             {prompts::Pad::Back, "", "back"}, {prompts::Pad::LB, "", "hide"}};
     else
-        items = {{prompts::Pad::Start, "Tab", "all actions"}, {prompts::Pad::Back, "F1", "help"}, {prompts::Pad::B, "Esc", "back"}};
+        items = {{prompts::Pad::Start, "Tab", "editor"}, {prompts::Pad::Back, "F1", "help"}, {prompts::Pad::B, "Esc", "back"}};
     const int gap = 7;
     int w = 8;
     for (const auto& [pad, key, label] : items)
@@ -973,7 +1586,7 @@ void drawSession()
 
 bool overlayWanted()
 {
-    if (s.overlay != Overlay::None || coedit::active() || !coedit::notice().empty())
+    if (s.overlay != Overlay::None || coedit::active() || !coedit::notice().empty() || levelMap() || s.mouseUsed)
         return true;
     if (prompts::lastDevice() == prompts::Device::Controller ? s.hints && !s.pointers.empty() : SDL_GetTicks() - s.startMs < 8000)
         return true;
@@ -988,32 +1601,45 @@ void drawOverlay()
 {
     if (!rm)
         return;
-    //Where everyone edits: the tile under each cursor, then the cursors
+    const bool mapView = s.editor != Editor::Level || leveleditor::shell::inMapView();
+    const bool keyboard = s.overlay == Overlay::Keyboard;
     const std::vector<coedit::Cursor> remote = coedit::remoteCursors();
-    for (const coedit::Cursor& c : remote)
-        tileOutline(c.x, c.y, c.color);
-    if (s.overlay == Overlay::None) {
+    //Where everyone edits: a reticle on each player's cell
+    if (mapView && !keyboard) {
+        const bool several = s.pointers.size() > 1 || coedit::active();
+        for (const coedit::Cursor& c : remote) {
+            if (!inWindow(c.x, c.y))
+                reticle(c.x, c.y, c.color, c.name);
+        }
+        if (s.owner < 0 && s.mouseUsed && !inWindow(s.cx, s.cy))
+            reticle(s.cx, s.cy, pointerColor(0), several ? (coedit::active() ? "You" : "P1") : std::string());
         for (size_t k = 0; k < s.pointers.size(); k++) {
-            if (s.pointers[k].shown)
-                tileOutline(s.pointers[k].x, s.pointers[k].y, pointerColor(static_cast<int>(k)));
+            const Pointer& p = s.pointers[k];
+            if (p.shown && !inWindow(p.x, p.y))
+                reticle(p.x, p.y, pointerColor(static_cast<int>(k)), several ? "P" + std::to_string(k + 1) : std::string());
         }
     }
-    for (const coedit::Cursor& c : remote)
-        drawArrow(c.x, c.y, c.color, c.name);
     if (s.overlay == Overlay::None) {
-        const bool several = s.pointers.size() > 1;
+        if (levelMap())
+            drawChip();
+        else
+            drawHints();
+    }
+    drawSession();
+    if (s.overlay == Overlay::Window)
+        drawWindow();
+    else if (keyboard)
+        drawKeyboard();
+    //The cursors on top (the controllers' drawn pointers; the others' online)
+    for (const coedit::Cursor& c : remote)
+        drawArrow(c.x, c.y, c.color, mapView ? std::string() : c.name);
+    if (!keyboard) {
         for (size_t k = 0; k < s.pointers.size(); k++) {
             const Pointer& p = s.pointers[k];
             if (p.shown)
-                drawArrow(p.x, p.y, pointerColor(static_cast<int>(k)), several ? "P" + std::to_string(k + 1) : std::string());
+                drawArrow(p.x, p.y, pointerColor(static_cast<int>(k)), std::string());
         }
-        drawHints();
     }
-    drawSession();
-    if (s.overlay == Overlay::Actions)
-        drawActions();
-    else if (s.overlay == Overlay::Keyboard)
-        drawKeyboard();
 }
 
 // Presents the frame with the overlay; the screen keeps the editor's frame
@@ -1128,14 +1754,10 @@ void update()
         s.overlayDirty = true;
     }
 
-    if (s.overlay != Overlay::None) {
+    if (s.overlay == Overlay::Keyboard) {
         if (!s.pointers.empty()) {
             const int index = std::clamp<int>(s.overlayOwner, 0, static_cast<int>(s.pointers.size()) - 1);
-            Pointer& owner = s.pointers[static_cast<size_t>(index)];
-            if (s.overlay == Overlay::Actions)
-                updateActions(owner);
-            else
-                updateKeyboard(owner);
+            updateKeyboard(s.pointers[static_cast<size_t>(index)]);
         }
     } else {
         for (size_t k = 0; k < s.pointers.size(); k++)
@@ -1173,6 +1795,7 @@ void begin(Editor editor)
     s = State();
     s.active = true;
     s.editor = editor;
+    s.category = editor == Editor::Level ? 1 : 0;    //(the level editor's blocks; the world editor's first group)
     s.controllers.open();
     s.startMs = SDL_GetTicks();
     s.cursorWasVisible = SDL_CursorVisible();
@@ -1233,27 +1856,69 @@ bool pollEvent(SDL_Event* event)
                 SDL_CaptureMouse(false);
         }
         prompts::note(*event);
-        //The action menu has the keyboard and the mouse while it is open
-        if (s.overlay == Overlay::Actions && (event->type == SDL_EVENT_KEY_DOWN || event->type == SDL_EVENT_KEY_UP ||
-                event->type == SDL_EVENT_MOUSE_MOTION || event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP)) {
-            if (event->type == SDL_EVENT_MOUSE_MOTION) {
-                s.cx = std::clamp(event->motion.x, 0.0f, SCREEN_W - 1.0f);
-                s.cy = std::clamp(event->motion.y, 0.0f, SCREEN_H - 1.0f);
+        //The window: Tab or Esc closes it; the mouse over it is the window's
+        if (s.overlay == Overlay::Window) {
+            if (event->type == SDL_EVENT_KEY_DOWN && !event->key.repeat && (event->key.key == SDLK_TAB || event->key.key == SDLK_ESCAPE)) {
+                closeWindow();
+                continue;
+            }
+            if (event->type == SDL_EVENT_KEY_UP && (event->key.key == SDLK_TAB || event->key.key == SDLK_ESCAPE))
+                continue;
+            const bool motion = event->type == SDL_EVENT_MOUSE_MOTION;
+            const bool button = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP;
+            const float mx = motion ? event->motion.x : event->button.x;
+            const float my = motion ? event->motion.y : event->button.y;
+            if ((motion || button) && inWindow(mx, my)) {
+                s.cx = mx;
+                s.cy = my;
                 s.owner = -1;
                 if (!s.mouseUsed) {
                     s.mouseUsed = true;
                     SDL_ShowCursor();
                 }
+                if (motion)
+                    hoverAt(mx, my);
+                else if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && event->button.button == SDL_BUTTON_LEFT)
+                    clickAt(mx, my);
+                s.overlayDirty = true;
+                continue;
             }
-            if (event->type != SDL_EVENT_KEY_UP && event->type != SDL_EVENT_MOUSE_BUTTON_UP)
-                actionsEvent(*event);
+            if (motion && s.hover >= 0) {
+                s.hover = -1;
+                s.overlayDirty = true;
+            }
+        }
+        if (s.overlay == Overlay::Window && event->type == SDL_EVENT_MOUSE_WHEEL && inWindow(s.cx, s.cy)) {
+            s.scroll = std::clamp(s.scroll - static_cast<int>(event->wheel.y * 36.0f), 0, s.scrollMax);
+            s.overlayDirty = true;
             continue;
         }
-        //Tab: the action menu, for the keyboard and the mouse
+        //Tab: the window, for the keyboard and the mouse
         if (s.overlay == Overlay::None && event->type == SDL_EVENT_KEY_DOWN && event->key.key == SDLK_TAB && !event->key.repeat) {
-            openActions(-1);
+            openWindow(-1);
             continue;
         }
+        //The level editor's tools on the map: erase is the right button, pick takes the cell
+        if (levelMap() && s.overlay != Overlay::Keyboard && (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP) &&
+            event->button.button == SDL_BUTTON_LEFT) {
+            const int tool = currentTool();
+            if (tool == TOOL_PICK) {
+                if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                    leveleditor::shell::pick(static_cast<int>(event->button.x) / TILE, static_cast<int>(event->button.y) / TILE);
+                    setTool(TOOL_PAINT);
+                    s.pickRelease = true;
+                }
+                continue;
+            }
+            if (s.pickRelease && event->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                s.pickRelease = false;
+                continue;
+            }
+            if (tool == TOOL_ERASE)
+                event->button.button = SDL_BUTTON_RIGHT;
+        }
+        if (levelMap() && currentTool() == TOOL_ERASE && event->type == SDL_EVENT_MOUSE_MOTION && (event->motion.state & SDL_BUTTON_LMASK))
+            event->motion.state = (event->motion.state & ~SDL_BUTTON_LMASK) | SDL_BUTTON_RMASK;
         //The on-screen keyboard: the mouse clicks its keys (typing goes to the editor as always)
         if (s.overlay == Overlay::Keyboard) {
             if (event->type == SDL_EVENT_MOUSE_MOTION) {
@@ -1333,6 +1998,10 @@ SDL_MouseButtonFlags mouseState(float* x, float* y)
     float mx = 0;
     float my = 0;
     SDL_MouseButtonFlags buttons = gfx_mousestate(&mx, &my);
+    if (s.active && levelMap() && currentTool() == TOOL_ERASE && (buttons & SDL_BUTTON_LMASK))
+        buttons = (buttons & ~SDL_BUTTON_LMASK) | SDL_BUTTON_RMASK;
+    if (s.active && (s.overlay == Overlay::Window && inWindow(s.cx, s.cy)))
+        buttons &= ~(SDL_BUTTON_LMASK | SDL_BUTTON_RMASK);    //(clicks in the window aren't the editor's)
     if (s.active) {
         for (const Pointer& p : s.pointers)
             buttons |= p.buttons;

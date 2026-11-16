@@ -1,0 +1,43 @@
+name: Checks
+on: workflow_call
+
+# The game's own determinism and netplay checks (scripts/ci-checks.sh): the
+# rollback sync test in every mode, replays with random jumps, and online
+# matches over 127.0.0.1 with simulated lag, loss and disconnects.
+jobs:
+  checks:
+    name: Determinism and netplay
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake g++ ninja-build zlib1g-dev
+          curl -L https://github.com/mmatyas/supermariowar/releases/download/v2.0-beta.0/smwlibs-sdl3-linux.tar.xz | tar xJf - -C /tmp/
+
+      - name: Configure
+        run: cmake
+          -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_PREFIX_PATH=/tmp/smwlibs
+
+      - name: Build
+        run: cmake --build build --target smw
+
+      - name: Checks
+        run: bash scripts/ci-checks.sh build
+        env:
+          CHECKS_LOGS: ${{ runner.temp }}/checks-logs
+
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: checks-logs
+          path: ${{ runner.temp }}/checks-logs
+          if-no-files-found: ignore

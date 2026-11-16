@@ -207,6 +207,11 @@ void loadcurrentmap();
 void SetNoSpawn(short nospawnmode, short col, short row, bool value);
 int editor_platforms();
 class CoeditDocument;    // editing together (src/smw/editors/CoEdit.h)
+namespace shell {           // the editor window (src/smw/editors/LevelShell.h)
+void setBlock(int block, bool on);
+bool switchOn(int color);
+void pick(int col, int row);
+}
 } // namespace leveleditor
 
 class CMap
@@ -468,6 +473,9 @@ class CMap
 		friend void leveleditor::loadcurrentmap();
 		friend void leveleditor::SetNoSpawn(short, short, short, bool);
 		friend int leveleditor::editor_platforms();
+		friend void leveleditor::shell::setBlock(int, bool);
+		friend bool leveleditor::shell::switchOn(int);
+		friend void leveleditor::shell::pick(int, int);
 		friend class leveleditor::CoeditDocument;
 
 		friend class B_BreakableBlock;

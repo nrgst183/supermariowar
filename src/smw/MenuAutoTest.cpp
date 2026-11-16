@@ -381,20 +381,44 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         using editors::input::TestInput;
         //A button held for two frames from `from`
         auto tap = [](int f, int from) { return f >= from && f < from + 2; };
-        auto levelScript = [tap](editors::Editor, int f, int) {
+        auto levelScript = [tap](editors::Editor, int f, int pointer) {
             TestInput t;
+            //Players 2 and 3 (local editing together): their reticles on the map
+            if (pointer > 0) {
+                if (f >= 5) {
+                    t.px = pointer == 1 ? 420 : 520;
+                    t.py = pointer == 1 ? 120 : 300;
+                }
+                return t;
+            }
             if (f == 10) t.shot = "e1_level_start";
             if (f >= 20 && f < 45) { t.lx = 0.8f; t.ly = 0.5f; }
             t.a = (f >= 50 && f < 75);              //paint a stroke
             if (f >= 55 && f < 75) t.lx = 1.0f;
             if (f == 80) t.shot = "e2_level_painted";
+            //The editor window (it opens at the left: the pointer is at the right)
             t.start = tap(f, 90);
-            if (f == 100) t.shot = "e3_level_actions";
-            //"Save as..." (23 down)
-            for (int k = 0; k < 23; k++)
-                t.down = t.down || tap(f, 110 + 4 * k);
-            if (f == 205) t.shot = "e4_level_save_as_selected";
-            t.a = t.a || tap(f, 210);
+            if (f == 100) t.shot = "e3_level_window";
+            if (f >= 104 && f < 120) { t.px = 124; t.py = 213; }    //(the ? block)
+            if (f == 110) t.shot = "e3a_level_window_hover";
+            t.a = t.a || tap(f, 114);
+            if (f >= 120 && f < 135) { t.px = 33; t.py = 90; }      //(Terrain)
+            t.a = t.a || tap(f, 122);
+            if (f == 130) t.shot = "e3b_level_terrain";
+            if (f >= 135 && f < 150) { t.px = 33; t.py = 183; }     //(Types)
+            t.a = t.a || tap(f, 137);
+            if (f == 145) t.shot = "e3c_level_types";
+            if (f >= 150 && f < 165) { t.px = 264; t.py = 22; }     //(to the other side)
+            t.a = t.a || tap(f, 152);
+            if (f == 160) t.shot = "e3d_level_window_right";
+            t.start = t.start || tap(f, 166);
+            //A ? block on the map, then the chip
+            if (f >= 172 && f < 186) { t.px = 176; t.py = 336; }
+            t.a = t.a || tap(f, 176);
+            if (f == 184) t.shot = "e3e_level_chip";
+            //"Save as...": Shift (X) and S
+            t.x = f >= 188 && f < 200;
+            if (f == 192) t.key = SDLK_S;
             if (f == 235) t.shot = "e5_level_keyboard";
             t.down = t.down || tap(f, 240);
             t.right = t.right || tap(f, 245) || tap(f, 249);
@@ -402,7 +426,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             if (f == 270) t.shot = "e6_level_typed";
             t.back = tap(f, 275);
             if (f == 295) t.shot = "e7_level_back_in_editor";
-            t.back = t.back || tap(f, 305);
+            t.back = t.back || tap(f, 305) || tap(f, 311);    //(the first only leaves block mode)
             if (f == 320) t.shot = "e8_level_exit_prompt";
             if (f >= 325) { t.px = 282; t.py = 266; }
             t.a = t.a || tap(f, 330);
@@ -417,12 +441,10 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             if (f >= 20 && f < 50) t.ry = 1.0f;     //scrolls the world (arrow keys)
             if (f >= 20 && f < 35) t.rx = 1.0f;
             if (f == 55) t.shot = "w2_world_scrolled";
-            t.start = tap(f, 60);
+            t.start = tap(f, 60) || tap(f, 74);    //(the window, open and closed)
             if (f == 70) t.shot = "w3_world_actions";
-            //"Edit stages" (13 down), then a click on stage 1
-            for (int k = 0; k < 13; k++)
-                t.down = t.down || tap(f, 75 + 4 * k);
-            t.a = tap(f, 130);
+            //"Edit stages" (E), then a click on stage 1
+            if (f == 80) t.key = SDLK_E;
             if (f >= 140 && f < 150) { t.px = 16; t.py = 16; }
             t.b = tap(f, 150);    //(right click: edit the stage)
             if (f == 170) t.shot = "w5_world_stage_menu";
@@ -445,7 +467,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                 return MENU_CODE_NONE;
             case 2:
                 if (t == 1) {
-                    editors::input::setTestDriver(levelScript, at.shotsDir);
+                    editors::input::setTestDriver(levelScript, at.shotsDir, 3);
                     return MENU_CODE_RUN_LEVEL_EDITOR;
                 }
                 if (t == 6)

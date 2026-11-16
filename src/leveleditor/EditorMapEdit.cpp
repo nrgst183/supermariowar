@@ -79,6 +79,14 @@ void init_editor_edit()
 }
 } // namespace
 
+// The editor's own text and layer icons on the map; built into the game, its
+// window and chip show the mode, the layer and the map instead (editors/EditorInput.cpp)
+#ifdef SMW_EMBEDDED_EDITOR
+constexpr bool OLD_HUD = false;
+#else
+constexpr bool OLD_HUD = true;
+#endif
+
 int editor_edit()
 {
     init_editor_edit();
@@ -694,7 +702,7 @@ int editor_edit()
 			rm->spr_dialog.draw(fSelectedYes ? 250 : 326, 250, {192, 0, 64, 32});
         } else {
             if (edit_mode == 0) {
-				rm->menu_font_small.draw(0,0, "Block Mode");
+				if (OLD_HUD) rm->menu_font_small.draw(0,0, "Block Mode");
             } else if (edit_mode == 1 || edit_mode == 8) {
 				std::string modestring;
 
@@ -715,14 +723,14 @@ int editor_edit()
 				if (view_only_layer)
 					modestring += " Only";
 
-				rm->menu_font_small.draw(0,0, modestring.c_str());
+				if (OLD_HUD) rm->menu_font_small.draw(0,0, modestring.c_str());
 
-				if (view_only_layer)
+				if (OLD_HUD && view_only_layer)
 					rm->spr_backgroundlevel.draw(2, 18 + (3 - selected_layer) * 18, {selected_layer * 16, (3 - selected_layer) * 18, 16, 16});
-				else
+				else if (OLD_HUD)
 					rm->spr_backgroundlevel.draw(2, 18, {selected_layer * 16, 0, 16, 70});
             } else if (edit_mode == 2) {
-				rm->menu_font_small.draw(0,0, "Warp Mode");
+				if (OLD_HUD) rm->menu_font_small.draw(0,0, "Warp Mode");
             } else if (edit_mode == 3) {
                 for (int k = 0; k < MAPHEIGHT; k++) {
                     for (int j = 0; j < MAPWIDTH; j++) {
@@ -746,14 +754,14 @@ int editor_edit()
 					}
 				}
 
-				if (move_replace)
+				if (OLD_HUD && move_replace)
 					rm->menu_font_small.draw(0,0, "Move Mode - Replace");
-				else
+				else if (OLD_HUD)
 					rm->menu_font_small.draw(0,0, "Move Mode - Merge");
 
-				if (view_only_layer)
+				if (OLD_HUD && view_only_layer)
 					rm->spr_backgroundlevel.draw(2, 18 + (3 - selected_layer) * 18, {selected_layer * 16, (3 - selected_layer) * 18, 16, 16});
-				else
+				else if (OLD_HUD)
 					rm->spr_backgroundlevel.draw(2, 18, {selected_layer * 16, 0, 16, 70});
             } else if (edit_mode == 4) {
                 for (int k = 0; k < MAPHEIGHT; k++) {
@@ -768,8 +776,8 @@ int editor_edit()
 					}
 				}
 
-				rm->menu_font_small.draw(0, 480 - (rm->menu_font_small.getHeight() << 1), "No Player Spawn: [x] Global, [1-4] Team Spawn Zone");
-				rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[a] All, [n] None, [i] Invert");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - (rm->menu_font_small.getHeight() << 1), "No Player Spawn: [x] Global, [1-4] Team Spawn Zone");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[a] All, [n] None, [i] Invert");
             } else if (edit_mode == 5) {
                 for (int k = 0; k < MAPHEIGHT; k++) {
                     for (int j = 0; j < MAPWIDTH; j++) {
@@ -778,7 +786,7 @@ int editor_edit()
 					}
 				}
 
-				rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "No Item Spawn");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "No Item Spawn");
             } else if (edit_mode == 6) {
                 for (int k = 0; k < MAPHEIGHT; k++) {
                     for (int j = 0; j < MAPWIDTH; j++) {
@@ -787,13 +795,13 @@ int editor_edit()
 					}
 				}
 
-				rm->menu_font_small.draw(0, 0, "Tile Type Mode");
-				rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Press [Delete] To Clear All Tile Types");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 0, "Tile Type Mode");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "Press [Delete] To Clear All Tile Types");
             } else if (edit_mode == 7) {
-				rm->menu_font_small.draw(0, 0, "Map Item Mode");
+				if (OLD_HUD) rm->menu_font_small.draw(0, 0, "Map Item Mode");
 			}
 
-			rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
+			if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, maplist->currentFilename().c_str());
 
             if (g_musiccategorydisplaytimer > 0) {
 				--g_musiccategorydisplaytimer;
