@@ -242,7 +242,14 @@ void CGameValues::init()
         }
 
         //Set the players input to the default configuration (will be overwritten by options.bin settings)
+#ifdef SMW_XBOX
+        // No keyboard on the Xbox: each player uses the controller in their port
+        // (the joystick instance IDs 1-4 are the controller ports)
+        inputConfiguration[iPlayer][1].iDevice = static_cast<SDL_JoystickID>(iPlayer + 1);
+        playerInput.inputControls[iPlayer] = &inputConfiguration[iPlayer][1];
+#else
         playerInput.inputControls[iPlayer] = &inputConfiguration[iPlayer][0];
+#endif
     }
 
     //Set the default powerup weights for bonus wheel and [?] boxes
@@ -475,6 +482,17 @@ void CGameConfig::ReadInputConfig() {
                     }
                 }
             }
+
+#ifdef SMW_XBOX
+            // There's no keyboard on the Xbox: fall back to the player's own controller port
+            if (iDevice == DEVICE_KEYBOARD_ID) {
+                const auto port = static_cast<SDL_JoystickID>(iPlayer + 1);
+                if (std::ranges::find(claimedDevices, port) == claimedDevices.end()) {
+                    claimedDevices.push_back(port);
+                    iDevice = port;
+                }
+            }
+#endif
 
             playerInput.inputControls[iPlayer] = &inputConfiguration[iPlayer][iDevice == DEVICE_KEYBOARD_ID ? 0 : 1];
             playerInput.inputControls[iPlayer]->iDevice = iDevice;

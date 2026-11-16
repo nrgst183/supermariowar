@@ -6,6 +6,14 @@
 
 Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch game in which players try to beat one another in a variety of gameplay modes. You can play on teams, design your own levels, design your own worlds, and much more!
 
+> **About this fork.** This is a just-for-fun fork of [mmatyas/supermariowar](https://github.com/mmatyas/supermariowar). Basically everything added here was claude-slopped: I had Claude (Anthropic's AI) write the additions to the game for fun. All the credit for Super Mario War goes to Mátyás Mustoha ([mmatyas](https://github.com/mmatyas)), who made the fork this one is built on and keeps the game alive, and to the original developers: Samuele Poletto (*Mario War*), Florian Hufsky and the 72dpiarmy community (*Super Mario War*), and everyone who made the maps, skins, worlds and sounds over the years. See [History](#history) below.
+
+- [What's new in this fork](#whats-new-in-this-fork)
+  - [Gameplay and bots](#gameplay-and-bots)
+  - [Online play with rollback netcode](#online-play-with-rollback-netcode)
+  - [Theater: replays of every match](#theater-replays-of-every-match)
+  - [Editors](#editors)
+  - [Under the hood](#under-the-hood)
 - [History](#history)
 - [About](#about)
 - [Building](#building-instructions)
@@ -22,7 +30,54 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 - [How to play](#how-to-play)
 
 
+## What's new in this fork
+
+### Gameplay and bots
+
+![Four CPU players with random skins on Boo's Mansion, The Arctic, Airshipz and Mushroom Valley](docs/gfx/fork/gameplay.png)
+
+- **Smarter CPU players.** The bots find their way around a map instead of running at walls: they plan paths over jumps, drops and Sidewinder-style running jumps, take warp pipes between floors (Derelict), go for the ? blocks and the power-ups that come out, and fight better (stomping, dodging stomps).
+- **CPU players play by input.** Their AI runs outside the game simulation and sends button presses like a human player, so replays keep the CPUs' exact play and online matches stay in sync.
+- **A Super Mario Bros. 3 style interface**: status-bar panels in several color schemes (Night, Pipe, Castle, SMB3), power-up icons, and readable overlays that don't shake with the screen.
+- **Controller prompts** for Xbox controllers, including the original Xbox controller (detected automatically, or chosen in the controls menu).
+- Random skins per player, smooth motion between frames, and 50 more classic community maps.
+
+### Online play with rollback netcode
+
+![The online lobby: the host, a joiner playing with two players on one computer, and a CPU; a joiner downloading the host's map](docs/gfx/fork/online.png)
+
+- **Rollback netcode** for up to four players: everybody connects directly to each other, no server. Inputs that arrive late are predicted and corrected, so the game stays responsive with lag.
+- **A full online lobby**: pick your character and team, see everyone's ping, add CPU players, and play tournaments, tours and worlds online. Missing maps and custom skins are sent to the players who don't have them.
+- **No port forwarding (usually)**: the host's router is asked to open the port with UPnP, and the lobby shows the address friends join at.
+- If someone drops out, **the CPU takes over** their player and the match goes on.
+
+See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
+
+### Theater: replays of every match
+
+![The theater: a paused replay with its timeline, and the controls](docs/gfx/fork/theater.png)
+
+- Every match is saved as a small replay (the inputs, not a video), with the skins, the music and the players' pings. **Main menu, History** lists your matches.
+- The **theater** plays them back with a timeline (score changes and kills marked on it), pause, frame stepping, fast forward and rewind, smooth slow motion, a camera that follows any player, and jumping anywhere by clicking or dragging on the timeline.
+
+See [docs/HistoryReplaysEditors.md](docs/HistoryReplaysEditors.md).
+
+### Editors
+
+![The level editor's action menu and the world editor](docs/gfx/fork/editors.png)
+
+- The **level and world editors** are inside the game (**Main menu, Editors**), with mouse, keyboard and controller support, and an action menu for everything that used to be a hidden key.
+- **Edit together**: one player hosts a map or a world, the others join and edit it at the same time.
+
+### Under the hood
+
+- The game simulation is deterministic and runs on a fixed tick, which is what makes rollback, replays and the theater possible.
+- GitHub Actions builds every push for Linux, macOS, Windows and the web, runs the unit tests, and runs `scripts/ci-checks.sh`: the rollback sync test in every game mode, replays with random jumps, and online matches over localhost with simulated lag, packet loss and disconnects.
+
+
 ## History
+
+*The history below is from the original README, in mmatyas's words.*
 
 The original *Mario War* was created by *Samuele Poletto* in 2002, in which four Super Mario characters could fight on various levels by jumping on each other's head. It was written in Pascal/Assembly, and was released for DOS. Later versions also included a map editor.
 
@@ -73,7 +128,7 @@ The game uses artwork and sounds from Nintendo games. We hope that this noncomme
 
 ### Online play
 
-Up to four players can play online with rollback netcode (experimental): one player hosts a lobby from **Main menu, Online**, the others join it with the host's address. The game uses UDP port 7300 by default, which the host has to forward on the router unless everybody is on the same LAN. All players need the same version of the game. See [docs/netplay.md](docs/netplay.md) for how to play and for the developer documentation.
+Up to four players can play online with rollback netcode (experimental): one player hosts a lobby from **Main menu, Online**, the others join it with the host's address. The game uses UDP port 7300 by default; the host's router is asked to forward it automatically (UPnP), and if it can't, the host forwards it by hand (nothing is needed on the same LAN). All players need the same version of the game. See [docs/netplay.md](docs/netplay.md) for how to play and for the developer documentation.
 
 ### Supported platforms
 
@@ -111,13 +166,13 @@ If a dependency is not available on your system, CMake will automatically try to
 The game assets are included as a Git submodule, so you'll likely want to do a recursive clone:
 
 ```sh
-git clone --recursive https://github.com/mmatyas/supermariowar.git
+git clone --recursive https://github.com/nrgst183/supermariowar.git
 ```
 
 Alternatively, you can also initialize the submodules manually:
 
 ```sh
-git clone https://github.com/mmatyas/supermariowar.git
+git clone https://github.com/nrgst183/supermariowar.git
 cd supermariowar
 git submodule update --init
 ```

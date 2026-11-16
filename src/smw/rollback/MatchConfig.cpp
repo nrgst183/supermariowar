@@ -309,7 +309,8 @@ uint64_t simulationDataHash()
     if (!g_tilesetmanager)
         return hash;
     for (size_t i = 0; i < g_tilesetmanager->count(); i++) {
-        const CTileset* tileset = g_tilesetmanager->tileset(i);
+        // Only the names and tile type files are hashed: no need to load the images
+        const CTileset* tileset = g_tilesetmanager->tilesetInfo(i);
         hash = net::fnv1a64(tileset->name().data(), tileset->name().size(), hash);
         const uint64_t contents = fileHash((tileset->directory() / "tileset.tls").string());
         hash = net::fnv1a64(&contents, sizeof(contents), hash);

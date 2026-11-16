@@ -78,7 +78,8 @@ if (WIN32)
 endif()
 
 # The map and world editors, built in (editors/EditorLauncher.h); not on the web
-if(NOT EMSCRIPTEN)
+# or the Xbox (they need a mouse and a keyboard)
+if(NOT EMSCRIPTEN AND NOT XBOXOG)
 	target_sources(smw PRIVATE
 		editors/CoEdit.cpp
 		editors/CoEdit.h
@@ -98,11 +99,27 @@ endif()
 
 target_link_libraries(smw CommonFiles)
 
-if(NOT EMSCRIPTEN)
+if(NOT EMSCRIPTEN AND NOT XBOXOG)
 	target_link_libraries(smw smw_zlib)
 endif()
 
 target_link_libraries(smw toml11::toml11)
+
+#
+# Original Xbox: the .xbe, and a disc image with the game data
+#
+
+if(XBOXOG)
+	target_sources(smw PRIVATE "${SDL3_XBOX_MAIN}")
+	rxdk_add_xbe(smw
+		TITLE_NAME "Super Mario War"
+		TITLE_ID 0x534D0001
+		STACK 1048576
+		ISO
+		ISO_NAME supermariowar
+		DEPLOY "data=${PROJECT_SOURCE_DIR}/data"
+	)
+endif()
 
 #
 # Installation

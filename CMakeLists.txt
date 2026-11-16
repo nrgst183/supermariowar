@@ -13,6 +13,16 @@ project(smw
 	LANGUAGES CXX
 )
 
+# Original Xbox, built with RXDK (-DCMAKE_TOOLCHAIN_FILE=<RXDK tools>/cmake/RxdkToolchain.cmake).
+# SDL comes from the compatibility layer in platform/xbox (it has some C sources).
+# No netplay, no editors and no unit tests on the console.
+if(XBOXOG)
+	enable_language(C)
+	set(NO_NETWORK ON CACHE BOOL "Disable all network communication" FORCE)
+	set(BUILD_TESTS OFF CACHE BOOL "Build the unit tests" FORCE)
+	set(SMW_INSTALL_PORTABLE ON CACHE BOOL "Install to a single directory" FORCE)
+endif()
+
 #
 # Options for customizing builds
 #
@@ -85,7 +95,8 @@ add_compile_definitions(
 # Optimization flags for single-configuration GCC/Clang builds.
 # MSVC and multi-configuration generators use CMake's per-configuration
 # defaults (CMAKE_<LANG>_FLAGS_<CONFIG>), e.g. /Od for Debug and /O2 for Release.
-if (NOT MSVC AND NOT SMW_IS_MULTI_CONFIG)
+# (RXDK builds take the optimization flags of each configuration from the toolchain.)
+if (NOT MSVC AND NOT SMW_IS_MULTI_CONFIG AND NOT XBOXOG)
 	if (CMAKE_BUILD_TYPE STREQUAL Debug)
 		# Turn optimizations off; turn debugging symbols on.
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O0")
@@ -221,8 +232,10 @@ include_directories(src/smw)
 
 add_subdirectory(src/common)
 add_subdirectory(src/smw)
-add_subdirectory(src/leveleditor)
-add_subdirectory(src/worldeditor)
+if(NOT XBOXOG)
+	add_subdirectory(src/leveleditor)
+	add_subdirectory(src/worldeditor)
+endif()
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTS)
 	include(CTest)

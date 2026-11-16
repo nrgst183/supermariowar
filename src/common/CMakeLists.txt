@@ -100,6 +100,10 @@ target_compile_definitions(CommonFiles PUBLIC
     GIT_DATE="${SMW_GIT_DATE}"
 )
 
+if (XBOXOG)
+    target_compile_definitions(CommonFiles PUBLIC SMW_XBOX)
+endif()
+
 if (SDL2_FORCE_GLES)
     target_compile_definitions(CommonFiles PUBLIC SDL2_FORCE_GLES)
 endif()

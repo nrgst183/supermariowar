@@ -131,6 +131,14 @@ smw_declare_gitrepo(
 )
 
 
+if(XBOXOG)
+    # Original Xbox: SDL3, SDL3_image and SDL3_mixer are provided by the
+    # compatibility layer on the Xbox system libraries (platform/xbox)
+    FetchContent_MakeAvailable(toml11)
+    add_subdirectory("${PROJECT_SOURCE_DIR}/platform/xbox" "${PROJECT_BINARY_DIR}/platform/xbox")
+    return()
+endif()
+
 FetchContent_MakeAvailable(SDL3 SDL3_image SDL3_mixer toml11)
 if(NOT NO_NETWORK)
     FetchContent_MakeAvailable(enet)

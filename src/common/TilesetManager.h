@@ -23,6 +23,8 @@ public:
 
     explicit CTileset(std::filesystem::path dir);
     void ensureLoaded();
+    // Frees the images (they load again on the next use); the tile types stay
+    void unload();
     bool isLoaded() const { return m_sprite_large.operator bool(); }
     bool isModified() const { return m_modified; }
 
@@ -63,6 +65,10 @@ public:
 
     size_t indexFromName(const std::string& name) const;
     CTileset* tileset(size_t index);
+    // The tileset's name and folder, without loading its images
+    const CTileset* tilesetInfo(size_t index) const {
+        return index < m_tilesets.size() ? &m_tilesets[index] : nullptr;
+    }
     size_t count() const { return m_tilesets.size(); }
 
     void Draw(SDL_Surface* dstSurface, size_t iTilesetID, DrawSize iTileSize,
@@ -83,6 +89,14 @@ public:
 private:
     std::vector<CTileset> m_tilesets;
     size_t m_classicTilesetIndex = SIZE_MAX;
+
+#ifdef SMW_XBOX
+    // The Xbox has 64 MB of RAM, and a tileset takes ~5.5 MB in all three sizes:
+    // keep only the most recently used ones loaded
+    static constexpr size_t MAX_LOADED_TILESETS = 4;
+    std::vector<size_t> m_recently_used;  // most recent last
+    void trackUse(size_t index);
+#endif
 
     static const std::array<SDL_Rect, CTileset::MAX_TILES> s_rects_ingame;
     static const std::array<SDL_Rect, CTileset::MAX_TILES> s_rects_preview;

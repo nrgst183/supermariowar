@@ -107,6 +107,14 @@ void CTileset::ensureLoaded()
 }
 
 
+void CTileset::unload()
+{
+    m_sprite_large = gfxSprite();
+    m_sprite_medium = gfxSprite();
+    m_sprite_small = gfxSprite();
+}
+
+
 const gfxSprite& CTileset::sprite(DrawSize size) const
 {
     assert(m_sprite_large); // call ensureLoaded first!
@@ -256,11 +264,35 @@ void CTilesetManager::Draw(
 CTileset* CTilesetManager::tileset(size_t index)
 {
     if (index < m_tilesets.size()) {
+#ifdef SMW_XBOX
+        trackUse(index);
+#endif
         m_tilesets[index].ensureLoaded();
         return &m_tilesets[index];
     }
     return nullptr;
 }
+
+
+#ifdef SMW_XBOX
+void CTilesetManager::trackUse(size_t index)
+{
+    if (!m_recently_used.empty() && m_recently_used.back() == index)
+        return;
+
+    std::erase(m_recently_used, index);
+    m_recently_used.push_back(index);
+
+    // Unload the least recently used tilesets over the limit. The callers only
+    // keep a tileset pointer for the call at hand, so this is safe here.
+    while (m_recently_used.size() > MAX_LOADED_TILESETS) {
+        const size_t oldest = m_recently_used.front();
+        m_recently_used.erase(m_recently_used.begin());
+        if (!m_tilesets[oldest].isModified())
+            m_tilesets[oldest].unload();
+    }
+}
+#endif
 
 
 const SDL_Rect& CTilesetManager::rect(DrawSize size, size_t col, size_t row)
