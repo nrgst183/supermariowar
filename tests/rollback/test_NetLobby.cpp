@@ -662,6 +662,12 @@ TEST_CASE("Downloaded skin names: no paths, unique, existing files kept, only im
     std::filesystem::remove_all(dir);
 }
 
+// The same file, whatever separators the paths were built with ('\\' and '/' on Windows)
+bool samePath(const std::string& a, const std::string& b)
+{
+    return std::filesystem::path(a).lexically_normal() == std::filesystem::path(b).lexically_normal();
+}
+
 TEST_CASE("Skins are announced, downloaded in chunks, hash checked and shown for every slot") {
     LobbyNet net;
     net.skinDir = tempDir("skins");
@@ -691,18 +697,18 @@ TEST_CASE("Skins are announced, downloaded in chunks, hash checked and shown for
 
     //Alice has another file called Cool: she downloaded the host's, with its own name, next to hers, and never overwrote hers
     const std::string aliceGotHost = a.lobby->slotSkinPath(0);
-    CHECK(aliceGotHost == net.skinDir + "/node1/net/Cool.png");
+    CHECK(samePath(aliceGotHost, net.skinDir + "/node1/net/Cool.png"));
     CHECK(readFile(aliceGotHost) == hostSkin);
     CHECK(readFile(aliceFile) == aliceSkin);
     //The host got Alice's, which is not its own Cool
-    CHECK(host.lobby->slotSkinPath(1) == net.skinDir + "/node0/net/Cool.png");
+    CHECK(samePath(host.lobby->slotSkinPath(1), net.skinDir + "/node0/net/Cool.png"));
     CHECK(readFile(host.lobby->slotSkinPath(1)) == aliceSkin);
     CHECK(readFile(hostFile) == hostSkin);
     //Bob already had the host's skin (found by its hash): it downloaded nothing of it
-    CHECK(b.lobby->slotSkinPath(0) == net.skinDir + "/node2/own/HostsSkinCopy.png");
+    CHECK(samePath(b.lobby->slotSkinPath(0), net.skinDir + "/node2/own/HostsSkinCopy.png"));
     CHECK(readFile(b.lobby->slotSkinPath(1)) == aliceSkin);
-    CHECK(a.lobby->slotSkinPath(2) == net.skinDir + "/node1/net/Bobby.png");
-    CHECK(host.lobby->slotSkinPath(2) == net.skinDir + "/node0/net/Bobby.png");
+    CHECK(samePath(a.lobby->slotSkinPath(2), net.skinDir + "/node1/net/Bobby.png"));
+    CHECK(samePath(host.lobby->slotSkinPath(2), net.skinDir + "/node0/net/Bobby.png"));
     //The only "Cool" Bob downloaded is Alice's, not the host's (which it had)
     CHECK(readFile(net.skinDir + "/node2/net/Cool.png") == aliceSkin);
     CHECK_FALSE(std::filesystem::exists(net.skinDir + "/node2/net/Cool (2).png"));
