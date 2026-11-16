@@ -13,6 +13,7 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
   - [Online play with rollback netcode](#online-play-with-rollback-netcode)
   - [Theater: replays of every match](#theater-replays-of-every-match)
   - [Editors](#editors)
+  - [Menus](#menus)
   - [Under the hood](#under-the-hood)
 - [History](#history)
 - [About](#about)
@@ -55,24 +56,35 @@ See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 
 ### Theater: replays of every match
 
-![The theater: a paused replay with its timeline, and the controls](docs/gfx/fork/theater.png)
+![The theater: jumping to the next kill, paused with a controller, the controls, and the leave prompt](docs/gfx/fork/theater.png)
 
 - Every match is saved as a small replay (the inputs, not a video), with the skins, the music and the players' pings. **Main menu, History** lists your matches.
 - The **theater** plays them back with a timeline (score changes and kills marked on it), pause, frame stepping, fast forward and rewind, smooth slow motion, a camera that follows any player, and jumping anywhere by clicking or dragging on the timeline.
+- **Fully playable with a controller**: the d-pad jumps to the previous or next *moment* (a kill, a point, the end of the match, landing just before it), the left stick scrubs through the replay, and B asks before it leaves.
 
 See [docs/HistoryReplaysEditors.md](docs/HistoryReplaysEditors.md).
 
 ### Editors
 
-![The level editor's action menu and the world editor](docs/gfx/fork/editors.png)
+![The map editor's window with its palettes, players' gloves and the info chip; a screen's commands and the tile picker; the on-screen keyboard; the world editor](docs/gfx/fork/editors.png)
 
-- The **level and world editors** are inside the game (**Main menu, Editors**), with mouse, keyboard and controller support, and an action menu for everything that used to be a hidden key.
+- The **map and world editors** are inside the game (**Main menu, Editors**), with mouse, keyboard and full controller support.
+- **The editor window** (Start or Tab) docks beside the map: tools (paint, erase, move, pick), layers, and palettes of blocks, items and tile types with a tip for each. With a controller, the d-pad moves a highlight through it and choosing a block takes you straight back to the map.
+- **Every player gets a glove**: each controller (and the mouse) has its own animated Mario Paint style glove in the player's color, with a frame on the tile it edits. On the map, X takes what's under the glove, Y changes the layer and LB / RB step through the blocks, items and tile types.
+- **Every screen of the editor works with a controller**: the tile picker, warps, platforms, hazards, race goals, backgrounds and the rest show what the buttons do there, and Start lists the screen's commands (new platform, its path, delete...).
+- **An on-screen keyboard** in the original Xbox dashboard's style, built from the game's pipes and blocks, for naming maps and worlds with a controller.
 - **Edit together**: one player hosts a map or a world, the others join and edit it at the same time.
+
+### Menus
+
+![The Editors menu and the Online menu](docs/gfx/fork/menus.png)
+
+- The **Editors** menu picks maps or worlds, then this computer or online (host or join), and the **Online** menu is laid out in the same rounded panels with pipe buttons, with prompts for the controller or the keys you're using.
 
 ### Under the hood
 
 - The game simulation is deterministic and runs on a fixed tick, which is what makes rollback, replays and the theater possible.
-- GitHub Actions builds every push for Linux, macOS, Windows and the web, runs the unit tests, and runs `scripts/ci-checks.sh`: the rollback sync test in every game mode, replays with random jumps, and online matches over localhost with simulated lag, packet loss and disconnects.
+- GitHub Actions builds every push for Linux, macOS, Windows, the web and the original Xbox, runs the unit tests, and runs `scripts/ci-checks.sh`: the rollback sync test in every game mode, replays with random jumps, and online matches over localhost with simulated lag, packet loss and disconnects.
 
 
 ## History
