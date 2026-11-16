@@ -41,6 +41,11 @@ class FPSLimiter
         void afterFlip();
         void idle();
 
+        // Online: the ticks are this much longer (1: normal; e.g. 1.05: 5% slower)
+        // while this machine runs ahead of the others, so they catch up without
+        // a skipped tick (rollback::NetGame's time sync)
+        void setTickStretch(float stretch);
+
         static FPSLimiter& instance();
 
     private:
@@ -58,6 +63,7 @@ class FPSLimiter
         uint64_t        nextTickNs = 0;        // deadline of the next tick (drift-free schedule)
         uint64_t        nextRenderNs = 0;
         uint64_t        workNs = 0;            // time spent updating and drawing in the last iteration
+        float           tickStretch = 1.0f;
 
         // Measured over the last second
         uint64_t        statsStartNs = 0;

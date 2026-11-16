@@ -330,6 +330,8 @@ void CMap::predrawbackground(gfxSprite &background, gfxSprite &mapspr)
     //Add animated tile objects for each animated tile in a platform (to be used later for drawing)
     addPlatformAnimatedTiles();
 
+    //The background is opaque: drawn every frame as a plain copy, not blended pixel by pixel
+    SDL_SetSurfaceBlendMode(mapspr.getSurface(), SDL_BLENDMODE_NONE);
 }
 
 void CMap::predrawforeground(gfxSprite &foregroundspr)

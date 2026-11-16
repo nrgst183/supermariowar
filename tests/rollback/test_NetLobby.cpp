@@ -214,14 +214,14 @@ std::vector<uint8_t> readFile(const std::string& path)
 
 
 TEST_CASE("The automatic input delay grows with the round trip and its jitter, within 1..6") {
-    CHECK(autoInputDelay(0, 0) == 1);
-    CHECK(autoInputDelay(30, 10) == 1);       // LAN
-    CHECK(autoInputDelay(140, 6) == 2);       // (70 + 6) / 16 -> 5 frames late, 3 to prediction
-    CHECK(autoInputDelay(160, 25) == 4);      // (80 + 25) / 16 -> 7
-    CHECK(autoInputDelay(240, 1) == 5);       // (120 + 1) / 16 -> 8
+    CHECK(autoInputDelay(0, 0) == 0);
+    CHECK(autoInputDelay(30, 10) == 0);       // LAN
+    CHECK(autoInputDelay(140, 6) == 1);       // (70 + 6) / 16 -> 5 frames late, 4 to prediction
+    CHECK(autoInputDelay(160, 25) == 3);      // (80 + 25) / 16 -> 7
+    CHECK(autoInputDelay(240, 1) == 4);       // (120 + 1) / 16 -> 8
     CHECK(autoInputDelay(330, 15) == 6);      // 12 frames late: capped
     CHECK(autoInputDelay(2000, 100) == 6);
-    CHECK(autoInputDelay(-5, -1) == 1);
+    CHECK(autoInputDelay(-5, -1) == 0);
     for (int rtt = 0; rtt < 400; rtt += 10)
         CHECK(autoInputDelay(static_cast<float>(rtt), 5) <= autoInputDelay(static_cast<float>(rtt + 10), 5));
 }

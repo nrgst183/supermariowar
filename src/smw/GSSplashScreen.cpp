@@ -115,8 +115,7 @@ void SplashScreenState::update()
             game_values.playerInput.outputControls[iPlayer].menu_random.fPressed) {
             {
                 blitdest = rm->menu_backdrop.getSurface();
-                rm->menu_shade.setalpha(App::menuTransparency);
-                rm->menu_shade.draw(0, 0);
+                rm->drawShade(App::menuTransparency);
                 blitdest = screen;
 
                 eyecandy[2].clean();

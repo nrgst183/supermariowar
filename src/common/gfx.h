@@ -55,6 +55,9 @@ void gfx_close();
 bool gfx_loadpalette(const std::filesystem::path& palette_path);
 
 void gfx_cliprect(SDL_Rect& srcRect, SDL_Rect& dstRect, const SDL_Rect& clipRect);
+// Darkens the whole surface as a black picture drawn over it with this alpha would (a
+// screen fade; much faster than blending a picture); false if its format isn't 32 bit
+bool gfx_darken(SDL_Surface* surface, Uint8 alpha);
 
 /// Clips a source and destination area pair, so that the destination area doesn't go past
 /// a certain threshold in a given direction.

@@ -289,7 +289,8 @@ private:
     std::string m_dropNotice;
     uint32_t m_dropNoticeMs = 0;
 
-    static constexpr int SNAPSHOT_RING = 10;    // max prediction + 2
+    static constexpr int MAX_PREDICTION = 10;   // frames the match may run ahead of the confirmed inputs
+    static constexpr int SNAPSHOT_RING = MAX_PREDICTION + 2;
     std::array<Snapshot, SNAPSHOT_RING> m_snapshots;
 
     struct Timing {

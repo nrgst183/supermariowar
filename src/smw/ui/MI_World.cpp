@@ -476,8 +476,7 @@ void MI_World::Draw()
     }
 
     if (iState == 4 || iState == 5) {
-        rm->menu_shade.setalpha(static_cast<Uint8>(iScreenfade));
-        rm->menu_shade.draw(0, 0);
+        rm->drawShade(static_cast<Uint8>(iScreenfade));
     }
 }
 

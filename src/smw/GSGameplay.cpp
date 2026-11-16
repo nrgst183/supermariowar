@@ -1014,15 +1014,16 @@ void GameplayState::render(float alpha)
     const bool smooth = game_values.smoothmotion && (replay::playing() ? theaterAlpha(alpha) : lastUpdateTicked && alpha < 1.0f);
     if (smooth)
         interpolator.apply(alpha);
+    correctionSmoother.apply();
 
     drawEverything(g_sim.countdownState, iScoreTextOffset);
 
+    correctionSmoother.restore();
     if (smooth)
         interpolator.restore();
 
     if (game_values.flags.pausegame || game_values.flags.exitinggame) {
-        rm->menu_shade.setalpha(App::menuTransparency);
-        rm->menu_shade.draw(0, 0);
+        rm->drawShade(App::menuTransparency);
         drawExitPauseDialog();
     }
 

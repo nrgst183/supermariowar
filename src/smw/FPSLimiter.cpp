@@ -54,7 +54,12 @@ uint64_t FPSLimiter::tickNs() const
     if (game_values.frameadvance)
         return NS_PER_SECOND;
 #endif
-    return TICK_NS;
+    return tickStretch == 1.0f ? TICK_NS : static_cast<uint64_t>(static_cast<double>(TICK_NS) * tickStretch);
+}
+
+void FPSLimiter::setTickStretch(float stretch)
+{
+    tickStretch = std::clamp(stretch, 1.0f, 1.25f);
 }
 
 void FPSLimiter::applyFrameRateMode(FrameRateMode newMode)

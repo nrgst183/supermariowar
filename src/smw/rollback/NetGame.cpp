@@ -7,6 +7,7 @@
 #include "ResourceManager.h"
 #include "GameMode.h"
 #include "GameValues.h"
+#include "FPSLimiter.h"
 #include "GSGameplay.h"
 #include "MapList.h"
 #include "Resimulation.h"
@@ -240,6 +241,7 @@ void NetGame::shutdown()
     if (m_transport)
         m_transport->close(500);
     m_inMatch = false;
+    FPSLimiter::instance().setTickStretch(1.0f);
     m_session.reset();
     m_lobby.reset();
     m_transport.reset();    //disconnects and flushes
@@ -778,6 +780,9 @@ void NetGame::beginMatch()
         }
     }
     session.inputDelay = config.inputDelay;
+    session.maxPrediction = MAX_PREDICTION;
+    //(time sync: the clock slows a little below this, see advance())
+    session.skipThreshold = 3.0f;
     session.checksumInterval = std::max(0, cmd::g_net.checksumInterval);
     session.timeoutMs = static_cast<uint32_t>(std::max(500, cmd::g_net.timeoutMs));
     session.matchId = m_matchId;
@@ -826,6 +831,8 @@ void NetGame::beginMatch()
     replay::beginOnline(bytes, names, skins);
 
     startConfiguredMatch(config);
+    GameplayState::instance().correction().reset();
+    FPSLimiter::instance().setTickStretch(1.0f);
 
     m_session = std::make_unique<RollbackSession>(session, *m_transport, *this, monotonicMs());
     m_inMatch = true;
@@ -850,6 +857,15 @@ NetGame::Outcome NetGame::advance(const InputFrame& localInput)
     const FrameResult result = m_session->advanceFrame(localInput, now);
     updateLostPeers(now);
     m_transport->flush();
+
+    //Time sync, smoothly: while we run ahead of the others, our ticks get a little longer (up to 10%:
+    //a frame regained in 10 ticks), so they catch up without a skipped tick (a visible hitch; the
+    //session only skips when far ahead)
+    {
+        const float ahead = m_session->aheadFrames();
+        const float stretch = ahead > 0.25f ? 1.0f + std::min(0.1f, (ahead - 0.25f) * 0.08f + 0.02f) : 1.0f;
+        FPSLimiter::instance().setTickStretch(stretch);
+    }
 
     const double seconds = secondsSince(start);
     m_timing.updateSeconds += seconds;
@@ -884,6 +900,7 @@ NetGame::Outcome NetGame::advance(const InputFrame& localInput)
         outcome.ended = true;
         m_waiting = false;
         m_inMatch = false;
+    FPSLimiter::instance().setTickStretch(1.0f);
         returnToLobby("");
         if (!m_closeAfterMatch.empty()) {
             printf("netplay: session closed: %s\n", m_closeAfterMatch.c_str());
@@ -942,6 +959,7 @@ void NetGame::onSessionFailed()
     printStats(true);
     m_waiting = false;
     m_inMatch = false;
+    FPSLimiter::instance().setTickStretch(1.0f);
     if (m_series.active) {
         //The match doesn't count: its state isn't the same everywhere. Back to the series state it started from.
         applySeriesState(m_config.series);
@@ -978,6 +996,7 @@ void NetGame::leaveMatch(const char* reason)
         printStats(true);
     m_session.reset();
     m_inMatch = false;
+    FPSLimiter::instance().setTickStretch(1.0f);
     m_lastMatchError = std::string("You left the match (") + reason + ")";
     if (m_lobby) {
         m_lobby->leave(reason, true);
@@ -1082,6 +1101,8 @@ void NetGame::loadState(int frame)
 {
     const Clock::time_point start = Clock::now();
     const Snapshot& snapshot = m_snapshots[static_cast<size_t>(frame) % SNAPSHOT_RING];
+    //(where the players were drawn: a correction glides from there, GameplayCorrection.h)
+    GameplayState::instance().correction().beforeRollback();
     if (snapshot.empty() || snapshot.tick() != frame)
         printf("netplay: ERROR: no snapshot of frame %d to roll back to\n", frame);
     rollback::loadState(snapshot);
@@ -1094,9 +1115,14 @@ bool NetGame::advance(const InputFrame& input, bool resimulating)
     const Clock::time_point start = Clock::now();
     if (resimulating) {
         sim::ResimulationScope scope;
+        sim::detail::rollbackTick = g_sim.tick;    //(its late sounds: Resimulation.h)
         GameplayState::instance().advanceTick(input);
+        sim::detail::rollbackTick = -1;
+        GameplayState::instance().correction().afterResimulatedTick();
     } else {
+        sim::detail::shownTick = g_sim.tick;
         GameplayState::instance().advanceTick(input);
+        GameplayState::instance().correction().afterTick();
     }
     m_timing.simSeconds += secondsSince(start);
     m_timing.simTicks++;
@@ -1166,6 +1192,8 @@ void NetGame::printStats(bool final)
         us(m_timing.updateSeconds, m_timing.updates), m_timing.maxUpdateSeconds * 1e6, us(m_timing.simSeconds, m_timing.simTicks),
         us(m_timing.saveSeconds, m_timing.saves), us(m_timing.loadSeconds, m_timing.loads),
         m_timing.updates ? static_cast<double>(m_timing.simTicks) / static_cast<double>(m_timing.updates) : 0.0);
+    printf("netfeel: match %d corrections smoothed %d drawn at once %d\n", m_matchId, GameplayState::instance().correction().smoothed(),
+        GameplayState::instance().correction().snapped());
     for (int p = 0; p < config.peerCount; p++) {
         if (remote(p))
             printf("netpeer: match %d peer %d rtt %.0f ms advantage %+.2f\n", m_matchId, p, st.peers[static_cast<size_t>(p)].rttMs,

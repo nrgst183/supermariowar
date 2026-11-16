@@ -1,6 +1,7 @@
 #ifndef GAMESTATE_GAMEPLAY_H
 #define GAMESTATE_GAMEPLAY_H
 
+#include "GameplayCorrection.h"
 #include "GameplayInterpolation.h"
 #include "GameState.h"
 #include "input.h"
@@ -38,6 +39,9 @@ class GameplayState : public GameState
         // simulation.
         bool rendersBetweenTicks() const override { return true; }
         void render(float alpha) override;
+
+        // Online: the corrections after a rollback, drawn smoothly (GameplayCorrection.h)
+        CorrectionSmoother& correction() { return correctionSmoother; }
 
         static GameplayState& instance();
 
@@ -96,6 +100,7 @@ class GameplayState : public GameState
         short iScoreTextOffset[4] = {};
 
         RenderInterpolator interpolator;
+        CorrectionSmoother correctionSmoother;
         bool lastUpdateTicked = false;  // whether the latest update() ran a tick (not paused)
         int replayEndFrames = 0;        // frames since the replay's last tick
         bool matchOnline = false;       // the match is an online one (for the match history)

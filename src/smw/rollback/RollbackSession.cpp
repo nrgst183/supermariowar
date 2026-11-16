@@ -186,6 +186,13 @@ void RollbackSession::updateTimeSync(uint32_t nowMs)
         return;
     m_framesSinceSync = 0;
 
+    const float ahead = aheadFrames();
+    if (ahead >= std::max(1.0f, m_config.skipThreshold))
+        m_skipBudget = std::min(static_cast<int>(ahead), MAX_SKIPS_PER_SYNC);
+}
+
+float RollbackSession::aheadFrames() const
+{
     //Each side's estimate is off by the same latency error in opposite
     //directions: half their difference is how far ahead we really are
     float ahead = 0.0f;
@@ -193,8 +200,7 @@ void RollbackSession::updateTimeSync(uint32_t nowMs)
         if (isRemote(p) && !m_peers[p].lost)
             ahead = std::max(ahead, (m_peers[p].avgLocalAdvantage - m_peers[p].avgRemoteAdvantage) * 0.5f);
     }
-    if (ahead >= 1.0f)
-        m_skipBudget = std::min(static_cast<int>(ahead), MAX_SKIPS_PER_SYNC);
+    return ahead;
 }
 
 FrameResult RollbackSession::advanceFrame(const InputFrame& localInput, uint32_t nowMs)
@@ -292,7 +298,8 @@ void RollbackSession::sendInputs(uint32_t nowMs)
 
         const int start = std::max(peer.acked, m_localReceived - INPUT_HISTORY + 1);
         const int count = std::clamp(m_localReceived - start, 0, net::MAX_INPUT_FRAMES_PER_PACKET);
-        const int advantage = static_cast<int>(std::lround(std::clamp(localAdvantage(peer, nowMs), -127.0f, 127.0f)));
+        //(in 1/64 frames: time sync slows the clock for fractions of a frame)
+        const int advantage = static_cast<int>(std::lround(std::clamp(localAdvantage(peer, nowMs), -500.0f, 500.0f) * 64.0f));
         const uint32_t hold = peer.echoTime ? static_cast<uint32_t>(std::max(0, msDiff(nowMs, peer.echoReceivedMs))) : 0;
 
         net::ByteWriter w(m_packet, sizeof(m_packet));
@@ -302,7 +309,7 @@ void RollbackSession::sendInputs(uint32_t nowMs)
         w.u8(static_cast<uint8_t>(count));
         w.u32(static_cast<uint32_t>(peer.received));
         w.u32(static_cast<uint32_t>(m_frame));
-        w.i8(static_cast<int8_t>(advantage));
+        w.i16(static_cast<int16_t>(advantage));
         w.u32(sendTime);
         w.u32(peer.echoTime);
         w.u16(static_cast<uint16_t>(std::min<uint32_t>(hold, 0xffff)));
@@ -345,7 +352,7 @@ void RollbackSession::receiveInput(int p, const uint8_t* data, size_t size, uint
     const int count = r.u8();
     const int ack = static_cast<int>(r.u32());
     const int remoteFrame = static_cast<int>(r.u32());
-    const int advantage = r.i8();
+    const float advantage = static_cast<float>(r.i16()) / 64.0f;
     const uint32_t sendTime = r.u32();
     const uint32_t echoTime = r.u32();
     const uint32_t echoHold = r.u16();
@@ -363,7 +370,7 @@ void RollbackSession::receiveInput(int p, const uint8_t* data, size_t size, uint
         peer.echoReceivedMs = nowMs;
         peer.remoteFrame = remoteFrame;
         peer.remoteAdvantage = advantage;
-        peer.avgRemoteAdvantage += (static_cast<float>(advantage) - peer.avgRemoteAdvantage) * AVERAGE_WEIGHT;
+        peer.avgRemoteAdvantage += (advantage - peer.avgRemoteAdvantage) * AVERAGE_WEIGHT;
 
         if (echoTime != 0) {
             const int32_t rtt = msDiff(nowMs, echoTime) - static_cast<int32_t>(echoHold);

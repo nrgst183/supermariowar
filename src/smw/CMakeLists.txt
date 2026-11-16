@@ -17,6 +17,7 @@ add_executable(smw WIN32
 	GameplayDebug.cpp
 	GameplayDraw.cpp
 	GameplayEffects.cpp
+	GameplayCorrection.cpp
 	GameplayInterpolation.cpp
 	GameplayInterpolation.h
 	GameplayMapObjects.cpp

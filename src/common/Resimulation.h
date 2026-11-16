@@ -15,6 +15,12 @@ namespace sim {
 
 namespace detail {
 inline bool resimulating = false;
+// Online rollback (rollback/NetGame.cpp): the tick being re-simulated (-1: none), and
+// the latest tick that was shown. A sound of a re-simulated tick near the present that
+// wasn't heard when the tick was first shown (the late input made it happen) is
+// played late instead of not at all (sfx.cpp).
+inline int rollbackTick = -1;
+inline int shownTick = -1;
 } // namespace detail
 
 inline bool isResimulating()

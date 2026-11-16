@@ -103,8 +103,7 @@ constexpr short iCountDownRectGroup[28] = {0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1
 void GameplayState::drawScreenFade()
 {
     if (game_values.screenfade > 0) {
-        rm->menu_shade.setalpha(static_cast<Uint8>(game_values.screenfade));
-        rm->menu_shade.draw(0, 0);
+        rm->drawShade(static_cast<Uint8>(game_values.screenfade));
     }
 }
 

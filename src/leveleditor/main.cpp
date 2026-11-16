@@ -177,7 +177,7 @@ void inner_main()
 	rm->spr_mapitems[2] = ImageLoader(convertPath("gfx/leveleditor/leveleditor_mapitems_thumbnail.png")).create();
 
 	rm->spr_dialog = ImageLoader(convertPath("gfx/leveleditor/leveleditor_dialog.png")).withAlpha(255).create();
-	rm->menu_shade = ImageLoader(convertPath("gfx/leveleditor/leveleditor_shade.png")).withAlpha(128).create();
+	rm->menu_shade = ImageLoader(convertPath("gfx/leveleditor/leveleditor_shade.png")).withAlpha(128).withChangingAlpha().create();
 
 	rm->spr_tileanimation[0] = ImageLoader(convertPath("gfx/packs/Classic/tilesets/tile_animation.png")).create();
 	rm->spr_tileanimation[1] = ImageLoader(convertPath("gfx/packs/Classic/tilesets/tile_animation_preview.png")).create();

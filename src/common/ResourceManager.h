@@ -65,6 +65,9 @@ public:
 	gfxFont			game_font_large;
 
 	gfxSprite		menu_shade;
+	bool			menu_shade_black = false;    // (all black: drawShade() darkens the screen instead)
+	// The menu shade over the screen with this alpha (fades, the pause dialog)
+	void drawShade(Uint8 alpha);
 	gfxSprite		menu_smw;
 	gfxSprite		menu_version;
 	gfxSprite		menu_plain_field;

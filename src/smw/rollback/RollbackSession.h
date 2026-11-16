@@ -111,6 +111,10 @@ struct SessionConfig {
     int maxPrediction = 8;     // ticks the simulation may run ahead of the confirmed inputs
     int checksumInterval = 60; // compare peer checksums every N frames; 0 = off
     uint32_t timeoutMs = 5000; // a peer that sends nothing for this long is gone
+    // Time sync skips ticks once we run this many frames ahead. Below it, the
+    // game may instead slow its clock a little (aheadFrames()): that is smooth,
+    // a skipped tick is a visible hitch.
+    float skipThreshold = 1.0f;
     uint8_t matchId = 0;
 };
 
@@ -198,6 +202,9 @@ public:
     const char* lostReason(int peer) const { return (peer >= 0 && peer < net::MAX_PEERS) ? m_peers[peer].lostReason : ""; }
     // The frame from which the CPU plays a lost peer's slots, -1 until agreed
     int dropFrame(int peer) const { return (peer >= 0 && peer < net::MAX_PEERS) ? m_peers[peer].dropFrame : -1; }
+    // How many frames we run ahead of the furthest behind peer (time sync's
+    // estimate; 0 or less: we aren't ahead)
+    float aheadFrames() const;
     // The slots the CPU has taken over (bit s; once their drop frame is agreed)
     uint8_t cpuSlots() const;
 
@@ -241,7 +248,7 @@ private:
         int received = 0;             // all its inputs below this frame are known
         int acked = 0;                // it has all our inputs below this frame
         int remoteFrame = 0;
-        int remoteAdvantage = 0;      // its estimate of how far it runs ahead of us
+        float remoteAdvantage = 0;    // its estimate of how far it runs ahead of us
         uint32_t lastReceiveMs = 0;
         uint32_t echoTime = 0;        // its latest send time
         uint32_t echoReceivedMs = 0;  // when we got it

@@ -1052,8 +1052,7 @@ void MenuState::update()
             rm->loadMenuGraphics();
 
             blitdest = rm->menu_backdrop.getSurface();
-            rm->menu_shade.setalpha(App::menuTransparency);
-            rm->menu_shade.draw(0, 0);
+            rm->drawShade(App::menuTransparency);
             blitdest = screen;
         } else if (MENU_CODE_WORLD_GRAPHICS_PACK_CHANGED == code) {
             rm->loadWorldGraphics();
@@ -1206,8 +1205,7 @@ void MenuState::update()
     }
 
     if (game_values.screenfade > 0) {
-        rm->menu_shade.setalpha(static_cast<Uint8>(game_values.screenfade));
-        rm->menu_shade.draw(0, 0);
+        rm->drawShade(static_cast<Uint8>(game_values.screenfade));
     }
 
     if (cmd::g_autotest.enabled && cmd::g_autotest.kind == cmd::AutoTestArgs::Kind::Shots)

@@ -65,6 +65,8 @@ public:
 private:
     SdlSurfacePtr m_picture;
     std::optional<int> m_wrap_x = std::nullopt;
+    Uint8 m_bakedAlpha = 255;    // the loading alpha, made part of the pixels (ImageLoader::withAlpha)
+    friend class ImageLoader;
 
     void blit(const SDL_Rect* srcRect, SDL_Surface* dst, Vec2i dstPos) const;
 };
@@ -83,12 +85,19 @@ public:
         m_color_key = std::nullopt;
         return *this;
     }
+    // A constant transparency: it is made part of the picture (drawn much faster);
+    // setalpha() is then relative to it and can't make the sprite more opaque
     ImageLoader& withAlpha(Uint8 alpha) {
         m_alpha = alpha;
         return *this;
     }
     ImageLoader& withWrapping(int wrap_x = 640) {
         m_wrap_x = wrap_x;
+        return *this;
+    }
+    // The transparency changes later (setalpha(), any value): kept as the surface's alpha modulation
+    ImageLoader& withChangingAlpha() {
+        m_changingAlpha = true;
         return *this;
     }
     ImageLoader& withoutOptimization() {
@@ -102,6 +111,7 @@ private:
     bool m_optimize = true;
     std::optional<RGB> m_color_key = colors::MAGENTA;
     std::optional<Uint8> m_alpha = std::nullopt;
+    bool m_changingAlpha = false;
     std::optional<int> m_wrap_x = std::nullopt;
 };
 

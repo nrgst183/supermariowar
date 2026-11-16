@@ -29,7 +29,7 @@
 // Multi-match modes (NetSeries.h): SERIES_BEGIN, SERIES_SCREEN, SERIES_END,
 // WHEEL_PRESS/WHEEL_STOP (bonus wheel), WORLD_INPUT/WORLD_TICK (world map).
 //
-// INPUT (sender -> one receiver, 26 + frames * slots bytes):
+// INPUT (sender -> one receiver, 27 + frames * slots bytes):
 //   u8  type
 //   u8  match id         (stale packets of an earlier match are ignored)
 //   u32 start frame      (first input frame in this packet)
@@ -37,7 +37,7 @@
 //   u32 ack              (number of the receiver's input frames the sender has:
 //                         all frames below this are known)
 //   u32 current frame    (sender's simulation frame, for time sync)
-//   i8  frame advantage  (sender's frames ahead of the receiver, as it estimates)
+//   i16 frame advantage  (sender's frames ahead of the receiver, as it estimates, in 1/64 frames)
 //   u32 send time (ms)   (sender's clock, echoed back for the ping)
 //   u32 echo time (ms)   (latest send time received from the receiver)
 //   u16 echo hold (ms)   (how long ago that echo time was received)
@@ -59,7 +59,7 @@
 namespace rollback::net {
 
 constexpr uint32_t PROTOCOL_MAGIC = 0x52574d53; // "SMWR"
-constexpr uint16_t PROTOCOL_VERSION = 4;    // 4: CPU players play by the host's input
+constexpr uint16_t PROTOCOL_VERSION = 5;    // 4: CPU players play by the host's input; 5: the time sync advantage in 1/64 frames
 
 constexpr int MAX_PEERS = 4;
 
@@ -111,7 +111,7 @@ enum class MsgType : uint8_t {
 // The series messages are the range [SeriesBegin, SERIES_MSG_END)
 constexpr uint8_t SERIES_MSG_END = 96;
 
-constexpr size_t INPUT_HEADER_SIZE = 26;
+constexpr size_t INPUT_HEADER_SIZE = 27;
 constexpr int MAX_INPUT_FRAMES_PER_PACKET = 120;
 
 class ByteWriter {

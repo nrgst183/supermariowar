@@ -289,6 +289,31 @@ SpriteStrip gfx_loadfullskin(const fs::path& path, short colorScheme)
     return strip;
 }
 
+bool gfx_darken(SDL_Surface* surface, Uint8 alpha)
+{
+    if (!surface || SDL_BYTESPERPIXEL(surface->format) != 4)
+        return false;
+    if (alpha == 0)
+        return true;
+    if (!SDL_LockSurface(surface))
+        return false;
+    //Each color channel times (255 - alpha) / 255; the alpha channel is kept
+    const Uint32 keep = 255u - alpha;
+    const SDL_PixelFormatDetails* details = SDL_GetPixelFormatDetails(surface->format);
+    const Uint32 alphaMask = details ? details->Amask : 0;
+    for (int y = 0; y < surface->h; y++) {
+        Uint32* row = reinterpret_cast<Uint32*>(static_cast<Uint8*>(surface->pixels) + static_cast<ptrdiff_t>(y) * surface->pitch);
+        for (int x = 0; x < surface->w; x++) {
+            const Uint32 p = row[x];
+            const Uint32 rb = (((p & 0x00ff00ffu) * keep + 0x00800080u) >> 8) & 0x00ff00ffu;
+            const Uint32 ga = (((p >> 8) & 0x00ff00ffu) * keep + 0x00800080u) & 0xff00ff00u;
+            row[x] = ((rb | ga) & ~alphaMask) | (p & alphaMask);
+        }
+    }
+    SDL_UnlockSurface(surface);
+    return true;
+}
+
 void gfx_cliprect(SDL_Rect& srcRect, SDL_Rect& dstRect, const SDL_Rect& clipArea)
 {
     if (dstRect.x >= clipArea.x + clipArea.w

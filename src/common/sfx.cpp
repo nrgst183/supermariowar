@@ -1,5 +1,8 @@
 #include "sfx.h"
 
+#include <array>
+#include <cstdlib>
+
 #include "Resimulation.h"
 
 #include <SDL3/SDL.h>
@@ -251,12 +254,41 @@ sfxSound::sfxSound(const fs::path& path)
     : m_audio(s_audiosys->openAudio(path))
 {}
 
+namespace {
+// The sounds played lately, with the tick that played them (online: a rollback doesn't play
+// them again, see sim::detail::rollbackTick)
+struct PlayedSound {
+    const sfxSound* sound = nullptr;
+    int tick = -1;
+    Uint32 ms = 0;
+};
+std::array<PlayedSound, 32> s_played {};
+size_t s_playedNext = 0;
+// A sound found by a rollback this many ticks back or less is still played (about 100 ms)
+constexpr int LATE_SOUND_TICKS = 6;
+
+bool heardRecently(const sfxSound* sound, int tick, Uint32 now)
+{
+    for (const PlayedSound& p : s_played) {
+        if (p.sound == sound && now - p.ms < 1000 && std::abs(p.tick - tick) <= 3)
+            return true;
+    }
+    return false;
+}
+} // namespace
+
 bool sfxSound::play()
 {
-    if (sim::isResimulating())
-        return false;
-
     const Uint32 current_time = SDL_GetTicks();
+    int tick = sim::detail::shownTick;
+    if (sim::isResimulating()) {
+        //A rollback's re-simulated tick: only a sound it found near the present, that wasn't heard
+        tick = sim::detail::rollbackTick;
+        const int late = sim::detail::shownTick - tick;
+        if (tick < 0 || late < 0 || late > LATE_SOUND_TICKS || heardRecently(this, tick, current_time))
+            return false;
+    }
+
     if (current_time - m_last_start_time < 40)
         return false;
 
@@ -264,6 +296,8 @@ bool sfxSound::play()
 
     m_last_start_time = current_time;
     ownChannel(track_ptr, track_idx);
+    s_played[s_playedNext] = {this, tick, current_time};
+    s_playedNext = (s_playedNext + 1) % s_played.size();
     return true;
 }
 

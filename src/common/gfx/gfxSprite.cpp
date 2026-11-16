@@ -4,6 +4,7 @@
 
 #include <SDL3_image/SDL_image.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <filesystem>
@@ -15,11 +16,43 @@ namespace fs = std::filesystem;
 
 
 namespace {
+// A constant transparency made part of the picture: the color key becomes transparent pixels and
+// every pixel's alpha is scaled by `alpha`. SDL blits per-pixel alpha with its fast (SIMD) blitters,
+// but a surface with an alpha modulation goes through its slowest, generic one: the eyecandy, the
+// score panels' shade and the like were most of the drawing time.
+SdlSurfacePtr bakeAlpha(SdlSurfacePtr img, Uint8 alpha, std::optional<RGB> colorKey)
+{
+    SdlSurfacePtr argb(SDL_ConvertSurface(img.get(), SDL_PIXELFORMAT_ARGB8888));
+    if (!argb)
+        return img;
+    const bool keyed = colorKey.has_value();
+    const Uint32 key = keyed ? (static_cast<Uint32>(colorKey->r) << 16) | (static_cast<Uint32>(colorKey->g) << 8) | colorKey->b : 0;
+    if (!SDL_LockSurface(argb.get()))
+        return img;
+    for (int y = 0; y < argb->h; y++) {
+        Uint32* row = reinterpret_cast<Uint32*>(static_cast<Uint8*>(argb->pixels) + static_cast<ptrdiff_t>(y) * argb->pitch);
+        for (int x = 0; x < argb->w; x++) {
+            const Uint32 p = row[x];
+            if (keyed && (p & 0x00ffffffu) == key) {
+                row[x] = p & 0x00ffffffu;
+                continue;
+            }
+            const Uint32 a = ((p >> 24) * alpha + 127) / 255;
+            row[x] = (p & 0x00ffffffu) | (a << 24);
+        }
+    }
+    SDL_UnlockSurface(argb.get());
+    SDL_SetSurfaceColorKey(argb.get(), false, 0);
+    SDL_SetSurfaceBlendMode(argb.get(), SDL_BLENDMODE_BLEND);
+    return argb;
+}
+
 SdlSurfacePtr loadImage(
     const fs::path& path,
     bool optimize = true,
     std::optional<RGB> color_key = std::nullopt,
-    std::optional<Uint8> alpha = std::nullopt)
+    std::optional<Uint8> alpha = std::nullopt,
+    bool bake = false)
 {
     const std::string path_str = path.generic_string();
 
@@ -50,13 +83,17 @@ SdlSurfacePtr loadImage(
         throw std::format("Couldn't convert {} to the display's pixel format: {}", path_str, SDL_GetError());
     }
 
+    const bool baked = alpha && bake && *alpha < 255;
+    if (baked)
+        img = bakeAlpha(std::move(img), *alpha, color_key);
+
     if (optimize) {
         if (!SDL_SetSurfaceRLE(img.get(), 1)) {
             throw std::format("Couldn't set RLE acceleration for {}: {}", path_str, SDL_GetError());
         }
     }
 
-    if (alpha) {
+    if (alpha && !baked) {
         if (!SDL_SetSurfaceBlendMode(img.get(), SDL_BLENDMODE_BLEND)) {
             throw std::format("Couldn't set blend mode for {}: {}", path_str, SDL_GetError());
         }
@@ -172,6 +209,10 @@ void gfxSprite::setalpha(Uint8 alpha)
 {
     assert(m_picture != nullptr);
 
+    //(its loading alpha is in its pixels: relative to that, it can only get more transparent)
+    if (m_bakedAlpha < 255)
+        alpha = static_cast<Uint8>(std::min(255, alpha * 255 / std::max<int>(1, m_bakedAlpha)));
+
     if (!SDL_SetSurfaceBlendMode(m_picture.get(), SDL_BLENDMODE_BLEND)) {
         fprintf(stderr, "\n ERROR: couldn't set blend mode on sprite: %s\n", SDL_GetError());
         return;
@@ -190,5 +231,8 @@ void gfxSprite::setWrap(short wrapsize)
 
 gfxSprite ImageLoader::create() const
 {
-    return gfxSprite(loadImage(m_path, m_optimize, m_color_key, m_alpha), m_wrap_x);
+    gfxSprite sprite(loadImage(m_path, m_optimize, m_color_key, m_alpha, !m_changingAlpha), m_wrap_x);
+    if (m_alpha && !m_changingAlpha && *m_alpha < 255)
+        sprite.m_bakedAlpha = *m_alpha;
+    return sprite;
 }

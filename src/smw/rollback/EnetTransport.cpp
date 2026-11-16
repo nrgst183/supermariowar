@@ -173,6 +173,11 @@ bool EnetTransport::poll(TransportEvent& event)
                     enet_peer_reset(ev.peer);
                     continue;
                 }
+                //No packet throttle: ENet drops a share of the unreliable packets while the round trip
+                //time jitters (its congestion control), and those are the inputs, a few bytes each:
+                //every dropped one is a late input (a rollback or a wait) exactly when the connection
+                //is bad. (Once connected: a command queued while connecting breaks the handshake.)
+                enet_peer_throttle_configure(ev.peer, ENET_PEER_PACKET_THROTTLE_INTERVAL, ENET_PEER_PACKET_THROTTLE_SCALE, 0);
                 event = TransportEvent();
                 event.type = TransportEvent::Type::Connected;
                 event.connection = connection;

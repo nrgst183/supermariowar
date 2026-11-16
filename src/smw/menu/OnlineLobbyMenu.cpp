@@ -134,7 +134,7 @@ void UI_OnlineLobbyMenu::RebuildDelayItems(int autoDelay)
     m_delayAuto = autoDelay;
     miInputDelay->clear();
     miInputDelay->add(std::format("Auto ({})", autoDelay), -1);
-    for (short delay = 1; delay <= 6; delay++)
+    for (short delay = 0; delay <= 6; delay++)
         miInputDelay->add(std::to_string(delay), delay);
     miInputDelay->setCurrentIndex(0);
 }

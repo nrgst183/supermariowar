@@ -15,8 +15,8 @@ using net::MsgType;
 
 namespace {
 constexpr float TICK_MS = 16.0f;
-constexpr int ROLLBACK_FRAMES = 3;
-constexpr int MIN_DELAY = 1;
+constexpr int ROLLBACK_FRAMES = 4;    // (a correction glides: GameplayCorrection.h)
+constexpr int MIN_DELAY = 0;    // (on a LAN the inputs arrive within a frame: rollback alone hides that)
 constexpr int MAX_DELAY = 6;
 constexpr uint32_t STATE_INTERVAL_MS = 100;    // at most this often (host)
 

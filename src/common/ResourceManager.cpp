@@ -3,6 +3,7 @@
 #include "FileList.h"
 #include "Game.h"
 #include "GameValues.h"
+#include "gfx.h"
 #include "TilesetManager.h"
 #include "path.h"
 #include "gfx/Color.h"
@@ -10,6 +11,8 @@
 #include <iostream>
 
 namespace fs = std::filesystem;
+
+static bool isAllBlack(const gfxSprite& sprite);
 
 
 bool CResourceManager::LoadMenuSkin(short playerID, short skinID, short colorID, bool fLoadBothDirections)
@@ -299,7 +302,8 @@ void CResourceManager::loadMenuGraphics()
         return ImageLoader(convertPath(relpath, graphicspack));
     };
 
-    menu_shade = builder("gfx/packs/menu/menu_shade.png").withAlpha(App::menuTransparency).withoutColorKey().create();
+    menu_shade = builder("gfx/packs/menu/menu_shade.png").withAlpha(App::menuTransparency).withChangingAlpha().withoutColorKey().create();
+    menu_shade_black = isAllBlack(menu_shade);
 
     spr_scoreboard = builder("gfx/packs/menu/scoreboard.png").create();
     menu_slider_bar = builder("gfx/packs/menu/menu_slider_bar.png").create();
@@ -483,4 +487,32 @@ bool CResourceManager::LoadGameSounds()
 
     game_values.soundcapable = true;
     return true;
+}
+
+static bool isAllBlack(const gfxSprite& sprite)
+{
+    SDL_Surface* surface = sprite.getSurface();
+    if (!surface || SDL_BYTESPERPIXEL(surface->format) != 4 || surface->w < 640 || surface->h < 480)
+        return false;
+    const SDL_PixelFormatDetails* details = SDL_GetPixelFormatDetails(surface->format);
+    const Uint32 alphaMask = details ? details->Amask : 0;
+    const Uint32 black = SDL_MapSurfaceRGB(surface, 0, 0, 0) & ~alphaMask;
+    if (!SDL_LockSurface(surface))
+        return false;
+    bool all = true;
+    for (int y = 0; y < surface->h && all; y++) {
+        const Uint32* row = reinterpret_cast<const Uint32*>(static_cast<const Uint8*>(surface->pixels) + static_cast<ptrdiff_t>(y) * surface->pitch);
+        for (int x = 0; x < surface->w && all; x++)
+            all = (row[x] & ~alphaMask) == black && (row[x] & alphaMask) == alphaMask;
+    }
+    SDL_UnlockSurface(surface);
+    return all;
+}
+
+void CResourceManager::drawShade(Uint8 alpha)
+{
+    if (menu_shade_black && blitdest && gfx_darken(blitdest, alpha))
+        return;
+    menu_shade.setalpha(alpha);
+    menu_shade.draw(0, 0);
 }
