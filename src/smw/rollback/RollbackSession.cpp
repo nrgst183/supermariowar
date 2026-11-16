@@ -1,6 +1,7 @@
 #include "RollbackSession.h"
 
 #include <algorithm>
+#include <cstring>
 #include <climits>
 #include <cmath>
 
@@ -289,7 +290,8 @@ bool RollbackSession::drained() const
 void RollbackSession::sendInputs(uint32_t nowMs)
 {
     const Peer& local = m_peers[m_config.localPeer];
-    const uint32_t sendTime = nowMs ? nowMs : 1;    //0 means "no time" in an echo
+    //(the low 16 bits of the clock: enough for a round trip; 0 means "no time" in an echo)
+    const uint16_t sendTime = static_cast<uint16_t>(nowMs) ? static_cast<uint16_t>(nowMs) : 1;
 
     for (int p = 0; p < m_config.peerCount; p++) {
         if (!isRemote(p) || !m_peers[p].connected || m_peers[p].lost)
@@ -302,20 +304,49 @@ void RollbackSession::sendInputs(uint32_t nowMs)
         const int advantage = static_cast<int>(std::lround(std::clamp(localAdvantage(peer, nowMs), -500.0f, 500.0f) * 64.0f));
         const uint32_t hold = peer.echoTime ? static_cast<uint32_t>(std::max(0, msDiff(nowMs, peer.echoReceivedMs))) : 0;
 
+        //The inputs: as they are, or as runs of the same input when that is shorter
+        const int slots = local.slotCount;
+        auto sameAsBefore = [&](int f) {
+            for (int i = 0; i < slots; i++) {
+                if (input(f, local.slots[i]) != input(f - 1, local.slots[i]))
+                    return false;
+            }
+            return true;
+        };
+        int runs = 0;
+        for (int f = start; f < start + count; f++) {
+            if (f == start || !sameAsBefore(f) || runs == 0)
+                runs++;
+        }
+        //(a run is at most 255 frames: count is at most MAX_INPUT_FRAMES_PER_PACKET)
+        const bool coded = count > 0 && runs * (1 + slots) < count * slots;
+
         net::ByteWriter w(m_packet, sizeof(m_packet));
         w.u8(static_cast<uint8_t>(net::MsgType::Input));
         w.u8(m_config.matchId);
-        w.u32(static_cast<uint32_t>(start));
-        w.u8(static_cast<uint8_t>(count));
-        w.u32(static_cast<uint32_t>(peer.received));
         w.u32(static_cast<uint32_t>(m_frame));
+        w.i16(static_cast<int16_t>(start - m_frame));
+        w.u8(static_cast<uint8_t>(count | (coded ? net::INPUT_RUNS : 0)));
+        w.i16(static_cast<int16_t>(std::clamp(peer.received - m_frame, -32768, 32767)));
         w.i16(static_cast<int16_t>(advantage));
-        w.u32(sendTime);
-        w.u32(peer.echoTime);
+        w.u16(sendTime);
+        w.u16(peer.echoTime);
         w.u16(static_cast<uint16_t>(std::min<uint32_t>(hold, 0xffff)));
-        for (int f = start; f < start + count; f++) {
-            for (int i = 0; i < local.slotCount; i++)
-                w.u8(input(f, local.slots[i]));
+        if (coded) {
+            for (int f = start; f < start + count;) {
+                int run = 1;
+                while (f + run < start + count && sameAsBefore(f + run))
+                    run++;
+                w.u8(static_cast<uint8_t>(run));
+                for (int i = 0; i < slots; i++)
+                    w.u8(input(f, local.slots[i]));
+                f += run;
+            }
+        } else {
+            for (int f = start; f < start + count; f++) {
+                for (int i = 0; i < slots; i++)
+                    w.u8(input(f, local.slots[i]));
+            }
         }
 
         m_transport.send(m_config.peerConnection[p], Channel::Unreliable, w.data(), w.size());
@@ -348,15 +379,36 @@ void RollbackSession::receiveInput(int p, const uint8_t* data, size_t size, uint
     net::ByteReader r(data, size);
     r.u8();
     r.u8();
-    const int start = static_cast<int>(r.u32());
-    const int count = r.u8();
-    const int ack = static_cast<int>(r.u32());
     const int remoteFrame = static_cast<int>(r.u32());
+    const int start = remoteFrame + r.i16();
+    const uint8_t countByte = r.u8();
+    const int count = countByte & ~net::INPUT_RUNS;
+    const int ack = remoteFrame + r.i16();
     const float advantage = static_cast<float>(r.i16()) / 64.0f;
-    const uint32_t sendTime = r.u32();
-    const uint32_t echoTime = r.u32();
+    const uint16_t sendTime = r.u16();
+    const uint16_t echoTime = r.u16();
     const uint32_t echoHold = r.u16();
-    const uint8_t* inputs = r.bytes(static_cast<size_t>(count) * static_cast<size_t>(peer.slotCount));
+    if (!r.ok() || count > net::MAX_INPUT_FRAMES_PER_PACKET)
+        return;
+    const size_t slots = static_cast<size_t>(peer.slotCount);
+    uint8_t decoded[net::MAX_INPUT_FRAMES_PER_PACKET * INPUT_MAX_PLAYERS];
+    const uint8_t* inputs = nullptr;
+    if (countByte & net::INPUT_RUNS) {
+        //Runs: u8 frames + the slots' inputs, until every frame is there
+        int frames = 0;
+        while (frames < count) {
+            const int run = r.u8();
+            const uint8_t* values = r.bytes(slots);
+            if (!r.ok() || run == 0 || frames + run > count)
+                return;
+            for (int f = 0; f < run; f++)
+                std::memcpy(decoded + static_cast<size_t>(frames + f) * slots, values, slots);
+            frames += run;
+        }
+        inputs = decoded;
+    } else {
+        inputs = r.bytes(static_cast<size_t>(count) * slots);
+    }
     if (!r.ok() || r.remaining() != 0)
         return;
 
@@ -365,7 +417,8 @@ void RollbackSession::receiveInput(int p, const uint8_t* data, size_t size, uint
         peer.acked = std::max(peer.acked, ack);
 
     //Timing: only from the newest packet
-    if (peer.echoTime == 0 || msDiff(sendTime, peer.echoTime) > 0) {
+    //(16 bit times: newer when less than half the range ahead)
+    if (peer.echoTime == 0 || static_cast<int16_t>(static_cast<uint16_t>(sendTime - peer.echoTime)) > 0) {
         peer.echoTime = sendTime;
         peer.echoReceivedMs = nowMs;
         peer.remoteFrame = remoteFrame;
@@ -373,7 +426,7 @@ void RollbackSession::receiveInput(int p, const uint8_t* data, size_t size, uint
         peer.avgRemoteAdvantage += (advantage - peer.avgRemoteAdvantage) * AVERAGE_WEIGHT;
 
         if (echoTime != 0) {
-            const int32_t rtt = msDiff(nowMs, echoTime) - static_cast<int32_t>(echoHold);
+            const int32_t rtt = static_cast<int32_t>(static_cast<uint16_t>(static_cast<uint16_t>(nowMs) - echoTime)) - static_cast<int32_t>(echoHold);
             if (rtt >= 0 && rtt < 10000)
                 peer.rttMs = peer.rttMs == 0 ? static_cast<float>(rtt) : peer.rttMs + (static_cast<float>(rtt) - peer.rttMs) * AVERAGE_WEIGHT;
         }

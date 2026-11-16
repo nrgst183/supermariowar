@@ -434,6 +434,19 @@ bool drawBrushTiles(const Brush& b, int x, int y, int size)
     return true;
 }
 
+bool drawBrushTile(const Brush& b, int dc, int dr, int x, int y)
+{
+    if (b.mode != 1 || b.id < 0 || static_cast<size_t>(b.id) >= g_tilesetmanager->count() || b.cols < 1 || b.rows < 1)
+        return false;
+    //(the selection's pattern, repeated: as a rectangle paints it)
+    const int c = ((dc % b.cols) + b.cols) % b.cols;
+    const int r = ((dr % b.rows) + b.rows) % b.rows;
+    const SDL_Rect dst {x, y, 32, 32};
+    g_tilesetmanager->tileset(b.id)->draw(DrawSize::Ingame,
+        CTilesetManager::rect(DrawSize::Ingame, static_cast<size_t>(b.x + c), static_cast<size_t>(b.y + r)), screen, dst);
+    return true;
+}
+
 bool drawTiles(int x, int y, int size)
 {
     Brush b;

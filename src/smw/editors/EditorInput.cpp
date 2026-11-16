@@ -1234,8 +1234,9 @@ void updatePointer(int index)
         }
         dx += mx - p.x + static_cast<float>(stepX * TILE);
         dy += my - p.y + static_cast<float>(stepY * TILE);
-    } else if (picking && (p.last.lx != 0 || p.last.ly != 0) && p.pad.lx == 0 && p.pad.ly == 0) {
-        //(the stick let go: onto the middle of its tile)
+    } else if ((picking || (levelMap() && s.overlay == Overlay::None && !inWindow(p.x, p.y))) && (p.last.lx != 0 || p.last.ly != 0) &&
+               p.pad.lx == 0 && p.pad.ly == 0) {
+        //(the stick let go, on the tileset or the map: onto the middle of its cell, so it is clear which one it is)
         dx += std::floor(p.x / TILE) * TILE + TILE / 2.0f - p.x;
         dy += std::floor(p.y / TILE) * TILE + TILE / 2.0f - p.y;
     }
@@ -2407,7 +2408,7 @@ void reticle(float px, float py, SDL_Color c, const std::string& tag)
 }
 
 // Cells framed (a rectangle being drawn, the area to paste): a dashed frame in a color, and a tag
-void cellFrame(int c0, int r0, int c1, int r1, SDL_Color c, const std::string& tag)
+void cellFrame(int c0, int r0, int c1, int r1, SDL_Color c, const std::string& tag, float pointerY = -1)
 {
     const int x = std::min(c0, c1) * TILE;
     const int y = std::min(r0, r1) * TILE;
@@ -2432,11 +2433,96 @@ void cellFrame(int c0, int r0, int c1, int r1, SDL_Color c, const std::string& t
     if (!tag.empty()) {
         const int tw = theme::font().getWidth(tag) + 8;
         const int tx = std::clamp(x, 0, SCREEN_W - tw);
-        const int ty = y + h + 4 + 16 <= SCREEN_H ? y + h + 4 : std::max(0, y - 20);
+        //(below; above when the pointer is in its lower half, so the glove doesn't cover it)
+        const bool above = (pointerY >= 0 && pointerY >= static_cast<float>(y + h / 2) && y - 20 >= 0) || y + h + 4 + 16 > SCREEN_H;
+        const int ty = above ? std::max(0, y - 20) : y + h + 4;
         fill(tx, ty, tw, 16, black);
         fill(tx + 1, ty + 1, tw - 2, 14, c);
         fill(tx + 1, ty + 1, tw - 2, 2, theme::shade(c, 140));
         theme::font().draw(tx + 4, ty + 1, tag);
+    }
+}
+
+// What A would put down, faint over the map: the selection in each cell of a rectangle (tiles: their
+// pattern repeating, as painting does it); erasing, the cells tinted red
+void drawGhost(int c0, int r0, int c1, int r1, bool erase)
+{
+    namespace sh = leveleditor::shell;
+    const int x0 = std::clamp(std::min(c0, c1), 0, sh::MAP_COLS - 1);
+    const int y0 = std::clamp(std::min(r0, r1), 0, sh::MAP_ROWS - 1);
+    const int x1 = std::clamp(std::max(c0, c1), 0, sh::MAP_COLS - 1);
+    const int y1 = std::clamp(std::max(r0, r1), 0, sh::MAP_ROWS - 1);
+    const SDL_Rect area {x0 * TILE, y0 * TILE, (x1 - x0 + 1) * TILE, (y1 - y0 + 1) * TILE};
+    if (erase) {
+        static SDL_Surface* red = nullptr;
+        if (!red) {
+            red = SDL_CreateSurface(TILE, TILE, SDL_PIXELFORMAT_ARGB8888);
+            if (!red)
+                return;
+            SDL_FillSurfaceRect(red, nullptr, SDL_MapSurfaceRGBA(red, 216, 40, 32, 110));
+            SDL_SetSurfaceBlendMode(red, SDL_BLENDMODE_BLEND);
+        }
+        for (int c = x0; c <= x1; c++) {
+            for (int r = y0; r <= y1; r++) {
+                SDL_Rect dst {c * TILE, r * TILE, TILE, TILE};
+                SDL_BlitSurface(red, nullptr, screen, &dst);
+            }
+        }
+        return;
+    }
+    const sh::Brush b = sh::brush();
+    if (b.mode < 0)
+        return;
+    static SDL_Surface* canvas = nullptr;
+    if (!canvas) {
+        canvas = SDL_CreateSurface(SCREEN_W, SCREEN_H, SDL_PIXELFORMAT_ARGB8888);
+        if (!canvas)
+            return;
+        SDL_SetSurfaceBlendMode(canvas, SDL_BLENDMODE_BLEND);
+        SDL_SetSurfaceAlphaMod(canvas, 150);
+    }
+    SDL_FillSurfaceRect(canvas, &area, SDL_MapSurfaceRGBA(canvas, 0, 0, 0, 0));
+    SDL_Surface* const was = screen;
+    SDL_Surface* const wasDest = blitdest;
+    screen = canvas;
+    blitdest = canvas;
+    for (int c = x0; c <= x1; c++) {
+        for (int r = y0; r <= y1; r++) {
+            if (b.mode == 1)
+                sh::drawBrushTile(b, c - x0, r - y0, c * TILE, r * TILE);
+            else
+                drawBrush(b, c * TILE, r * TILE);
+        }
+    }
+    screen = was;
+    blitdest = wasDest;
+    SDL_Rect dst = area;
+    SDL_BlitSurface(canvas, &area, screen, &dst);
+}
+
+// Where each controller's A would paint now (no tool armed, not drawing a rectangle): the selection,
+// faint, in the cell (the tiles: all of them, from there)
+void drawGhosts()
+{
+    namespace sh = leveleditor::shell;
+    if (s.armed != Armed::None || s.overlay != Overlay::None || !sh::paintsCells())
+        return;
+    const int tool = currentTool();
+    if (tool == TOOL_PICK)
+        return;
+    for (const Pointer& p : s.pointers) {
+        if (!p.shown || p.drag >= 0 || inWindow(p.x, p.y))
+            continue;
+        const int c = std::clamp(static_cast<int>(p.x) / TILE, 0, sh::MAP_COLS - 1);
+        const int r = std::clamp(static_cast<int>(p.y) / TILE, 0, sh::MAP_ROWS - 1);
+        if (tool == TOOL_ERASE) {
+            drawGhost(c, r, c, r, true);
+            continue;
+        }
+        const sh::Brush b = sh::brush();
+        const int w = b.mode == 1 ? b.cols : 1;
+        const int h = b.mode == 1 ? b.rows : 1;
+        drawGhost(c, r, c + w - 1, r + h - 1, false);
     }
 }
 
@@ -2456,25 +2542,27 @@ void drawCellTools()
         int c = 0, r = 0;
         cellOf(p.x, p.y, &c, &r);
         const bool erase = p.drag == B || currentTool() == TOOL_ERASE;
+        if (s.armed != Armed::Copy)
+            drawGhost(p.dragCol, p.dragRow, c, r, erase);
         const std::string size = std::to_string(std::abs(c - p.dragCol) + 1) + " x " + std::to_string(std::abs(r - p.dragRow) + 1);
         cellFrame(p.dragCol, p.dragRow, c, r, s.armed == Armed::Copy ? SDL_Color {255, 255, 255, 255} : erase ? red : pointerColor(static_cast<int>(k)),
-            s.armed == Armed::Copy ? "Copy " + size : erase ? "Clear " + size : size);
+            s.armed == Armed::Copy ? "Copy " + size : erase ? "Clear " + size : size, p.y);
     }
     if (s.mouseDrag) {
         int c = 0, r = 0;
         cellOf(s.cx, s.cy, &c, &r);
-        cellFrame(s.mouseDragCol, s.mouseDragRow, c, r, {255, 255, 255, 255}, "Copy");
+        cellFrame(s.mouseDragCol, s.mouseDragRow, c, r, {255, 255, 255, 255}, "Copy", s.cy);
     }
     if (s.armed == Armed::Paste) {
         int w = 1, h = 1;
         sh::clipboard(&w, &h);
         int c = 0, r = 0;
         cellOf(s.cx, s.cy, &c, &r);
-        cellFrame(c, r, std::min(c + w - 1, sh::MAP_COLS - 1), std::min(r + h - 1, sh::MAP_ROWS - 1), {255, 255, 255, 255}, "Paste here (A)");
+        cellFrame(c, r, std::min(c + w - 1, sh::MAP_COLS - 1), std::min(r + h - 1, sh::MAP_ROWS - 1), {255, 255, 255, 255}, "Paste here (A)", s.cy);
     } else if (s.armed == Armed::Fill) {
         int c = 0, r = 0;
         cellOf(s.cx, s.cy, &c, &r);
-        cellFrame(c, r, c, r, {255, 255, 255, 255}, "Fill from here (A)");
+        cellFrame(c, r, c, r, {255, 255, 255, 255}, "Fill from here (A)", s.cy);
     }
 }
 
@@ -2592,35 +2680,54 @@ void drawTilePicker(const leveleditor::shell::TilePicker& picker)
     }
 }
 
-// The level editor's chip when the window is closed: what is selected, the layer, the cell; with a
-// controller, its buttons on the map below
+// The level editor's chip when the window is closed: what A puts down (or the tool), the layers, the
+// cell; with a controller, the last things picked and what its buttons do now
 void drawChip()
 {
     namespace sh = leveleditor::shell;
-    const std::string name = selectionName();
+    const int tool = currentTool();
+    const sh::Brush brush = sh::brush();
+    //(the name: the tool when it isn't painting, else the selection, with its size for tiles)
+    std::string name = tool == TOOL_ERASE ? "Eraser" : tool == TOOL_PICK ? "Take: A picks up a cell" : selectionName();
+    if (tool == TOOL_PAINT && brush.mode == 1)
+        name = brushName(brush);
     const int col = static_cast<int>(s.cx) / TILE;
     const int row = static_cast<int>(s.cy) / TILE;
-    const std::string info = "Layer " + std::to_string(sh::layer() + 1) + "   " + std::to_string(col) + "," + std::to_string(row);
+    const std::string where = std::to_string(col) + "," + std::to_string(row);
     const bool controller = prompts::lastDevice() == prompts::Device::Controller;
     const std::vector<prompts::Prompt> row1 = controller ? std::vector<prompts::Prompt> {{{prompts::Pad::Start}, {}, "editor"}}
                                                          : std::vector<prompts::Prompt> {{{}, {"Tab"}, "editor"}};
-    //(the buttons; with a tool armed, what they do with it)
+    //(the buttons: what they do now; with a tool armed, what they do with it)
+    bool dragging = false;
+    for (const Pointer& p : s.pointers)
+        dragging = dragging || p.drag >= 0;
     std::vector<prompts::Prompt> buttons;
     if (s.armed == Armed::Copy)
-        buttons = {{{prompts::Pad::A}, {}, "hold and drag over the cells to copy"}, {{prompts::Pad::B}, {}, "stop"}};
+        buttons = {{{prompts::Pad::A}, {}, "hold, move over the cells, let go"}, {{prompts::Pad::B}, {}, "stop"}};
     else if (s.armed == Armed::Paste)
         buttons = {{{prompts::Pad::A}, {}, "paste here"}, {{prompts::Pad::B}, {}, "stop pasting"}};
     else if (s.armed == Armed::Fill)
         buttons = {{{prompts::Pad::A}, {}, "fill from this cell"}, {{prompts::Pad::B}, {}, "stop"}};
+    else if (dragging)
+        buttons = {{{prompts::Pad::LStick}, {}, "size the rectangle"}, {{}, {}, "let go to fill it"}};
+    else if (sh::paintsCells() && tool != TOOL_PICK)
+        buttons = {{{prompts::Pad::A}, {}, tool == TOOL_ERASE ? "erase (hold: area)" : "place (hold: area)"},
+            {{prompts::Pad::B}, {}, "erase"}, {{prompts::Pad::X}, {}, "take"}, {{prompts::Pad::Y}, {}, "layer"},
+            {{prompts::Pad::RStick}, {}, "tools"}};
     else
-        buttons = {{{prompts::Pad::A}, {}, "place"}, {{prompts::Pad::B}, {}, "remove"}, {{prompts::Pad::X}, {}, "take"},
-            {{prompts::Pad::Y}, {}, "layer"}, {{prompts::Pad::RStick}, {}, "tools"}, {{prompts::Pad::LStick}, {}, "view"}};
+        buttons = {{{prompts::Pad::A}, {}, tool == TOOL_PICK ? "take this" : "place"}, {{prompts::Pad::B}, {}, "remove"},
+            {{prompts::Pad::X}, {}, "take"}, {{prompts::Pad::Y}, {}, "layer"}, {{prompts::Pad::RStick}, {}, "tools"}};
     const int pw = prompts::promptsWidth(row1, 14);
     const int bw = controller && s.hints ? prompts::promptsWidth(buttons, 10) : 0;
+    //(the layers: four boxes, the one painted on lit)
+    const int pillW = 22;
+    const int layersW = theme::font().getWidth("Layer") + 6 + 4 * (pillW + 3);
+    const std::string info = where;
     //(the last things picked, with LB and RB at their ends)
     const bool recents = controller && s.recents.size() >= 2;
     const int recentW = recents ? static_cast<int>(s.recents.size()) * 26 + 2 * prompts::padWidth(prompts::Pad::LB) + 12 : 0;
-    const int w = std::max({46 + std::max(theme::font().getWidth(name), theme::font().getWidth(info)) + 16 + pw + 10, bw + 20, recentW + 20});
+    const int line2 = layersW + 12 + theme::font().getWidth(info);
+    const int w = std::max({46 + std::max(theme::font().getWidth(name), line2) + 16 + pw + 10, bw + 20, recentW + 20});
     const int h = 46 + (recents ? 28 : 0) + (bw > 0 ? 24 : 0);
     //(bottom left; at the top while a pointer is down there)
     bool low = s.cy > SCREEN_H - h - 44 && s.cx < w + 30;
@@ -2630,17 +2737,31 @@ void drawChip()
     const int y = low ? 6 : SCREEN_H - h - 6;
     theme::strip(x, y, w, h);
     theme::inset(x + 6, y + 6, 34, 34);
-    drawSelection(x + 7, y + 7);
+    if (tool == TOOL_ERASE)
+        drawArt(x + 15, y + 15, ART_ERASER);
+    else if (tool == TOOL_PICK)
+        drawArt(x + 15, y + 15, ART_PICK);
+    else
+        drawSelection(x + 7, y + 7);
     theme::font().draw(x + 46, y + 7, name);
-    theme::font().draw(x + 46, y + 24, info);
+    //(the layers)
+    int lx = x + 46;
+    theme::font().draw(lx, y + 24, "Layer");
+    lx += theme::font().getWidth("Layer") + 6;
+    for (int k = 0; k < 4; k++) {
+        const bool on = sh::layer() == k;
+        theme::block(lx, y + 24, pillW, 16, on ? theme::Tone::Green : theme::Tone::Dark);
+        theme::font().drawCentered(lx + pillW / 2, y + 24, std::to_string(k + 1));
+        lx += pillW + 3;
+    }
+    theme::font().draw(lx + 9, y + 24, info);
     prompts::drawPrompts(x + w - pw / 2 - 8, y + 14, row1);
     int by = y + 47;
     if (recents) {
         int rx = x + 10;
         rx += prompts::drawPad(rx, by + 4, prompts::Pad::LB) + 4;
-        const leveleditor::shell::Brush now = sh::brush();
-        for (const leveleditor::shell::Brush& b : s.recents) {
-            if (b == now) {
+        for (const sh::Brush& b : s.recents) {
+            if (b == brush) {
                 fill(rx - 2, by - 2, 28, 28, {0, 0, 0, 255});
                 fill(rx - 1, by - 1, 26, 26, {248, 200, 24, 255});
             }
@@ -2949,8 +3070,10 @@ void drawOverlay()
     leveleditor::shell::TilePicker picker;
     if (s.editor == Editor::Level && !keyboard && leveleditor::shell::tilePicker(&picker))
         drawTilePicker(picker);
-    if (levelMap() && !keyboard)
+    if (levelMap() && !keyboard) {
+        drawGhosts();
         drawCellTools();
+    }
     //Where everyone edits: a reticle on each player's cell
     if (mapView && !keyboard) {
         const bool several = s.pointers.size() > 1 || coedit::active();

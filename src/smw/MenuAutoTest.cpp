@@ -563,7 +563,9 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         auto tap = [](int f, int from) { return f >= from && f < from + 2; };
         auto levelScript = [tap](editors::Editor, int f, int) {
             TestInput t;
-            //A rectangle of blocks: A held from one cell to another
+            //A rectangle of the ground's tile (taken with X): A held from one cell to another
+            if (f < 5) { t.px = 16; t.py = 464; }
+            t.x = f >= 2 && f < 4;
             if (f >= 5 && f < 26) { t.px = 80; t.py = 240; }
             t.a = f >= 20 && f < 45;
             if (f >= 26 && f < 45) { t.px = 240; t.py = 304; }
@@ -596,7 +598,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             if (f == 178) t.shot = "x7_pasted";
             //The ground's tile taken (X), then the rectangle's tiles filled with it
             if (f >= 180 && f < 188) { t.px = 16; t.py = 464; }
-            t.x = tap(f, 183);
+            t.x = t.x || tap(f, 183);
             t.rs = t.rs || tap(f, 188);
             t.down = t.down || tap(f, 192) || tap(f, 196) || tap(f, 200) || tap(f, 204);
             t.a = t.a || tap(f, 208);

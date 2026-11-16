@@ -93,6 +93,8 @@ Brush brush();
 void setBrush(const Brush& brush);
 // Tiles' picture (at most 3x3 of them) in a square of `size` pixels at x, y (the overlay draws the rest)
 bool drawBrushTiles(const Brush& brush, int x, int y, int size);
+// One of the tiles' cells, full size (32 pixels) at x, y: the pattern's cell dc, dr (repeating)
+bool drawBrushTile(const Brush& brush, int dc, int dr, int x, int y);
 
 // ---- the tileset screen (choosing tiles): what it shows
 

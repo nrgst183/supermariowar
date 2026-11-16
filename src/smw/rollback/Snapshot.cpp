@@ -80,11 +80,6 @@ void forEachStateRegion(Fn&& fn)
     }
 }
 
-// Snapshot pieces are padded to 8 bytes, so hashing can read whole words
-constexpr size_t align8(size_t size)
-{
-    return (size + 7) & ~size_t(7);
-}
 } // namespace
 
 void registerGameMode(const CGameMode* mode, size_t size)
@@ -100,13 +95,66 @@ void registerGameMode(const CGameMode* mode, size_t size)
         gameModes[gameModeCount++] = {mode, size};
 }
 
+namespace {
+// The arena bytes that don't matter (see Snapshot.h), sorted: the object lists' unused capacity
+struct Hole {
+    size_t offset;
+    size_t size;
+};
+
+size_t findHoles(std::array<Hole, 4>& holes)
+{
+    sim::Arena& arena = sim::Arena::instance();
+    const CObjectContainer* containers[] = {&g_sim.noncolcontainer, &g_sim.objectcontainer[0], &g_sim.objectcontainer[1], &g_sim.objectcontainer[2]};
+    size_t count = 0;
+    for (const CObjectContainer* container : containers) {
+        const CObjectContainer::List& list = container->list();
+        const auto* data = reinterpret_cast<const std::byte*>(list.data());
+        if (!data || !arena.contains(data))
+            continue;
+        const size_t start = static_cast<size_t>(data - arena.base()) + list.size() * sizeof(*list.data());
+        const size_t end = static_cast<size_t>(data - arena.base()) + list.capacity() * sizeof(*list.data());
+        if (end > start + 32)
+            holes[count++] = {start, end - start};
+    }
+    //(sorted: four at most)
+    for (size_t i = 1; i < count; i++) {
+        for (size_t k = i; k > 0 && holes[k].offset < holes[k - 1].offset; k--)
+            std::swap(holes[k], holes[k - 1]);
+    }
+    return count;
+}
+} // namespace
+
 void saveState(Snapshot& snapshot)
 {
     sim::Arena& arena = sim::Arena::instance();
 
-    // Lay out the regions first, to know the size
+    // The arena: the spans between the bytes that don't matter
+    std::array<Hole, 4> holes;
+    const size_t holeCount = findHoles(holes);
     snapshot.m_arenaUsed = arena.used();
-    size_t offset = align8(snapshot.m_arenaUsed);
+    snapshot.m_spans.clear();
+    size_t at = 0;
+    size_t saved = 0;
+    for (size_t h = 0; h < holeCount; h++) {
+        const Hole& hole = holes[h];
+        if (hole.offset >= snapshot.m_arenaUsed)
+            break;
+        if (hole.offset > at) {
+            snapshot.m_spans.push_back({static_cast<uint32_t>(at), static_cast<uint32_t>(hole.offset - at)});
+            saved += hole.offset - at;
+        }
+        at = std::max(at, hole.offset + hole.size);
+    }
+    if (at < snapshot.m_arenaUsed) {
+        snapshot.m_spans.push_back({static_cast<uint32_t>(at), static_cast<uint32_t>(snapshot.m_arenaUsed - at)});
+        saved += snapshot.m_arenaUsed - at;
+    }
+    snapshot.m_arenaSaved = saved;
+
+    // Then the regions: lay them out first, to know the size
+    size_t offset = saved;
     size_t count = 0;
     forEachStateRegion([&](void* data, size_t size, const char* name) {
         if (count == Snapshot::MAX_REGIONS) {
@@ -114,23 +162,24 @@ void saveState(Snapshot& snapshot)
             return;
         }
         snapshot.m_regions[count++] = {data, size, offset, name};
-        offset += align8(size);
+        offset += size;
     });
     snapshot.m_regionCount = count;
     snapshot.m_size = offset;
 
-    // Grows only when the state is larger than ever before (zero-filled, so
-    // the padding between pieces is always zero)
+    // Grows only when the state is larger than ever before (the pieces follow each other, no padding)
     if (snapshot.m_bytes.size() < snapshot.m_size)
         snapshot.m_bytes.resize(snapshot.m_size + snapshot.m_size / 4);
 
     std::byte* out = snapshot.m_bytes.data();
-    std::memcpy(out, arena.base(), snapshot.m_arenaUsed);
-    std::memset(out + snapshot.m_arenaUsed, 0, align8(snapshot.m_arenaUsed) - snapshot.m_arenaUsed);
+    size_t pos = 0;
+    for (const Snapshot::Span& span : snapshot.m_spans) {
+        std::memcpy(out + pos, arena.base() + span.offset, span.size);
+        pos += span.size;
+    }
     for (size_t i = 0; i < count; i++) {
         const Snapshot::Region& region = snapshot.m_regions[i];
         std::memcpy(out + region.offset, region.data, region.size);
-        std::memset(out + region.offset + region.size, 0, align8(region.size) - region.size);
     }
 
     snapshot.m_nextNetworkId = CObject::nextNetworkId();
@@ -150,7 +199,16 @@ void loadState(const Snapshot& snapshot)
     const bool exityes = flags.exityes;
 
     const std::byte* in = snapshot.m_bytes.data();
-    sim::Arena::instance().restore(in, snapshot.m_arenaUsed);
+    sim::Arena& arena = sim::Arena::instance();
+    const size_t currentUsed = arena.used();
+    size_t pos = 0;
+    for (const Snapshot::Span& span : snapshot.m_spans) {
+        std::memcpy(arena.base() + span.offset, in + pos, span.size);
+        pos += span.size;
+    }
+    //(what was used after the saved state: zero again, as if never used)
+    if (currentUsed > snapshot.m_arenaUsed)
+        std::memset(arena.base() + snapshot.m_arenaUsed, 0, currentUsed - snapshot.m_arenaUsed);
     for (size_t i = 0; i < snapshot.m_regionCount; i++) {
         const Snapshot::Region& region = snapshot.m_regions[i];
         std::memcpy(region.data, in + region.offset, region.size);
@@ -161,6 +219,17 @@ void loadState(const Snapshot& snapshot)
     flags.pausegame = pausegame;
     flags.exitinggame = exitinggame;
     flags.exityes = exityes;
+}
+
+std::vector<std::byte> Snapshot::arenaBytes() const
+{
+    std::vector<std::byte> arena(m_arenaUsed, std::byte {0});
+    size_t pos = 0;
+    for (const Span& span : m_spans) {
+        std::memcpy(arena.data() + span.offset, m_bytes.data() + pos, span.size);
+        pos += span.size;
+    }
+    return arena;
 }
 
 uint64_t Snapshot::hash() const
@@ -296,13 +365,15 @@ std::string describeDifference(const Snapshot& expected, const Snapshot& actual,
 
     const std::vector<KnownBlock> blocks = knownArenaBlocks();
     const size_t arenaCommon = std::min(expected.arenaSize(), actual.arenaSize());
+    const std::vector<std::byte> expectedArena = expected.arenaBytes();
+    const std::vector<std::byte> actualArena = actual.arenaBytes();
     for (size_t pos = 0; pos < arenaCommon;) {
-        if (expected.bytes()[pos] == actual.bytes()[pos]) {
+        if (expectedArena[pos] == actualArena[pos]) {
             pos++;
             continue;
         }
         size_t end = pos;
-        while (end < arenaCommon && (end - pos < 64) && expected.bytes()[end] != actual.bytes()[end])
+        while (end < arenaCommon && (end - pos < 64) && expectedArena[end] != actualArena[end])
             end++;
         line(std::format("arena bytes {}..{}: {}", pos, end, nameArenaOffset(blocks, pos)));
         pos = end + 1;

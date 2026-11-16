@@ -29,19 +29,22 @@
 // Multi-match modes (NetSeries.h): SERIES_BEGIN, SERIES_SCREEN, SERIES_END,
 // WHEEL_PRESS/WHEEL_STOP (bonus wheel), WORLD_INPUT/WORLD_TICK (world map).
 //
-// INPUT (sender -> one receiver, 27 + frames * slots bytes):
+// INPUT (sender -> one receiver, 19 bytes + the inputs; sent every frame, so
+// it is kept small):
 //   u8  type
 //   u8  match id         (stale packets of an earlier match are ignored)
-//   u32 start frame      (first input frame in this packet)
-//   u8  frame count
-//   u32 ack              (number of the receiver's input frames the sender has:
-//                         all frames below this are known)
 //   u32 current frame    (sender's simulation frame, for time sync)
+//   i16 start frame      (first input frame in this packet, from the current frame)
+//   u8  frame count      (bit 7: the inputs are run-length coded, see below)
+//   i16 ack              (number of the receiver's input frames the sender has,
+//                         from the current frame: all frames below it are known)
 //   i16 frame advantage  (sender's frames ahead of the receiver, as it estimates, in 1/64 frames)
-//   u32 send time (ms)   (sender's clock, echoed back for the ping)
-//   u32 echo time (ms)   (latest send time received from the receiver)
+//   u16 send time (ms)   (sender's clock, low 16 bits, never 0; echoed back for the ping)
+//   u16 echo time (ms)   (latest send time received from the receiver; 0: none yet)
 //   u16 echo hold (ms)   (how long ago that echo time was received)
-//   frame count x (one byte per player slot the sender drives, by slot order)
+//   the inputs, one byte per player slot the sender drives (by slot order) per
+//   frame: frame count x that, or run-length coded (the same input held for
+//   several frames, as players do): runs of u8 frames + one byte per slot
 //
 // CHECKSUM (reliable): u8 type, u8 match id, u32 frame, u64 peerChecksum()
 // of the confirmed state at that frame.
@@ -59,7 +62,7 @@
 namespace rollback::net {
 
 constexpr uint32_t PROTOCOL_MAGIC = 0x52574d53; // "SMWR"
-constexpr uint16_t PROTOCOL_VERSION = 5;    // 4: CPU players play by the host's input; 5: the time sync advantage in 1/64 frames
+constexpr uint16_t PROTOCOL_VERSION = 6;    // 4: CPU players play by the host's input; 5: the time sync advantage in 1/64 frames; 6: smaller input packets
 
 constexpr int MAX_PEERS = 4;
 
@@ -111,7 +114,8 @@ enum class MsgType : uint8_t {
 // The series messages are the range [SeriesBegin, SERIES_MSG_END)
 constexpr uint8_t SERIES_MSG_END = 96;
 
-constexpr size_t INPUT_HEADER_SIZE = 27;
+constexpr size_t INPUT_HEADER_SIZE = 19;
+constexpr uint8_t INPUT_RUNS = 0x80;    // in the frame count: the inputs are run-length coded
 constexpr int MAX_INPUT_FRAMES_PER_PACKET = 120;
 
 class ByteWriter {

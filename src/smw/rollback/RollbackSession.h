@@ -250,7 +250,7 @@ private:
         int remoteFrame = 0;
         float remoteAdvantage = 0;    // its estimate of how far it runs ahead of us
         uint32_t lastReceiveMs = 0;
-        uint32_t echoTime = 0;        // its latest send time
+        uint16_t echoTime = 0;        // its latest send time (low 16 bits; 0: none yet)
         uint32_t echoReceivedMs = 0;  // when we got it
         float rttMs = 0;
         float avgLocalAdvantage = 0;

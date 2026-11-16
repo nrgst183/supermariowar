@@ -17,7 +17,10 @@ class CGameMode;
 //  1. The simulation arena (common/SimArena.h): every player, object, AI,
 //     moving platform and path, and the buffers of the simulation's
 //     containers, with all the pointers between them. The arena never moves,
-//     so copying its used bytes back restores the whole object graph.
+//     so copying its used bytes back restores the whole object graph. The
+//     unused capacity of the object lists isn't copied: they reserve room
+//     for 300 objects each (about half of a typical match's arena), and
+//     nothing reads past a vector's size.
 //
 //  2. A fixed list of state outside the arena, copied byte for byte (see
 //     forEachStateRegion() in Snapshot.cpp):
@@ -69,10 +72,14 @@ public:
     bool empty() const { return m_regionCount == 0; }
     int tick() const { return m_tick; }
 
-    // The saved bytes: the used part of the arena, then the other regions
+    // The saved bytes: the arena's spans, then the other regions
     size_t size() const { return m_size; }
+    // The arena's used bytes (some of them not saved, see above), and those saved
     size_t arenaSize() const { return m_arenaUsed; }
+    size_t arenaSaved() const { return m_arenaSaved; }
     const std::byte* bytes() const { return m_bytes.data(); }
+    // The arena as it was saved, whole (the bytes not saved as zero): for comparing snapshots
+    std::vector<std::byte> arenaBytes() const;
 
     size_t regionCount() const { return m_regionCount; }
     const Region& region(size_t index) const { return m_regions[index]; }
@@ -88,9 +95,17 @@ private:
 
     static constexpr size_t MAX_REGIONS = 48;
 
+    // A run of arena bytes [offset, offset + size)
+    struct Span {
+        uint32_t offset = 0;
+        uint32_t size = 0;
+    };
+
     std::vector<std::byte> m_bytes;    // grows to the largest state seen, then stays
     size_t m_size = 0;
     size_t m_arenaUsed = 0;
+    size_t m_arenaSaved = 0;
+    std::vector<Span> m_spans;    // the arena bytes saved, one after the other at the start of m_bytes
     std::array<Region, MAX_REGIONS> m_regions {};
     size_t m_regionCount = 0;
     int m_nextNetworkId = 0;
