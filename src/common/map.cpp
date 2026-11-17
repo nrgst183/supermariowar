@@ -117,6 +117,12 @@ void CMap::ClearAnimatedTiles()
 
 void CMap::loadMap(const std::string& file, ReadType iReadType)
 {
+    //(the main thread: a preview loading in the background finishes first, and isn't shown)
+    if (!mapPreviewOnWorker()) {
+        if (this == g_map)
+            bumpMainMapGeneration();
+        mapPreviewSettle();
+    }
     szLoadedFile = file;
     if (g_tilesetmanager)
         g_tilesetmanager->beginMap();

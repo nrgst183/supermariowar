@@ -6,6 +6,7 @@
 #include "util/DirIterator.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -307,8 +308,63 @@ void CTilesetManager::Draw(
 }
 
 
+// ---- The worker of the menus' background map preview loads (see TilesetManager.h)
+
+namespace {
+std::atomic<bool> s_previewRunning {false};
+std::atomic<SDL_ThreadID> s_previewWorker {0};
+void (*s_previewWait)() = nullptr;
+unsigned s_mainMapGeneration = 0;
+} // namespace
+
+bool mapPreviewOnWorker()
+{
+    const SDL_ThreadID worker = s_previewWorker;
+    return worker != 0 && worker == SDL_GetCurrentThreadID();
+}
+
+void mapPreviewWaitForLoads()
+{
+    //(cheap when nothing loads: the tilesets call it for every tile drawn)
+    if (s_previewRunning && s_previewWait && !mapPreviewOnWorker())
+        s_previewWait();
+}
+
+void mapPreviewSettle()
+{
+    if (s_previewWait && !mapPreviewOnWorker())
+        s_previewWait();
+}
+
+unsigned mainMapGeneration()
+{
+    return s_mainMapGeneration;
+}
+
+void bumpMainMapGeneration()
+{
+    ++s_mainMapGeneration;
+}
+
+void setMapPreviewWorker(bool onThisThread)
+{
+    s_previewWorker = onThisThread ? SDL_GetCurrentThreadID() : 0;
+}
+
+void setMapPreviewWaiter(void (*wait)())
+{
+    s_previewWait = wait;
+}
+
+void setMapPreviewRunning(bool running)
+{
+    s_previewRunning = running;
+}
+
 CTileset* CTilesetManager::tileset(size_t index)
 {
+    //(the main thread: a preview loading in the background uses the tilesets; it finishes first)
+    mapPreviewWaitForLoads();
     if (index < m_tilesets.size()) {
 #ifdef SMW_XBOX
         trackUse(index);

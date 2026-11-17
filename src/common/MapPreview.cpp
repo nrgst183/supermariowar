@@ -33,14 +33,14 @@ gfxSprite CMap::createThumbnailSurface(bool fUseClassicPack)
     std::string path;
 
     if (fUseClassicPack) {
-        localSzBackgroundFile = "gfx/packs/Classic/backgrounds/" + g_map->szBackgroundFile;
+        localSzBackgroundFile = "gfx/packs/Classic/backgrounds/" + szBackgroundFile;
         path = convertPath(localSzBackgroundFile);
 
         //if the background file doesn't exist, use the classic background
         if (!FileExists(path))
             path = convertPath("gfx/packs/Classic/backgrounds/Land_Classic.png");
     } else {
-        localSzBackgroundFile = "gfx/packs/backgrounds/" + g_map->szBackgroundFile;
+        localSzBackgroundFile = "gfx/packs/backgrounds/" + szBackgroundFile;
         path = convertPath(localSzBackgroundFile, gamegraphicspacklist->currentPath());
 
         //if the background file doesn't exist, use the classic background
@@ -108,7 +108,7 @@ void CMap::preDrawPreviewWarps(gfxSprite& targetSurface, bool fThumbnail)
 
     for (int j = 0; j < MAPHEIGHT; j++) {
         for (int i = 0; i < MAPWIDTH; i++) {
-            Warp * wWarp = &g_map->warpdata[i][j];
+            Warp * wWarp = &warpdata[i][j];
 
             if (wWarp->connection != -1) {
                 SDL_Rect rSrc = {wWarp->connection * iTileSize, wWarp->direction * iTileSize, iTileSize, iTileSize};

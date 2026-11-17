@@ -14,6 +14,7 @@ class MI_MapPreview : public UI_Control
 public:
 
     MI_MapPreview(gfxSprite* nspr, short x, short y, short width, short indent);
+    ~MI_MapPreview() override;
 
     //Updates animations or other events every frame
     void Update() override;
@@ -23,6 +24,10 @@ public:
 
     void LoadCurrentMap();
     void LoadMap(const std::string& szMapPath);
+    /// The current map of `maplist`, loaded on a worker thread (the menu keeps its frame rate: on
+    /// the Xbox a map, its background and tilesets take a few frames): its name shows at once, the
+    /// preview when it's ready (Update). A request while one runs waits for it (the last one wins).
+    void LoadCurrentMapInBackground();
 
     bool SetMap(const char * szMapName, bool fWorld);
     void SetSpecialMap(const char * szMapName, const char * szMapPath);
@@ -36,7 +41,12 @@ protected:
     //The map itself (its layers, platforms and hazards) at rectDst, without the frame
     void DrawContent();
 
+    void ApplyBackgroundLoad();
+    void StartBackgroundLoad(const std::string& path, const std::string& name);
+
     gfxSprite * spr;
+    std::string m_pendingPath;      // a background load asked for while one ran
+    std::string m_pendingName;
 
     gfxSprite surfaceMapBackground;
     gfxSprite surfaceMapBlockLayer;

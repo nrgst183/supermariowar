@@ -55,7 +55,8 @@ void MapReader1700::read_tiles(CMap& map, BinaryFile& mapfile)
 
                 TilesetTile * tile = &map.mapdata[i][j][k];
 
-                if (iTileID == TILESETSIZE) {
+                //(TILESETSIZE: no tile; some maps have numbers outside the tileset too: none either)
+                if (iTileID < 0 || iTileID >= TILESETSIZE) {
                     tile->iID = TILESETNONE;
                     tile->iCol = 0;
                     tile->iRow = 0;
@@ -253,7 +254,7 @@ MapReader1700::read_platform_tiles(CMap& map, BinaryFile& mapfile, short iWidth,
             TilesetTile tile;
             TileType type;
 
-            if (iTile == TILESETSIZE) {
+            if (iTile < 0 || iTile >= TILESETSIZE) {
                 tile.iID = TILESETNONE;
                 tile.iCol = 0;
                 tile.iRow = 0;

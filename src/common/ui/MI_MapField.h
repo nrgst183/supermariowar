@@ -32,6 +32,7 @@ public:
 
     // Loads the current map's preview now (also one that was waiting)
     void LoadCurrentMap();
+    void LoadInBackground();
 
     void SetDimensions(short iWidth, short iIndent) override;
 

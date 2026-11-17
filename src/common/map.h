@@ -509,6 +509,13 @@ class CMap
 // Defined in global.cpp
 extern CMap* g_map;
 void LoadCurrentMapBackground();
+// The background image file of a map (the classic one if it isn't installed)
+std::string mapBackgroundPath(const CMap& map);
+// rm->spr_background if it's that file's image (loaded already), else null
+const gfxSprite* loadedMapBackground(const std::string& path);
+// That file's image becomes rm->spr_background (loaded elsewhere: a map preview's worker)
+void setLoadedMapBackground(const std::string& path, gfxSprite&& image);
+
 
 // Defined in map.cpp
 extern short g_iCurrentDrawIndex;

@@ -118,3 +118,19 @@ private:
 
 // Defined in global.cpp
 extern CTilesetManager* g_tilesetmanager;
+
+// The worker of the menus' background preview loads
+// (MI_MapPreview::LoadCurrentMapInBackground). The main thread waits for it before it touches what
+// the worker uses (the tilesets, the map, the background: the guards in CTilesetManager,
+// CMap::loadMap and LoadCurrentMapBackground). Cheap when nothing loads.
+// (The preview, ui/MI_MapPreview.cpp, registers its worker and how to wait for it.)
+bool mapPreviewOnWorker();
+void mapPreviewWaitForLoads();
+// The main thread loaded a map: a load running finishes, and one now out of date goes (its memory)
+void mapPreviewSettle();
+// Counts the main thread's loads of g_map: a background load started before one isn't shown
+unsigned mainMapGeneration();
+void bumpMainMapGeneration();
+void setMapPreviewWorker(bool onThisThread);
+void setMapPreviewWaiter(void (*wait)());
+void setMapPreviewRunning(bool running);   // (set by the main thread before the worker starts)

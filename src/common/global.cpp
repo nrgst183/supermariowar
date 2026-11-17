@@ -49,24 +49,43 @@ CTilesetManager *g_tilesetmanager;
 const char * g_szMusicCategoryNames[MAXMUSICCATEGORY] = {"Land", "Underground", "Underwater", "Castle", "Platforms", "Ghost", "Bonus", "Battle", "Desert", "Clouds", "Snow"};
 
 
-void LoadCurrentMapBackground()
+namespace {
+//The background loaded last (many maps share one: it is still loaded)
+std::string s_loadedBackgroundPath;
+const SDL_Surface* s_loadedBackgroundSurface = nullptr;
+} // namespace
+
+std::string mapBackgroundPath(const CMap& map)
 {
-    std::string path = "gfx/packs/backgrounds/" + g_map->szBackgroundFile;
-    path = convertPath(path, gamegraphicspacklist->currentPath());
+    std::string path = convertPath("gfx/packs/backgrounds/" + map.szBackgroundFile, gamegraphicspacklist->currentPath());
 
     //if the background file doesn't exist, use the classic background
     if (!FileExists(path)) {
-        fprintf(stderr, "[map] Background '%s' isn't installed: using the classic one\n", g_map->szBackgroundFile.c_str());
+        fprintf(stderr, "[map] Background '%s' isn't installed: using the classic one\n", map.szBackgroundFile.c_str());
         path = convertPath("gfx/packs/backgrounds/Land_Classic.png", gamegraphicspacklist->currentPath());
     }
+    return path;
+}
 
-    //The same background as last time (many maps share one): it is still loaded
-    static std::string s_loadedPath;
-    static const SDL_Surface* s_loadedSurface = nullptr;
-    if (path == s_loadedPath && rm->spr_background.getSurface() && rm->spr_background.getSurface() == s_loadedSurface)
+const gfxSprite* loadedMapBackground(const std::string& path)
+{
+    if (path == s_loadedBackgroundPath && rm->spr_background.getSurface() && rm->spr_background.getSurface() == s_loadedBackgroundSurface)
+        return &rm->spr_background;
+    return nullptr;
+}
+
+void setLoadedMapBackground(const std::string& path, gfxSprite&& image)
+{
+    rm->spr_background = std::move(image);
+    s_loadedBackgroundPath = path;
+    s_loadedBackgroundSurface = rm->spr_background.getSurface();
+}
+
+void LoadCurrentMapBackground()
+{
+    mapPreviewWaitForLoads();
+    const std::string path = mapBackgroundPath(*g_map);
+    if (loadedMapBackground(path))
         return;
-
-    rm->spr_background = ImageLoader(path).withoutColorKey().create();
-    s_loadedPath = path;
-    s_loadedSurface = rm->spr_background.getSurface();
+    setLoadedMapBackground(path, ImageLoader(path).withoutColorKey().create());
 }

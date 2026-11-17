@@ -41,7 +41,7 @@ MenuCodeEnum MI_MapField::Modify(bool modify)
         return MENU_CODE_UNSELECT_ITEM;
 
     if (!modify && iPendingLoadTimer > 0)
-        LoadCurrentMap();
+        LoadInBackground();
 
     miModifyImageLeft->setVisible(modify);
     miModifyImageRight->setVisible(modify);
@@ -75,7 +75,7 @@ MenuCodeEnum MI_MapField::SendInput(CPlayerInput * playerInput)
 
         if (playerInput->outputControls[iPlayer].menu_select.fPressed || playerInput->outputControls[iPlayer].menu_cancel.fPressed) {
             if (iPendingLoadTimer > 0)
-                LoadCurrentMap();
+                LoadInBackground();
             miModifyImageLeft->setVisible(false);
             miModifyImageRight->setVisible(false);
 
@@ -129,13 +129,20 @@ void MI_MapField::LoadCurrentMap()
     MI_MapPreview::LoadCurrentMap();
 }
 
+// The player's choice: loaded on a worker thread (the menu keeps its frame rate), shown when ready
+void MI_MapField::LoadInBackground()
+{
+    iPendingLoadTimer = 0;
+    MI_MapPreview::LoadCurrentMapInBackground();
+}
+
 void MI_MapField::RequestMapLoad()
 {
     if (iRecentLoadTimer > 0) {
         szMapName = maplist->currentShortmapname();
         iPendingLoadTimer = MAP_LOAD_SETTLE_FRAMES;
     } else {
-        LoadCurrentMap();
+        LoadInBackground();
     }
     iRecentLoadTimer = MAP_LOAD_SETTLE_FRAMES;
 }
@@ -145,7 +152,7 @@ void MI_MapField::Update()
     if (iRecentLoadTimer > 0)
         iRecentLoadTimer--;
     if (iPendingLoadTimer > 0 && --iPendingLoadTimer == 0)
-        LoadCurrentMap();
+        LoadInBackground();
 
     //Empty out the search string after a certain time
     if (iSearchStringTimer > 0) {

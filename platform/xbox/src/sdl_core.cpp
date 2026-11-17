@@ -6,6 +6,7 @@
 #include "sdl_internal.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <string>
@@ -312,6 +313,71 @@ int SDL_XboxStartNetwork(void)
             sdlx_log("[xbox] The network didn't start (XNetStartup: %d)\n", static_cast<int>(result));
     }
     return started;
+}
+
+/* ---- Threads ------------------------------------------------------------ */
+
+struct SDL_Thread {
+    HANDLE handle;
+    SDL_ThreadFunction fn;
+    void* data;
+    int status;
+};
+
+static DWORD WINAPI sdlx_threadMain(LPVOID param)
+{
+    SDL_Thread* thread = static_cast<SDL_Thread*>(param);
+    thread->status = thread->fn(thread->data);
+    return 0;
+}
+
+SDL_Thread* SDL_CreateThread(SDL_ThreadFunction fn, const char* name, void* data)
+{
+    (void)name;
+    auto* thread = static_cast<SDL_Thread*>(calloc(1, sizeof(SDL_Thread)));
+    if (!thread) {
+        SDL_SetError("Out of memory");
+        return nullptr;
+    }
+    thread->fn = fn;
+    thread->data = data;
+    thread->handle = CreateThread(NULL, 256 * 1024, sdlx_threadMain, thread, 0, NULL);
+    if (!thread->handle) {
+        free(thread);
+        SDL_SetError("CreateThread failed");
+        return nullptr;
+    }
+    return thread;
+}
+
+void SDL_WaitThread(SDL_Thread* thread, int* status)
+{
+    if (!thread)
+        return;
+    WaitForSingleObject(thread->handle, INFINITE);
+    CloseHandle(thread->handle);
+    if (status)
+        *status = thread->status;
+    free(thread);
+}
+
+SDL_ThreadID SDL_GetCurrentThreadID(void)
+{
+    return static_cast<SDL_ThreadID>(GetCurrentThreadId());
+}
+
+bool SDL_SetCurrentThreadPriority(SDL_ThreadPriority priority)
+{
+    int value = THREAD_PRIORITY_NORMAL;
+    switch (priority) {
+        case SDL_THREAD_PRIORITY_LOW: value = THREAD_PRIORITY_LOWEST; break;
+        case SDL_THREAD_PRIORITY_NORMAL: value = THREAD_PRIORITY_NORMAL; break;
+        case SDL_THREAD_PRIORITY_HIGH: value = THREAD_PRIORITY_HIGHEST; break;
+        case SDL_THREAD_PRIORITY_TIME_CRITICAL: value = THREAD_PRIORITY_TIME_CRITICAL; break;
+    }
+    if (!SetThreadPriority(GetCurrentThread(), value))
+        return SDL_SetError("SetThreadPriority failed");
+    return true;
 }
 
 int SDL_XboxGetNickname(char* name, int size)

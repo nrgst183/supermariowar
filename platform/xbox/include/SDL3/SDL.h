@@ -94,6 +94,21 @@ void SDL_Delay(Uint32 ms);
 void SDL_DelayNS(Uint64 ns);
 void SDL_DelayPrecise(Uint64 ns);
 
+/* Threads (the kernel's CreateThread; 256 KB of stack: loading a map runs on one) */
+typedef struct SDL_Thread SDL_Thread;
+typedef int (SDLCALL *SDL_ThreadFunction)(void* data);
+typedef Uint64 SDL_ThreadID;
+SDL_Thread* SDL_CreateThread(SDL_ThreadFunction fn, const char* name, void* data);
+void SDL_WaitThread(SDL_Thread* thread, int* status);
+SDL_ThreadID SDL_GetCurrentThreadID(void);
+typedef enum SDL_ThreadPriority {
+    SDL_THREAD_PRIORITY_LOW,
+    SDL_THREAD_PRIORITY_NORMAL,
+    SDL_THREAD_PRIORITY_HIGH,
+    SDL_THREAD_PRIORITY_TIME_CRITICAL
+} SDL_ThreadPriority;
+bool SDL_SetCurrentThreadPriority(SDL_ThreadPriority priority);
+
 /* ---- Filesystem ---------------------------------------------------------- */
 
 const char* SDL_GetBasePath(void);

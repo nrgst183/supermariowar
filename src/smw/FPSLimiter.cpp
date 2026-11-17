@@ -54,8 +54,7 @@ uint64_t FPSLimiter::tickNs() const
     if (game_values.frameadvance)
         return NS_PER_SECOND;
 #endif
-    const uint64_t tick = lockedToDisplay ? renderPeriodNs : TICK_NS;
-    return tickStretch == 1.0f ? tick : static_cast<uint64_t>(static_cast<double>(tick) * tickStretch);
+    return tickStretch == 1.0f ? TICK_NS : static_cast<uint64_t>(static_cast<double>(TICK_NS) * tickStretch);
 }
 
 void FPSLimiter::setTickStretch(float stretch)
@@ -81,18 +80,7 @@ void FPSLimiter::applyFrameRateMode(FrameRateMode newMode)
     const float refreshRate = gfx_refreshrate();
     renderPeriodNs = static_cast<uint64_t>(NS_PER_SECOND / (refreshRate > 0.0f ? refreshRate : FALLBACK_REFRESH_RATE));
 
-    //The Xbox at about 60 Hz: one tick per refresh (ticks of 1/60 s, 4% longer than 16 ms). With the
-    //62.5 ticks a second of the PCs, every 25th frame would run two ticks: a frame twice the work
-    //(what can miss the refresh), and a jolt. Online, the PCs' ticks stretch to stay with it (the
-    //time sync, setTickStretch). A frame that misses its refresh still catches up (two ticks).
-    lockedToDisplay = false;
-#ifdef SMW_XBOX
-    lockedToDisplay = vsyncActive && refreshRate >= 58.0f && refreshRate <= 63.0f;
-#endif
-    nextTickNs = 0;
-
-    printf("[gfx] Frame rate: %s (VSync %s, display %.2f Hz%s)\n", modeName(mode), vsyncActive ? "on" : "off", refreshRate,
-        lockedToDisplay ? ", one tick per refresh" : "");
+    printf("[gfx] Frame rate: %s (VSync %s, display %.2f Hz)\n", modeName(mode), vsyncActive ? "on" : "off", refreshRate);
 }
 
 int FPSLimiter::frameStart()
@@ -115,17 +103,14 @@ int FPSLimiter::frameStart()
     if (nextTickNs == 0)
         nextTickNs = now;
 
-    //(locked to the display: the frames start a little after each refresh, early or late by some
-    //microseconds; half a tick of slack makes that one tick, every time)
-    const uint64_t slack = lockedToDisplay ? tick / 2 : 0;
     int ticks = 0;
-    while (now + slack >= nextTickNs && ticks < MAX_TICKS_PER_FRAME) {
+    while (now >= nextTickNs && ticks < MAX_TICKS_PER_FRAME) {
         nextTickNs += tick;
         ticks++;
     }
 
     // Too far behind: drop the backlog rather than fast-forward
-    if (now + slack >= nextTickNs)
+    if (now >= nextTickNs)
         nextTickNs = now + tick;
 
     statsTicks += ticks;
@@ -134,8 +119,7 @@ int FPSLimiter::frameStart()
 
 float FPSLimiter::alpha() const
 {
-    //(locked to the display, what's drawn is the tick: nothing to interpolate)
-    if (unthrottled() || mode == FrameRateMode::TickRate || lockedToDisplay)
+    if (unthrottled() || mode == FrameRateMode::TickRate)
         return 1.0f;
 
     const uint64_t tick = tickNs();
@@ -200,7 +184,6 @@ void FPSLimiter::afterFlip()
     if (vsyncActive && renderRate > 0.0f && renderRate * renderPeriodNs > 1.5f * NS_PER_SECOND) {
         printf("[gfx] VSync doesn't limit the frame rate (%.1f FPS); pacing renders instead\n", renderRate);
         vsyncActive = false;
-        lockedToDisplay = false;
     }
 }
 
