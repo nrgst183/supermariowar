@@ -146,7 +146,12 @@ public:
     /// The header, the status line, and the hint under the buttons
     void SetTitle(std::string title) { m_title = std::move(title); }
     void SetStatus(std::string text, Tone tone, std::string hint);
-    void SetJoining(bool joining) { m_joining = joining; }
+    void SetJoining(bool joining)
+    {
+        if (joining && !m_joining)
+            m_joinTicks = 0;
+        m_joining = joining;
+    }
     /// The line "Settings: host only" at the bottom right of the header bar
     void SetSettingsNote(std::string note) { m_note = std::move(note); }
     /// The buttons row (y 352): the controller's buttons or the keys of what can be done
@@ -163,6 +168,7 @@ private:
     std::vector<prompts::Prompt> m_prompts;
     bool m_joining = false;
     int m_tick = 0;
+    int m_joinTicks = 0;    //(frames since the "connecting" screen came up)
 };
 
 
@@ -185,16 +191,22 @@ private:
 /// Word-wrapped text, centered on x, at most `maxLines` lines of the large menu font
 class MI_WrappedText : public UI_Control {
 public:
+    enum class Tone { Info, Good, Warn, Error };    //(the status icons of SmwTheme.h)
+
     MI_WrappedText(short x, short y, short width, int maxLines);
 
-    void SetText(std::string text);
+    void SetText(std::string text, Tone tone = Tone::Info);
     const std::string& text() const { return m_text; }
+    /// Drawn in a panel (the menus' blue), with the tone's icon at its left
+    void SetBoxed(bool boxed) { m_boxed = boxed; }
     void Draw() override;
 
 private:
     std::string m_text;
     short m_width = 0;
     int m_maxLines = 1;
+    Tone m_tone = Tone::Info;
+    bool m_boxed = false;
 };
 
 

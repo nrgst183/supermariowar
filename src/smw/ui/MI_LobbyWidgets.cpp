@@ -7,6 +7,7 @@
 #include "RandomNumberGenerator.h"
 #include "rollback/NetGame.h"
 #include "ui/MI_Image.h"
+#include "ui/MI_MenuPanel.h"
 #include "ui/SmwTheme.h"
 
 #include <algorithm>
@@ -515,7 +516,11 @@ void MI_LobbyScene::Draw()
         theme::spinningCoin(304, 150, m_tick++);
         rm->menu_font_large.drawCentered(320, 196, "Connecting...");
         rm->menu_font_small.drawCentered(320, 232, ellipsize(rm->menu_font_small, m_status, 320));
-        prompts::drawPrompts(320, 262, {{{Pad::B}, {prompts::menuKey(prompts::MENU_CANCEL)}, "stop"}});
+        //After a moment, how long it has been (joining gives up after 15 seconds)
+        const int seconds = m_joinTicks++ / 60;
+        if (seconds >= 2)
+            rm->menu_font_small.drawCentered(320, 252, ("No answer yet (" + std::to_string(seconds) + " s)").c_str());
+        prompts::drawPrompts(320, 280, {{{Pad::B}, {prompts::menuKey(prompts::MENU_CANCEL)}, "stop"}});
         return;
     }
     ++m_tick;
@@ -554,30 +559,28 @@ MI_WrappedText::MI_WrappedText(short x, short y, short width, int maxLines)
     , m_maxLines(maxLines)
 {}
 
-void MI_WrappedText::SetText(std::string text)
+void MI_WrappedText::SetText(std::string text, Tone tone)
 {
     m_text = std::move(text);
+    m_tone = tone;
 }
 
-void MI_WrappedText::Draw()
+namespace {
+// The words of a text in lines at most `width` wide
+std::vector<std::string> wrapWords(const gfxFont& font, const std::string& text, int width)
 {
-    if (!m_visible || m_text.empty())
-        return;
-
-    const gfxFont& font = rm->menu_font_large;
-
     std::vector<std::string> lines;
     std::string line;
     size_t pos = 0;
-    while (pos < m_text.size()) {
-        size_t end = m_text.find(' ', pos);
+    while (pos < text.size()) {
+        size_t end = text.find(' ', pos);
         if (end == std::string::npos)
-            end = m_text.size();
-        const std::string word = m_text.substr(pos, end - pos);
+            end = text.size();
+        const std::string word = text.substr(pos, end - pos);
         pos = end + 1;
 
         const std::string candidate = line.empty() ? word : line + " " + word;
-        if (!line.empty() && font.getWidth(candidate) > m_width) {
+        if (!line.empty() && font.getWidth(candidate) > width) {
             lines.push_back(line);
             line = word;
         } else {
@@ -586,16 +589,47 @@ void MI_WrappedText::Draw()
     }
     if (!line.empty())
         lines.push_back(line);
+    return lines;
+}
+} // namespace
+
+void MI_WrappedText::Draw()
+{
+    if (!m_visible || m_text.empty())
+        return;
+
+    //(in a panel: the large font when the text fits on one line, else the small one)
+    const gfxFont* chosen = &rm->menu_font_large;
+    std::vector<std::string> lines = wrapWords(*chosen, m_text, m_width);
+    if (m_boxed && lines.size() > 1) {
+        chosen = &rm->menu_font_small;
+        lines = wrapWords(*chosen, m_text, m_width);
+    }
+    const gfxFont& font = *chosen;
 
     if (static_cast<int>(lines.size()) > m_maxLines) {
         lines.resize(static_cast<size_t>(m_maxLines));
         lines.back() = ellipsize(font, lines.back(), m_width);
     }
 
+    const int lineHeight = font.getHeight() + 2;
+    int centerX = m_pos.x;
+    if (m_boxed) {
+        //(as wide as the longest line, the icon at the left)
+        int widest = 0;
+        for (const std::string& text : lines)
+            widest = std::max(widest, font.getWidth(text));
+        const int w = widest + 64;
+        const int x = m_pos.x - w / 2;
+        const int h = static_cast<int>(lines.size()) * lineHeight + 8;
+        menupanel::box(x, m_pos.y - 5, w, h);
+        theme::statusIcon(x + 12, m_pos.y - 5 + (h - 16) / 2, static_cast<theme::Status>(m_tone));
+        centerX += 12;
+    }
     int y = m_pos.y;
     for (const std::string& text : lines) {
-        font.drawChopCentered(m_pos.x, y, m_width, text);
-        y += font.getHeight() + 2;
+        font.drawChopCentered(centerX, y, m_width, text);
+        y += lineHeight;
     }
 }
 

@@ -71,6 +71,11 @@ public:
     // The host's router (UPnP, PortMapping.h): one line for the lobby screen ("" when nothing to
     // say); `good` tells whether friends can likely reach us
     std::string routerNote(bool& good) const;
+    // This computer's address on its network (what the others on it join), e.g. "192.168.1.20";
+    // empty without a network (or a network build)
+    static std::string lanAddress();
+    // The UDP port this computer's lobby is on (0: none)
+    uint16_t lobbyPort() const;
     const NetLobby* lobby() const { return m_lobby.get(); }
     // Host: starts a match with the mode, map and settings the menus have
     // selected and the lobby's slots. It starts by itself once every peer

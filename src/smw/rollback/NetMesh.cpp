@@ -33,7 +33,7 @@ NetMesh::NetMesh(IMeshTransport& transport, const Options& options, uint32_t now
     } else {
         m_hostConnection = m_transport.connect(m_options.joinHost, m_options.joinPort);
         if (m_hostConnection < 0)
-            fail("could not connect to " + m_options.joinHost + ":" + std::to_string(m_options.joinPort));
+            fail("can't find the address " + m_options.joinHost);
         else
             printf("netplay: joining %s:%u from port %u\n", m_options.joinHost.c_str(), m_options.joinPort, m_transport.localPort());
     }
@@ -396,7 +396,9 @@ bool NetMesh::poll(Event& event, uint32_t nowMs)
 {
     m_nowMs = nowMs;
     if (m_state == State::Connecting && static_cast<int32_t>(nowMs - m_startMs) > static_cast<int32_t>(m_options.joinTimeoutMs))
-        fail("timed out while joining");
+        fail(m_localPeer < 0 ? "no answer from " + m_options.joinHost + ":" + std::to_string(m_options.joinPort)
+                    + " (is the lobby open, and its port forwarded?)"
+                              : "timed out while joining");
     if (m_options.host && m_joiningPeer >= 0 && static_cast<int32_t>(nowMs - m_joiningSinceMs) > static_cast<int32_t>(m_options.joinTimeoutMs)) {
         printf("netplay: peer %d took too long to join\n", m_joiningPeer);
         dropPeer(m_joiningPeer);

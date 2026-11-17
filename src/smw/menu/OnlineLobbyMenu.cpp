@@ -187,7 +187,7 @@ void UI_OnlineLobbyMenu::ShowPage(Page page)
         control->setVisible(!team && !joining);
     for (MI_LockTag* tag : miHostTag)
         tag->setVisible(!team && !joining);
-    miScene->SetTitle(team ? "Team and Character Selection" : "Online Options");
+    miScene->SetTitle(joining ? "Online" : team ? "Team and Character Selection" : "Online Options");
 
     SetCancelCode(team ? MENU_CODE_ONLINE_LEAVE : MENU_CODE_ONLINE_OPTIONS_BACK);
     if (m_dialog == Dialog::None)
@@ -228,6 +228,7 @@ void UI_OnlineLobbyMenu::ApplyLayout(bool host, bool joining)
 
     miScene->SetJoining(joining);
     const bool team = m_page == Page::Team;
+    miScene->SetTitle(joining ? "Online" : team ? "Team and Character Selection" : "Online Options");
     miTeam->setVisible(team && !joining);
     miOptionsButton->setVisible(team && !joining);
     miContinueButton->setVisible(team && !joining);
@@ -339,9 +340,13 @@ void UI_OnlineLobbyMenu::Sync()
             anyone |= lobby->peer(p).present;
         bool good = false;
         const std::string router = rollback::NetGame::instance().routerNote(good);
+        const std::string lan = rollback::NetGame::lanAddress();
         if (!anyone && !router.empty()) {
             status = router;
             tone = good ? Tone::Good : Tone::Warn;
+        } else if (!anyone && !lan.empty()) {
+            status = "Waiting for players: they join " + lan + ":" + std::to_string(rollback::NetGame::instance().lobbyPort());
+            tone = Tone::Info;
         }
     }
     m_statusLine = status;
@@ -351,6 +356,8 @@ void UI_OnlineLobbyMenu::Sync()
         //(the team box: its keys are in the buttons row, the line says who may change the settings)
         if (m_currentFocus == miTeam)
             hint.clear();
+        else if (m_currentFocus == miContinueButton && host && inLobby && !canStart)
+            hint = "Not yet: " + why;
         else if (m_currentFocus == miContinueButton)
             hint = host ? "Choose the match type, game mode and map" : "See what the host has chosen";
         else if (m_currentFocus == miOptionsButton)

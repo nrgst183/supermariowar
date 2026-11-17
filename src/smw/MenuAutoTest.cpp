@@ -770,6 +770,30 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
+    //--at-role syslink: the LAN games (system link) menu, searching and then with what it found
+    //(scripts/menu-screenshots.sh runs hosts on the network for it)
+    if (at.shotsRole == "syslink" && step == 1) {
+        if (t == 1)
+            return MENU_CODE_TO_SYSTEM_LINK_MENU;
+        if (t == 15)
+            shot("s1_searching");
+        if (t == 260)
+            shot("s2_found");
+        if (t == 275)
+            game_values.playerInput.outputControls[0].menu_down.fPressed = true;
+        if (t == 290)
+            shot("s3_second_game");
+        //(and it joins it: the lobby of that host)
+        if (t == 300)
+            game_values.playerInput.outputControls[0].menu_select.fPressed = true;
+        if (t == 480) {
+            shot("s4_joined");
+            step = 1000;
+            t = 0;
+        }
+        return MENU_CODE_NONE;
+    }
+
     //--at-role graphics: the graphics options menu
     if (at.shotsRole == "graphics" && step == 1) {
         if (t == 1)

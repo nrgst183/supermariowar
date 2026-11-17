@@ -37,7 +37,8 @@ bool checkHeader(const uint8_t* data, size_t size, uint8_t type)
 
 void putText(std::vector<uint8_t>& out, const std::string& text)
 {
-    const size_t length = std::min(text.size(), MAX_TEXT);
+    //((std::min): on Windows, enet.h brings in windows.h and its min macro)
+    const size_t length = (std::min)(text.size(), MAX_TEXT);
     out.push_back(static_cast<uint8_t>(length));
     out.insert(out.end(), text.begin(), text.begin() + static_cast<std::ptrdiff_t>(length));
 }
@@ -144,6 +145,10 @@ std::vector<uint8_t> encodeAnswer(const HostInfo& info)
     out.push_back(info.inMatch ? 1 : 0);
     putText(out, info.name);
     putText(out, info.build);
+    //The details (after the first version's answer: older builds stop reading before them)
+    putText(out, info.mode);
+    putText(out, info.map);
+    out.push_back(info.players);
     return out;
 }
 
@@ -159,6 +164,12 @@ bool decodeAnswer(const uint8_t* data, size_t size, HostInfo& info)
     size_t at = 11;
     if (!getText(data, size, at, decoded.name) || !getText(data, size, at, decoded.build))
         return false;
+    //The details: all of them, or none (an older build's answer)
+    if (at < size) {
+        if (!getText(data, size, at, decoded.mode) || !getText(data, size, at, decoded.map) || at >= size)
+            return false;
+        decoded.players = data[at++];
+    }
     if (decoded.port == 0)
         return false;
     info = std::move(decoded);
@@ -258,6 +269,12 @@ void Browser::update(uint32_t nowMs)
         }
         it->info = std::move(info);
         it->lastSeenMs = nowMs;
+        //How long since the last query: the round trip (to within a frame), smoothed
+        const uint32_t since = nowMs - m_lastQueryMs;
+        if (since < QUERY_EVERY_MS) {
+            const int ping = static_cast<int>(since);
+            it->pingMs = it->pingMs < 0 ? ping : (it->pingMs * 3 + ping) / 4;
+        }
     }
 
     std::erase_if(m_games, [&](const FoundGame& game) { return nowMs - game.lastSeenMs > FORGET_AFTER_MS; });

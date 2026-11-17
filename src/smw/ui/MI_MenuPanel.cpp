@@ -27,6 +27,16 @@ void box(int x, int y, int w, int h)
     roundedFill(x + 2, y + 2, w - 4, h - 4, 6, {0, 40, 104, 255});
     roundedFill(x + 3, y + 3, w - 6, h - 6, 5, {0, 95, 177, 255});
 }
+
+void row(int x, int y, int w, int h, bool selected, bool dim)
+{
+    if (selected) {
+        roundedFill(x, y, w, h, 6, {248, 248, 248, 255});
+        roundedFill(x + 2, y + 2, w - 4, h - 4, 4, dim ? SDL_Color {104, 112, 136, 255} : SDL_Color {32, 144, 232, 255});
+    } else {
+        roundedFill(x, y, w, h, 6, dim ? SDL_Color {56, 64, 88, 255} : SDL_Color {0, 64, 136, 255});
+    }
+}
 } // namespace menupanel
 
 
@@ -51,8 +61,9 @@ void MI_MenuPanel::Draw()
     menupanel::box(m_pos.x, m_pos.y, m_w, m_h);
     if (!m_title.empty())
         rm->menu_font_large.draw(m_pos.x + 20, m_pos.y + 10, m_title.c_str());
-    if (!m_note.empty())
-        rm->menu_font_small.drawRightJustified(m_pos.x + m_w - 20, m_pos.y + 14, m_note.c_str());
+    const std::string note = m_noteSource ? m_noteSource() : m_note;
+    if (!note.empty())
+        rm->menu_font_small.drawRightJustified(m_pos.x + m_w - 20, m_pos.y + 14, note.c_str());
 }
 
 

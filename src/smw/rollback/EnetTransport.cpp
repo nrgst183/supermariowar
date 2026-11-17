@@ -26,6 +26,29 @@ int connectionOf(const ENetPeer* peer)
 }
 } // namespace
 
+std::string EnetTransport::localAddress()
+{
+    if (!initEnet())
+        return {};
+    ENetSocket socket = enet_socket_create(ENET_SOCKET_TYPE_DATAGRAM);
+    if (socket == ENET_SOCKET_NULL)
+        return {};
+
+    //"Connecting" a UDP socket sends nothing: the system only picks the route, and with it the
+    //address of the interface the packets would leave from
+    ENetAddress remote;
+    remote.host = ENET_HOST_TO_NET_32(0x08080808);    //(any address outside the network)
+    remote.port = 53;
+    ENetAddress local {};
+    char text[64] = {};
+    const bool found = enet_socket_connect(socket, &remote) == 0 && enet_socket_get_address(socket, &local) == 0
+        && local.host != ENET_HOST_ANY && enet_address_get_host_ip(&local, text, sizeof(text)) == 0;
+    enet_socket_destroy(socket);
+    if (!found || std::string(text).rfind("127.", 0) == 0)
+        return {};
+    return text;
+}
+
 std::unique_ptr<EnetTransport> EnetTransport::create(uint16_t port, const NetConditions& conditions, std::string& error)
 {
     if (!initEnet()) {

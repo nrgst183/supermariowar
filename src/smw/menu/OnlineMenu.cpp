@@ -2,6 +2,7 @@
 
 #include "GameValues.h"
 #include "ResourceManager.h"
+#include "rollback/NetGame.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
 #include "ui/MI_LobbyWidgets.h"
@@ -43,7 +44,16 @@ UI_OnlineMenu::UI_OnlineMenu()
 
     //Three panels (under their fields): you, hosting, joining
     AddNonControl(new MI_MenuPanel(36, 42, 568, 112, "You", "Your name, and how far ahead you see"));
-    AddNonControl(new MI_MenuPanel(36, 158, 568, 108, "Host a game", "The others join this computer's address"));
+    //(the host's panel says the address the others on this network join)
+    MI_MenuPanel* hostPanel = new MI_MenuPanel(36, 158, 568, 108, "Host a game");
+    hostPanel->SetNoteSource([]() -> std::string {
+        const std::string address = rollback::NetGame::lanAddress();
+        if (address.empty())
+            return "The others join this computer's address";
+        const int port = atoi(game_values.onlineport.c_str());
+        return "Others join " + address + ":" + std::to_string(port > 0 ? port : 7300);
+    });
+    AddNonControl(hostPanel);
 #ifdef SMW_SYSTEM_LINK
     AddNonControl(new MI_MenuPanel(36, 270, 568, 108, "Join a game", "Hosted on a console or PC of your network"));
 #else
@@ -92,8 +102,9 @@ UI_OnlineMenu::UI_OnlineMenu()
     miJoinButton->SetCode(MENU_CODE_ONLINE_JOIN);
 #endif
 
-    //What went wrong (or what's happening), under the panels
-    miMessage = new MI_WrappedText(320, 384, 580, 3);
+    //What went wrong (or what's happening), under the panels, in a panel of its own
+    miMessage = new MI_WrappedText(320, 390, 512, 3);
+    miMessage->SetBoxed(true);
 
     //What the buttons do here (a controller's, or the keys), and back
     miPrompts = new MI_PromptStrip(16, 434, 512, "", []() {
@@ -152,7 +163,13 @@ void UI_OnlineMenu::ShowMessage(std::string text)
 {
     //(an empty message: the network's state shows again, on the Xbox)
     m_showingStatus = text.empty();
-    miMessage->SetText(std::move(text));
+
+    //Its icon: a problem, or just news (e.g. "The host closed the lobby")
+    using Tone = MI_WrappedText::Tone;
+    const bool problem = text.rfind("Can't", 0) == 0 || text.rfind("Could not", 0) == 0 || text.rfind("Lost", 0) == 0
+        || text.rfind("The port", 0) == 0 || text.find("removed") != std::string::npos;
+    const bool missing = text.rfind("Enter", 0) == 0;
+    miMessage->SetText(std::move(text), problem ? Tone::Error : missing ? Tone::Warn : Tone::Info);
 }
 
 void UI_OnlineMenu::ClearMessage()

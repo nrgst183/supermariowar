@@ -11,7 +11,9 @@
 // (the Online menu's System Link list) broadcasts a query to the local
 // network every second and lists who answers: the host's name, its lobby
 // port, how many are in, whether a match runs, and its build (only the same
-// build can join). Games that stop answering drop off the list.
+// build can join); then (newer builds: an answer may end before) the mode, the
+// map and how many players the next match has. Games that stop answering drop
+// off the list.
 //
 // Any build with the network does both (Xboxes and PCs find each other). The
 // sockets are ENet's; nothing here touches the game.
@@ -27,6 +29,10 @@ struct HostInfo {
     uint8_t maxMembers = 0;
     bool inMatch = false;       // a match runs (joining waits for its end)
     std::string build;          // GIT_REVISION
+    // (the details: empty / 0 in the answers of builds before them)
+    std::string mode;           // the game mode the host has chosen ("Classic")
+    std::string map;            // and the map
+    uint8_t players = 0;        // the players of the next match, CPUs included
 };
 
 // A game found on the network
@@ -34,6 +40,7 @@ struct FoundGame {
     uint32_t ipv4 = 0;          // network byte order
     HostInfo info;
     uint32_t lastSeenMs = 0;
+    int pingMs = -1;            // how long it took to answer (-1: not known)
     // "192.168.1.20:7300"
     std::string address() const;
 };

@@ -26,6 +26,9 @@ public:
 
     // Binds to `port` on all interfaces (0: any free port). Null on failure.
     static std::unique_ptr<EnetTransport> create(uint16_t port, const NetConditions& conditions, std::string& error);
+    // This computer's IPv4 address on its network (the one its traffic leaves from), e.g.
+    // "192.168.1.20"; empty if there's none (no network)
+    static std::string localAddress();
     ~EnetTransport() override;
 
     // Starts connecting; the Connected event follows. -1 on failure.

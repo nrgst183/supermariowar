@@ -219,6 +219,28 @@ std::string NetGame::routerNote(bool& good) const
 #endif
 }
 
+std::string NetGame::lanAddress()
+{
+#ifdef NETWORK_DISABLED
+    return {};
+#else
+    //Asked every frame by the menus: looked up again every few seconds (the network may change)
+    static std::string address;
+    static auto askedAt = std::chrono::steady_clock::time_point();
+    const auto now = std::chrono::steady_clock::now();
+    if (askedAt == std::chrono::steady_clock::time_point() || now - askedAt > std::chrono::seconds(5)) {
+        address = EnetTransport::localAddress();
+        askedAt = now;
+    }
+    return address;
+#endif
+}
+
+uint16_t NetGame::lobbyPort() const
+{
+    return m_transport ? m_transport->localPort() : 0;
+}
+
 bool NetGame::host(uint16_t port, std::string& error)
 {
     return open(true, port ? port : DEFAULT_LOBBY_PORT, "", 0, error);
@@ -233,8 +255,12 @@ bool NetGame::join(const std::string& address, std::string& error)
         hostName = address.substr(0, colon);
         port = atoi(address.c_str() + colon + 1);
     }
-    if (hostName.empty() || port <= 0 || port > 65535) {
+    if (hostName.empty()) {
         error = "expected an address like 192.168.1.20:" + std::to_string(DEFAULT_LOBBY_PORT);
+        return false;
+    }
+    if (port <= 0 || port > 65535) {
+        error = "the port (after the ':') must be a number from 1 to 65535";
         return false;
     }
     return open(false, 0, hostName, static_cast<uint16_t>(port), error);
@@ -311,6 +337,10 @@ void NetGame::pump()
         info.maxMembers = static_cast<uint8_t>(net::MAX_PEERS);
         info.inMatch = m_lobby->phase() != NetLobby::Phase::Lobby;
         info.build = GIT_REVISION;
+        info.mode = m_lobby->modeName();
+        info.map = m_lobby->mapName();
+        for (int s = 0; s < 4; s++)
+            info.players += m_lobby->slot(s).kind != SlotKind::Empty;
         lanResponder().answer(info);
     }
 #endif

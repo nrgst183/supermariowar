@@ -13,6 +13,9 @@ TEST_CASE("System link: the answer survives the trip")
     in.maxMembers = 4;
     in.inMatch = true;
     in.build = "dc63264a";
+    in.mode = "Classic";
+    in.map = "Block Piles";
+    in.players = 3;
     const std::vector<uint8_t> message = encodeAnswer(in);
     HostInfo out;
     REQUIRE(decodeAnswer(message.data(), message.size(), out));
@@ -22,10 +25,23 @@ TEST_CASE("System link: the answer survives the trip")
     CHECK(out.maxMembers == 4);
     CHECK(out.inMatch);
     CHECK(out.build == "dc63264a");
+    CHECK(out.mode == "Classic");
+    CHECK(out.map == "Block Piles");
+    CHECK(out.players == 3);
 
-    //Cut short: refused
-    for (size_t n = 0; n < message.size(); n++)
-        CHECK_FALSE(decodeAnswer(message.data(), n, out));
+    //Cut short: refused, but where the first version's answer ended (an older build's answer:
+    //without the details)
+    const size_t firstVersion = 6 + 5 + 1 + in.name.size() + 1 + in.build.size();
+    for (size_t n = 0; n < message.size(); n++) {
+        if (n == firstVersion) {
+            REQUIRE(decodeAnswer(message.data(), n, out));
+            CHECK(out.name == "Andrew");
+            CHECK(out.mode.empty());
+            CHECK(out.players == 0);
+        } else {
+            CHECK_FALSE(decodeAnswer(message.data(), n, out));
+        }
+    }
 }
 
 TEST_CASE("System link: queries and answers are told apart")
