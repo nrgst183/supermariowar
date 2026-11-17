@@ -41,8 +41,6 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 - If someone drops out, **the CPU takes over** their player and the match goes on.
 - **LAN games and system link**: games hosted on your network are listed by themselves, with their mode, map, players and connection, and joined with one button, between PCs and Xboxes alike.
 
-![The Online menu (the address to give the others shown by the Host button), and the LAN games list with two lobbies found on the network](docs/gfx/fork/online_menus.png)
-
 See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 
 ### Map and world editors in the game
