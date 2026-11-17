@@ -45,7 +45,7 @@ See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 
 ### Map and world editors in the game
 
-![The map editor](docs/gfx/fork/map_editor.png)
+![The map editor: three players editing a map together with the blocks palette open, the tools menu (undo, redo, copy an area, paste, fill), pasting a copied area, and the tile picker](docs/gfx/fork/map_editor.png)
 
 ![The world editor](docs/gfx/fork/world_editor.png)
 
