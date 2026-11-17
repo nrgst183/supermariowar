@@ -13,6 +13,12 @@ public:
 
     void SetText(std::string text);
     void Draw() override;
+    /// Where the text starts and ends on the screen (x), and its top
+    int left() const;
+    int right() const;
+    int top() const {
+        return m_pos.y;
+    }
 
 private:
     std::string szText;

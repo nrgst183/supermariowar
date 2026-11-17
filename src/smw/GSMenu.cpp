@@ -30,6 +30,7 @@
 #include "ui/MI_MapField.h"
 #include "ui/MI_MapFilterScroll.h"
 #include "ui/MI_SelectField.h"
+#include "ui/MI_Text.h"
 #include "ui/MI_TournamentScoreboard.h"
 #include "ui/MI_TourStop.h"
 #include "ui/MI_World.h"
@@ -81,6 +82,48 @@
 
 // std::uniue_ptr requires that the special member function have access
 // to the complete types.
+namespace {
+// What the buttons do, in the title bar of the menus (with a controller: with the keyboard and mouse
+// the menus look as they always have): choose, change a value, select at the left (as much as fits
+// before the title), back at the right when it goes back
+void drawMenuHints(const UI_Menu& menu)
+{
+    if (prompts::lastDevice() != prompts::Device::Controller)
+        return;
+    using prompts::Pad;
+    using prompts::Prompt;
+    using prompts::menuKey;
+    const MI_HeaderText* title = menu.Title();
+    if (!title)
+        return;
+    constexpr int GAP = 10;
+    constexpr int Y = 2;
+
+    std::vector<Prompt> left;
+    const Prompt change {{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"};
+    if (menu.IsModifying()) {
+        left = {change, {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "done"}};
+    } else {
+        left = {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"}};
+        if (menu.NudgesFocus())
+            left.push_back(change);
+        left.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"});
+    }
+    //(clear of the title: the least needed first out)
+    while (!left.empty() && 8 + prompts::promptsWidth(left, GAP) > title->left() - 12)
+        left.erase(left.begin());
+    if (!left.empty())
+        prompts::drawPrompts(8 + prompts::promptsWidth(left, GAP) / 2, Y, left, GAP);
+
+    if (menu.CancelCode() != MENU_CODE_NONE) {
+        const std::vector<Prompt> right {{{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}};
+        const int w = prompts::promptsWidth(right, GAP);
+        if (App::screenWidth - 8 - w > title->right() + 12)
+            prompts::drawPrompts(App::screenWidth - 8 - w / 2, Y, right, GAP);
+    }
+}
+} // namespace
+
 MenuState::MenuState() = default;
 MenuState::~MenuState() = default;
 
@@ -92,6 +135,7 @@ MenuState& MenuState::instance()
 
 bool MenuState::init()
 {
+    UI_Menu::drawHints = drawMenuHints;
     mMainMenu = std::make_unique<UI_MainMenu>();
 
     // Options menu

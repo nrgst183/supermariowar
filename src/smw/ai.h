@@ -139,6 +139,7 @@ public:
     void StompEnemy(COutputControl * playerKeys, short ix, short iy, MO_CarriedObject * carriedItem);
     void CheckFallDanger(COutputControl * playerKeys, short ix, short iy, short iDeathX1, short iDeathX2);
     void AvoidJumpingIntoDeath(COutputControl * playerKeys, short iy, short iDeathX1, short iDeathX2);
+    void AvoidDeadlyLanding(COutputControl * playerKeys);
     void UseStoredPowerup(COutputControl * playerKeys, PowerupType powerup, MO_CarriedObject * carriedItem, short iTeamID);
     void CountBenchmarkStats(COutputControl * playerKeys);
 

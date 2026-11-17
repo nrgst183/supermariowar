@@ -99,6 +99,8 @@ public:
     void Refresh() override;
     MenuCodeEnum Modify(bool modify) override;  //! Called when user selects this control to change it's value
     MenuCodeEnum SendInput(CPlayerInput* playerInput) override;  //! Sends player input to control on every frame
+    bool CanNudge() const override;
+    MenuCodeEnum Nudge(int dir) override;
     MenuCodeEnum MouseClick(short iMouseX, short iMouseY) override;
 
 protected:

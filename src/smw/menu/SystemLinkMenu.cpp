@@ -276,6 +276,7 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
     : UI_Menu()
 {
     AddTitleBar(TITLE);
+    SetHints(false);    //(its own prompts, at the bottom)
 #ifdef SMW_XBOX
     const MenuCodeEnum back = MENU_CODE_TO_MAIN_MENU;    //(the Xbox: the main menu opens this one)
 #else

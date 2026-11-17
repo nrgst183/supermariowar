@@ -48,6 +48,20 @@ public:
         return MENU_CODE_NONE;
     }
 
+    /// Left/right on the control while it's only focused, when the menu has nothing that way: a value
+    /// field takes the next/previous value at once (no select, change, select). Whether it does that,
+    /// and doing it (dir -1/1): the code its change returns
+    virtual bool CanNudge() const {
+        return false;
+    }
+    virtual MenuCodeEnum Nudge(int /*dir*/) {
+        return MENU_CODE_NONE;
+    }
+    /// A button's code (what pressing it does), MENU_CODE_NONE for the rest
+    virtual MenuCodeEnum PressCode() const {
+        return MENU_CODE_NONE;
+    }
+
     virtual void Refresh() {}
 
     virtual void Disable(bool disable) {

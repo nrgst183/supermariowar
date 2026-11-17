@@ -18,6 +18,7 @@
 #include "GameMode.h"
 #include "GameValues.h"
 #include "GSMenu.h"
+#include "ui/InputPrompts.h"
 #include "map.h"
 #include "MapList.h"
 #include "path.h"
@@ -418,6 +419,8 @@ void main_game()
     game_values.ReadConfig();
     if (cmd::g_autotest.enabled && cmd::g_autotest.prompts >= 0)
         game_values.buttonprompts = static_cast<short>(cmd::g_autotest.prompts);
+    if (cmd::g_autotest.enabled && cmd::g_autotest.pad)
+        prompts::setLastDevice(prompts::Device::Controller);
     if (cmd::g_autotest.enabled && cmd::g_autotest.colors >= 0)
         game_values.overlaycolors = static_cast<short>(cmd::g_autotest.colors);
 

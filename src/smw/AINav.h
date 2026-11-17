@@ -57,6 +57,13 @@ int SpotBelow(int col, int row);
 // (so we get there fast enough to take off)
 bool RunJumpFrom(int col, int row, int dir);
 
+// A jump up from (col,row) to (toCol,toRow): the column furthest toward the target we can already
+// be in while rising (every tile from our row up to the target's is open), the target's own column
+// when only a floor we can jump through holds it up. Moving there on the way up, rather than at
+// the top, gets us onto ledges a jump barely clears (one 3 tiles up: the feet are over it for a few
+// frames only).
+int RiseColumn(int col, int row, int toCol, int toRow);
+
 // The first move of the shortest path from (col,row) to the spot nearest to the point (x,y)
 Step NextStep(int col, int row, int targetX, int targetY);
 

@@ -316,6 +316,14 @@ int shortestDir(int from, int to)
     return d < 0 ? -1 : d > 0 ? 1 : 0;
 }
 
+bool columnOpen(int c, int fromRow, int toRow)
+{
+    for (int r = toRow; r <= fromRow; r++)
+        if (!passable(c, r))
+            return false;
+    return true;
+}
+
 }  // namespace
 
 int SpotBelow(int col, int row)
@@ -552,6 +560,30 @@ Step NextStep(int col, int row, int targetX, int targetY)
             }
         }
     }
+}
+
+
+int RiseColumn(int col, int row, int toCol, int toRow)
+{
+    col = wrapCol(col);
+    toCol = wrapCol(toCol);
+    const int dir = shortestDir(col, toCol);
+    if (dir == 0 || toRow >= row)
+        return col;
+    int best = col;
+    for (int c = wrapCol(col + dir); ; c = wrapCol(c + dir)) {
+        if (c == toCol) {
+            //(its floor one we jump through: we can be under it already, unless it's as high as a
+            //jump goes: then rising through it we may not get over it)
+            if (!solid(c, toRow + 1) && row - toRow < 3 && columnOpen(c, row, toRow))
+                best = c;
+            break;
+        }
+        if (!columnOpen(c, row, toRow))
+            break;
+        best = c;
+    }
+    return best;
 }
 
 }  // namespace ainav

@@ -31,6 +31,7 @@ UI_OnlineMenu::UI_OnlineMenu()
     : UI_Menu()
 {
     AddTitleBar("Online");
+    SetHints(false);    //(its own prompts, at the bottom)
 
     //Three panels (under their fields): you, hosting, joining
     AddNonControl(new MI_MenuPanel(36, 42, 568, 112, "You", "Your name, and how far ahead you see"));

@@ -23,6 +23,8 @@ public:
 
     //Sends player input to control on every frame
     MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
+    bool CanNudge() const override { return !fDisable; }
+    MenuCodeEnum Nudge(int dir) override;
     MenuCodeEnum MouseClick(short iMouseX, short iMouseY)  override;
 
     MenuCodeEnum ChooseRandomMap();

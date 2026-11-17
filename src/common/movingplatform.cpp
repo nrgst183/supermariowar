@@ -104,6 +104,35 @@ MovingPlatform::MovingPlatform(const std::vector<TilesetTile>& tiledata, const s
     rSrcRect.w = w * iTileSize;
     rSrcRect.h = h * iTileSize;
 
+    //The tiles drawn: runs of tiles in each row, rows with the same runs merged
+    std::vector<SDL_Rect> rowRuns;
+    for (short iRow = 0; iRow < iTileHeight; iRow++) {
+        rowRuns.clear();
+        for (short iCol = 0; iCol < iTileWidth; iCol++) {
+            if (iTileData[iCol * iTileHeight + iRow].iID == TILESETNONE)
+                continue;
+            if (!rowRuns.empty() && rowRuns.back().x + rowRuns.back().w == iCol * iTileSize)
+                rowRuns.back().w += iTileSize;
+            else
+                rowRuns.push_back({iCol * iTileSize, iRow * iTileSize, iTileSize, iTileSize});
+        }
+        //(the same columns as the rows just above: those get taller)
+        size_t above = 0;
+        while (above < drawParts.size() && drawParts[drawParts.size() - 1 - above].y + drawParts[drawParts.size() - 1 - above].h == iRow * iTileSize)
+            above++;
+        bool same = above == rowRuns.size() && above > 0;
+        for (size_t i = 0; same && i < above; i++) {
+            const SDL_Rect& a = drawParts[drawParts.size() - above + i];
+            same = a.x == rowRuns[i].x && a.w == rowRuns[i].w;
+        }
+        if (same) {
+            for (size_t i = 0; i < above; i++)
+                drawParts[drawParts.size() - above + i].h += iTileSize;
+        } else {
+            drawParts.insert(drawParts.end(), rowRuns.begin(), rowRuns.end());
+        }
+    }
+
     fVelX = pPath->velocity0().x;
     fVelY = pPath->velocity0().y;
 
@@ -181,8 +210,24 @@ void MovingPlatform::draw()
 
         if (rWrapRect.x != rDstRect.x)
             customSprite->draw(rSrcRect, blitdest, rWrapRect);
-    } else {
+    } else if (iWidth >= App::screenWidth) {
         sprites[1 - g_iCurrentDrawIndex].draw(rSrcRect, blitdest, rDstRect);
+    } else {
+        //Each part where the whole would put it, and its copy wrapped around the screen's edge
+        //when that shows (as the sprite's own wrapping does for the whole)
+        SDL_Surface* surface = sprites[1 - g_iCurrentDrawIndex].getSurface();
+        for (const SDL_Rect& part : drawParts) {
+            const int x = rDstRect.x + part.x;
+            const int y = rDstRect.y + part.y;
+            SDL_Rect src = part;
+            SDL_Rect dst = {x, y, part.w, part.h};
+            SDL_BlitSurface(surface, &src, blitdest, &dst);
+            if (x + part.w > App::screenWidth || x < 0) {
+                src = part;
+                dst = {x < 0 ? x + App::screenWidth : x - App::screenWidth, y, part.w, part.h};
+                SDL_BlitSurface(surface, &src, blitdest, &dst);
+            }
+        }
     }
 }
 

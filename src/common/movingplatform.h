@@ -7,6 +7,7 @@
 #include "SimArena.h"
 
 #include <array>
+#include <vector>
 
 class CPlayer;
 class IO_MovingObject;
@@ -97,6 +98,12 @@ class MovingPlatform : public sim::ArenaAllocated
         const gfxSprite* customSprite = nullptr;
 
         SDL_Rect	rSrcRect;
+
+        //The parts of the prerendered tiles that aren't empty (in the sprites): drawing only these
+        //skips a platform's empty tiles, which every frame were read and compared pixel by pixel
+        //(an airship's outline: a good share of its rectangle). Rows of tiles with the same
+        //columns merged into one rectangle.
+        std::vector<SDL_Rect> drawParts;
 
         short iDrawLayer;
 

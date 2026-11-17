@@ -118,6 +118,22 @@ MenuCodeEnum MI_SelectField<T>::Modify(bool modify)
 
 
 template<typename T>
+bool MI_SelectField<T>::CanNudge() const
+{
+    //(not the fields that act as buttons: a press does something else, or steps through the values)
+    return !fDisable && !m_autoAdvance && mcControlSelectedCode == MENU_CODE_NONE && m_items.size() > 1;
+}
+
+template<typename T>
+MenuCodeEnum MI_SelectField<T>::Nudge(int dir)
+{
+    if (!CanNudge())
+        return MENU_CODE_NONE;
+    const bool moved = dir > 0 ? moveNext() : movePrev();
+    return moved ? mcItemChangedCode : MENU_CODE_NONE;
+}
+
+template<typename T>
 MenuCodeEnum MI_SelectField<T>::SendInput(CPlayerInput * playerInput)
 {
     for (int iPlayer = 0; iPlayer < 4; iPlayer++) {

@@ -10,6 +10,7 @@
 
 class UI_Control;
 class CPlayerInput;
+class MI_HeaderText;
 
 class UI_Menu {
 public:
@@ -29,6 +30,22 @@ public:
 
     void SetCancelCode(MenuCodeEnum code) {
         cancelCode = code;
+    }
+    MenuCodeEnum CancelCode() const {
+        return cancelCode;
+    }
+    /// Left/right change the focused control's value (a value field with nothing to its sides but a
+    /// shortcut to the menu's Back button, which B is too)
+    bool NudgesFocus() const;
+
+    /// What the buttons do, drawn in the title bar of the menus that have one (the game sets it: the
+    /// prompts are its; the editors have none); a menu with hints of its own turns them off
+    static void (*drawHints)(const UI_Menu& menu);
+    const MI_HeaderText* Title() const {
+        return m_hints ? m_title : nullptr;
+    }
+    void SetHints(bool hints) {
+        m_hints = hints;
     }
 
     void ResetMenu();
@@ -74,6 +91,8 @@ protected:
 
     MenuCodeEnum cancelCode = MENU_CODE_NONE;
     bool fModifyingItem = false;
+    const MI_HeaderText* m_title = nullptr;
+    bool m_hints = true;
 
     CEyecandyContainer eyeCandy;
 

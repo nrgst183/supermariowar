@@ -16,6 +16,17 @@ void MI_Text::SetText(std::string text)
     szText = std::move(text);
 }
 
+int MI_Text::left() const
+{
+    const int w = font->getWidth(szText);
+    return m_align == TextAlign::CENTER ? m_pos.x - w / 2 : m_align == TextAlign::RIGHT ? m_pos.x - w : m_pos.x;
+}
+
+int MI_Text::right() const
+{
+    return left() + font->getWidth(szText);
+}
+
 void MI_Text::Draw()
 {
     if (!m_visible)

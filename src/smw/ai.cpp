@@ -5,6 +5,7 @@
 
 #include "GameValues.h"
 #include "movingplatform.h"
+#include "IO_Block.h"
 #include "SimulationState.h"
 #include "gamemodes/Chicken.h"
 #include "gamemodes/Star.h"
@@ -335,6 +336,15 @@ void CPlayerAI::Think(COutputControl * playerKeys)
         AimWeapon(playerKeys, actionType);
 
     //Jump if trying to move left/right and x velocity is zero
+    // On the way up a jump onto a higher spot of our path: keep to it until the top (steering after
+    // something else now drops us back where we jumped from); after, whatever is best
+    if (improved() && !navActive && pPlayer->inair && pPlayer->vely < 0.0f && navRow < navLastRow &&
+        (navMove == static_cast<short>(ainav::Move::Jump) || navMove == static_cast<short>(ainav::Move::RunJump))) {
+        playerKeys->game_left.fDown = false;
+        playerKeys->game_right.fDown = false;
+        NavigateTo(playerKeys, 0, 0);
+    }
+
     if (!navActive && (playerKeys->game_left.fDown || playerKeys->game_right.fDown) && pPlayer->velx == 0.0f)
         playerKeys->game_jump.fDown = true;
 
@@ -440,6 +450,9 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     AvoidJumpingIntoDeath(playerKeys, iy, iDeathX1, iDeathX2);
 
     if (improved())
+        AvoidDeadlyLanding(playerKeys);
+
+    if (improved())
         UseMovementItems(playerKeys, actionType, nearestObjects);
 
     /***************************************************
@@ -501,6 +514,165 @@ void CPlayerAI::CheckFallDanger(COutputControl * playerKeys, short ix, short iy,
 }
 
 // Think(): no jumping into a death tile above the player (or wildly into 1 tile high gaps)
+namespace {
+// Where the buttons held (dir -1/0/1 and jump, the same from now on) take a player: the moves of
+// PlayerMovement (speeding up, friction, gravity, letting go of jump while rising), the map's walls
+// and floors, the screen's edges, and the moving platforms where they are now. 1: onto a safe floor,
+// -1: onto a deadly one (lava, spikes), 0: neither within two seconds or off the bottom.
+constexpr int kLandingDeath = tile_flag_death_on_top | tile_flag_super_death_top | tile_flag_player_death;
+
+int tileAt(int x, int y)
+{
+    if (y < 0 || y >= App::screenHeight)
+        return tile_flag_nonsolid;
+    x = ((x % App::screenWidth) + App::screenWidth) % App::screenWidth;
+    const short c = static_cast<short>(x / TILESIZE);
+    const short r = static_cast<short>(y / TILESIZE);
+    int t = g_map->map(c, r);
+    IO_Block* b = g_map->block(c, r);
+    if (b && !b->isTransparent() && !b->isHidden())
+        t |= tile_flag_solid;
+    return t;
+}
+
+struct LandingState {
+    float x, y, vx, vy;
+    bool air;
+    const std::vector<MovingPlatform*>* platforms;
+};
+
+int platformTileAt(const std::vector<MovingPlatform*>& platforms, int x, int y)
+{
+    int t = tile_flag_nonsolid;
+    for (MovingPlatform* p : platforms)
+        t |= p->GetTileTypeFromCoord(static_cast<short>(x), static_cast<short>(y));
+    return t;
+}
+
+int predictLanding(const LandingState& p, int dir, bool jump, bool canJump)
+{
+    float x = p.x, y = p.y;
+    float vx = p.vx, vy = p.vy;
+    bool air = p.air;
+    const std::vector<MovingPlatform*>& platforms = *p.platforms;
+    const bool edges = ainav::CanCrossEdge(static_cast<int>(p.y), static_cast<int>(p.y));
+    for (int t = 0; t < 120; t++) {
+        if (jump && !air && canJump) {
+            vy = -VELJUMP;
+            air = true;
+        }
+        if (dir != 0) {
+            vx += VELMOVINGADD * static_cast<float>(dir);
+            const float cap = std::max(VELMOVING, vx * static_cast<float>(dir));
+            if (vx * static_cast<float>(dir) > cap)
+                vx = cap * static_cast<float>(dir);
+        } else {
+            const float f = air ? VELAIRFRICTION : VELMOVINGFRICTION;
+            vx = vx > f ? vx - f : vx < -f ? vx + f : 0.0f;
+        }
+
+        // Sideways, stopped by walls (and the screen's edges where the map closes them)
+        const float nx = x + vx;
+        const int side = vx > 0.0f ? static_cast<int>(nx) + PW - 1 : static_cast<int>(nx);
+        bool blocked = !edges && (nx < 0.0f || nx + PW > static_cast<float>(App::screenWidth));
+        for (int yy = static_cast<int>(y); yy < static_cast<int>(y) + PH && !blocked && vx != 0.0f; yy += TILESIZE / 2)
+            blocked = (tileAt(side, yy) & tile_flag_solid) != 0;
+        if (!blocked && vx != 0.0f)
+            blocked = (tileAt(side, static_cast<int>(y) + PH - 1) & tile_flag_solid) != 0;
+        if (blocked)
+            vx = 0.0f;
+        else
+            x = nx;
+        if (x < 0.0f)
+            x += static_cast<float>(App::screenWidth);
+        else if (x >= static_cast<float>(App::screenWidth))
+            x -= static_cast<float>(App::screenWidth);
+
+        const int left = static_cast<int>(x), right = static_cast<int>(x) + PW - 1;
+        if (!air) {
+            // Walked off the edge of what we stand on?
+            const int feet = static_cast<int>(y) + PH;
+            const int under = tileAt(left, feet) | tileAt(right, feet) | platformTileAt(platforms, left, feet) | platformTileAt(platforms, right, feet);
+            if (!(under & (tile_flag_solid | tile_flag_solid_on_top)))
+                air = true;
+            continue;
+        }
+
+        if (!jump && vy < -VELSTOPJUMP)
+            vy = -VELSTOPJUMP;
+        vy += GRAVITATION;
+        if (vy > MAXVELY)
+            vy = MAXVELY;
+        const float ny = y + vy;
+        if (vy < 0.0f) {
+            if ((tileAt(left, static_cast<int>(ny)) | tileAt(right, static_cast<int>(ny))) & tile_flag_solid)
+                vy = 0.0f;
+            else
+                y = ny;
+            continue;
+        }
+        // Falling: onto a floor when our feet cross the top of a tile (or a platform's)
+        const int feetBefore = static_cast<int>(y) + PH;
+        const int feetAfter = static_cast<int>(ny) + PH;
+        if (feetAfter >= App::screenHeight)
+            return 0;
+        if (feetAfter / TILESIZE != (feetBefore - 1) / TILESIZE || feetBefore % TILESIZE == 0) {
+            const int row = feetAfter;
+            const int tl = tileAt(left, row), tr = tileAt(right, row);
+            const int pl = platformTileAt(platforms, left, row), pr = platformTileAt(platforms, right, row);
+            const bool floor = ((tl | tr) & (tile_flag_solid | tile_flag_solid_on_top)) != 0;
+            const bool platform = ((pl | pr) & (tile_flag_solid | tile_flag_solid_on_top)) != 0;
+            if (floor || platform) {
+                if (pairIsDeadly(tl, tr, kLandingDeath) && !(platform && !pairIsDeadly(pl, pr, kLandingDeath)))
+                    return -1;
+                if (platform && !floor && pairIsDeadly(pl, pr, kLandingDeath))
+                    return -1;
+                return 1;
+            }
+        }
+        y = ny;
+    }
+    return 0;
+}
+} // namespace
+
+// The buttons chosen would land us in lava or on spikes (in the air already, walking off an edge or
+// jumping): the nearest other choice that doesn't (the jump the other way, letting go, the other
+// way), or failing that one that at least isn't certain death
+void CPlayerAI::AvoidDeadlyLanding(COutputControl * playerKeys)
+{
+    if (pPlayer->isInvincible() || pPlayer->flying)
+        return;
+    bool& left = playerKeys->game_left.fDown;
+    bool& right = playerKeys->game_right.fDown;
+    bool& jump = playerKeys->game_jump.fDown;
+    const int dir = right ? 1 : left ? -1 : 0;
+    const bool canJump = !pPlayer->lockjump;
+    const LandingState state {static_cast<float>(pPlayer->ix), static_cast<float>(pPlayer->iy), pPlayer->velx, pPlayer->vely,
+                             pPlayer->inair, &g_map->platforms};
+    if (predictLanding(state, dir, jump, canJump) >= 0)
+        return;
+
+    struct Choice { int dir; bool jump; };
+    const Choice choices[] = {{dir, !jump}, {0, jump}, {0, !jump}, {dir == 0 ? 1 : -dir, jump}, {dir == 0 ? 1 : -dir, !jump},
+                              {dir == 0 ? -1 : dir, jump}};
+    const Choice* fallback = nullptr;
+    for (const Choice& ch : choices) {
+        const int r = predictLanding(state, ch.dir, ch.jump, canJump);
+        if (r == 1) {
+            fallback = &ch;
+            break;
+        }
+        if (r == 0 && !fallback)
+            fallback = &ch;
+    }
+    if (!fallback)
+        return;
+    left = fallback->dir < 0;
+    right = fallback->dir > 0;
+    jump = fallback->jump;
+}
+
 void CPlayerAI::AvoidJumpingIntoDeath(COutputControl * playerKeys, short iy, short iDeathX1, short iDeathX2)
 {
     short iDeathY = iy / TILESIZE;
@@ -924,11 +1096,11 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
     bool& right = playerKeys->game_right.fDown;
     const int px = pPlayer->ix;
 
-    auto steerTo = [&](int col) {
-        // Toward the middle of the column, the short way around the screen; in the air we
+    auto steerToX = [&](int x) {
+        // Toward x (the player's left side), the short way around the screen; in the air we
         // keep moving the way we're going for a while, so aim with where that takes us
         const int ahead = pPlayer->inair ? static_cast<int>(pPlayer->velx * AIR_BRAKE_FRAMES) : 0;
-        int d = col * TILESIZE + (TILESIZE - PW) / 2 - px - ahead;
+        int d = x - px - ahead;
         if (d > App::screenWidth / 2)
             d -= App::screenWidth;
         else if (d < -App::screenWidth / 2)
@@ -937,6 +1109,10 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
             left = true;
         else if (d > 3)
             right = true;
+    };
+    // Toward the middle of the column
+    auto steerTo = [&](int col) {
+        steerToX(col * TILESIZE + (TILESIZE - PW) / 2);
     };
 
     if (pPlayer->inair) {
@@ -948,8 +1124,23 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
             const int floorTop = (navRow + 1) * TILESIZE;
             if (pPlayer->vely < 0.0f)
                 playerKeys->game_jump.fDown = true;
-            if (pPlayer->iy + PH <= floorTop + 4 || navRow * TILESIZE >= pPlayer->iy)
+            if (pPlayer->iy + PH <= floorTop + 4 || navRow * TILESIZE >= pPlayer->iy) {
                 steerTo(navCol);
+            } else if (navRow < navLastRow && navCol != navLastCol) {
+                // Still below it: as close to it as the way up is open (against the ledge's side
+                // when that's all), so we're there when our feet clear it
+                const int rise = ainav::RiseColumn(navLastCol, navLastRow, navCol, navRow);
+                if (rise == navCol) {
+                    steerTo(navCol);
+                } else {
+                    int dx = navCol - rise;
+                    if (dx > MAPWIDTH / 2)
+                        dx -= MAPWIDTH;
+                    else if (dx < -MAPWIDTH / 2)
+                        dx += MAPWIDTH;
+                    steerToX(dx > 0 ? (rise + 1) * TILESIZE - PW : rise * TILESIZE);
+                }
+            }
         } else if (navMove == static_cast<short>(ainav::Move::RunJump)) {
             // The whole jump; brake (back toward where we took off) until our head is above the
             // ledge's underside, then onto it (its side may stop us on the way up: harmless)

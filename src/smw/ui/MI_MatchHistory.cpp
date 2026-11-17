@@ -2,6 +2,7 @@
 
 #include "GameMode.h"
 #include "input.h"
+#include "ui/InputPrompts.h"
 #include "ResourceManager.h"
 #include "rollback/Replay.h"
 
@@ -230,8 +231,20 @@ void MI_MatchHistory::drawDetails(short y) const
         ty += 15;
     }
 
-    const std::string hint = !m_message.empty() ? m_message
-        : e.replay.empty() ? "No replay    Cancel: back"
-        : "Select: watch the replay    Cancel: back";
-    rm->menu_font_small.drawRightJustified(right, bottom - 14, hint);
+    if (!m_message.empty()) {
+        rm->menu_font_small.drawRightJustified(right, bottom - 14, m_message);
+        return;
+    }
+    //What the buttons do: the controller's or the keys (as the other menus show them)
+    using prompts::Pad;
+    using prompts::menuKey;
+    std::vector<prompts::Prompt> row;
+    if (e.replay.empty())
+        rm->menu_font_small.drawRightJustified(right - prompts::promptsWidth({{{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}}, 12) - 16,
+                                               bottom - 14, "No replay");
+    else
+        row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "watch the replay"});
+    row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"});
+    const int w = prompts::promptsWidth(row, 12);
+    prompts::drawPrompts(right - w / 2, bottom - 16, row, 12);
 }

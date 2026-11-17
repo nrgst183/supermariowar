@@ -50,6 +50,14 @@ MenuCodeEnum MI_MapField::Modify(bool modify)
     return MENU_CODE_MODIFY_ACCEPTED;
 }
 
+MenuCodeEnum MI_MapField::Nudge(int dir)
+{
+    if (fDisable)
+        return MENU_CODE_NONE;
+    const bool moved = dir > 0 ? MoveNext(false) : MovePrev(false);
+    return moved ? MENU_CODE_MAP_CHANGED : MENU_CODE_NONE;
+}
+
 MenuCodeEnum MI_MapField::SendInput(CPlayerInput * playerInput)
 {
     const SDL_Keycode iPressedKey = playerInput->iPressedKey;

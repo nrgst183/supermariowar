@@ -19,6 +19,9 @@ public:
     MenuCodeEnum MouseClick(short iMouseX, short iMouseY) override;
 
     void SetName(std::string name);
+    MenuCodeEnum PressCode() const override {
+        return menuCode;
+    }
     void SetCode(MenuCodeEnum code) {
         menuCode = code;
     }
