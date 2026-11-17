@@ -25,6 +25,7 @@ class UI_OnlineLobbyMenu;
 class UI_MatchHistoryMenu;
 class UI_EditorsMenu;
 class UI_OnlineMenu;
+class UI_SystemLinkMenu;
 class UI_OptionsMenu;
 class UI_PlayerControlsMenu;
 class UI_PlayerControlsSelectMenu;
@@ -116,6 +117,7 @@ class MenuState : public GameState
         // Online (rollback netplay) menus
         void HostOnlineGame();
         void JoinOnlineGame();
+        void JoinSystemLinkGame();
         void EnterOnlineLobby();
         void LeaveOnlineLobby(const std::string& message);
         void LeaveOnlineLobbyNow();
@@ -185,6 +187,7 @@ class MenuState : public GameState
         // Online menus
         std::unique_ptr<UI_OnlineMenu> mOnlineMenu;
         std::unique_ptr<UI_OnlineLobbyMenu> mOnlineLobbyMenu;
+        std::unique_ptr<UI_SystemLinkMenu> mSystemLinkMenu;
         std::unique_ptr<UI_MatchHistoryMenu> mMatchHistoryMenu;
         std::unique_ptr<UI_EditorsMenu> mEditorsMenu;
         bool mOnlineView = false;       //A player who is not the host looks at (or, if the host allows it, edits) the match settings

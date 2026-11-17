@@ -816,6 +816,21 @@ bool SDL_XboxDeleteSaveGame(const char* name);
 // Calls `callback` with the name of each of the title's saves
 void SDL_XboxEnumerateSaveGames(void (*callback)(void* userdata, const char* name), void* userdata);
 
+// The network (system link): XNet, started once, without its security, so
+// that Xboxes and PCs exchange plain UDP. Starting it early gives its DHCP
+// time while the menus are up. Returns 1 if it runs (ENet calls it too).
+int SDL_XboxStartNetwork(void);
+
+typedef enum SDL_XboxNetworkStatus {
+    SDL_XBOX_NETWORK_OFF,         /* not started, or it couldn't start */
+    SDL_XBOX_NETWORK_NO_CABLE,    /* no network cable (or nothing at its end) */
+    SDL_XBOX_NETWORK_PENDING,     /* getting an address (DHCP) */
+    SDL_XBOX_NETWORK_NO_ADDRESS,  /* no address came */
+    SDL_XBOX_NETWORK_READY        /* *address: the console's ("192.168.1.20") */
+} SDL_XboxNetworkStatus;
+// `address` (at least 16 characters) gets the console's address when READY
+SDL_XboxNetworkStatus SDL_XboxGetNetworkStatus(char* address, int size);
+
 #ifdef __cplusplus
 }
 #endif

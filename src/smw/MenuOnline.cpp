@@ -16,6 +16,7 @@
 #include "menu/MatchSelectionMenu.h"
 #include "menu/OnlineLobbyMenu.h"
 #include "menu/OnlineMenu.h"
+#include "menu/SystemLinkMenu.h"
 
 #include <algorithm>
 #include <cctype>
@@ -78,6 +79,34 @@ void MenuState::JoinOnlineGame()
         return;
     }
 
+    game_values.onlinename = trimmed(game_values.onlinename);
+    net.lobby()->setName(game_values.onlinename);
+    game_values.WriteConfig();
+    EnterOnlineLobby();
+}
+
+// The game chosen in the System Link menu (the games found on the local network)
+void MenuState::JoinSystemLinkGame()
+{
+    rollback::NetGame& net = rollback::NetGame::instance();
+    mSystemLinkMenu->ClearMessage();
+
+    std::string why;
+    const std::string address = mSystemLinkMenu->SelectedAddress(why);
+    if (address.empty()) {
+        mSystemLinkMenu->ShowMessage(why);
+        return;
+    }
+
+    std::string error;
+    if (!net.join(address, error)) {
+        mSystemLinkMenu->ShowMessage("Can't join: " + error);
+        return;
+    }
+    mSystemLinkMenu->Close();
+
+    //(the Online menu's address field shows it next time)
+    game_values.onlineaddress = address;
     game_values.onlinename = trimmed(game_values.onlinename);
     net.lobby()->setName(game_values.onlinename);
     game_values.WriteConfig();

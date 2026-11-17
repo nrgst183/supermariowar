@@ -53,6 +53,7 @@
 #include "menu/ModeOptionsMenu.h"
 #include "menu/OnlineLobbyMenu.h"
 #include "menu/OnlineMenu.h"
+#include "menu/SystemLinkMenu.h"
 #include "menu/OptionsMenu.h"
 #include "menu/PlayerControlsMenu.h"
 #include "menu/PlayerControlsSelectMenu.h"
@@ -123,6 +124,7 @@ bool MenuState::init()
     // Online menu
     mOnlineMenu = std::make_unique<UI_OnlineMenu>();
     mOnlineLobbyMenu = std::make_unique<UI_OnlineLobbyMenu>();
+    mSystemLinkMenu = std::make_unique<UI_SystemLinkMenu>();
     mMatchHistoryMenu = std::make_unique<UI_MatchHistoryMenu>();
     mEditorsMenu = std::make_unique<UI_EditorsMenu>();
 
@@ -846,6 +848,7 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
             mEditorsMenu->SetStatus("Can't join: " + error);
 #endif
     } else if (MENU_CODE_TO_ONLINE_MENU == code) {
+        mSystemLinkMenu->Close();
         mOnlineMenu->ClearMessage();
         mOnlineMenu->Open();
         mCurrentMenu = mOnlineMenu.get();
@@ -853,6 +856,11 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         HostOnlineGame();
     } else if (MENU_CODE_ONLINE_JOIN == code) {
         JoinOnlineGame();
+    } else if (MENU_CODE_TO_SYSTEM_LINK_MENU == code) {
+        mSystemLinkMenu->Open();
+        mCurrentMenu = mSystemLinkMenu.get();
+    } else if (MENU_CODE_SYSTEM_LINK_JOIN == code) {
+        JoinSystemLinkGame();
     } else if (MENU_CODE_ONLINE_LOBBY_CHANGED == code) {
         mOnlineLobbyMenu->ApplyChanges();
     } else if (MENU_CODE_ONLINE_OPTIONS == code) {

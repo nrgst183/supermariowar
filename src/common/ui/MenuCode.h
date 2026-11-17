@@ -112,6 +112,8 @@ enum MenuCodeEnum {
     MENU_CODE_ONLINE_OPTIONS_BACK,
     MENU_CODE_ONLINE_KICK,
     MENU_CODE_ONLINE_SETTINGS_BACK,     // a joiner leaves the settings view
+    MENU_CODE_TO_SYSTEM_LINK_MENU,      // the games found on the local network (system link / LAN games)
+    MENU_CODE_SYSTEM_LINK_JOIN,         // joins the game of the chosen row
 
     // Match history (MatchHistory.h) and the editors
     MENU_CODE_TO_HISTORY_MENU,

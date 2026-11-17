@@ -43,8 +43,16 @@ if(NOT NO_NETWORK)
     target_sources(SmwRollbackNet PRIVATE
         EnetTransport.cpp
         EnetTransport.h
-        PortMapping.cpp
+        LanDiscovery.cpp
+        LanDiscovery.h
     )
+    # The router's port (UPnP): not on the Xbox, where system link is the local network
+    if(XBOXOG)
+        target_sources(SmwRollbackNet PRIVATE PortMappingNone.cpp)
+        target_compile_definitions(SmwRollbackNet PUBLIC SMW_XBOX)
+    else()
+        target_sources(SmwRollbackNet PRIVATE PortMapping.cpp)
+    endif()
     target_link_libraries(SmwRollbackNet PUBLIC enet)
     if (WIN32)
         target_link_libraries(SmwRollbackNet PUBLIC ws2_32 winmm)

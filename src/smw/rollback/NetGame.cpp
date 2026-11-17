@@ -19,6 +19,11 @@
 
 #ifndef NETWORK_DISABLED
 #include "EnetTransport.h"
+#include "LanDiscovery.h"
+#endif
+
+#ifdef SMW_XBOX
+#include <SDL3/SDL.h>
 #endif
 
 #include <algorithm>
@@ -98,6 +103,17 @@ std::string NetGame::peerName(int peer) const
     return "Player " + std::to_string(peer + 1);
 }
 
+#ifndef NETWORK_DISABLED
+namespace {
+// System link: a host answers the searches of the local network (LanDiscovery.h)
+lan::Responder& lanResponder()
+{
+    static lan::Responder responder;
+    return responder;
+}
+} // namespace
+#endif
+
 bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint16_t joinPort, std::string& error)
 {
     if (inMatch()) {
@@ -152,6 +168,9 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
     //Friends join without a port forwarded by hand where the router lets us open it (UPnP)
     if (asHost && (args.upnp > 0 || (args.upnp < 0 && !cmd::g_autotest.enabled)))
         upnp::openPort(port);
+    //System link: the games on the local network find this one
+    if (asHost)
+        lanResponder().open();
     m_wasClosed = false;
     m_lastMatchError.clear();
     return true;
@@ -166,6 +185,21 @@ std::string NetGame::routerNote(bool& good) const
 #else
     if (!m_lobby || !isHost())
         return {};
+#ifdef SMW_XBOX
+    //No router to open on the Xbox: system link, on the local network
+    char address[32];
+    switch (SDL_XboxGetNetworkStatus(address, sizeof(address))) {
+        case SDL_XBOX_NETWORK_READY:
+            good = true;
+            return "System link: others join at " + std::string(address) + ":" + std::to_string(m_transport ? m_transport->localPort() : DEFAULT_LOBBY_PORT);
+        case SDL_XBOX_NETWORK_NO_CABLE:
+            return "No network cable: plug one in for system link";
+        case SDL_XBOX_NETWORK_PENDING:
+            return "Getting a network address...";
+        default:
+            return "The network has no address (check the dashboard's network settings)";
+    }
+#endif
     const upnp::Status st = upnp::status();
     const std::string port = std::to_string(st.port);
     switch (st.state) {
@@ -237,6 +271,7 @@ void NetGame::shutdown()
 {
 #ifndef NETWORK_DISABLED
     upnp::closePort();
+    lanResponder().close();
 #endif
     if (m_transport)
         m_transport->close(500);
@@ -264,6 +299,21 @@ void NetGame::pump()
         return;
 
     const uint32_t now = monotonicMs();
+#ifndef NETWORK_DISABLED
+    //System link: the searches of the local network get this game
+    if (isHost() && lanResponder().isOpen() && m_lobby->phase() != NetLobby::Phase::Closed) {
+        lan::HostInfo info;
+        info.port = m_transport ? m_transport->localPort() : DEFAULT_LOBBY_PORT;
+        info.name = m_lobby->peer(m_lobby->localPeer()).name;
+        if (info.name.empty())
+            info.name = "Player 1";
+        info.members = static_cast<uint8_t>(m_lobby->memberCount());
+        info.maxMembers = static_cast<uint8_t>(net::MAX_PEERS);
+        info.inMatch = m_lobby->phase() != NetLobby::Phase::Lobby;
+        info.build = GIT_REVISION;
+        lanResponder().answer(info);
+    }
+#endif
     LobbyGameEvent event;
     while (m_lobby->poll(event, now))
         handle(event, now);

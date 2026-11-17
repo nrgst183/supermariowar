@@ -15,10 +15,10 @@ project(smw
 
 # Original Xbox, built with RXDK (-DCMAKE_TOOLCHAIN_FILE=<RXDK tools>/cmake/RxdkToolchain.cmake).
 # SDL comes from the compatibility layer in platform/xbox (it has some C sources).
-# No netplay, no editors and no unit tests on the console.
+# The netplay runs over system link (ENet on the Xbox's Winsock, platform/xbox).
+# No editors and no unit tests on the console.
 if(XBOXOG)
 	enable_language(C)
-	set(NO_NETWORK ON CACHE BOOL "Disable all network communication" FORCE)
 	set(BUILD_TESTS OFF CACHE BOOL "Build the unit tests" FORCE)
 	set(SMW_INSTALL_PORTABLE ON CACHE BOOL "Install to a single directory" FORCE)
 	# Float maths on SSE, like the PC builds: exact single precision, so the

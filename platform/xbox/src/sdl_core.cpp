@@ -1,6 +1,7 @@
 // Xbox SDL3 compatibility layer: init, errors, properties, time, paths.
 
 #include <xtl.h>
+#include <winsockx.h>
 
 #include "sdl_internal.h"
 
@@ -291,6 +292,50 @@ void SDL_XboxEnumerateSaveGames(void (*callback)(void* userdata, const char* nam
         callback(userdata, name);
     } while (XFindNextSaveGame(find, &data));
     XFindClose(find);
+}
+
+
+/* ---- Network --------------------------------------------------------------- */
+
+int SDL_XboxStartNetwork(void)
+{
+    static int started = -1;
+    if (started < 0) {
+        // Plain UDP (no XNet security): PCs on the network can play too
+        XNetStartupParams params;
+        memset(&params, 0, sizeof(params));
+        params.cfgSizeOfStruct = sizeof(params);
+        params.cfgFlags = XNET_STARTUP_BYPASS_SECURITY;
+        const INT result = XNetStartup(&params);
+        started = result == 0 ? 1 : 0;
+        if (!started)
+            sdlx_log("[xbox] The network didn't start (XNetStartup: %d)\n", static_cast<int>(result));
+    }
+    return started;
+}
+
+SDL_XboxNetworkStatus SDL_XboxGetNetworkStatus(char* address, int size)
+{
+    if (address && size > 0)
+        address[0] = 0;
+    if (!SDL_XboxStartNetwork())
+        return SDL_XBOX_NETWORK_OFF;
+    if (!(XNetGetEthernetLinkStatus() & XNET_ETHERNET_LINK_ACTIVE))
+        return SDL_XBOX_NETWORK_NO_CABLE;
+
+    XNADDR xna;
+    memset(&xna, 0, sizeof(xna));
+    const DWORD flags = XNetGetTitleXnAddr(&xna);
+    if (flags == XNET_GET_XNADDR_PENDING)
+        return SDL_XBOX_NETWORK_PENDING;
+    if ((flags & XNET_GET_XNADDR_NONE) || !(flags & (XNET_GET_XNADDR_STATIC | XNET_GET_XNADDR_DHCP | XNET_GET_XNADDR_AUTO | XNET_GET_XNADDR_PPPOE)))
+        return SDL_XBOX_NETWORK_NO_ADDRESS;
+
+    if (address && size > 0) {
+        const unsigned char* b = reinterpret_cast<const unsigned char*>(&xna.ina.s_addr);
+        snprintf(address, static_cast<size_t>(size), "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
+    }
+    return SDL_XBOX_NETWORK_READY;
 }
 
 

@@ -16,5 +16,9 @@ add_executable(smw-tests
 	rollback/test_PortMapping.cpp
 	rollback/test_RollbackSession.cpp
 )
+# The system link discovery is part of the network code
+if(NOT NO_NETWORK)
+	target_sources(smw-tests PRIVATE rollback/test_LanDiscovery.cpp)
+endif()
 target_link_libraries(smw-tests PRIVATE doctest CommonFiles SmwRollbackNet)
 doctest_discover_tests(smw-tests)

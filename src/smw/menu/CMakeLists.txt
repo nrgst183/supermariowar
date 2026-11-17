@@ -19,6 +19,8 @@ target_sources(smw PRIVATE
     OnlineLobbyMenu.h
     OnlineMenu.cpp
     OnlineMenu.h
+    SystemLinkMenu.cpp
+    SystemLinkMenu.h
     OptionsMenu.cpp
     OptionsMenu.h
     PlayerControlsMenu.cpp

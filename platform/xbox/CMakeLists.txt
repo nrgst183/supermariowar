@@ -37,6 +37,7 @@ target_link_libraries(sdl3_xbox INTERFACE
     libxgraphics${_rxdk_d}
     libdsound${_rxdk_d}
     libxapi${_rxdk_d}
+    libxnet${_rxdk_d}
     libc${_rxdk_d}
     libcpp${_rxdk_d}
     libkernel${_rxdk_d}
@@ -46,3 +47,38 @@ target_link_libraries(sdl3_xbox INTERFACE
 # The title's entry point (RXDK calls main(void); it calls the game's SDL_main).
 # Added to the executable directly, so the linker always sees it.
 set(SDL3_XBOX_MAIN "${CMAKE_CURRENT_SOURCE_DIR}/src/sdl_main_xbox.cpp" CACHE INTERNAL "")
+
+# ENet (the netplay's UDP, over system link) on the Xbox's Winsock: ENet's own
+# sources, with the platform part here (enet/include/enet/enet.h and
+# src/enet_xbox.c); ENet's CMake build is for Windows and Unix. The same ENet
+# commit as the other builds (cmake/BundledDeps.cmake).
+if(NOT NO_NETWORK)
+    include(FetchContent)
+    FetchContent_Populate(enet_xbox
+        QUIET
+        GIT_REPOSITORY https://github.com/mmatyas/enet.git
+        GIT_TAG 74d43e850f5abda0e5f565caa5d54f462bc210fd
+        SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/enet_xbox-src"
+        BINARY_DIR "${CMAKE_BINARY_DIR}/_deps/enet_xbox-build"
+        SUBBUILD_DIR "${CMAKE_BINARY_DIR}/_deps/enet_xbox-subbuild"
+    )
+
+    add_library(enet STATIC
+        "${enet_xbox_SOURCE_DIR}/callbacks.c"
+        "${enet_xbox_SOURCE_DIR}/compress.c"
+        "${enet_xbox_SOURCE_DIR}/host.c"
+        "${enet_xbox_SOURCE_DIR}/list.c"
+        "${enet_xbox_SOURCE_DIR}/packet.c"
+        "${enet_xbox_SOURCE_DIR}/peer.c"
+        "${enet_xbox_SOURCE_DIR}/protocol.c"
+        src/enet_xbox.c
+    )
+    # This folder first: its enet/enet.h supplies the platform part, then
+    # includes ENet's
+    target_include_directories(enet PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/enet/include"
+        "${enet_xbox_SOURCE_DIR}/include"
+    )
+    target_compile_options(enet PRIVATE -w)
+    target_link_libraries(enet PUBLIC sdl3_xbox)
+endif()

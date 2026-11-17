@@ -16,6 +16,9 @@ int main(void)
 
     sdlx_set_fpu_precision();
 
+    // The network starts now: its address (DHCP) comes while the menus are up
+    SDL_XboxStartNetwork();
+
     const int result = SDL_main(1, argv);
     sdlx_log("[xbox] The game exited with %d\n", result);
 
