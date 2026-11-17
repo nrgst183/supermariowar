@@ -88,5 +88,12 @@ constexpr unsigned short tileToFlags(TileType tiletype) {
 }
 
 
+// Two tiles a side of a body touches (their flags, tileToFlags): that side is deadly when both
+// tiles have `deathFlag`, or one has it and the other isn't solid
+constexpr bool pairIsDeadly(int t1, int t2, int deathFlag) {
+    return ((t1 & deathFlag) && (t2 & deathFlag)) || ((t1 & deathFlag) && !(t2 & tile_flag_solid)) ||
+           (!(t1 & tile_flag_solid) && (t2 & deathFlag));
+}
+
 TileType NextTileType(TileType type);
 TileType PrevTileType(TileType type);

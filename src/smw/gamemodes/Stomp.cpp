@@ -13,7 +13,6 @@
 #include "objects/walkingenemy/WE_Koopa.h"
 #include "objects/walkingenemy/WE_Spiny.h"
 
-
 //Stomp mode:
 //Kill randomly appearing goomobas on map
 //First one to kill the limit wins
@@ -33,10 +32,7 @@ void CGM_Stomp::init()
     for (short iEnemy = 0; iEnemy < NUMSTOMPENEMIES; iEnemy++)
         iEnemyWeightCount += game_values.gamemodesettings.stomp.enemyweight[iEnemy];
 
-    //if (iEnemyWeightCount == 0)
-    //  iEnemyWeightCount = 1;
 }
-
 
 void CGM_Stomp::think()
 {

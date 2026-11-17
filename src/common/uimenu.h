@@ -5,11 +5,11 @@
 #include "ui/MenuCode.h"
 
 #include <memory>
+#include <string>
 #include <vector>
 
 class UI_Control;
 class CPlayerInput;
-
 
 class UI_Menu {
 public:
@@ -17,6 +17,8 @@ public:
 
     void AddControl(UI_Control* control, UI_Control* up, UI_Control* down, UI_Control* left, UI_Control* right);
     void AddNonControl(UI_Control* control);
+    /// The bar along the top of the screen, with the menu's title (a non-control)
+    void AddTitleBar(const std::string& title);
 
     /// Sets the initially focused element on opening/resetting the menu.
     void setInitialFocus(UI_Control* control);

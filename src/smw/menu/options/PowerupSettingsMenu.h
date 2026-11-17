@@ -26,16 +26,4 @@ private:
     MI_SelectField<short>* miHiddenBlockRespawnField = nullptr;
     MI_StoredPowerupResetButton* miStoredPowerupResetButton = nullptr;
     MI_Button* miPowerupSettingsMenuBackButton = nullptr;
-
-    MI_Image* miPowerupSettingsMenuLeftHeaderBar = nullptr;
-    MI_Image* miPowerupSettingsMenuRightHeaderBar = nullptr;
-    MI_Text* miPowerupSettingsMenuHeaderText = nullptr;
-
-    /*
-    MI_Image* miPowerupSelectionDialogImage = nullptr;
-    MI_Text* miPowerupSelectionDialogExitText = nullptr;
-    MI_Text* miPowerupSelectionDialogTournamentText = nullptr;
-    MI_Button* miPowerupSelectionDialogYesButton = nullptr;
-    MI_Button* miPowerupSelectionDialogNoButton = nullptr;
-    */
 };

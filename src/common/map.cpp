@@ -28,7 +28,6 @@ using std::endl;
 
 short g_iCurrentDrawIndex = 0;
 
-
 CMap::CMap()
     : warpexits()
     , tilebltrect()
@@ -44,7 +43,6 @@ CMap::CMap()
 
 CMap::~CMap()
 {}
-
 
 //With the new 32x30 tile set, we need to convert old maps to use the
 //correct indexes into the tile set
@@ -130,7 +128,6 @@ void CMap::loadMap(const std::string& file, ReadType iReadType)
     eyecandy[2] = 0;
     mapitems.clear();
     maphazards.clear();
-
 
     BinaryFile mapfile(file, "rb");
     if (!mapfile.is_open()) {
@@ -348,9 +345,6 @@ void CMap::calculatespawnareas(short iType, bool fUseTempBlocks, bool fIgnoreDea
                                 }
                             }
                         }
-
-                        //if (m == j)
-                        //fUsed = true;
                     }
                 }
             }
@@ -576,8 +570,8 @@ void CMap::update()
 bool CMap::findspawnpoint(short iType, short * x, short * y, short width, short height, bool tilealigned)
 {
     if (totalspawnsize[iType] <= 0) {
-		*x = RANDOM_INT(App::screenWidth);
-		*y = RANDOM_INT(App::screenHeight * 0.87f);
+        *x = RANDOM_INT(App::screenWidth);
+        *y = RANDOM_INT(App::screenHeight * 0.87f);
         return true;
     }
 

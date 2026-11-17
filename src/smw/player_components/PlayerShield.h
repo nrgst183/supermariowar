@@ -10,16 +10,16 @@ class CPlayer;
     through them).
 */
 enum PlayerShieldType {
-	OFF = 0,
-	SOFT = 1,
-	SOFT_WITH_STOMP = 2,
-	HARD = 3
+    OFF = 0,
+    SOFT = 1,
+    SOFT_WITH_STOMP = 2,
+    HARD = 3
 };
 
 class PlayerShield
 {
 public:
-	void reset();
+    void reset();
     void update();
 
     bool is_on() const;
@@ -32,8 +32,8 @@ public:
     unsigned short time_left() const;
 
 private:
-	PlayerShieldType type;
-	short timer;
+    PlayerShieldType type;
+    short timer;
 
 #ifdef _DEBUG
 friend class GameplayState;

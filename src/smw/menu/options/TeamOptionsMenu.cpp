@@ -7,7 +7,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-
 UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     : UI_Menu()
 {
@@ -40,18 +39,12 @@ UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     miTeamOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miTeamOptionsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
-    miTeamOptionsMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miTeamOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miTeamOptionsMenuHeaderText = new MI_HeaderText("Team Options Menu", 320, 5);
-
     AddControl(miTeamKillsField, miTeamOptionsMenuBackButton, miTeamColorsField, nullptr, miTeamOptionsMenuBackButton);
     AddControl(miTeamColorsField, miTeamKillsField, miTournamentControlField, nullptr, miTeamOptionsMenuBackButton);
     AddControl(miTournamentControlField, miTeamColorsField, miTeamOptionsMenuBackButton, nullptr, miTeamOptionsMenuBackButton);
     AddControl(miTeamOptionsMenuBackButton, miTournamentControlField, miTeamKillsField, miTournamentControlField, nullptr);
 
-    AddNonControl(miTeamOptionsMenuLeftHeaderBar);
-    AddNonControl(miTeamOptionsMenuRightHeaderBar);
-    AddNonControl(miTeamOptionsMenuHeaderText);
+    AddTitleBar("Team Options Menu");
 
     setInitialFocus(miTeamKillsField);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);

@@ -8,7 +8,6 @@
 #include "ResourceManager.h"
 #include "objects/blocks/WeaponBreakableBlock.h"
 
-
 //------------------------------------------------------------------------------
 // class boomerang
 //------------------------------------------------------------------------------
@@ -175,21 +174,6 @@ void MO_Boomerang::update()
                 state = 2;
                 fFlipped = true;
 
-                /*
-                CPlayer * player = GetPlayerFromGlobalID(iPlayerID);
-
-                //No wrap boomerang
-                if (player)
-                {
-                    if ((player->ix < ix && velx > 0) || (player->ix > ix && velx < 0))
-                                velx = -velx;
-                }
-                else
-                {
-                        velx = -velx;
-                }
-                */
-
                 velx = -velx;  // Wrap Boomerang
             }
         } else if (state == 2) {
@@ -233,21 +217,6 @@ void MO_Boomerang::update()
                 // Remove boomerang if player was removed from game
                 forcedead();
                 return;
-
-                /*
-                //Die at nearest edge if player was removed from game
-                if (velx > 0)
-                        velx = 5.0f;
-                else
-                        velx = -5.0f;
-
-                if ((fx < 0.0f && fOldX >= 0.0f) ||
-                        (fx + iw >= App::screenWidth && fOldX + iw < App::screenWidth))
-                {
-                        forcedead();
-                        return;
-                }
-                */
             }
         }
     }

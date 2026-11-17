@@ -10,7 +10,6 @@
 #include "ui/MI_Text.h"
 #include "ui/MI_WorldPreviewDisplay.h"
 
-
 UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     : UI_Menu()
 {
@@ -44,7 +43,6 @@ UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     miTourField = new MI_SelectField<short>(&rm->spr_selectfield, 130, 380, "Tour", 380, 100);
     for (size_t iTour = 0; iTour < tourlist->count(); iTour++) {
         std::string szTemp = GetNameFromFileName(tourlist->at(iTour).string(), true);
-        // strcat(szTemp, " Tour");
         miTourField->add(std::move(szTemp), iTour);
     }
     miTourField->setOutputPtr(&game_values.tourindex);
@@ -104,7 +102,6 @@ void UI_MatchSelectionMenu::SelectionChanged()
     miWorldField->setVisible(game_values.matchtype == MatchType::World);
     miMinigameField->setVisible(game_values.matchtype == MatchType::MiniGame);
 
-    // miMatchSelectionDisplayImage->Show(game_values.matchtype != MatchType::World);
     miWorldPreviewDisplay->setVisible(game_values.matchtype == MatchType::World);
 
     if (game_values.matchtype == MatchType::World)
@@ -116,21 +113,6 @@ void UI_MatchSelectionMenu::SelectionChanged()
 void UI_MatchSelectionMenu::WorldMapChanged()
 {
     miWorldPreviewDisplay->SetWorld();
-}
-
-void UI_MatchSelectionMenu::ActivateMinigameField()
-{
-    miMatchSelectionField->hideItem(MatchType::MiniGame, false);
-    miMatchSelectionField->setCurrentValue(MatchType::MiniGame);
-
-    miTournamentField->setVisible(false);
-    miTourField->setVisible(false);
-    miWorldField->setVisible(false);
-    miMinigameField->setVisible(true);
-
-    miMatchSelectionDisplayImage->setVisible(true);
-    miWorldPreviewDisplay->setVisible(false);
-    miMatchSelectionDisplayImage->SetImage(0, 240 * static_cast<int>(game_values.matchtype), 320, 240);
 }
 
 Minigame UI_MatchSelectionMenu::GetMinigame() const

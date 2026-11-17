@@ -22,8 +22,4 @@ private:
     MI_SelectField<short>* miButtonPromptsField;
 
     MI_Button* miPlayerControlsBackButton;
-
-    MI_Image* miPlayerControlsLeftHeaderBar;
-    MI_Image* miPlayerControlsMenuRightHeaderBar;
-    MI_Text* miPlayerControlsMenuHeaderText;
 };

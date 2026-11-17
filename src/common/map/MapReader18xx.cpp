@@ -9,14 +9,12 @@
 
 #include <iostream>
 
-
 namespace {
 struct TilesetTranslation {
     short iID;
     std::string szName;
 };
 }  // namespace
-
 
 MapReader1800::MapReader1800()
     : MapReader1702()
@@ -187,7 +185,6 @@ void MapReader1800::read_warp_locations(CMap& map, BinaryFile& mapfile)
 
             for (short sType = 0; sType < NUMSPAWNAREATYPES; sType++)
                 map.nospawn[sType][i][j] = mapfile.read_bool();
-
         }
     }
 }
@@ -290,12 +287,8 @@ void MapReader1800::read_platforms(CMap& map, BinaryFile& mapfile, bool fPreview
         if (patch_version >= 1)
             iDrawLayer = static_cast<short>(mapfile.read_i32());
 
-        //printf("Layer: %d\n", iDrawLayer);
-
         short iPathType = 0;
         iPathType = mapfile.read_i32();
-
-        //printf("PathType: %d\n", iPathType);
 
         MovingPlatformPath* path = nullptr;
         path = read_platform_path_details(mapfile, iPathType, fPreview);

@@ -12,7 +12,6 @@
 
 enum class ClipEdge : unsigned char { Top, Right, Bottom, Left };
 
-
 class gfxSprite {
 public:
     explicit gfxSprite() = default;
@@ -30,7 +29,7 @@ public:
     /// this function could be merged with the one without the clip parameters.
     void draw(int x, int y, const SDL_Rect& srcRect, ClipEdge clipEdge, int clipTreshold) const;
 
-   /// Draw the whole sprite on a target surface at a target coordinate.
+    /// Draw the whole sprite on a target surface at a target coordinate.
     void draw(SDL_Surface* dst, Vec2i dstPos) const {
         blit(nullptr, dst, dstPos);
     }
@@ -71,7 +70,6 @@ private:
     void blit(const SDL_Rect* srcRect, SDL_Surface* dst, Vec2i dstPos) const;
 };
 
-
 class ImageLoader {
 public:
     explicit ImageLoader(std::filesystem::path path)
@@ -100,15 +98,10 @@ public:
         m_changingAlpha = true;
         return *this;
     }
-    ImageLoader& withoutOptimization() {
-        m_optimize = false;
-        return *this;
-    }
     gfxSprite create() const;
 
 private:
     std::filesystem::path m_path;
-    bool m_optimize = true;
     std::optional<RGB> m_color_key = colors::MAGENTA;
     std::optional<Uint8> m_alpha = std::nullopt;
     bool m_changingAlpha = false;

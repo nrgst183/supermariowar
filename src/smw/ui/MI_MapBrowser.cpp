@@ -11,15 +11,8 @@
 
 #include <SDL3_image/SDL_image.h>
 
-
 namespace {
-#ifndef __EMSCRIPTEN__
-inline void smallDelay() { SDL_Delay(10); }
-#else
-inline void smallDelay() {}
-#endif
 } // namespace
-
 
 MI_MapBrowser::MI_MapBrowser()
     : UI_Control(0, 0)
@@ -76,7 +69,7 @@ void MI_MapBrowser::Draw()
         }
     }
 
-           //Draw the selected map
+    //Draw the selected map
     rDst.y = iSelectedRow * 150 + 30;
     rDst.x = iSelectedCol * 200 + 40;
 
@@ -262,11 +255,9 @@ void MI_MapBrowser::LoadPage(short page, bool fUseFilters)
 
         if (!fLoaded) {
             g_map->loadMap((*itr).second.filename, read_type_preview);
-            smallDelay();  //Sleeps to help the music from skipping
             gfxSprite thumbnail = g_map->createThumbnailSurface(false);
             IMG_SavePNG(thumbnail.getSurface(), sConvertedPath.c_str());  //(if it can't be saved, it is just made again next time)
             mapSurfaces[iMap] = std::move(thumbnail);
-            smallDelay();
         }
         mapListNodes[iMap] = &(*itr).second;
         mapNames[iMap] = (*itr).first.c_str();

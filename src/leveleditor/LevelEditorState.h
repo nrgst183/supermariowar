@@ -41,7 +41,7 @@
 #include <string>
 
 #ifdef _WIN32
-	#include <windows.h>
+    #include <windows.h>
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -77,7 +77,6 @@ static inline bool editorPollEvent(SDL_Event* event)
 namespace leveleditor {
 #endif
 
-
 enum {EDITOR_EDIT, EDITOR_TILES, EDITOR_QUIT, SAVE_AS, FIND, CLEAR_MAP, EDITOR_BLOCKS, NEW_MAP, SAVE, EDITOR_WARP, EDITOR_EYECANDY, DISPLAY_HELP, EDITOR_PLATFORM, EDITOR_TILETYPE, EDITOR_BACKGROUNDS, EDITOR_MAPITEMS, EDITOR_ANIMATION, EDITOR_PROPERTIES, EDITOR_MODEITEMS, EDITOR_MAPHAZARDS};
 
 constexpr int MAX_PLATFORMS = 32;
@@ -88,18 +87,18 @@ constexpr int UI_PLATFORM_COLS = 8;
 
 class EditorMapTile
 {
-	public:
-		TilesetTile	tile[MAPLAYERS];
-		MapBlock	block;
-		Warp		warp;
-		bool		nospawn[NUMSPAWNAREATYPES];
-		TileType	tiletype;
-		int			item;
+    public:
+        TilesetTile	tile[MAPLAYERS];
+        MapBlock	block;
+        Warp		warp;
+        bool		nospawn[NUMSPAWNAREATYPES];
+        TileType	tiletype;
+        int			item;
 };
 
 class MapPlatform
 {
-	public:
+    public:
     MapPlatform()
         : tiles(MAPWIDTH * MAPHEIGHT)
         , types(MAPWIDTH * MAPHEIGHT)
@@ -132,22 +131,22 @@ class MapPlatform
 
     std::vector<TilesetTile> tiles;
     std::vector<TileType> types;
-		short iVelocity;
-		short iStartX;
-		short iStartY;
-		short iEndX;
-		short iEndY;
+        short iVelocity;
+        short iStartX;
+        short iStartY;
+        short iEndX;
+        short iEndY;
 
-		PlatformPathType iPathType;
+        PlatformPathType iPathType;
 
-		float fAngle;
-		float fRadiusX;
-		float fRadiusY;
+        float fAngle;
+        float fRadiusX;
+        float fRadiusY;
 
-		short iDrawLayer;
+        short iDrawLayer;
 
-		SDL_Rect rIcon[2];
-		gfxSprite preview;
+        SDL_Rect rIcon[2];
+        gfxSprite preview;
 };
 
 bool ReadAnimatedTileTypeFile(const char * szFile);
@@ -160,7 +159,7 @@ bool dialog(const char * title, const char * instructions, char * input, int inp
 int display_help();
 
 #ifdef _DEBUG
-	void convertAll();
+    void convertAll();
 #endif
 
 void drawmap(bool fScreenshot, short iBlockSize, bool fWithPlatforms = false);

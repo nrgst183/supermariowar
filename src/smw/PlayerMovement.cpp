@@ -1,32 +1,13 @@
 #include "CpuDriver.h"
 #include "rollback/Replay.h"
-#include "player.h"
 
 #include "eyecandy.h"
 #include "GameValues.h"
-#include "gfx.h"
-#include "GSGameplay.h"
-#include "map.h"
 #include "movingplatform.h"
-#include "ObjectContainer.h"
-#include "objectgame.h"
-#include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "gamemodes/Chicken.h"
-#include "gamemodes/ShyGuyTag.h"
-#include "gamemodes/Star.h"
 #include "gamemodes/Tag.h"
-#include "IO_Block.h"
-#include "objects/carriable/CO_Bomb.h"
-#include "objects/carriable/CO_Shell.h"
-#include "objects/carriable/CO_KuriboShoe.h"
-#include "objects/moving/MO_Boomerang.h"
-#include "objects/moving/MO_Explosion.h"
-#include "objects/moving/MO_Fireball.h"
-#include "objects/moving/MO_Hammer.h"
-#include "objects/moving/MO_IceBlast.h"
-#include "objects/moving/MO_Podobo.h"
 
 #include <cassert>
 #include <cmath>
@@ -388,7 +369,6 @@ void CPlayer::move()
     if (keymask || (keymaskdown && (velx < -1.0f || velx > 1.0f)))
         suicidetimer.reset();
 
-
     secretcode.update(*this, keymask);
     kuriboshoe.update(*this, keymask);
     cardcollection.update(*this, keymask);
@@ -565,15 +545,9 @@ void CPlayer::Jump(short iMove, float jumpModifier, bool fKuriboBounce)
 
     inair = true;
 
-    //Need to help the player off the platform otherwise it will collide with them again
-    if (platform) {
-        //if (platform->fVelY < 0.0f)
-        //	setYf(fy + platform->fVelY);
+    //Off the platform (it would collide with the player again)
+    platform = nullptr;
 
-        platform = nullptr;
-    }
-
-    //printf("Player Jumped!\n");
 }
 
 bool CPlayer::bouncejump()

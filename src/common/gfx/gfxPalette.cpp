@@ -8,7 +8,6 @@
 
 namespace fs = std::filesystem;
 
-
 std::optional<RGB> gfxPalette::replacementFor(RGB keyColor, size_t teamIndex, PlayerPalette playerState) const
 {
     const auto it = m_colorsheets.find(keyColor);
@@ -17,12 +16,11 @@ std::optional<RGB> gfxPalette::replacementFor(RGB keyColor, size_t teamIndex, Pl
         : std::nullopt;
 }
 
-
 bool gfxPalette::load(const fs::path& path)
 {
     m_colorsheets.clear();
 
-    const gfxSprite sprite = ImageLoader(path).withoutColorKey().withoutOptimization().create();
+    const gfxSprite sprite = ImageLoader(path).withoutColorKey().create();
 
     if (SDL_MUSTLOCK(sprite.getSurface()))
         SDL_LockSurface(sprite.getSurface());

@@ -71,7 +71,6 @@ void CMap::draw(gfxSprite& targetSurface, int layer)
             //If this is an animated tile, then setup an animated tile struct for use in drawing
             if (tile->iID >= 0) {
                 g_tilesetmanager->Draw(targetSurface.getSurface(), tile->iID, DrawSize::Ingame, tile->iCol, tile->iRow, i, j);
-                //rm->spr_maptiles[0].draw(g_tilesetmanager->rRects[0][tile->iCol][tile->iRow], targetSurface, bltrect);
             } else if (tile->iID == TILESETANIMATED) {
                 //See if we already have this tile
                 bool fNeedNewAnimatedTile = true;
@@ -133,7 +132,7 @@ void CMap::draw(gfxSprite& targetSurface, int layer)
 
     bltrect.x = 0;
     bltrect.y = 0;
-	bltrect.w = App::screenWidth;
+    bltrect.w = App::screenWidth;
     bltrect.h = App::screenHeight;
 }
 
@@ -169,7 +168,6 @@ void CMap::addPlatformAnimatedTiles()
 
                     (animatedtile->rDest) = {iDestX, iDestY, TILESIZE, TILESIZE};
                     animatedtiles.push_back(animatedtile);
-
                 }
 
                 iDestX += TILESIZE;

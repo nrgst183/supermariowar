@@ -7,7 +7,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-
 bool PlayerCollisions::checktop(CPlayer& player)
 {
     if (player.topY() < 0.0f)
@@ -158,7 +157,6 @@ void PlayerCollisions::checksides(CPlayer& player)
                 }
             }
         }
-
     }
 
     // TODO: is this correct?
@@ -488,7 +486,6 @@ void PlayerCollisions::handle_p2p(CPlayer* o1, CPlayer* o2)
     if ((o1->shield.getType() == OFF || o1->shield.getType() == HARD) && !o1->isInvincible() && is_stomping(*o2, *o1))
         return;
 
-
     //Quit checking collision if either player is hard shielded
     if (o1->shield.getType() == SOFT_WITH_STOMP || o2->shield.getType() == SOFT_WITH_STOMP) {
         //Do tag transfer if there is one to do
@@ -566,7 +563,6 @@ void PlayerCollisions::handle_p2p_pushback(CPlayer * o1, CPlayer * o2)
             o2->collisions.checkleft(*o2);
         } else {
             short middle = o2->ix + ((o1->ix + PW) - o2->ix) / 2;       //no ABS needed (o1->x < o2->x -> o1->x+w > o2->x !)
-            //printf("hlf:%f, o1x:%f, o2x:%f\n", hlf, o1->x, o2->x);
             o1->setXi(middle - PW - 1); //o1 is left
             o2->setXi(middle + 1);      //o2 is right
 

@@ -9,7 +9,6 @@
 #include "ui/MI_Text.h"
 #include "uimenu.h"
 
-
 namespace {
 //Rearrange display of powerups
 //short iPowerupDisplayMap[NUM_POWERUPS] = { 4, 0, 1, 2, 3, 6, 10, 12, 11, 14, 13, 7, 16, 17, 18, 19, 15, 9, 5, 8, 20, 21, 22, 23, 24, 25};
@@ -78,7 +77,6 @@ MI_PowerupSelection::MI_PowerupSelection(short x, short y, short width, short nu
     miOverride->add("Weighted Average", PowerupDropRateStyle::WeightedAverage);
     miOverride->setOutputPtr(&game_values.overridepowerupsettings);
     miOverride->setCurrentValue(game_values.overridepowerupsettings);
-    //miOverride->SetItemChangedCode(MENU_CODE_POWERUP_OVERRIDE_CHANGED);
 
     miPreset = new MI_SelectField<short>(&rm->spr_selectfield, 70, m_pos.y + 40, "Item Set", 500, 250);
     miPreset->add("Custom Set 1", 0);
@@ -188,9 +186,6 @@ MI_PowerupSelection::MI_PowerupSelection(short x, short y, short width, short nu
     //Setup positions and visible powerups
     SetupPowerupFields();
 
-    //Set enabled based on if we are overriding or not
-    //EnablePowerupFields();
-
     mMenu->AddNonControl(miDialogImage);
     mMenu->AddNonControl(miDialogAreYouText);
     mMenu->AddNonControl(miDialogSureText);
@@ -220,23 +215,12 @@ void MI_PowerupSelection::SetupPowerupFields()
     }
 }
 
-void MI_PowerupSelection::EnablePowerupFields(bool fEnable)
-{
-    for (short iPowerup = 0; iPowerup < NUM_POWERUPS; iPowerup++) {
-        miPowerupSlider[iPowerup]->Disable(!fEnable);
-    }
-
-    miPreset->setNeighbor(MenuNavDirection::Down, fEnable ? miPowerupSlider[0] : nullptr);
-}
-
 MenuCodeEnum MI_PowerupSelection::Modify(bool modify)
 {
     mMenu->ResetMenu();
     iOffset = 0;
     iIndex = 0;
     SetupPowerupFields();
-
-    //EnablePowerupFields(game_values.poweruppreset >= 1 && game_values.poweruppreset <= 3);
 
     fModifying = modify;
     return MENU_CODE_MODIFY_ACCEPTED;
@@ -255,9 +239,6 @@ MenuCodeEnum MI_PowerupSelection::SendInput(CPlayerInput* playerInput)
             miPowerupSlider[iPowerup]->setCurrentValue(iCurrentValue);
             game_values.powerupweights[iPowerupPositionMap[iPowerup]] = iCurrentValue;
         }
-
-        //If it is a custom preset, then allow modification
-        //EnablePowerupFields(game_values.poweruppreset >= 1 && game_values.poweruppreset <= 3);
     } else if (MENU_CODE_POWERUP_SETTING_CHANGED == ret) {
         //Update the custom presets
         for (short iPowerup = 0; iPowerup < NUM_POWERUPS; iPowerup++) {
@@ -280,7 +261,6 @@ MenuCodeEnum MI_PowerupSelection::SendInput(CPlayerInput* playerInput)
             miDialogYesButton->SetCode(MENU_CODE_POWERUP_CLEAR_YES);
         else
             miDialogYesButton->SetCode(MENU_CODE_POWERUP_RESET_YES);
-
     } else if (MENU_CODE_POWERUP_RESET_YES == ret || MENU_CODE_POWERUP_RESET_NO == ret || MENU_CODE_POWERUP_CLEAR_YES == ret) {
         miDialogImage->setVisible(false);
         miDialogAreYouText->setVisible(false);

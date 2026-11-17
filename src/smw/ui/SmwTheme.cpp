@@ -250,15 +250,6 @@ void pipe(int x, int y, int w, bool green)
     fill(x, y + 12, w, 2, p.darker);
 }
 
-void pipeLip(int x, int y, bool green)
-{
-    const Palette p = palette(green ? Tone::Green : Tone::Gray);
-    fill(x, y - 2, 8, 20, BLACK);
-    fill(x + 2, y, 4, 16, p.mid);
-    fill(x + 2, y, 2, 14, p.light);
-    fill(x + 4, y + 12, 2, 4, p.darker);
-}
-
 void coin(int x, int y)
 {
     if (res().spr_scorecoins)
@@ -377,11 +368,6 @@ void signalSmall(int x, int y, int pingMs)
     }
 }
 
-gfxFont& gameFont()
-{
-    return res().game_font_large;
-}
-
 void itemCard(int x, int y, int size)
 {
     strip(x, y, size, size);
@@ -429,43 +415,6 @@ int timer(int x, int y, const std::string& time)
     icon(x, y, Icon::Clock);
     font().draw(x + 18, y, time);
     return timerWidth(time);
-}
-
-int scoreDigitsWidth(const std::string& text)
-{
-    int w = 0;
-    for (char c : text)
-        w += c >= '0' && c <= '9' ? 18 : 10;
-    return std::max(0, w - 2);
-}
-
-int scoreDigits(int x, int y, const std::string& text)
-{
-    const gfxSprite& digits = res().spr_scoretext;
-    const SDL_Color navy {16, 24, 112, 255};
-    int cx = x;
-    for (char c : text) {
-        if (c >= '0' && c <= '9') {
-            if (digits)
-                digits.draw(cx, y, {(c - '0') * 16, 0, 16, 16});
-            cx += 18;
-            continue;
-        }
-        //(the font has digits only: the rest in its colors, white outlined navy)
-        if (c == ':') {
-            for (int dy : {3, 9}) {
-                fill(cx + 1, y + dy, 6, 6, {255, 255, 255, 255});
-                fill(cx + 3, y + dy + 2, 2, 2, navy);
-            }
-        } else if (c == '/') {
-            for (int k = 0; k < 6; k++)
-                fill(cx + 5 - k, y + 2 + k * 2, 3, 3, {255, 255, 255, 255});
-            for (int k = 0; k < 6; k++)
-                fill(cx + 6 - k, y + 3 + k * 2, 1, 1, navy);
-        }
-        cx += 10;
-    }
-    return cx - x;
 }
 
 void spinningCoin(int x, int y, int tick, int color)

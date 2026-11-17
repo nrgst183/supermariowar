@@ -8,7 +8,7 @@ class CPlayer;
 class PlayerInvincibility
 {
 public:
-	void reset();
+    void reset();
     void update(CPlayer& player);
 
     bool is_on() const;
@@ -17,7 +17,7 @@ public:
 
 private:
     bool invincible;
-	short timer;
+    short timer;
 };
 
 #endif // PLAYER_INVINCIBILITY

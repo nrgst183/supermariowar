@@ -14,7 +14,6 @@ namespace fs = std::filesystem;
 
 static bool isAllBlack(const gfxSprite& sprite);
 
-
 bool CResourceManager::LoadMenuSkin(short playerID, short skinID, short colorID, bool fLoadBothDirections)
 {
     return LoadMenuSkin(playerID, skinlist->at(skinID).path, colorID, fLoadBothDirections);
@@ -324,7 +323,6 @@ void CResourceManager::loadMenuGraphics()
     spr_tournament_powerup_splash = builder("gfx/packs/menu/tournament_powerup_splash.png").create();
     spr_player_select_background = builder("gfx/packs/menu/player_select_background.png").create();
     spr_player_select_ready = builder("gfx/packs/menu/player_select_ready.png").create();
-    //spr_ipfield = builder("gfx/packs/menu/menu_ipfield.png").create();
     spr_selectfield = builder("gfx/packs/menu/menu_selectfield.png").create();
     spr_selectfielddisabled = builder("gfx/packs/menu/menu_selectfield_disabled.png").create();
     spr_map_filter_icons = builder("gfx/packs/menu/menu_map_flags.png").create();

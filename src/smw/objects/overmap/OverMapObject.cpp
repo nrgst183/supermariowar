@@ -9,7 +9,6 @@ IO_OverMapObject::IO_OverMapObject(gfxSprite* nspr, Vec2s pos, short iNumSpr, sh
     : CObject(nspr, pos)
 {
     objectType = object_overmap;
-    // movingObjectType = movingobject_none;
 
     iNumSprites = iNumSpr;
 

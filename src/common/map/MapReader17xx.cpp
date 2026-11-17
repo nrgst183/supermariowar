@@ -10,7 +10,6 @@
 #include <cassert>
 #include <iostream>
 
-
 MapReader1700::MapReader1700()
     : MapReader1600()
 {
@@ -165,7 +164,6 @@ void MapReader1700::read_warp_locations(CMap& map, BinaryFile& mapfile)
             //Copy player no spawn areas into team no spawn areas
             for (short sType = 1; sType < 5; sType++)
                 map.nospawn[sType][i][j] = map.nospawn[0][i][j];
-
         }
     }
 }
@@ -227,10 +225,8 @@ void MapReader1700::read_platforms(CMap& map, BinaryFile& mapfile, bool fPreview
         auto [tiles, types] = read_platform_tiles(map, mapfile, iWidth, iHeight);
 
         short iDrawLayer = 2;
-        //printf("Layer: %d\n", iDrawLayer);
 
         short iPathType = 0;
-        //printf("PathType: %d\n", iPathType);
 
         MovingPlatformPath* path = read_platform_path_details(mapfile, iPathType, fPreview);
         if (!path)
@@ -289,9 +285,6 @@ MovingPlatformPath* MapReader1700::read_platform_path_details(BinaryFile& mapfil
         float speed = mapfile.read_float();
 
         return new StraightPath(speed, Vec2f(startX, startY), Vec2f(endX, endY), fPreview);
-
-        //printf("Read segment path\n");
-        //printf("StartX: %.2f StartY:%.2f EndX:%.2f EndY:%.2f Velocity:%.2f\n", startX, startY, endX, endY, speed);
     }
     if (iPathType == 1) { //continuous path
         float startX = mapfile.read_float();
@@ -300,9 +293,6 @@ MovingPlatformPath* MapReader1700::read_platform_path_details(BinaryFile& mapfil
         float speed = mapfile.read_float();
 
         return new StraightPathContinuous(speed, Vec2f(startX, startY), angle, fPreview);
-
-        //printf("Read continuous path\n");
-        //printf("StartX: %.2f StartY:%.2f Angle:%.2f Velocity:%.2f\n", startX, startY, angle, speed);
     }
     if (iPathType == 2) { //elliptical path
         float radiusX = mapfile.read_float();
@@ -313,9 +303,6 @@ MovingPlatformPath* MapReader1700::read_platform_path_details(BinaryFile& mapfil
         float speed = mapfile.read_float();
 
         return new EllipsePath(speed, angle, Vec2f(radiusX, radiusY), Vec2f(centerX, centerY), fPreview);
-
-        //printf("Read elliptical path\n");
-        //printf("CenterX: %.2f CenterY:%.2f Angle:%.2f RadiusX: %.2f RadiusY: %.2f Velocity:%.2f\n", centerX, centerY, angle, radiusX, radiusY, speed);
     }
     return nullptr;
 }

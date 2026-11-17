@@ -1,66 +1,6 @@
-#include "GSGameplay.h"
 
-#include "CmdArgs.h"
-#include "eyecandy.h"
-#include "FileList.h"
-#include "GameMode.h"
 #include "GameValues.h"
-#include "gfx.h"
-#include "joystick.h"
-#include "GSMenu.h"
-#include "map.h"
-#include "MapList.h"
-#include "ObjectContainer.h"
-#include "objecthazard.h"
-#include "player.h"
-#include "RandomNumberGenerator.h"
-#include "ResourceManager.h"
-#include "Score.h"
-#include "sfx.h"
 #include "SimulationState.h"
-#include "WorldTourStop.h"
-#include "gamemodes/Chicken.h"
-#include "gamemodes/MiniBoss.h"
-#include "gamemodes/Tag.h"
-#include "objects/MysteryMushroomTempPlayer.h"
-#include "objects/carriable/CO_KuriboShoe.h"
-#include "objects/carriable/CO_Shell.h"
-#include "objects/carriable/CO_Spike.h"
-#include "objects/carriable/CO_ThrowBlock.h"
-#include "objects/carriable/CO_ThrowBox.h"
-#include "objects/blocks/BounceBlock.h"
-#include "objects/blocks/BreakableBlock.h"
-#include "objects/blocks/DonutBlock.h"
-#include "objects/blocks/FlipBlock.h"
-#include "objects/blocks/NoteBlock.h"
-#include "objects/blocks/OnOffSwitchBlock.h"
-#include "objects/blocks/PowerupBlock.h"
-#include "objects/blocks/SwitchBlock.h"
-#include "objects/blocks/ThrowBlock.h"
-#include "objects/blocks/ViewBlock.h"
-#include "objects/blocks/WeaponBreakableBlock.h"
-#include "objects/moving/MO_BulletBill.h"
-#include "objects/moving/MO_Coin.h"
-#include "objects/moving/MO_PirhanaPlant.h"
-#include "objects/powerup/PU_BobombPowerup.h"
-#include "objects/powerup/PU_BombPowerup.h"
-#include "objects/powerup/PU_BoomerangPowerup.h"
-#include "objects/powerup/PU_BulletBillPowerup.h"
-#include "objects/powerup/PU_ClockPowerup.h"
-#include "objects/powerup/PU_ExtraGuyPowerup.h"
-#include "objects/powerup/PU_FeatherPowerup.h"
-#include "objects/powerup/PU_FirePowerup.h"
-#include "objects/powerup/PU_HammerPowerup.h"
-#include "objects/powerup/PU_IceWandPowerup.h"
-#include "objects/powerup/PU_LeafPowerup.h"
-#include "objects/powerup/PU_ModPowerup.h"
-#include "objects/powerup/PU_MysteryMushroomPowerup.h"
-#include "objects/powerup/PU_PodoboPowerup.h"
-#include "objects/powerup/PU_PoisonPowerup.h"
-#include "objects/powerup/PU_PowPowerup.h"
-#include "objects/powerup/PU_PWingsPowerup.h"
-#include "objects/powerup/PU_StarPowerup.h"
-#include "objects/powerup/PU_Tanooki.h"
 #include "objects/walkingenemy/WalkingEnemy.h"
 
 #include <format>
@@ -69,8 +9,6 @@
 #include <cmath>
 #include <cassert>
 #include <cstring>
-
-#include "GSGameplayInternal.h"
 
 //TODO  - Review what is colliding with what and remove duplicates (i.e. shell vs. throwblock and throwblock vs. shell should only detect one way)
 constexpr short g_iCollisionMap[MOVINGOBJECT_LAST][MOVINGOBJECT_LAST] = {
@@ -111,7 +49,6 @@ constexpr short g_iCollisionMap[MOVINGOBJECT_LAST][MOVINGOBJECT_LAST] = {
     {0,0,0,1,1,0,0,1,1,0,0,0,1,1,0,0,0,0,0,0,1,1,0,1,1,0,0,0,0,0,1,0,0,1}, //movingobject_throwbox = 33
 };
 
-
 bool coldec_player2player(CPlayer * o1, CPlayer * o2);
 bool coldec_player2obj(CPlayer * o1, CObject * o2);
 bool coldec_obj2obj(CObject * o1, CObject * o2);
@@ -121,7 +58,6 @@ void collisionhandler_o2o(IO_MovingObject * o1, IO_MovingObject * o2)
 {
     o2->collide(o1);
 }
-
 
 void handleP2PCollisions()
 {
@@ -199,12 +135,6 @@ void handleObj2ObjCollisions()
                     auto* movingobject2 = dynamic_cast<IO_MovingObject*>(object2);
                     if (!movingobject2)
                         continue;
-
-                    //if (g_iCollisionMap[movingobject1->getMovingObjectType()][movingobject2->getMovingObjectType()])
-                    //  continue;
-
-                    //if (iLayer1 == iLayer2 && iObject1 == iObject2)
-                    //  continue;
 
                     MovingObjectType iType1 = movingobject1->getMovingObjectType();
                     MovingObjectType iType2 = movingobject2->getMovingObjectType();

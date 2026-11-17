@@ -19,12 +19,6 @@ bool PlayerJail::isActive() const
     return timer > 0;
 }
 
-void PlayerJail::setColor(int8_t color)
-{
-    assert(color < 4 && color >= -1);
-    this->color = color;
-}
-
 int8_t PlayerJail::getColor() const
 {
     return color;

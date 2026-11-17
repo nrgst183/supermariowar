@@ -32,10 +32,6 @@ private:
 
     MI_Button* miOptionsMenuBackButton;
 
-    MI_Image* miOptionsMenuLeftHeaderBar;
-    MI_Image* miOptionsMenuRightHeaderBar;
-    MI_Text* miOptionsMenuHeaderText;
-
     MI_Image* miGenerateThumbsDialogImage;
     MI_Text* miGenerateThumbsDialogAreYouText;
     MI_Text* miGenerateThumbsDialogSureText;

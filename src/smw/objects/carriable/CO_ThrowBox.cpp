@@ -6,7 +6,6 @@
 #include "player.h"
 #include "ResourceManager.h"
 
-
 //------------------------------------------------------------------------------
 // class throwable box - can be used as a shield, thrown at a player, or holds items
 //------------------------------------------------------------------------------
@@ -46,18 +45,6 @@ bool CO_ThrowBox::collide(CPlayer* player)
     if (HasKillVelocity() && player->globalID != iPlayerID)
         return KillPlayer(player);
 
-    /*
-    //Kill player when another player is holding the box
-    else
-    {
-        if (owner && player != owner && (game_values.teamcollision == TeamCollisionStyle::On || player->teamID != owner->teamID))
-        {
-                iPlayerID = owner->globalID;
-                iTeamID = owner->teamID;
-                return KillPlayer(player);
-        }
-    }*/
-
     // Otherwise allow them to pick this box up
     if (owner == nullptr && player->isready()) {
         if (player->AcceptItem(this)) {
@@ -67,7 +54,6 @@ bool CO_ThrowBox::collide(CPlayer* player)
 
     return false;
 }
-
 
 bool CO_ThrowBox::KillPlayer(CPlayer* player)
 {

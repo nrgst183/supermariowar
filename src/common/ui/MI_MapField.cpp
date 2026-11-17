@@ -9,7 +9,6 @@
 
 #include <cstring>
 
-
 /**************************************
  * MI_MapField Class
  **************************************/
@@ -52,7 +51,6 @@ MenuCodeEnum MI_MapField::SendInput(CPlayerInput * playerInput)
 {
     const SDL_Keycode iPressedKey = playerInput->iPressedKey;
 
-
     for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
         if (playerInput->outputControls[iPlayer].menu_right.fPressed || playerInput->outputControls[iPlayer].menu_down.fPressed) {
             if (MoveNext(playerInput->outputControls[iPlayer].menu_scrollfast.fDown))
@@ -85,8 +83,6 @@ MenuCodeEnum MI_MapField::SendInput(CPlayerInput * playerInput)
                     (iPressedKey >= SDLK_0 && iPressedKey <= SDLK_9) ||
                     iPressedKey == SDLK_MINUS || iPressedKey == SDLK_EQUALS) {
                 short iOldIndex = maplist->GetCurrent()->second.iIndex;
-
-                //maplist->startswith((char)playerInput->iPressedKey);
 
                 sSearchString += static_cast<char>(iPressedKey);
                 iSearchStringTimer = 10;
@@ -170,8 +166,6 @@ void MI_MapField::Draw()
 
     miModifyImageLeft->Draw();
     miModifyImageRight->Draw();
-
-    //rm->menu_font_large.draw(rectDst.x, rectDst.y, sSearchString.c_str());
 }
 
 MenuCodeEnum MI_MapField::MouseClick(short iMouseX, short iMouseY)
@@ -248,7 +242,6 @@ void MI_MapField::SetDimensions(short width, short indent)
     miModifyImageRight->SetPosition(m_pos.x + iWidth - 16, m_pos.y + 4);
 
     if (fShowtags) {
-        //iSlideListOut = (iWidth - 352) >> 1;
         iSlideListOut = (static_cast<int>(iWidth - App::screenWidth * 0.55)) >> 1;
         iSlideListOutGoal = iSlideListOut;
     }

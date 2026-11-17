@@ -2,63 +2,16 @@
 
 #include "rollback/NetGame.h"
 
-#include "CmdArgs.h"
 #include "FileList.h"
-#include "Game.h"
-#include "GameMode.h"
 #include "GameValues.h"
-#include "gfx.h"
-#include "GSGameplay.h"
-#include "GameplayStyles.h"
-#include "joystick.h"
-#include "map.h"
-#include "MapList.h"
 #include "path.h"
-#include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
-#include "Score.h"
 #include "SimulationState.h"
-#include "gamemodes/BonusHouse.h"
-#include "gamemodes/MiniBoss.h"
-#include "gamemodes/MiniBoxes.h"
-#include "gamemodes/MiniPipe.h"
-#include "ui/MI_BonusWheel.h"
-#include "ui/MI_MapBrowser.h"
-#include "ui/MI_MapField.h"
-#include "ui/MI_MapFilterScroll.h"
-#include "ui/MI_SelectField.h"
-#include "ui/MI_TournamentScoreboard.h"
 #include "ui/MI_TourStop.h"
-#include "ui/MI_World.h"
 #include "Version.h"
-#include "world.h"
 #include "WorldTourStop.h"
-#include "world/WorldMapIO.h"
 
-#include "menu/BonusWheelMenu.h"
-#include "menu/GameSettingsMenu.h"
-#include "menu/MainMenu.h"
-#include "menu/MapFilterEditMenu.h"
-#include "menu/MatchSelectionMenu.h"
-#include "menu/ModeOptionsMenu.h"
-#include "menu/OptionsMenu.h"
-#include "menu/PlayerControlsMenu.h"
-#include "menu/PlayerControlsSelectMenu.h"
-#include "menu/TeamSelectMenu.h"
-#include "menu/TournamentScoreboardMenu.h"
 #include "menu/TourStopMenu.h"
-#include "menu/WorldMenu.h"
-
-#include "menu/options/EyeCandyOptionsMenu.h"
-#include "menu/options/GameplayOptionsMenu.h"
-#include "menu/options/GraphicsOptionsMenu.h"
-#include "menu/options/PowerupDropRatesMenu.h"
-#include "menu/options/PowerupSettingsMenu.h"
-#include "menu/options/ProjectileLimitsMenu.h"
-#include "menu/options/ProjectileOptionsMenu.h"
-#include "menu/options/SoundOptionsMenu.h"
-#include "menu/options/TeamOptionsMenu.h"
-
 
 #include <format>
 #include <string>
@@ -140,8 +93,6 @@ void MenuState::StartGame()
 #endif
 
     game_values.appstate = AppState::StartGame;
-    //backgroundonly = false;
-    //fastmap = false;
 
     game_values.WriteConfig();
 

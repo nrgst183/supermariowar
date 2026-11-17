@@ -6,7 +6,6 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_Text.h"
 
-
 UI_OptionsMenu::UI_OptionsMenu()
     : UI_Menu()
 {
@@ -45,10 +44,6 @@ UI_OptionsMenu::UI_OptionsMenu()
     miOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miOptionsMenuBackButton->SetCode(MENU_CODE_TO_MAIN_MENU);
 
-    miOptionsMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miOptionsMenuHeaderText = new MI_HeaderText("Options Menu", 320, 5);
-
     miGenerateThumbsDialogImage = new MI_Image(&rm->spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);
     miGenerateThumbsDialogAreYouText = new MI_HeaderText("Are You", 320, 195);
     miGenerateThumbsDialogSureText = new MI_HeaderText("Sure?", 320, 220);
@@ -77,9 +72,7 @@ UI_OptionsMenu::UI_OptionsMenu()
 
     AddControl(miOptionsMenuBackButton, miGenerateMapThumbsButton, miGameplayOptionsMenuButton, miGenerateMapThumbsButton, nullptr);
 
-    AddNonControl(miOptionsMenuLeftHeaderBar);
-    AddNonControl(miOptionsMenuRightHeaderBar);
-    AddNonControl(miOptionsMenuHeaderText);
+    AddTitleBar("Options Menu");
 
     AddNonControl(miGenerateThumbsDialogImage);
     AddNonControl(miGenerateThumbsDialogAreYouText);

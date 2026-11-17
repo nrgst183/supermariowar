@@ -12,15 +12,15 @@ template<typename T> class MI_SelectField;
 
 class MI_InputControlField : public UI_Control
 {
-	public:
-		MI_InputControlField(gfxSprite * nspr, short x, short y, std::string name, short width, short indent);
+    public:
+        MI_InputControlField(gfxSprite * nspr, short x, short y, std::string name, short width, short indent);
         virtual ~MI_InputControlField();
 
-		void Draw() override;
-		MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
-		void SetKey(SDL_Keycode * iSetKey, SDL_Keycode key, SDL_JoystickID device);
+        void Draw() override;
+        MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
+        void SetKey(SDL_Keycode * iSetKey, SDL_Keycode key, SDL_JoystickID device);
 
-		MenuCodeEnum Modify(bool modify) override;
+        MenuCodeEnum Modify(bool modify) override;
 
     void SetDevice(SDL_JoystickID device) {
         iDevice = device;
@@ -38,57 +38,56 @@ class MI_InputControlField : public UI_Control
         iPlayerIndex = playerindex;
     }
 
-	private:
+    private:
 
-		gfxSprite * spr;
-		const std::string szName;
+        gfxSprite * spr;
+        const std::string szName;
 
-		short iWidth, iIndent;
+        short iWidth, iIndent;
 
-		SDL_JoystickID iDevice;
-		SDL_Keycode * iKey;
-		short iType;
-		short iKeyIndex;
-		short iPlayerIndex;
+        SDL_JoystickID iDevice;
+        SDL_Keycode * iKey;
+        short iType;
+        short iKeyIndex;
+        short iPlayerIndex;
 
-		static const char * Joynames[30];
+        static const char * Joynames[30];
 };
-
 
 class MI_InputControlContainer : public UI_Control
 {
-	public:
+    public:
 
-		MI_InputControlContainer(gfxSprite * spr_button, short x, short y, short playerID);
-		virtual ~MI_InputControlContainer();
+        MI_InputControlContainer(gfxSprite * spr_button, short x, short y, short playerID);
+        virtual ~MI_InputControlContainer();
 
-		void Update() override;
-		void Draw() override;
+        void Update() override;
+        void Draw() override;
 
-		MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
-		MenuCodeEnum Modify(bool modify) override;
+        MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
+        MenuCodeEnum Modify(bool modify) override;
 
-		void SetPlayer(short iPlayerID);
+        void SetPlayer(short iPlayerID);
 
-		void UpdateDeviceKeys(SDL_JoystickID iDevice);
+        void UpdateDeviceKeys(SDL_JoystickID iDevice);
 
-	private:
+    private:
 
-		void SetVisibleInputFields();
-		void refreshDeviceList();
+        void SetVisibleInputFields();
+        void refreshDeviceList();
 
-		short iPlayerID;
-		SDL_JoystickID iDevice;
-		short iSelectedInputType;
+        short iPlayerID;
+        SDL_JoystickID iDevice;
+        short iSelectedInputType;
 
-		std::unique_ptr<UI_Menu> mInputMenu;
+        std::unique_ptr<UI_Menu> mInputMenu;
 
-		MI_Image * miImage[2];
-		MI_Text * miText;
-		MI_SelectField<SDL_JoystickID>* miDeviceSelectField;
-		MI_Button * miInputTypeButton;
-		MI_InputControlField * miGameInputControlFields[NUM_KEYS];
-		MI_InputControlField * miMenuInputControlFields[NUM_KEYS];
+        MI_Image * miImage[2];
+        MI_Text * miText;
+        MI_SelectField<SDL_JoystickID>* miDeviceSelectField;
+        MI_Button * miInputTypeButton;
+        MI_InputControlField * miGameInputControlFields[NUM_KEYS];
+        MI_InputControlField * miMenuInputControlFields[NUM_KEYS];
 
-		MI_Button * miBackButton;
+        MI_Button * miBackButton;
 };

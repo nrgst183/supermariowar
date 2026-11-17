@@ -4,74 +4,19 @@
 #include "CmdArgs.h"
 
 #include "GameValues.h"
-#include "input.h"
-#include "map.h"
 #include "movingplatform.h"
-#include "ObjectContainer.h"
-#include "player.h"
-#include "RandomNumberGenerator.h"
 #include "SimulationState.h"
 #include "gamemodes/Chicken.h"
-#include "gamemodes/Race.h"
 #include "gamemodes/Star.h"
 #include "gamemodes/Tag.h"
-#include "objects/IO_FlameCannon.h"
 
 #include "objects/moving/MO_BonusHouseChest.h"
-#include "objects/moving/MO_Boomerang.h"
-#include "objects/moving/MO_CarriedObject.h"
-#include "objects/moving/MO_Coin.h"
-#include "objects/moving/MO_CollectionCard.h"
-#include "objects/moving/MO_Explosion.h"
-#include "objects/moving/MO_Fireball.h"
-#include "objects/moving/MO_FlagBase.h"
-#include "objects/moving/MO_Hammer.h"
-#include "objects/moving/MO_IceBlast.h"
-#include "objects/moving/MO_PirhanaPlant.h"
-#include "objects/moving/MO_Podobo.h"
 #include "objects/moving/MO_Yoshi.h"
 
 #include "objects/carriable/CO_Flag.h"
-#include "objects/carriable/CO_Spring.h"
 #include "objects/carriable/CO_Bomb.h"
 #include "objects/carriable/CO_Egg.h"
-#include "objects/carriable/CO_PhantoKey.h"
-#include "objects/carriable/CO_Shell.h"
 #include "objects/carriable/CO_Star.h"
-#include "objects/carriable/CO_ThrowBlock.h"
-#include "objects/carriable/CO_ThrowBox.h"
-
-#include "objects/overmap/WO_Area.h"
-#include "objects/overmap/WO_Phanto.h"
-#include "objects/overmap/WO_PipeBonus.h"
-#include "objects/overmap/WO_PipeCoin.h"
-#include "objects/overmap/WO_RaceGoal.h"
-
-#include "objects/powerup/PU_BobombPowerup.h"
-#include "objects/powerup/PU_BombPowerup.h"
-#include "objects/powerup/PU_BoomerangPowerup.h"
-#include "objects/powerup/PU_BulletBillPowerup.h"
-#include "objects/powerup/PU_ClockPowerup.h"
-#include "objects/powerup/PU_CoinPowerup.h"
-#include "objects/powerup/PU_ExtraGuyPowerup.h"
-#include "objects/powerup/PU_ExtraHeartPowerup.h"
-#include "objects/powerup/PU_ExtraTimePowerup.h"
-#include "objects/powerup/PU_FeatherPowerup.h"
-#include "objects/powerup/PU_FirePowerup.h"
-#include "objects/powerup/PU_HammerPowerup.h"
-#include "objects/powerup/PU_IceWandPowerup.h"
-#include "objects/powerup/PU_JailKeyPowerup.h"
-#include "objects/powerup/PU_LeafPowerup.h"
-#include "objects/powerup/PU_ModPowerup.h"
-#include "objects/powerup/PU_MysteryMushroomPowerup.h"
-#include "objects/powerup/PU_PodoboPowerup.h"
-#include "objects/powerup/PU_PoisonPowerup.h"
-#include "objects/powerup/PU_PowPowerup.h"
-#include "objects/powerup/PU_PWingsPowerup.h"
-#include "objects/powerup/PU_SecretPowerup.h"
-#include "objects/powerup/PU_StarPowerup.h"
-#include "objects/powerup/PU_Tanooki.h"
-#include "objects/powerup/PU_TreasureChestBonus.h"
 
 #include <memory>
 #include <cstdio>
@@ -267,9 +212,6 @@ void CPlayerAI::Think(COutputControl * playerKeys)
 
     navActive = false;
 
-    auto* gmChicken = dynamic_cast<CGM_Chicken*>(game_values.gamemode);
-    auto* gmTag = dynamic_cast<CGM_Tag*>(game_values.gamemode);
-
     /***************************************************
     * 1. Figure out what objects are nearest to us
     ***************************************************/
@@ -298,27 +240,26 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     }
 
     //Expire attention objects
-	std::vector<int> toDelete;
+    std::vector<int> toDelete;
     std::map<int, AttentionObject*>::iterator itr = attentionObjects.begin(), lim = attentionObjects.end();
     while (itr != lim) {
         if (itr->second->iTimer > 0) {
             if (--(itr->second->iTimer) == 0) {
-
-				toDelete.push_back(itr->first);
+                toDelete.push_back(itr->first);
             }
         }
 
         ++itr;
-	}
+    }
 
-	for (std::vector<int>::iterator tdIt = toDelete.begin(); tdIt != toDelete.end(); ++tdIt) {
-		// perform the actual disposal and removal
-		std::map<int, AttentionObject*>::iterator deadObjIt = attentionObjects.find(*tdIt);
+    for (std::vector<int>::iterator tdIt = toDelete.begin(); tdIt != toDelete.end(); ++tdIt) {
+        // perform the actual disposal and removal
+        std::map<int, AttentionObject*>::iterator deadObjIt = attentionObjects.find(*tdIt);
 
-		delete deadObjIt->second;
+        delete deadObjIt->second;
 
-		attentionObjects.erase(deadObjIt);
-	}
+        attentionObjects.erase(deadObjIt);
+    }
 
     short iStoredPowerup = game_values.gamepowerups[pPlayer->globalID];
     MO_CarriedObject * carriedItem = pPlayer->carriedItem;
@@ -330,33 +271,33 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     * 2. Figure out priority of actions
     ***************************************************/
 
-    short actionType = 0;
+    Action actionType = ACTION_FIGHT;
     if (nearestObjects.threat && nearestObjects.threatdistance < 14400 && !pPlayer->isInvincible()) {
-        actionType = 2;
+        actionType = ACTION_EVADE;
     } else if (nearestObjects.stomp && nearestObjects.stompdistance < 14400) {
-        actionType = 4;
+        actionType = ACTION_STOMP;
     } else if (nearestObjects.goal && nearestObjects.teammate) {
         if (nearestObjects.goaldistance < nearestObjects.teammatedistance)
-            actionType = 1;
+            actionType = ACTION_GOAL;
         else
-            actionType = 3;
+            actionType = ACTION_TEAMMATE;
     } else if (nearestObjects.teammate) {
-        actionType = 3;
+        actionType = ACTION_TEAMMATE;
     } else if (nearestObjects.goal) {
         if (nearestObjects.playerdistance < 8100)
-            actionType = 0;
+            actionType = ACTION_FIGHT;
         else
-            actionType = 1;
+            actionType = ACTION_GOAL;
     } else {
-        actionType = 0;
+        actionType = ACTION_FIGHT;
     }
 
     /***************************************************
     * 3. Deal with closest item
     ***************************************************/
     //return if no players, goals, or threats available
-    if (((actionType != 0) || nearestObjects.player) && (actionType != 1 || nearestObjects.goal) && ((actionType != 2) || nearestObjects.threat) &&
-            ((actionType != 3) || nearestObjects.teammate) && ((actionType != 4) || nearestObjects.stomp) && (iFallDanger == 0)) {
+    if (((actionType != ACTION_FIGHT) || nearestObjects.player) && (actionType != ACTION_GOAL || nearestObjects.goal) && ((actionType != ACTION_EVADE) || nearestObjects.threat) &&
+            ((actionType != ACTION_TEAMMATE) || nearestObjects.teammate) && ((actionType != ACTION_STOMP) || nearestObjects.stomp) && (iFallDanger == 0)) {
         //Use turbo
         if (pPlayer->bobomb) {
             if (nearestObjects.playerdistance <= 4096 || nearestObjects.stompdistance <= 4096 || nearestObjects.threatdistance <= 4096)
@@ -375,271 +316,18 @@ void CPlayerAI::Think(COutputControl * playerKeys)
             }
         }
 
-        if (actionType == 0) { //Kill nearest player
-            CPlayer * player = nearestObjects.player;
-            bool * moveToward;
-            bool * moveAway;
-
-            if ((player->ix > ix && nearestObjects.playerwrap) || (player->ix < ix && !nearestObjects.playerwrap)) {
-                moveToward = &playerKeys->game_left.fDown;
-                moveAway = &playerKeys->game_right.fDown;
-            } else {
-                moveToward = &playerKeys->game_right.fDown;
-                moveAway = &playerKeys->game_left.fDown;
-            }
-
-            const bool plainFight = !carriedItem && !(gmTag && (gmTag->tagged() == player || gmTag->tagged() == pPlayer)) &&
-                !(gmChicken && gmChicken->chicken() == pPlayer) && !player->isInvincible() && !player->shyguy && !player->bobomb &&
-                !pPlayer->isInvincible() && !pPlayer->shyguy && !pPlayer->bobomb;
-
-            //Move player relative to opponent when we are playing star mode and we are holding a star
-            if (improvedFighting() && plainFight) {
-                // Climb up beside an opponent above us, never right under their feet
-                int ox = player->ix + PW / 2;
-                const int odx = ainav::HorizontalDistance(ox - (ix + PW / 2), iy, player->iy);
-                const bool above = player->iy < iy - 40;
-                if (above)
-                    ox += odx > 0 ? -SIDE_OFFSET : SIDE_OFFSET;
-                const bool usePath = (pPlayer->inair ? navMove != 0 : true) && NeedsPath(ox, player->iy + PH / 2) && !(above && odx > -NEAR_ABOVE && odx < NEAR_ABOVE);
-                const bool midMove = pPlayer->inair && navMove != 0;   // finish a path move we've started
-                if (!(usePath || midMove) || !NavigateTo(playerKeys, ox, player->iy + PH - 1)) {
-                    if (!pPlayer->inair)
-                        navMove = 0;
-                    FightPlayer(playerKeys, player, nearestObjects.playerwrap);
-                }
-            } else if (game_values.gamemode->gamemode == game_mode_star) {
-                if (carriedItem && carriedItem->getMovingObjectType() == movingobject_star) {
-                    if ((static_cast<CO_Star*>(carriedItem))->getType() == 1)
-                        *moveAway = true;
-                    else {
-                        *moveToward = true;
-
-                        //If player is close
-                        if (player->iy <= iy && player->iy > iy - 60 &&
-                                player->ix - ix < 90 && player->ix - ix > -90) {
-                            //And we are facing toward that player, throw the star
-                            if ((player->ix > ix && pPlayer->isFacingRight()) ||
-                                ((player->ix < ix) && !pPlayer->isFacingRight())) {
-                                pPlayer->throw_star = 30;
-                                playerKeys->game_turbo.fDown = false;
-                            }
-                        }
-                    }
-                }
-            }
-            //Move player relative to opponent when we are carrying a weapon like a shell or throwblock
-            else if (carriedItem) {
-                if (carriedItem->getMovingObjectType() == movingobject_shell || carriedItem->getMovingObjectType() == movingobject_throwblock) {
-                    *moveToward = true;
-
-                    //If player is close
-                    if (player->iy > iy - 10 && player->iy < iy + 30 &&
-                            abs(player->ix - ix) < 150) {
-                        //And we are facing toward that player, throw the projectile
-                        if ((player->ix > ix && pPlayer->isFacingRight()) ||
-                            ((player->ix < ix) && !pPlayer->isFacingRight())) {
-                            playerKeys->game_turbo.fDown = false;
-                        }
-                    }
-                }
-            } else if ((gmTag && gmTag->tagged() == player) || player->isInvincible() || player->shyguy || (gmChicken && gmChicken->chicken() == pPlayer)) {
-                *moveAway = true;
-            } else if (pPlayer->isInvincible() || pPlayer->shyguy  || pPlayer->bobomb || (gmTag && gmTag->tagged() == pPlayer)) {
-                *moveToward = true;
-            } else if (player->iy >= iy && !player->isInvincible() && !player->bobomb) {
-                *moveToward = true;
-            } else {
-                if (nearestObjects.playerdistance < 8100)	//else if player is near but higher, run away (left)
-                    *moveAway = true;
-                else
-                    *moveToward = true;	//Don't just stand and do nothing
-            }
-
-
-            if (improvedFighting() && plainFight) {
-                //FightPlayer() did the jumping
-            } else if (player->iy <= iy &&					//jump if player is higher or at the same level and
-                    player->ix - ix < 45 &&				//player is very near
-                    player->ix - ix > -45) {
-                //or if player is high
-                playerKeys->game_jump.fDown = true;
-            } else if (player->iy > iy &&			//try to down jump if player is below us
-                       player->ix - ix < 45 &&
-                       player->ix - ix > -45 && aiRandom().getBoolean()) {
-                //or if player is high
-                if (!pPlayer->inair) playerKeys->game_down.fDown = true;
-
-                if (!pPlayer->superstomp.isInSuperStompState()) {
-                    //If the player has the tanooki or shoe, then try to super stomp on them
-                    if (pPlayer->tanookisuit.isOn() || pPlayer->kuriboshoe.is_on()) {
-                        playerKeys->game_down.fDown = true;
-                        playerKeys->game_jump.fPressed = true;
-                        if (pPlayer->tanookisuit.isOn())
-                        {
-                            playerKeys->game_turbo.fPressed = true;
-                            pPlayer->lockfire = false;
-                        }
-                    }
-                }
-            }
-        } else if (actionType == 1 && nearestObjects.goalIsBlock) { //Hit a ? block from below
-            CObject * block = nearestObjects.goal;
-            const int blockX = block->x() + TILESIZE / 2;
-            const int spotY = nearestObjects.goalSpotRow * TILESIZE + TILESIZE / 2;
-            int spotCol = -1, spotRow = -1;
-            const bool under = !pPlayer->inair && ainav::PlayerSpot(ix, iy, spotCol, spotRow) && spotRow == nearestObjects.goalSpotRow &&
-                               spotCol == block->x() / TILESIZE;
-            const int dx = ainav::HorizontalDistance(blockX - (ix + PW / 2), iy, spotY);
-            if (under) {
-                //Under it: line up with it, then jump into it (not following a path: in the air, the
-                //branch below keeps jump held, so that the jump gets its full height)
-                navMove = 0;
-                //(the box can be in a 1-tile shaft: jump nearly still, or we'd rise beside it)
-                const float v = pPlayer->velx;
-                if (dx >= -8 && dx <= 8) {
-                    if (v > 1.0f)
-                        playerKeys->game_left.fDown = true;     //brake
-                    else if (v < -1.0f)
-                        playerKeys->game_right.fDown = true;
-                    else
-                        playerKeys->game_jump.fDown = !pPlayer->lockjump;
-                } else if (dx < 0) {
-                    playerKeys->game_left.fDown = true;
-                } else {
-                    playerKeys->game_right.fDown = true;
-                }
-            } else if (pPlayer->inair && navMove == 0 && dx >= -24 && dx <= 24 && block->y() < iy) {
-                //Jumping into it: keep rising, stay under it
-                if (pPlayer->vely < 0.0f)
-                    playerKeys->game_jump.fDown = true;
-                if (dx < -4)
-                    playerKeys->game_left.fDown = true;
-                else if (dx > 4)
-                    playerKeys->game_right.fDown = true;
-            } else if (!NavigateTo(playerKeys, blockX, spotY)) {
-                //No path known: head that way
-                if (dx < 0)
-                    playerKeys->game_left.fDown = true;
-                else
-                    playerKeys->game_right.fDown = true;
-            }
-        } else if (actionType == 1) { //Go for goal
-            CObject * goal = nearestObjects.goal;
-            const int goalX = goal->x() + goal->w() / 2;
-            const int goalY = goal->y() + goal->h() / 2;
-
-            if (improvedFighting() && (NeedsPath(goalX, goalY) || (pPlayer->inair && navMove != 0)) && NavigateTo(playerKeys, goalX, goalY)) {
-                //Following the path to it
-            } else if ((goal->x() > ix && nearestObjects.goalwrap) || (goal->x() < ix && !nearestObjects.goalwrap))
-                playerKeys->game_left.fDown = true;
-            else
-                playerKeys->game_right.fDown = true;
-
-            if (goal->y() <= iy && goal->x() - ix < 45 && goal->x() - ix > -45) {
-                playerKeys->game_jump.fDown = true;
-            } else if (goal->y() > iy && goal->x() - ix < 45 && goal->x() - ix > -45) {
-                if (!pPlayer->inair) playerKeys->game_down.fDown = true;
-            }
-
-            if (dynamic_cast<CO_Egg*>(goal))
-                playerKeys->game_turbo.fDown = true;
-            else if (dynamic_cast<CO_Star*>(goal) && canTakeStar())
-                playerKeys->game_turbo.fDown = true;
-            else if (dynamic_cast<CO_Flag*>(goal))
-                playerKeys->game_turbo.fDown = true;
-
-            //Drop current item if we're going after another carried item
-            if (carriedItem) {
-                if (auto* movingobject = dynamic_cast<IO_MovingObject*>(goal)) {
-                    MovingObjectType goalobjecttype = movingobject->getMovingObjectType();
-                    if (goalobjecttype == movingobject_egg || goalobjecttype == movingobject_flag ||
-                            goalobjecttype == movingobject_star || goalobjecttype == movingobject_phantokey) {
-                        MovingObjectType carriedobjecttype = carriedItem->getMovingObjectType();
-
-                        //If we are holding something that isn't a mode goal object, then drop it
-                        if (carriedobjecttype != movingobject_egg && carriedobjecttype != movingobject_flag &&
-                                carriedobjecttype != movingobject_star && carriedobjecttype != movingobject_phantokey) {
-                            playerKeys->game_turbo.fDown = false;
-                        }
-                    }
-                }
-            }
-
-            //Open treasure chests in bonus houses in world mode
-            if (dynamic_cast<MO_BonusHouseChest*>(goal))
-                playerKeys->game_turbo.fPressed = true;
-        } else if (actionType == 2) { //Evade Threat
-            CObject * threat = nearestObjects.threat;
-
-            //If threat, always use turbo
-            playerKeys->game_turbo.fDown = true;
-
-            if ((threat->x() > ix && nearestObjects.threatwrap) || (threat->x() < ix && !nearestObjects.threatwrap))
-                playerKeys->game_right.fDown = true;
-            else
-                playerKeys->game_left.fDown = true;
-
-            if (threat->y() <= iy && threat->x() - ix < 60 && threat->x() - ix > -60) {
-                if (!pPlayer->inair) playerKeys->game_down.fDown = true;
-            } else if (threat->y() > iy && threat->x() - ix < 60 && threat->x() - ix > -60) {
-                playerKeys->game_jump.fDown = true;
-            }
-        } else if (actionType == 3) { //Tag teammate
-            CPlayer * teammate = nearestObjects.teammate;
-
-            if ((teammate->ix > ix && nearestObjects.teammatewrap) || (teammate->ix < ix && !nearestObjects.teammatewrap))
-                playerKeys->game_left.fDown = true;
-            else
-                playerKeys->game_right.fDown = true;
-
-            if (teammate->iy <= iy && teammate->ix - ix < 45 && teammate->ix - ix > -45) {
-                playerKeys->game_jump.fDown = true;
-            } else if (teammate->iy > iy && teammate->ix - ix < 45 && teammate->ix - ix > -45) {
-                if (!pPlayer->inair) playerKeys->game_down.fDown = true;
-            }
-        } else if (actionType == 4) { //Stomp something (goomba, koopa, cheepcheep)
-            CObject * stomp = nearestObjects.stomp;
-            bool * moveToward;
-            bool * moveAway;
-
-            if ((stomp->x() > ix && nearestObjects.stompwrap) || (stomp->x() < ix && !nearestObjects.stompwrap)) {
-                moveToward = &playerKeys->game_left.fDown;
-                moveAway = &playerKeys->game_right.fDown;
-            } else {
-                moveToward = &playerKeys->game_right.fDown;
-                moveAway = &playerKeys->game_left.fDown;
-            }
-
-            if (stomp->y() > iy + PH || pPlayer->shyguy || pPlayer->isInvincible() ||
-                    (carriedItem && (carriedItem->getMovingObjectType() == movingobject_shell || carriedItem->getMovingObjectType() == movingobject_throwblock))) {
-                //if true stomp target is lower or at the same level, run toward
-                *moveToward = true;
-            } else {
-                if (nearestObjects.stompdistance < 8100)
-                    *moveAway = true;
-                else
-                    *moveToward = true;
-            }
-
-
-            if (stomp->y() <= iy + PH && nearestObjects.stompdistance < 2025) {
-                playerKeys->game_jump.fDown = true;
-            } else if (stomp->y() > iy + PH && nearestObjects.stompdistance < 2025) {
-                if (!pPlayer->inair) playerKeys->game_down.fDown = true;
-
-                if (!pPlayer->superstomp.isInSuperStompState()) {
-                    //If the player has the tanooki or shoe, then try to super stomp on them
-                    if (pPlayer->tanookisuit.isOn() || pPlayer->kuriboshoe.is_on()) {
-                        playerKeys->game_down.fDown = true;
-                        playerKeys->game_jump.fPressed = true;
-                        if (pPlayer->tanookisuit.isOn())
-                        {
-                            playerKeys->game_turbo.fPressed = true;
-                            pPlayer->lockfire = false;
-                        }
-                    }
-                }
-            }
+        if (actionType == ACTION_FIGHT) {
+            ChaseNearestPlayer(playerKeys, ix, iy, carriedItem);
+        } else if (actionType == ACTION_GOAL && nearestObjects.goalIsBlock) {
+            HitGoalBlock(playerKeys, ix, iy);
+        } else if (actionType == ACTION_GOAL) {
+            GoForGoal(playerKeys, ix, iy, carriedItem);
+        } else if (actionType == ACTION_EVADE) {
+            EvadeThreat(playerKeys, ix, iy);
+        } else if (actionType == ACTION_TEAMMATE) {
+            TagTeammate(playerKeys, ix, iy);
+        } else if (actionType == ACTION_STOMP) {
+            StompEnemy(playerKeys, ix, iy, carriedItem);
         }
     }
 
@@ -713,12 +401,11 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     * 4. Deal with falling onto spikes (this needs to be improved)
     ***************************************************/
 
-    //Make sure we don't jump over something that could kill us
-    short iDeathY = iy / TILESIZE;
+    //Make sure we don't jump over something that could kill us, or up into it
+    //(the columns under the player; its position is not wrapped around the screen edges yet when
+    //it was pushed after its last move)
     short iDeathX1;
     short iDeathX2;
-
-    //The player's position is not wrapped around the screen edges yet when it was pushed after its last move
     if (ix < 0 && ix / TILESIZE < 0)
         iDeathX1 = (ix + App::screenWidth) / TILESIZE;
     else if (ix >= App::screenWidth)
@@ -733,56 +420,7 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     else
         iDeathX2 = (ix + PW) / TILESIZE;
 
-    if (iDeathY < 0)
-        iDeathY = 0;
-
-    //short depth = -1;
-    while (iDeathY < MAPHEIGHT) {
-        int ttLeftTile = g_map->map(iDeathX1, iDeathY);
-        int ttRightTile = g_map->map(iDeathX2, iDeathY);
-
-        bool fDeathTileUnderPlayer1 = ((ttLeftTile & tile_flag_death_on_top) && (ttRightTile & tile_flag_death_on_top)) ||
-                                     ((ttLeftTile & tile_flag_death_on_top) && !(ttRightTile & tile_flag_solid)) ||
-                                     (!(ttLeftTile & tile_flag_solid) && (ttRightTile & tile_flag_death_on_top));
-
-        if (fDeathTileUnderPlayer1) {
-            if (iFallDanger == 0)
-                iFallDanger = (playerKeys->game_right.fDown ? -1 : 1);
-
-            goto ExitDeathCheck;
-        } else if ((ttLeftTile & tile_flag_solid) || (ttLeftTile & tile_flag_solid_on_top) || g_map->block(iDeathX1, iDeathY) ||
-                  (ttRightTile & tile_flag_solid) || (ttRightTile & tile_flag_solid_on_top) || g_map->block(iDeathX2, iDeathY)) {
-            iFallDanger = 0;
-            goto ExitDeathCheck;
-        }
-
-
-        //Look through all platforms and see if we are hitting solid or death tiles in them
-        for (size_t iPlatform = 0; iPlatform < g_map->platforms.size(); iPlatform++) {
-            int lefttile = g_map->platforms[iPlatform]->GetTileTypeFromCoord(ix, iDeathY << 5);
-            int righttile = g_map->platforms[iPlatform]->GetTileTypeFromCoord(ix + PW, iDeathY << 5);
-
-            bool fDeathTileUnderPlayer2 = ((lefttile & tile_flag_death_on_top) && (righttile & tile_flag_death_on_top)) ||
-                                         ((lefttile & tile_flag_death_on_top) && !(righttile & tile_flag_solid)) ||
-                                         (!(lefttile & tile_flag_solid) && (righttile & tile_flag_death_on_top));
-
-            if (fDeathTileUnderPlayer2) {
-                if (iFallDanger == 0)
-                    iFallDanger = (playerKeys->game_right.fDown ? -1 : 1);
-
-                goto ExitDeathCheck;
-            } else if ((lefttile & tile_flag_solid) || (lefttile & tile_flag_solid_on_top) ||
-                      (righttile & tile_flag_solid) || (righttile & tile_flag_solid_on_top)) {
-                iFallDanger = 0;
-                goto ExitDeathCheck;
-            }
-        }
-
-        iDeathY++;
-    }
-
-//If we are done checking for death under the player, come here
-ExitDeathCheck:
+    CheckFallDanger(playerKeys, ix, iy, iDeathX1, iDeathX2);
 
     //There is a death tile below us so move to the side that is safest
     if (iFallDanger < 0) {
@@ -799,8 +437,73 @@ ExitDeathCheck:
         playerKeys->game_down.fDown = false;
     }
 
-    //Make sure we don't jump up into something that can kill us
-    iDeathY = iy / TILESIZE;
+    AvoidJumpingIntoDeath(playerKeys, iy, iDeathX1, iDeathX2);
+
+    if (improved())
+        UseMovementItems(playerKeys, actionType, nearestObjects);
+
+    /***************************************************
+    * 5. Use stored powerups
+    ***************************************************/
+    if (iStoredPowerup > 0)
+        UseStoredPowerup(playerKeys, static_cast<PowerupType>(iStoredPowerup), carriedItem, iTeamID);
+
+    if (cmd::g_autotest.aiBench && pPlayer->globalID < 4)
+        CountBenchmarkStats(playerKeys);
+}
+
+// Think(): a death tile (or a platform's) under the player, before anything solid: iFallDanger says
+// which way to move away from it (-1 right, 1 left), 0 if there is none
+void CPlayerAI::CheckFallDanger(COutputControl * playerKeys, short ix, short iy, short iDeathX1, short iDeathX2)
+{
+    short iDeathY = iy / TILESIZE;
+    if (iDeathY < 0)
+        iDeathY = 0;
+
+    while (iDeathY < MAPHEIGHT) {
+        int ttLeftTile = g_map->map(iDeathX1, iDeathY);
+        int ttRightTile = g_map->map(iDeathX2, iDeathY);
+
+        bool fDeathTileUnderPlayer1 = pairIsDeadly(ttLeftTile, ttRightTile, tile_flag_death_on_top);
+
+        if (fDeathTileUnderPlayer1) {
+            if (iFallDanger == 0)
+                iFallDanger = (playerKeys->game_right.fDown ? -1 : 1);
+
+            return;
+        } else if ((ttLeftTile & tile_flag_solid) || (ttLeftTile & tile_flag_solid_on_top) || g_map->block(iDeathX1, iDeathY) ||
+                  (ttRightTile & tile_flag_solid) || (ttRightTile & tile_flag_solid_on_top) || g_map->block(iDeathX2, iDeathY)) {
+            iFallDanger = 0;
+            return;
+        }
+
+        //Look through all platforms and see if we are hitting solid or death tiles in them
+        for (size_t iPlatform = 0; iPlatform < g_map->platforms.size(); iPlatform++) {
+            int lefttile = g_map->platforms[iPlatform]->GetTileTypeFromCoord(ix, iDeathY << 5);
+            int righttile = g_map->platforms[iPlatform]->GetTileTypeFromCoord(ix + PW, iDeathY << 5);
+
+            bool fDeathTileUnderPlayer2 = pairIsDeadly(lefttile, righttile, tile_flag_death_on_top);
+
+            if (fDeathTileUnderPlayer2) {
+                if (iFallDanger == 0)
+                    iFallDanger = (playerKeys->game_right.fDown ? -1 : 1);
+
+                return;
+            } else if ((lefttile & tile_flag_solid) || (lefttile & tile_flag_solid_on_top) ||
+                      (righttile & tile_flag_solid) || (righttile & tile_flag_solid_on_top)) {
+                iFallDanger = 0;
+                return;
+            }
+        }
+
+        iDeathY++;
+    }
+}
+
+// Think(): no jumping into a death tile above the player (or wildly into 1 tile high gaps)
+void CPlayerAI::AvoidJumpingIntoDeath(COutputControl * playerKeys, short iy, short iDeathX1, short iDeathX2)
+{
+    short iDeathY = iy / TILESIZE;
 
     if (iDeathY < 0)
         iDeathY = 0;
@@ -826,73 +529,69 @@ ExitDeathCheck:
         iDeathY--;
         heightlimit--;
     }
+}
 
-    if (improved())
-        UseMovementItems(playerKeys, actionType, nearestObjects);
-
-    /***************************************************
-    * 5. Use stored powerups
-    ***************************************************/
-
-    if (iStoredPowerup > 0) {
-        const auto canUse = [this, carriedItem, iTeamID](PowerupType powerup) -> bool {
-            switch (powerup) {
-                case PowerupType::PoisonMushroom:
-                    return false;
-                case PowerupType::ExtraLife1:
-                case PowerupType::ExtraLife2:
-                case PowerupType::ExtraLife3:
-                case PowerupType::ExtraLife5:
-                case PowerupType::Clock:
-                case PowerupType::Pow:
-                case PowerupType::BulletBill:
-                case PowerupType::Mod:
-                case PowerupType::Podobo:
-                    return true;  // use 1-5up, clock, pow, bulletbill, mod, podobo, right away
-                case PowerupType::Fire:
-                case PowerupType::Hammer:
-                case PowerupType::Feather:
-                case PowerupType::Boomerang:
-                case PowerupType::IceWand:
-                case PowerupType::Bomb:
-                case PowerupType::Leaf:
-                case PowerupType::PWings:
-                    return pPlayer->powerup == -1;
-                case PowerupType::Star:
-                    return !pPlayer->isInvincible();
-                case PowerupType::Bobomb:
-                    return !pPlayer->bobomb;
-                case PowerupType::ShellGreen:
-                case PowerupType::ShellRed:
-                case PowerupType::ShellSpiny:
-                case PowerupType::ShellBuzzy:
-                    return !carriedItem;
-                case PowerupType::Tanooki:
-                    return !pPlayer->tanookisuit.isOn();
-                case PowerupType::JailKey:
-                    return pPlayer->jail.isActive();
-                case PowerupType::MysteryMushroom:
-                    //See if another player has a powerup
-                    for (size_t iPlayer = 0; iPlayer < g_sim.players.size(); iPlayer++) {
-                        if (iPlayer == static_cast<size_t>(pPlayer->localID) || g_sim.players[iPlayer]->teamID == iTeamID) {
-                            continue;
-                        }
-                        if (game_values.gamepowerups[g_sim.players[iPlayer]->globalID] > 0) {
-                            return true;
-                        }
+// Think(): the power-up kept in the item box, used when it helps now
+void CPlayerAI::UseStoredPowerup(COutputControl * playerKeys, PowerupType powerup, MO_CarriedObject * carriedItem, short iTeamID)
+{
+    const auto canUse = [this, carriedItem, iTeamID](PowerupType powerup) -> bool {
+        switch (powerup) {
+            case PowerupType::PoisonMushroom:
+                return false;
+            case PowerupType::ExtraLife1:
+            case PowerupType::ExtraLife2:
+            case PowerupType::ExtraLife3:
+            case PowerupType::ExtraLife5:
+            case PowerupType::Clock:
+            case PowerupType::Pow:
+            case PowerupType::BulletBill:
+            case PowerupType::Mod:
+            case PowerupType::Podobo:
+                return true;  // use 1-5up, clock, pow, bulletbill, mod, podobo, right away
+            case PowerupType::Fire:
+            case PowerupType::Hammer:
+            case PowerupType::Feather:
+            case PowerupType::Boomerang:
+            case PowerupType::IceWand:
+            case PowerupType::Bomb:
+            case PowerupType::Leaf:
+            case PowerupType::PWings:
+                return pPlayer->powerup == -1;
+            case PowerupType::Star:
+                return !pPlayer->isInvincible();
+            case PowerupType::Bobomb:
+                return !pPlayer->bobomb;
+            case PowerupType::ShellGreen:
+            case PowerupType::ShellRed:
+            case PowerupType::ShellSpiny:
+            case PowerupType::ShellBuzzy:
+                return !carriedItem;
+            case PowerupType::Tanooki:
+                return !pPlayer->tanookisuit.isOn();
+            case PowerupType::JailKey:
+                return pPlayer->jail.isActive();
+            case PowerupType::MysteryMushroom:
+                //See if another player has a powerup
+                for (size_t iPlayer = 0; iPlayer < g_sim.players.size(); iPlayer++) {
+                    if (iPlayer == static_cast<size_t>(pPlayer->localID) || g_sim.players[iPlayer]->teamID == iTeamID) {
+                        continue;
                     }
-                    break;
-            }
-            return false;
-        };
-        if (canUse(static_cast<PowerupType>(iStoredPowerup))) {
-            playerKeys->game_powerup.fDown = true;
+                    if (game_values.gamepowerups[g_sim.players[iPlayer]->globalID] > 0) {
+                        return true;
+                    }
+                }
+                break;
         }
-    }
+        return false;
+    };
+    if (canUse(powerup))
+        playerKeys->game_powerup.fDown = true;
+}
 
-    // AI comparisons: count direction reversals (dithering) and turns spent pushing against
-    // something without moving
-    if (cmd::g_autotest.aiBench && pPlayer->globalID < 4) {
+// --at-ai-bench: direction reversals (dithering) and turns spent pushing against something without moving
+void CPlayerAI::CountBenchmarkStats(COutputControl * playerKeys)
+{
+    {
         static int benchLastDir[4] = {0, 0, 0, 0};
         const int d = playerKeys->game_left.fDown == playerKeys->game_right.fDown ? 0 : playerKeys->game_left.fDown ? -1 : 1;
         if (d != 0 && benchLastDir[pPlayer->globalID] == -d)
@@ -900,7 +599,7 @@ ExitDeathCheck:
         if (d != 0)
             benchLastDir[pPlayer->globalID] = d;
     }
-    if (cmd::g_autotest.aiBench && pPlayer->globalID < 4) {
+    {
         // Stuck: pushing the same way as last turn and not having moved at all since
         static int benchLastIx[4] = {-1000, -1000, -1000, -1000};
         static int benchLastPush[4] = {0, 0, 0, 0};
@@ -910,6 +609,296 @@ ExitDeathCheck:
             aibench::stuck[g]++;
         benchLastPush[g] = push;
         benchLastIx[g] = pPlayer->ix;
+    }
+}
+
+// Think(): Kill the nearest player
+void CPlayerAI::ChaseNearestPlayer(COutputControl * playerKeys, short ix, short iy, MO_CarriedObject * carriedItem)
+{
+    auto* gmChicken = dynamic_cast<CGM_Chicken*>(game_values.gamemode);
+    auto* gmTag = dynamic_cast<CGM_Tag*>(game_values.gamemode);
+
+    CPlayer * player = nearestObjects.player;
+    bool * moveToward;
+    bool * moveAway;
+
+    if ((player->ix > ix && nearestObjects.playerwrap) || (player->ix < ix && !nearestObjects.playerwrap)) {
+        moveToward = &playerKeys->game_left.fDown;
+        moveAway = &playerKeys->game_right.fDown;
+    } else {
+        moveToward = &playerKeys->game_right.fDown;
+        moveAway = &playerKeys->game_left.fDown;
+    }
+
+    const bool plainFight = !carriedItem && !(gmTag && (gmTag->tagged() == player || gmTag->tagged() == pPlayer)) &&
+        !(gmChicken && gmChicken->chicken() == pPlayer) && !player->isInvincible() && !player->shyguy && !player->bobomb &&
+        !pPlayer->isInvincible() && !pPlayer->shyguy && !pPlayer->bobomb;
+
+    //Move player relative to opponent when we are playing star mode and we are holding a star
+    if (improvedFighting() && plainFight) {
+        // Climb up beside an opponent above us, never right under their feet
+        int ox = player->ix + PW / 2;
+        const int odx = ainav::HorizontalDistance(ox - (ix + PW / 2), iy, player->iy);
+        const bool above = player->iy < iy - 40;
+        if (above)
+            ox += odx > 0 ? -SIDE_OFFSET : SIDE_OFFSET;
+        const bool usePath = (pPlayer->inair ? navMove != 0 : true) && NeedsPath(ox, player->iy + PH / 2) && !(above && odx > -NEAR_ABOVE && odx < NEAR_ABOVE);
+        const bool midMove = pPlayer->inair && navMove != 0;   // finish a path move we've started
+        if (!(usePath || midMove) || !NavigateTo(playerKeys, ox, player->iy + PH - 1)) {
+            if (!pPlayer->inair)
+                navMove = 0;
+            FightPlayer(playerKeys, player, nearestObjects.playerwrap);
+        }
+    } else if (game_values.gamemode->gamemode == game_mode_star) {
+        if (carriedItem && carriedItem->getMovingObjectType() == movingobject_star) {
+            if ((static_cast<CO_Star*>(carriedItem))->getType() == 1)
+                *moveAway = true;
+            else {
+                *moveToward = true;
+
+                //If player is close
+                if (player->iy <= iy && player->iy > iy - 60 &&
+                        player->ix - ix < 90 && player->ix - ix > -90) {
+                    //And we are facing toward that player, throw the star
+                    if ((player->ix > ix && pPlayer->isFacingRight()) ||
+                        ((player->ix < ix) && !pPlayer->isFacingRight())) {
+                        pPlayer->throw_star = 30;
+                        playerKeys->game_turbo.fDown = false;
+                    }
+                }
+            }
+        }
+    }
+    //Move player relative to opponent when we are carrying a weapon like a shell or throwblock
+    else if (carriedItem) {
+        if (carriedItem->getMovingObjectType() == movingobject_shell || carriedItem->getMovingObjectType() == movingobject_throwblock) {
+            *moveToward = true;
+
+            //If player is close
+            if (player->iy > iy - 10 && player->iy < iy + 30 &&
+                    abs(player->ix - ix) < 150) {
+                //And we are facing toward that player, throw the projectile
+                if ((player->ix > ix && pPlayer->isFacingRight()) ||
+                    ((player->ix < ix) && !pPlayer->isFacingRight())) {
+                    playerKeys->game_turbo.fDown = false;
+                }
+            }
+        }
+    } else if ((gmTag && gmTag->tagged() == player) || player->isInvincible() || player->shyguy || (gmChicken && gmChicken->chicken() == pPlayer)) {
+        *moveAway = true;
+    } else if (pPlayer->isInvincible() || pPlayer->shyguy  || pPlayer->bobomb || (gmTag && gmTag->tagged() == pPlayer)) {
+        *moveToward = true;
+    } else if (player->iy >= iy && !player->isInvincible() && !player->bobomb) {
+        *moveToward = true;
+    } else {
+        if (nearestObjects.playerdistance < 8100)	//else if player is near but higher, run away (left)
+            *moveAway = true;
+        else
+            *moveToward = true;	//Don't just stand and do nothing
+    }
+
+    if (improvedFighting() && plainFight) {
+        //FightPlayer() did the jumping
+    } else if (player->iy <= iy &&					//jump if player is higher or at the same level and
+            player->ix - ix < 45 &&				//player is very near
+            player->ix - ix > -45) {
+        //or if player is high
+        playerKeys->game_jump.fDown = true;
+    } else if (player->iy > iy &&			//try to down jump if player is below us
+               player->ix - ix < 45 &&
+               player->ix - ix > -45 && aiRandom().getBoolean()) {
+        //or if player is high
+        if (!pPlayer->inair) playerKeys->game_down.fDown = true;
+
+        if (!pPlayer->superstomp.isInSuperStompState()) {
+            //If the player has the tanooki or shoe, then try to super stomp on them
+            if (pPlayer->tanookisuit.isOn() || pPlayer->kuriboshoe.is_on()) {
+                playerKeys->game_down.fDown = true;
+                playerKeys->game_jump.fPressed = true;
+                if (pPlayer->tanookisuit.isOn())
+                {
+                    playerKeys->game_turbo.fPressed = true;
+                    pPlayer->lockfire = false;
+                }
+            }
+        }
+    }
+}
+
+// Think(): Hit a ? block from below
+void CPlayerAI::HitGoalBlock(COutputControl * playerKeys, short ix, short iy)
+{
+    CObject * block = nearestObjects.goal;
+    const int blockX = block->x() + TILESIZE / 2;
+    const int spotY = nearestObjects.goalSpotRow * TILESIZE + TILESIZE / 2;
+    int spotCol = -1, spotRow = -1;
+    const bool under = !pPlayer->inair && ainav::PlayerSpot(ix, iy, spotCol, spotRow) && spotRow == nearestObjects.goalSpotRow &&
+                       spotCol == block->x() / TILESIZE;
+    const int dx = ainav::HorizontalDistance(blockX - (ix + PW / 2), iy, spotY);
+    if (under) {
+        //Under it: line up with it, then jump into it (not following a path: in the air, the
+        //branch below keeps jump held, so that the jump gets its full height)
+        navMove = 0;
+        //(the box can be in a 1-tile shaft: jump nearly still, or we'd rise beside it)
+        const float v = pPlayer->velx;
+        if (dx >= -8 && dx <= 8) {
+            if (v > 1.0f)
+                playerKeys->game_left.fDown = true;     //brake
+            else if (v < -1.0f)
+                playerKeys->game_right.fDown = true;
+            else
+                playerKeys->game_jump.fDown = !pPlayer->lockjump;
+        } else if (dx < 0) {
+            playerKeys->game_left.fDown = true;
+        } else {
+            playerKeys->game_right.fDown = true;
+        }
+    } else if (pPlayer->inair && navMove == 0 && dx >= -24 && dx <= 24 && block->y() < iy) {
+        //Jumping into it: keep rising, stay under it
+        if (pPlayer->vely < 0.0f)
+            playerKeys->game_jump.fDown = true;
+        if (dx < -4)
+            playerKeys->game_left.fDown = true;
+        else if (dx > 4)
+            playerKeys->game_right.fDown = true;
+    } else if (!NavigateTo(playerKeys, blockX, spotY)) {
+        //No path known: head that way
+        if (dx < 0)
+            playerKeys->game_left.fDown = true;
+        else
+            playerKeys->game_right.fDown = true;
+    }
+}
+
+// Think(): Go for the goal
+void CPlayerAI::GoForGoal(COutputControl * playerKeys, short ix, short iy, MO_CarriedObject * carriedItem)
+{
+    CObject * goal = nearestObjects.goal;
+    const int goalX = goal->x() + goal->w() / 2;
+    const int goalY = goal->y() + goal->h() / 2;
+
+    if (improvedFighting() && (NeedsPath(goalX, goalY) || (pPlayer->inair && navMove != 0)) && NavigateTo(playerKeys, goalX, goalY)) {
+        //Following the path to it
+    } else if ((goal->x() > ix && nearestObjects.goalwrap) || (goal->x() < ix && !nearestObjects.goalwrap))
+        playerKeys->game_left.fDown = true;
+    else
+        playerKeys->game_right.fDown = true;
+
+    if (goal->y() <= iy && goal->x() - ix < 45 && goal->x() - ix > -45) {
+        playerKeys->game_jump.fDown = true;
+    } else if (goal->y() > iy && goal->x() - ix < 45 && goal->x() - ix > -45) {
+        if (!pPlayer->inair) playerKeys->game_down.fDown = true;
+    }
+
+    if (dynamic_cast<CO_Egg*>(goal))
+        playerKeys->game_turbo.fDown = true;
+    else if (dynamic_cast<CO_Star*>(goal) && canTakeStar())
+        playerKeys->game_turbo.fDown = true;
+    else if (dynamic_cast<CO_Flag*>(goal))
+        playerKeys->game_turbo.fDown = true;
+
+    //Drop current item if we're going after another carried item
+    if (carriedItem) {
+        if (auto* movingobject = dynamic_cast<IO_MovingObject*>(goal)) {
+            MovingObjectType goalobjecttype = movingobject->getMovingObjectType();
+            if (goalobjecttype == movingobject_egg || goalobjecttype == movingobject_flag ||
+                    goalobjecttype == movingobject_star || goalobjecttype == movingobject_phantokey) {
+                MovingObjectType carriedobjecttype = carriedItem->getMovingObjectType();
+
+                //If we are holding something that isn't a mode goal object, then drop it
+                if (carriedobjecttype != movingobject_egg && carriedobjecttype != movingobject_flag &&
+                        carriedobjecttype != movingobject_star && carriedobjecttype != movingobject_phantokey) {
+                    playerKeys->game_turbo.fDown = false;
+                }
+            }
+        }
+    }
+
+    //Open treasure chests in bonus houses in world mode
+    if (dynamic_cast<MO_BonusHouseChest*>(goal))
+        playerKeys->game_turbo.fPressed = true;
+}
+
+// Think(): Evade the threat
+void CPlayerAI::EvadeThreat(COutputControl * playerKeys, short ix, short iy)
+{
+    CObject * threat = nearestObjects.threat;
+
+    //If threat, always use turbo
+    playerKeys->game_turbo.fDown = true;
+
+    if ((threat->x() > ix && nearestObjects.threatwrap) || (threat->x() < ix && !nearestObjects.threatwrap))
+        playerKeys->game_right.fDown = true;
+    else
+        playerKeys->game_left.fDown = true;
+
+    if (threat->y() <= iy && threat->x() - ix < 60 && threat->x() - ix > -60) {
+        if (!pPlayer->inair) playerKeys->game_down.fDown = true;
+    } else if (threat->y() > iy && threat->x() - ix < 60 && threat->x() - ix > -60) {
+        playerKeys->game_jump.fDown = true;
+    }
+}
+
+// Think(): Tag the teammate
+void CPlayerAI::TagTeammate(COutputControl * playerKeys, short ix, short iy)
+{
+    CPlayer * teammate = nearestObjects.teammate;
+
+    if ((teammate->ix > ix && nearestObjects.teammatewrap) || (teammate->ix < ix && !nearestObjects.teammatewrap))
+        playerKeys->game_left.fDown = true;
+    else
+        playerKeys->game_right.fDown = true;
+
+    if (teammate->iy <= iy && teammate->ix - ix < 45 && teammate->ix - ix > -45) {
+        playerKeys->game_jump.fDown = true;
+    } else if (teammate->iy > iy && teammate->ix - ix < 45 && teammate->ix - ix > -45) {
+        if (!pPlayer->inair) playerKeys->game_down.fDown = true;
+    }
+}
+
+// Think(): Stomp something (goomba, koopa, cheep cheep)
+void CPlayerAI::StompEnemy(COutputControl * playerKeys, short ix, short iy, MO_CarriedObject * carriedItem)
+{
+    CObject * stomp = nearestObjects.stomp;
+    bool * moveToward;
+    bool * moveAway;
+
+    if ((stomp->x() > ix && nearestObjects.stompwrap) || (stomp->x() < ix && !nearestObjects.stompwrap)) {
+        moveToward = &playerKeys->game_left.fDown;
+        moveAway = &playerKeys->game_right.fDown;
+    } else {
+        moveToward = &playerKeys->game_right.fDown;
+        moveAway = &playerKeys->game_left.fDown;
+    }
+
+    if (stomp->y() > iy + PH || pPlayer->shyguy || pPlayer->isInvincible() ||
+            (carriedItem && (carriedItem->getMovingObjectType() == movingobject_shell || carriedItem->getMovingObjectType() == movingobject_throwblock))) {
+        //if true stomp target is lower or at the same level, run toward
+        *moveToward = true;
+    } else {
+        if (nearestObjects.stompdistance < 8100)
+            *moveAway = true;
+        else
+            *moveToward = true;
+    }
+
+    if (stomp->y() <= iy + PH && nearestObjects.stompdistance < 2025) {
+        playerKeys->game_jump.fDown = true;
+    } else if (stomp->y() > iy + PH && nearestObjects.stompdistance < 2025) {
+        if (!pPlayer->inair) playerKeys->game_down.fDown = true;
+
+        if (!pPlayer->superstomp.isInSuperStompState()) {
+            //If the player has the tanooki or shoe, then try to super stomp on them
+            if (pPlayer->tanookisuit.isOn() || pPlayer->kuriboshoe.is_on()) {
+                playerKeys->game_down.fDown = true;
+                playerKeys->game_jump.fPressed = true;
+                if (pPlayer->tanookisuit.isOn())
+                {
+                    playerKeys->game_turbo.fPressed = true;
+                    pPlayer->lockfire = false;
+                }
+            }
+        }
     }
 }
 
@@ -1222,7 +1211,7 @@ bool CPlayerAI::AboutToBeStomped() const
 // the tail slows a fall), the P-Wings (flight) and the tanooki suit (the statue can't be hurt, and
 // comes down as a super stomp). Each starts with a fresh press of a button, so a button we hold
 // is let go for a turn first.
-void CPlayerAI::UseMovementItems(COutputControl * playerKeys, short actionType, const NearestObjects& nearest)
+void CPlayerAI::UseMovementItems(COutputControl * playerKeys, Action actionType, const NearestObjects& nearest)
 {
     if (pPlayer->isFrozen() || pPlayer->bobomb || pPlayer->kuriboshoe.is_on())
         return;
@@ -1230,11 +1219,11 @@ void CPlayerAI::UseMovementItems(COutputControl * playerKeys, short actionType, 
     // Where we want to go
     bool hasTarget = false;
     int tx = 0, ty = 0;
-    if (actionType == 0 && nearest.player) {
+    if (actionType == ACTION_FIGHT && nearest.player) {
         tx = nearest.player->ix + PW / 2;
         ty = nearest.player->iy + PH / 2;
         hasTarget = true;
-    } else if (actionType == 1 && nearest.goal) {
+    } else if (actionType == ACTION_GOAL && nearest.goal) {
         tx = nearest.goal->x() + nearest.goal->w() / 2;
         ty = nearest.goalIsBlock ? nearest.goalSpotRow * TILESIZE + TILESIZE / 2 : nearest.goal->y() + nearest.goal->h() / 2;
         hasTarget = true;
@@ -1248,7 +1237,7 @@ void CPlayerAI::UseMovementItems(COutputControl * playerKeys, short actionType, 
 
     // Tanooki: become a statue when someone is about to land on us or something dangerous is close
     if (pPlayer->tanookisuit.isOn()) {
-        const bool threatened = AboutToBeStomped() || (actionType == 2 && nearest.threat && nearest.threatdistance < 64 * 64);
+        const bool threatened = AboutToBeStomped() || (actionType == ACTION_EVADE && nearest.threat && nearest.threatdistance < 64 * 64);
         if (pPlayer->tanookisuit.isStatue()) {
             // Stay a statue for as long as it lasts (letting go early measured worse)
             playerKeys->game_down.fDown = true;
@@ -1272,7 +1261,7 @@ void CPlayerAI::UseMovementItems(COutputControl * playerKeys, short actionType, 
         return;
 
     // In a fight we want to come down on them, so we aim above them
-    const bool fight = actionType == 0 && hasTarget;
+    const bool fight = actionType == ACTION_FIGHT && hasTarget;
     const int aboveDy = dy - 56;   // to a point a little above their head
 
     switch (pPlayer->powerup) {
@@ -1281,7 +1270,7 @@ void CPlayerAI::UseMovementItems(COutputControl * playerKeys, short actionType, 
                 // ... to get above an opponent next to us (not one right over us), to a goal above
                 // us, or out of danger
                 const bool overThem = fight && dx > -110 && dx < 110 && (dx < -40 || dx > 40) && dy > -70 && dy < 16;
-                const bool upToGoal = actionType == 1 && targetAbove;
+                const bool upToGoal = actionType == ACTION_GOAL && targetAbove;
                 if (overThem || upToGoal || fallingIntoDanger) {
                     freshJump();
                     aibench::count(aibench::ItemFeather, pPlayer->globalID);
@@ -1290,7 +1279,7 @@ void CPlayerAI::UseMovementItems(COutputControl * playerKeys, short actionType, 
             break;
 
         case 7: // Leaf: shake the tail to glide over danger or across to a goal
-            if (pPlayer->vely > 1.0f && (fallingIntoDanger || (actionType == 1 && hasTarget && dy > -40 && (dx < -64 || dx > 64)))) {
+            if (pPlayer->vely > 1.0f && (fallingIntoDanger || (actionType == ACTION_GOAL && hasTarget && dy > -40 && (dx < -64 || dx > 64)))) {
                 freshJump();
                 aibench::count(aibench::ItemLeaf, pPlayer->globalID);
             }
@@ -1321,7 +1310,7 @@ void CPlayerAI::UseMovementItems(COutputControl * playerKeys, short actionType, 
 // Fire the held weapon when an opponent is in its line of fire, instead of at random moments.
 // The weapon fires on the press of the turbo button (CPlayer::useSpecialPowerup), so it is
 // released for one frame before a shot.
-void CPlayerAI::AimWeapon(COutputControl * playerKeys, short actionType)
+void CPlayerAI::AimWeapon(COutputControl * playerKeys, Action actionType)
 {
     const short powerup = pPlayer->powerup;
     if (pPlayer->bobomb || pPlayer->carriedItem || powerup < 1 || powerup > 7)
@@ -1369,7 +1358,7 @@ void CPlayerAI::AimWeapon(COutputControl * playerKeys, short actionType)
     // Turbo is also the run button: keep running while we hold fire
     if (aligned)
         playerKeys->game_turbo.fDown = !pPlayer->lockfire;
-    else if (actionType != 2)
+    else if (actionType != ACTION_EVADE)
         playerKeys->game_turbo.fDown = true;
 }
 

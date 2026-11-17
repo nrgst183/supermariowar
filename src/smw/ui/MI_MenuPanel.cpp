@@ -38,12 +38,6 @@ MI_MenuPanel::MI_MenuPanel(short x, short y, short w, short h, std::string title
     , m_note(std::move(note))
 {}
 
-void MI_MenuPanel::SetSize(short w, short h)
-{
-    m_w = w;
-    m_h = h;
-}
-
 void MI_MenuPanel::SetTitle(std::string title, std::string note)
 {
     m_title = std::move(title);

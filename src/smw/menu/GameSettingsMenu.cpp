@@ -14,7 +14,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-
 namespace {
 const char* g_szAutoFilterNames[NUM_AUTO_FILTERS] {
     "Death Tiles",
@@ -33,7 +32,6 @@ const char* g_szAutoFilterNames[NUM_AUTO_FILTERS] {
 const short g_iAutoFilterIcons[NUM_AUTO_FILTERS] {37, 29, 33, 1, 0, 6, 40, 73, 19, 87, 17, 118};
 } // namespace
 
-
 UI_GameSettingsMenu::UI_GameSettingsMenu()
     : UI_Menu()
 {
@@ -51,7 +49,6 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
 
     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
         miGoalField[iGameMode] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 125, gamemodes[iGameMode]->GetGoalName().c_str(), 352, 120);
-        // miGoalField[iGameMode]->SetKey(gamemodes[iGameMode]->goal);
         miGoalField[iGameMode]->setVisible(iGameMode == 0);
 
         for (short iGameModeOption = 0; iGameModeOption < GAMEMODE_NUM_OPTIONS; iGameModeOption++) {
@@ -92,11 +89,9 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
         miMapFilterScroll->Add(std::move(szTemp), game_values.piFilterIcons[NUM_AUTO_FILTERS + iFilter]);
     }
 
-
     miGameSettingsLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
     miGameSettingsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miGameSettingsMenuHeaderText = new MI_HeaderText("Single Game Menu", 320, 5);
-
 
     // Exit tournament dialog box
     miGameSettingsExitDialogImage = new MI_Image(&rm->spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);

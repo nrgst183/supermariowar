@@ -11,14 +11,12 @@
 #include <cstdlib>
 #include <cstring>
 
-
 namespace {
 constexpr const char* const DELIM_EMPTY = "";
 constexpr const char* const DELIM_COMMA = ",";
 constexpr const char* const DELIM_PIPE = "|";
 constexpr const char* const UNKNOWN_MAP_NAME = "-";
 } // namespace
-
 
 TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
 {
@@ -96,8 +94,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
         //This gets the closest game mode to what the tour has
         ts.iGoal = -1;
         if (pszTemp) {
-            //If it is commented out, this will allow things like 33 coins, 17 kill goals, etc.
-            //ts.iGoal = gamemodes[ts.iMode]->GetClosestGoal(atoi(pszTemp));
+            //Any goal, not only the menu's steps (33 coins, 17 kills, ...)
             ts.iGoal = atoi(pszTemp);
         }
 

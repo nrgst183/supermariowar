@@ -11,23 +11,16 @@
 
 #include <cstdlib>
 
-
 namespace {
 constexpr short MAX_NAME_CHARS = 17;       // the field takes one character less than this (MAX_NAME_LENGTH is 16)
 constexpr short MAX_PORT_CHARS = 6;
 constexpr short MAX_ADDRESS_CHARS = 64;
 } // namespace
 
-
 UI_OnlineMenu::UI_OnlineMenu()
     : UI_Menu()
 {
-    miLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miHeaderText = new MI_HeaderText("Online", 320, 5);
-    AddNonControl(miLeftHeaderBar);
-    AddNonControl(miRightHeaderBar);
-    AddNonControl(miHeaderText);
+    AddTitleBar("Online");
 
     //Three panels (under their fields): you, hosting, joining
     AddNonControl(new MI_MenuPanel(36, 42, 568, 78, "You", "Your name in the lobby and the matches"));

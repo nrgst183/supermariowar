@@ -267,12 +267,6 @@ std::string worldName()
     return worldlist ? worldlist->currentPath().stem().string() : std::string();
 }
 
-void worldSize(int* cols, int* rows)
-{
-    *cols = g_worldmap.getWidth();
-    *rows = g_worldmap.getHeight();
-}
-
 void viewOrigin(int* x, int* y)
 {
     *x = draw_offset_col * TILESIZE - draw_offset_x;

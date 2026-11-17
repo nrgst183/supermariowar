@@ -28,7 +28,6 @@ public:
     void SetSpecialMap(const char * szMapName, const char * szMapPath);
 
     const char * GetMapName() { return szMapName.c_str(); }
-    std::string GetMapFilePath() const;
 
     virtual void SetDimensions(short iWidth, short iIndent);
 

@@ -1,30 +1,10 @@
-#include "player.h"
 
-#include "eyecandy.h"
 #include "GameValues.h"
-#include "gfx.h"
-#include "GSGameplay.h"
-#include "map.h"
 #include "movingplatform.h"
-#include "ObjectContainer.h"
-#include "objectgame.h"
-#include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
-#include "gamemodes/Chicken.h"
-#include "gamemodes/ShyGuyTag.h"
-#include "gamemodes/Star.h"
 #include "gamemodes/Tag.h"
 #include "IO_Block.h"
-#include "objects/carriable/CO_Bomb.h"
-#include "objects/carriable/CO_Shell.h"
-#include "objects/carriable/CO_KuriboShoe.h"
-#include "objects/moving/MO_Boomerang.h"
-#include "objects/moving/MO_Explosion.h"
-#include "objects/moving/MO_Fireball.h"
-#include "objects/moving/MO_Hammer.h"
-#include "objects/moving/MO_IceBlast.h"
-#include "objects/moving/MO_Podobo.h"
 
 #include <cassert>
 #include <cmath>
@@ -107,8 +87,6 @@ void CPlayer::mapcolldet_moveHorizontally(short direction)
     short ty2 = (static_cast<short>(fy) + PH) / TILESIZE;
     short tx = -1;
 
-    //printf("Before X - ix: %d\tiy: %d\toldx: %.2f\toldy: %.2f\tty: %d\tty2: %d\ttxl: %d\ttxr: %d\tfx: %.2f\tfy: %.2f\tvelx: %.2f\tvely: %.2f\n", ix, iy, fOldX, fOldY, ty, ty2, ix/TILESIZE, (ix+PW)/TILESIZE, fx, fy, velx, vely);
-
     bool isMoveKeyDown = false;
     if (direction == 1)
         isMoveKeyDown = playerKeys->game_left.fDown;
@@ -143,22 +121,14 @@ void CPlayer::mapcolldet_moveHorizontally(short direction)
     bool deathTileBehind;
     bool superDeathTileBehind;
     if (direction == 1) {
-        deathTileBehind = ((toptile & tile_flag_death_on_right) && (bottomtile & tile_flag_death_on_right)) ||
-                          ((toptile & tile_flag_death_on_right) && !(bottomtile & tile_flag_solid)) ||
-                          (!(toptile & tile_flag_solid) && (bottomtile & tile_flag_death_on_right));
+        deathTileBehind = pairIsDeadly(toptile, bottomtile, tile_flag_death_on_right);
 
-        superDeathTileBehind = ((toptile & tile_flag_super_or_player_death_right) && (bottomtile & tile_flag_super_or_player_death_right)) ||
-                               ((toptile & tile_flag_super_or_player_death_right) && !(bottomtile & tile_flag_solid)) ||
-                               (!(toptile & tile_flag_solid) && (bottomtile & tile_flag_super_or_player_death_right));
+        superDeathTileBehind = pairIsDeadly(toptile, bottomtile, tile_flag_super_or_player_death_right);
     }
     else {
-        deathTileBehind = ((toptile & tile_flag_death_on_left) && (bottomtile & tile_flag_death_on_left)) ||
-                          ((toptile & tile_flag_death_on_left) && !(bottomtile & tile_flag_solid)) ||
-                          (!(toptile & tile_flag_solid) && (bottomtile & tile_flag_death_on_left));
+        deathTileBehind = pairIsDeadly(toptile, bottomtile, tile_flag_death_on_left);
 
-        superDeathTileBehind = ((toptile & tile_flag_super_or_player_death_left) && (bottomtile & tile_flag_super_or_player_death_left)) ||
-                               ((toptile & tile_flag_super_or_player_death_left) && !(bottomtile & tile_flag_solid)) ||
-                               (!(toptile & tile_flag_solid) && (bottomtile & tile_flag_super_or_player_death_left));
+        superDeathTileBehind = pairIsDeadly(toptile, bottomtile, tile_flag_super_or_player_death_left);
     }
 
     bool fTopBlockSolid = topblock && !topblock->isTransparent() && !topblock->isHidden();
@@ -185,17 +155,13 @@ void CPlayer::mapcolldet_moveHorizontally(short direction)
             return;
         }
 
-        bool collisionresult = true;
-
         if (fTopBlockSolid) { // collide with top block
-            collisionresult &= topblock->collide(this, counter_direction,
-                true);
+            topblock->collide(this, counter_direction, true);
             flipsidesifneeded();
         }
 
         if (fBottomBlockSolid) { // then bottom
-            collisionresult &= bottomblock->collide(this, counter_direction,
-                true);
+            bottomblock->collide(this, counter_direction, true);
             flipsidesifneeded();
         }
     } else if (superDeathTileBehind || (deathTileBehind && !isInvincible() && !isShielded() && !shyguy)) {
@@ -447,13 +413,9 @@ void CPlayer::mapcolldet_moveDownward(short txl, short txc, short txr,
         return;
     }
 
-    bool fDeathTileUnderPlayer = ((lefttile & tile_flag_death_on_top) && (righttile & tile_flag_death_on_top)) ||
-                                 ((lefttile & tile_flag_death_on_top) && !(righttile & tile_flag_solid)) ||
-                                 (!(lefttile & tile_flag_solid) && (righttile & tile_flag_death_on_top));
+    bool fDeathTileUnderPlayer = pairIsDeadly(lefttile, righttile, tile_flag_death_on_top);
 
-    bool fSuperDeathTileUnderPlayer = ((lefttile & tile_flag_super_or_player_death_top) && (righttile & tile_flag_super_or_player_death_top)) ||
-                                      ((lefttile & tile_flag_super_or_player_death_top) && !(righttile & tile_flag_solid)) ||
-                                      (!(lefttile & tile_flag_solid) && (righttile & tile_flag_super_or_player_death_top));
+    bool fSuperDeathTileUnderPlayer = pairIsDeadly(lefttile, righttile, tile_flag_super_or_player_death_top);
 
     if (fSolidTileUnderPlayer && !fSuperDeathTileUnderPlayer &&
             (!fDeathTileUnderPlayer || IsInvincibleOnBottom() || shyguy) ) {
@@ -567,8 +529,6 @@ void CPlayer::collision_detection_map()
     short unAlignedBlockX = 0;
     float unAlignedBlockFX = 0;
 
-    //printf("Before Y - ix: %d\tiy: %d\toldx: %.2f\toldy: %d\tty: %.2f\tty2: %d\ttxl: %d\ttxr: %d\tfx: %.2f\tfy: %.2f\tvelx: %.2f\tvely: %.2f\n", ix, iy, fOldX, fOldY, (int)(fPrecalculatedY) / TILESIZE, ((int)(fPrecalculatedY) + PH) / TILESIZE, txl, txr, fx, fy, velx, vely);
-
     short overlaptxl = (txl << 5) + TILESIZE + 1;
 
     if (ix + HALFPW < overlaptxl) {
@@ -600,7 +560,6 @@ void CPlayer::collision_detection_map()
             onice = false;
     }
 
-    //printf("After Y - ix: %d\tiy: %d\toldx: %.2f\toldy: %.2f\tty: %d\tty2: %d\ttxl: %d\ttxr: %d\tfx: %.2f\tfy: %.2f\tvelx: %.2f\tvely: %.2f\n\n", ix, iy, fOldX, fOldY, ty, ty, txl, txr, fx, fy, velx, vely);
 }
 
 //iPlayerIdCredit is passed in if this platform was triggered by another player and crushed this player (e.g. donut block)
@@ -638,10 +597,8 @@ void CPlayer::flipsidesifneeded()
         //This avoids rounding errors
         setXf(fx + 640);
         fOldX += 640;
-        //printf("Flipped Left\n");
     } else if (ix >= 640 || fx >= 640) {
         setXf(fx - 640);
         fOldX -= 640;
-        //printf("Flipped Right\n");
     }
 }

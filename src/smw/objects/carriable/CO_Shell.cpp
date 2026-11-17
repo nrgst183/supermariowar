@@ -10,7 +10,6 @@
 #include "objects/carriable/CO_ThrowBlock.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-
 //------------------------------------------------------------------------------
 // class shell projectile
 //------------------------------------------------------------------------------
@@ -402,30 +401,15 @@ void CO_Shell::Drop()
 
 void CO_Shell::Kick()
 {
-    /*
-    if (superkick)
-    {
-        vel = 10.0f;
-        fSmoking = true;
-        ifSoundOnPlay(rm->sfx_cannon);
-    }
-    */
-
     float fVel, fPlayerBonusVel = owner->velx / 2.0f;
     if (owner->isFacingRight()) {
         fVel = 5.0f;
         if (fPlayerBonusVel > 0.0f)
             fVel += fPlayerBonusVel;
-
-        // if (fVel >= 7.5f)
-        //	fSmoking = true;
     } else {
         fVel = -5.0f;
         if (fPlayerBonusVel < 0.0f)
             fVel += fPlayerBonusVel;
-
-        // if (fVel <= -7.5f)
-        //	fSmoking = true;
     }
 
     velx = fVel;

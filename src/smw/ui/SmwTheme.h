@@ -52,7 +52,6 @@ void panel(int x, int y, int w, int h);
 void strip(int x, int y, int w, int h);
 // A pipe lying down, 16 high, with its lips at both ends
 void pipe(int x, int y, int w, bool green);
-void pipeLip(int x, int y, bool green);    // 8 wide, 20 high (y - 2 to y + 18)
 
 // The game's icons (16x16, the crown 14x14)
 void coin(int x, int y);
@@ -82,15 +81,10 @@ void progressLine(int x, int y, int w, float fraction);
 // The status bar's timer: a clock and the time (16 high); returns the width
 int timer(int x, int y, const std::string& time);
 int timerWidth(const std::string& time);
-// The score digits of the match's score panels (16 x 16 each, 18 apart); ':' '/' and ' ' between them.
-// Returns the width.
-int scoreDigits(int x, int y, const std::string& text);
-int scoreDigitsWidth(const std::string& text);
 // A coin spinning (32 x 32; color: 0 red, 1 green, 2 gold, 3 blue)
 void spinningCoin(int x, int y, int tick, int color = 2);
 // A movie clapperboard, open (32 x 32): the theater help's item
 void clapperboard(int x, int y);
-gfxFont& gameFont();    // the match's large font (the announcements')
 
 // A connection's quality: four bars (22 x 16) lit by the ping (gray: not known yet)
 void signal(int x, int y, int pingMs);

@@ -6,14 +6,10 @@
 #include "eyecandy.h"
 #include "GameMode.h"
 #include "GameValues.h"
-#include "InputFrame.h"
 #include "map.h"
-#include "player.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
-#include "sfx.h"
 #include "CmdArgs.h"
-#include "Resimulation.h"
 
 #include <algorithm>
 
@@ -260,7 +256,6 @@ void GameplayState::updateScreenFade()
             game_values.screenfade = 0;
 
             //display the mode and goal at the start of the game
-            //if (game_values.matchtype == MatchType::QuickGame)
             if (game_values.startmodedisplay && game_values.singleplayermode == -1) {
                 std::string szMode;
                 if (game_values.gamemode->goal < 0)

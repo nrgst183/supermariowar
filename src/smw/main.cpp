@@ -13,7 +13,6 @@
     You should have received a copy of the GNU General Public License
     along with SMW.  If not, see <http://www.gnu.org/licenses/>. */
 
-
 #include "CmdArgs.h"
 #include "FileList.h"
 #include "GameMode.h"
@@ -85,9 +84,7 @@
 
 #include <SDL3/SDL_main.h>
 
-
 //now it's really time for an "engine" (aka resource manager)
-
 
 //------ system stuff ------
 SDL_Surface		*screen = nullptr;		//for gfx (maybe the gfx system should be improved -> resource manager)
@@ -96,14 +93,11 @@ SDL_Surface		*blitdest = nullptr;	//the destination surface for all drawing (can
 short			x_shake = 0;
 short			y_shake = 0;
 
-
 //------ game relevant stuff ------
 // (the simulation state, g_sim, is defined in GSGameplay.cpp)
 
-
 //Locations for swirl spawn effects
 short g_iSwirlSpawnLocations[4][2][25];
-
 
 // Non-owning views; the objects are owned by ownedGameModes below
 CGameMode			*gamemodes[GAMEMODE_LAST];
@@ -166,11 +160,9 @@ void destroyGameModes()
 
 short currentgamemode = 0;
 
-
 //*************************************
 //  MAIN LOOP
 //*************************************
-
 
 #ifdef __EMSCRIPTEN__
 void gameloop_frame();
@@ -239,7 +231,6 @@ void create_globals()
     filterslist = new FiltersList();
     maplist = new MapList(false);
 
-    //TODO: add proper test via size
     if (maplist->isEmpty()) {
         throw "Empty map directory!";
     }
@@ -336,7 +327,6 @@ void init_spawnlocations()
     }
 }
 
-
 //*************************************
 //  PROGRAM ENTRY POINT
 //*************************************
@@ -358,7 +348,6 @@ int main(int argc, char *argv[])
     }
     if (!cmd.data_root.empty())
         RootDataDirectory = cmd.data_root;
-
 
     try {
         main_game();
@@ -397,7 +386,7 @@ void main_game()
     ensureSettingsDir();
     create_globals();
 
-	gfx_init(App::screenWidth, App::screenHeight, false);		//initialize the graphics (SDL)
+    gfx_init(App::screenWidth, App::screenHeight, false);		//initialize the graphics (SDL)
     blitdest = screen;
 
 #if	0
@@ -407,7 +396,6 @@ void main_game()
     for (int k = 0; k < 100; k++) {
         game_values.playerInput.outputControls[3].menu_right.fPressed = true;
         miMapField->SendInput(&game_values.playerInput);
-        //printf("Map over-> %s\n", maplist->currentFilename());
     }
 
     return 0;
@@ -469,6 +457,8 @@ void main_game()
 
     if (cmd::g_autotest.enabled && cmd::g_autotest.seed != 0) {
         RandomNumberGenerator::gameplay().seed(static_cast<uint32_t>(cmd::g_autotest.seed));
+        //(the cosmetic one too: a test run looks the same every time, screenshots included)
+        RandomNumberGenerator::cosmetic().seed(static_cast<uint32_t>(cmd::g_autotest.seed) ^ 0x5bd1e995u);
     }
 
     if (cmd::g_autotest.enabled) {
@@ -479,15 +469,11 @@ void main_game()
             game_values.cpudifficulty = static_cast<short>(cmd::g_autotest.cpuLevel);
     }
 
-
     //**********************************************************
-
 
     gameloop(); // all the game logic happens here
 
-
     //**********************************************************
-
 
     printf("\n---------------- shutdown ----------------\n");
 
@@ -499,6 +485,6 @@ void main_game()
     sfx_close();
     gfx_close();
 
-	// release all resources
-	delete rm;
+    // release all resources
+    delete rm;
 }

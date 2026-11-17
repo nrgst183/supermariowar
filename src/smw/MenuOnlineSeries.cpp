@@ -4,9 +4,7 @@
 // (a lockstep of the world map's input, relayed by the host). The matches are ordinary online matches.
 #include "GSMenu.h"
 
-#include "rollback/MatchConfig.h"
 #include "rollback/NetGame.h"
-#include "rollback/SeriesState.h"
 
 #include "CmdArgs.h"
 #include "FileList.h"
@@ -14,8 +12,6 @@
 #include "GameValues.h"
 #include "GSGameplay.h"
 #include "MapList.h"
-#include "path.h"
-#include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "ui/MI_BonusWheel.h"

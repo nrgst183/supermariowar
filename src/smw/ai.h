@@ -7,6 +7,8 @@
 #include "Game.h"
 #include "SimArena.h"
 
+class MO_CarriedObject;
+enum class PowerupType : unsigned char;
 class CObject;
 class RandomNumberGenerator;
 
@@ -89,6 +91,9 @@ struct AttentionObject : sim::ArenaAllocated {
 class CPlayerAI : public sim::ArenaAllocated
 {
 public:
+    // What Think() goes for this time (the nearest one, NearestObjects)
+    enum Action : short { ACTION_FIGHT = 0, ACTION_GOAL = 1, ACTION_EVADE = 2, ACTION_TEAMMATE = 3, ACTION_STOMP = 4 };
+
     CPlayerAI();
     virtual ~CPlayerAI();
 
@@ -109,17 +114,33 @@ public:
     void threwStar(int untilTick) { starThrowUntil = untilTick; }
 
     void GetNearestObjects();
+    void ScanMiddleLayerObjects();
+    void ScanBackLayerObjects();
+    void ScanFrontLayerObjects();
+    void ScanPlayers();
+    void ScanPowerupBlocks();
     void DistanceToObject(CObject * object, CObject ** target, int * nearest, bool * wrap);
     void DistanceToObjectCenter(CObject * object, CObject ** target, int * nearest, bool * wrap);
     void DistanceToPlayer(CPlayer * player, CPlayer ** target, int * nearest, bool * wrap);
-    void AimWeapon(COutputControl * playerKeys, short actionType);
+    void AimWeapon(COutputControl * playerKeys, Action actionType);
     void FightPlayer(COutputControl * playerKeys, CPlayer * player, bool wrap);
     // Follow the path toward (x,y) (see AINav.h); false when there is no path (the caller decides then)
     bool NavigateTo(COutputControl * playerKeys, int x, int y);
     bool NeedsPath(int x, int y) const;
     void Stabilize(COutputControl * playerKeys);
     bool AboutToBeStomped() const;
-    void UseMovementItems(COutputControl * playerKeys, short actionType, const NearestObjects& nearest);
+    void UseMovementItems(COutputControl * playerKeys, Action actionType, const NearestObjects& nearest);
+    // Think()'s actions (ix, iy: where the player is; carriedItem: what it holds)
+    void ChaseNearestPlayer(COutputControl * playerKeys, short ix, short iy, MO_CarriedObject * carriedItem);
+    void HitGoalBlock(COutputControl * playerKeys, short ix, short iy);
+    void GoForGoal(COutputControl * playerKeys, short ix, short iy, MO_CarriedObject * carriedItem);
+    void EvadeThreat(COutputControl * playerKeys, short ix, short iy);
+    void TagTeammate(COutputControl * playerKeys, short ix, short iy);
+    void StompEnemy(COutputControl * playerKeys, short ix, short iy, MO_CarriedObject * carriedItem);
+    void CheckFallDanger(COutputControl * playerKeys, short ix, short iy, short iDeathX1, short iDeathX2);
+    void AvoidJumpingIntoDeath(COutputControl * playerKeys, short iy, short iDeathX1, short iDeathX2);
+    void UseStoredPowerup(COutputControl * playerKeys, PowerupType powerup, MO_CarriedObject * carriedItem, short iTeamID);
+    void CountBenchmarkStats(COutputControl * playerKeys);
 
 protected:
     bool improved() const;
@@ -150,7 +171,6 @@ private:
     AttentionObject currentAttentionObject;
 };
 
-
 /**************************************************
 * Inherit from the CPlayerAI class and create your own!
 ***************************************************/
@@ -158,7 +178,6 @@ class CSimpleAI : public CPlayerAI
 {
 public:
     void Think(COutputControl * playerKeys) override;
-
 };
 
 #endif // AI_H

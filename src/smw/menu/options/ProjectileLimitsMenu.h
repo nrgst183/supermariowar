@@ -27,8 +27,4 @@ private:
     MI_SelectField<short>* miWandLimitField;
 
     MI_Button* miProjectilesLimitsMenuBackButton;
-
-    MI_Image* miProjectilesLimitsMenuLeftHeaderBar;
-    MI_Image* miProjectilesLimitsMenuRightHeaderBar;
-    MI_Text* miProjectilesLimitsMenuHeaderText;
 };

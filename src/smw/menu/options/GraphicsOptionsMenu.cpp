@@ -11,7 +11,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-
 UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     : UI_Menu()
 {
@@ -89,10 +88,6 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miGraphicsOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miGraphicsOptionsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
-    miGraphicsOptionsMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miGraphicsOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miGraphicsOptionsMenuHeaderText = new MI_HeaderText("Graphics Options Menu", 320, 5);
-
     AddControl(miPingBarsField, miGraphicsOptionsMenuBackButton, miOverlayColorsField, nullptr, miGraphicsOptionsMenuBackButton);
     AddControl(miOverlayColorsField, miPingBarsField, miTopLayerField, nullptr, miGraphicsOptionsMenuBackButton);
     AddControl(miTopLayerField, miOverlayColorsField, miFrameRateField, nullptr, miGraphicsOptionsMenuBackButton);
@@ -108,9 +103,7 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     AddControl(miNetStatsField, miGameGraphicsPackField, miGraphicsOptionsMenuBackButton, nullptr, miGraphicsOptionsMenuBackButton);
     AddControl(miGraphicsOptionsMenuBackButton, miNetStatsField, miPingBarsField, miNetStatsField, nullptr);
 
-    AddNonControl(miGraphicsOptionsMenuLeftHeaderBar);
-    AddNonControl(miGraphicsOptionsMenuRightHeaderBar);
-    AddNonControl(miGraphicsOptionsMenuHeaderText);
+    AddTitleBar("Graphics Options Menu");
 
     setInitialFocus(miPingBarsField);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);

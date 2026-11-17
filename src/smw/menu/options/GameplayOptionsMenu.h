@@ -28,8 +28,4 @@ private:
     MI_SelectField<short>* miPointSpeedField;
     MI_SelectField<bool>* miSecretsField;
     MI_Button* miGameplayOptionsMenuBackButton;
-
-    MI_Image* miGameplayOptionsMenuLeftHeaderBar;
-    MI_Image* miGameplayOptionsMenuRightHeaderBar;
-    MI_Text* miGameplayOptionsMenuHeaderText;
 };

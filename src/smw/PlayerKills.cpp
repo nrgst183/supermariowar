@@ -1,32 +1,12 @@
 #include "CmdArgs.h"
-#include "ai.h"
-#include "player.h"
 
 #include "eyecandy.h"
 #include "GameValues.h"
-#include "gfx.h"
-#include "GSGameplay.h"
-#include "map.h"
-#include "movingplatform.h"
-#include "ObjectContainer.h"
-#include "objectgame.h"
-#include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "gamemodes/Chicken.h"
 #include "gamemodes/ShyGuyTag.h"
-#include "gamemodes/Star.h"
 #include "gamemodes/Tag.h"
-#include "IO_Block.h"
-#include "objects/carriable/CO_Bomb.h"
-#include "objects/carriable/CO_Shell.h"
-#include "objects/carriable/CO_KuriboShoe.h"
-#include "objects/moving/MO_Boomerang.h"
-#include "objects/moving/MO_Explosion.h"
-#include "objects/moving/MO_Fireball.h"
-#include "objects/moving/MO_Hammer.h"
-#include "objects/moving/MO_IceBlast.h"
-#include "objects/moving/MO_Podobo.h"
 
 #include <cassert>
 #include <cmath>
@@ -116,7 +96,6 @@ PlayerKillType CPlayer::KilledPlayer(CPlayer * killed, PlayerDeathStyle deathsty
 
     return iKillType;
 }
-
 
 void CPlayer::TransferTag(CPlayer* o2)
 {

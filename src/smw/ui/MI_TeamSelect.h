@@ -10,42 +10,42 @@ class MI_Image;
 
 class MI_TeamSelect : public UI_Control
 {
-	public:
-		MI_TeamSelect(gfxSprite * spr_background, short x, short y);
-		~MI_TeamSelect() override;
+    public:
+        MI_TeamSelect(gfxSprite * spr_background, short x, short y);
+        ~MI_TeamSelect() override;
 
-		void Update() override;
-		void Draw() override;
+        void Update() override;
+        void Draw() override;
 
-		MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
-		MenuCodeEnum Modify(bool modify) override;
+        MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
+        MenuCodeEnum Modify(bool modify) override;
 
-		void Reset();
-		short OrganizeTeams();
-		short GetTeam(short iPlayerID);
+        void Reset();
+        short OrganizeTeams();
+        short GetTeam(short iPlayerID);
 
-	private:
+    private:
 
-		void FindNewTeam(short iPlayerID, short iDirection);
+        void FindNewTeam(short iPlayerID, short iDirection);
 
-		std::unique_ptr<MI_Image> miImage;
-		gfxSprite * spr;
+        std::unique_ptr<MI_Image> miImage;
+        gfxSprite * spr;
 
-		short iTeamIDs[4][3];
-		short iTeamCounts[4];
-		short iNumTeams;
+        short iTeamIDs[4][3];
+        short iTeamCounts[4];
+        short iNumTeams;
 
-		short iAnimationTimer;
-		short iAnimationFrame;
-		short iRandomAnimationFrame;
+        short iAnimationTimer;
+        short iAnimationFrame;
+        short iRandomAnimationFrame;
 
-		bool fReady[4];
-		bool fAllReady;
+        bool fReady[4];
+        bool fAllReady;
 
-		short iFastScroll[4];
-		short iFastScrollTimer[4];
+        short iFastScroll[4];
+        short iFastScrollTimer[4];
 
-	friend class MenuState;
+    friend class MenuState;
 };
 
 #endif // UI_TEAM_SELECT_H

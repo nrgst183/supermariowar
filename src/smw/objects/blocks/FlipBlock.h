@@ -4,36 +4,36 @@
 
 class B_FlipBlock : public IO_Block {
 public:
-	B_FlipBlock(gfxSprite *nspr, Vec2s pos, bool fHidden);
+    B_FlipBlock(gfxSprite *nspr, Vec2s pos, bool fHidden);
 
-	void draw() override;
-	void update() override;
-	void reset() override;
+    void draw() override;
+    void update() override;
+    void reset() override;
 
-	bool collide(CPlayer * player, short direction, bool useBehavior) override;
-	bool collide(IO_MovingObject * object, short direction) override;
+    bool collide(CPlayer * player, short direction, bool useBehavior) override;
+    bool collide(IO_MovingObject * object, short direction) override;
 
     bool isTransparent() override {
         return state == 1;
     }
 
-	bool hittop(CPlayer * player, bool useBehavior) override;
-	bool hitbottom(CPlayer * player, bool useBehavior) override;
-	bool hitright(CPlayer * player, bool useBehavior) override;
-	bool hitleft(CPlayer * player, bool useBehavior) override;
+    bool hittop(CPlayer * player, bool useBehavior) override;
+    bool hitbottom(CPlayer * player, bool useBehavior) override;
+    bool hitright(CPlayer * player, bool useBehavior) override;
+    bool hitleft(CPlayer * player, bool useBehavior) override;
 
-	bool hittop(IO_MovingObject * object) override;
-	bool hitbottom(IO_MovingObject * object) override;
-	bool hitright(IO_MovingObject * object) override;
-	bool hitleft(IO_MovingObject * object) override;
+    bool hittop(IO_MovingObject * object) override;
+    bool hitbottom(IO_MovingObject * object) override;
+    bool hitright(IO_MovingObject * object) override;
+    bool hitleft(IO_MovingObject * object) override;
 
-	void triggerBehavior() override;
+    void triggerBehavior() override;
 
 private:
-	void explode();
+    void explode();
 
-	short counter;
-	short frame;
-	short timer;
-	short animationWidth;
+    short counter;
+    short frame;
+    short timer;
+    short animationWidth;
 };

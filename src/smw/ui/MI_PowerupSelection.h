@@ -14,7 +14,6 @@ class MI_Text;
 class UI_Menu;
 template<typename T> class MI_SelectField;
 
-
 class MI_PowerupSelection : public UI_Control {
 public:
     MI_PowerupSelection(short x, short y, short width, short numlines);
@@ -32,7 +31,6 @@ private:
     void AdjustDisplayArrows();
 
     void SetupPowerupFields();
-    void EnablePowerupFields(bool fEnable);
 
     short iIndex = 0;
     short iOffset = 0;

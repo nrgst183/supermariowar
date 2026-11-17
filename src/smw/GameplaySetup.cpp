@@ -1,68 +1,12 @@
 #include "CpuDriver.h"
 #include "GSGameplay.h"
 
-#include "CmdArgs.h"
 #include "eyecandy.h"
-#include "FileList.h"
-#include "GameMode.h"
 #include "GameValues.h"
-#include "gfx.h"
-#include "joystick.h"
-#include "GSMenu.h"
 #include "map.h"
-#include "MapList.h"
-#include "ObjectContainer.h"
-#include "objecthazard.h"
-#include "player.h"
-#include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
-#include "Score.h"
-#include "sfx.h"
 #include "SimulationState.h"
-#include "WorldTourStop.h"
-#include "gamemodes/Chicken.h"
-#include "gamemodes/MiniBoss.h"
 #include "gamemodes/Tag.h"
-#include "objects/MysteryMushroomTempPlayer.h"
-#include "objects/carriable/CO_KuriboShoe.h"
-#include "objects/carriable/CO_Shell.h"
-#include "objects/carriable/CO_Spike.h"
-#include "objects/carriable/CO_ThrowBlock.h"
-#include "objects/carriable/CO_ThrowBox.h"
-#include "objects/blocks/BounceBlock.h"
-#include "objects/blocks/BreakableBlock.h"
-#include "objects/blocks/DonutBlock.h"
-#include "objects/blocks/FlipBlock.h"
-#include "objects/blocks/NoteBlock.h"
-#include "objects/blocks/OnOffSwitchBlock.h"
-#include "objects/blocks/PowerupBlock.h"
-#include "objects/blocks/SwitchBlock.h"
-#include "objects/blocks/ThrowBlock.h"
-#include "objects/blocks/ViewBlock.h"
-#include "objects/blocks/WeaponBreakableBlock.h"
-#include "objects/moving/MO_BulletBill.h"
-#include "objects/moving/MO_Coin.h"
-#include "objects/moving/MO_PirhanaPlant.h"
-#include "objects/powerup/PU_BobombPowerup.h"
-#include "objects/powerup/PU_BombPowerup.h"
-#include "objects/powerup/PU_BoomerangPowerup.h"
-#include "objects/powerup/PU_BulletBillPowerup.h"
-#include "objects/powerup/PU_ClockPowerup.h"
-#include "objects/powerup/PU_ExtraGuyPowerup.h"
-#include "objects/powerup/PU_FeatherPowerup.h"
-#include "objects/powerup/PU_FirePowerup.h"
-#include "objects/powerup/PU_HammerPowerup.h"
-#include "objects/powerup/PU_IceWandPowerup.h"
-#include "objects/powerup/PU_LeafPowerup.h"
-#include "objects/powerup/PU_ModPowerup.h"
-#include "objects/powerup/PU_MysteryMushroomPowerup.h"
-#include "objects/powerup/PU_PodoboPowerup.h"
-#include "objects/powerup/PU_PoisonPowerup.h"
-#include "objects/powerup/PU_PowPowerup.h"
-#include "objects/powerup/PU_PWingsPowerup.h"
-#include "objects/powerup/PU_StarPowerup.h"
-#include "objects/powerup/PU_Tanooki.h"
-#include "objects/walkingenemy/WalkingEnemy.h"
 
 #include <format>
 #include <string>
@@ -267,12 +211,10 @@ void GameplayState::initRunGame()
     g_sim.tick = 0;
     g_sim.gameoverTick = -1;
 
-
     createPlayers();
     game_values.resetGameplaySettings();
     initScoreDisplayPosition();
     initEyeCandy();
-
 
     g_sim.windTimer = 0;
     g_sim.nextWind = static_cast<float>(RANDOM_INT(41) - 20) / 4.0f;

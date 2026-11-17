@@ -97,10 +97,7 @@ class GameplayState : public GameState
         void drawSpotlights();
         void drawOutOfScreenIndicators();
         void drawEverything(short iCountDownState, short iScoreTextOffset[4]);
-        //.
-        //..
-        //...
-        //TODO
+        // Steps of the tick (GameplayTick.cpp runs them)
         void update_countdown_timer();
         void update_world();
 

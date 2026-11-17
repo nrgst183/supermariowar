@@ -86,6 +86,8 @@ if(NOT EMSCRIPTEN AND NOT XBOXOG)
 		editors/CoEdit.h
 		editors/EditorInput.cpp
 		editors/EditorInput.h
+		editors/EditorInputDraw.cpp
+		editors/EditorInputInternal.h
 		editors/EditorLauncher.cpp
 		editors/EditorLauncher.h
 		editors/EmbeddedLevelEditor.cpp

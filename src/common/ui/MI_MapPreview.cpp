@@ -1,11 +1,8 @@
 #include "MI_MapPreview.h"
 
-#include "Game.h"
 #include "GameValues.h"
-#include "gfx.h"
 #include "map.h"
 #include "MapList.h"
-#include "ObjectContainer.h"
 #include "path.h"
 #include "objecthazard.h"
 #include "ResourceManager.h"
@@ -17,13 +14,6 @@
 #include "objects/overmap/WO_StraightPathHazard.h"
 
 #include <cstring>
-
-
-#ifndef __EMSCRIPTEN__
-    inline void smallDelay() { SDL_Delay(10); }
-#else
-    inline void smallDelay() {}
-#endif
 
 MI_MapPreview::MI_MapPreview(gfxSprite * nspr, short x, short y, short width, short indent)
     : UI_Control(x, y)
@@ -118,25 +108,18 @@ void MI_MapPreview::LoadCurrentMap()
 void MI_MapPreview::LoadMap(const std::string& szMapPath)
 {
     g_map->loadMap(szMapPath, read_type_preview);
-    smallDelay(); //Sleeps to help the music from skipping
 
     LoadCurrentMapBackground();
-    smallDelay();
 
     g_map->preDrawPreviewBackground(rm->spr_background, surfaceMapBackground, false);
-    smallDelay();
 
     g_map->preDrawPreviewBlocks(surfaceMapBlockLayer, false);
-    smallDelay();
 
     g_map->preDrawPreviewMapItems(surfaceMapBackground, false);
-    smallDelay();
 
     g_map->preDrawPreviewForeground(surfaceMapForeground, false);
-    smallDelay();
 
     g_map->preDrawPreviewWarps(game_values.toplayer ? surfaceMapForeground : surfaceMapBackground, false);
-    smallDelay();
 
     LoadMapHazards(true);
 }
@@ -155,11 +138,6 @@ void MI_MapPreview::SetSpecialMap(const char * mapName, const char * szMapPath)
 
     //(a path below the data directory)
     LoadMap(convertPath(szMapPath));
-}
-
-std::string MI_MapPreview::GetMapFilePath() const
-{
-    return maplist->currentFilename();
 }
 
 void MI_MapPreview::SetDimensions(short width, short indent)

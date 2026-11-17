@@ -18,7 +18,6 @@ class MI_MenuPanel : public UI_Control {
 public:
     MI_MenuPanel(short x, short y, short w, short h, std::string title = {}, std::string note = {});
 
-    void SetSize(short w, short h);
     void SetTitle(std::string title, std::string note = {});
     void Draw() override;
 

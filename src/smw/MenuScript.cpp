@@ -57,7 +57,6 @@
 #include "menu/options/SoundOptionsMenu.h"
 #include "menu/options/TeamOptionsMenu.h"
 
-
 #include <format>
 #include <string>
 #include <cstdlib> // atoi()
@@ -103,28 +102,10 @@ void MenuState::LoadScript(const char * szScriptFile)
     iScriptState = 0;
 }
 
-void MenuState::ResetScript()
-{
-    std::vector<ScriptOperation*>::iterator itr = operations.begin();
-
-    while (itr != operations.end()) {
-        (*itr)->iTimesExecuted = 0;
-        itr++;
-    }
-
-    current = operations.begin();
-    iScriptState = 0;
-}
-
 void MenuState::GetNextScriptOperation()
 {
     if (AppState::Menu != game_values.appstate)
         return;
-
-    //static short slowdowntimer = 0;
-    //if (++slowdowntimer < 30)
-    //return;
-    //slowdowntimer = 0;
 
     if (iScriptState == 1) {
         if (mCurrentMenu == mGameSettingsMenu.get()) {
@@ -200,7 +181,6 @@ void MenuState::GetNextScriptOperation()
 
             if (--bonuswheelnext < 0) {
                 game_values.playerInput.outputControls[0].menu_select.fPressed = true;
-                //iScriptState = 3;
                 bonuswheelnext = COSMETIC_RANDOM_INT(200) + 300;
             }
             return;
@@ -348,6 +328,5 @@ void MenuState::SetNextScriptOperation()
         }
     }
 }
-
 
 #endif

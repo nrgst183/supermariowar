@@ -10,29 +10,28 @@ constexpr int GAMEMODE_NUM_OPTIONS = 21;
 
 class CPlayer;
 
-
 struct SModeOption {
-	std::string szName;
-	short iValue;
+    std::string szName;
+    short iValue;
 };
 
 //gamemode base class
 class CGameMode
 {
-	public:
+    public:
 
-		CGameMode();
+        CGameMode();
         virtual ~CGameMode();
 
-		virtual void init();  //called once when the game is started
-		virtual void think();	//called once a frame
-		virtual void draw_background() {}
-		virtual void draw_foreground() {}
-		//called when a player stomps another player, after the p2p logic has run
-		//returns true if the other was deleted
-		virtual PlayerKillType playerkilledplayer(CPlayer &inflictor, CPlayer &other, KillStyle style);
-		virtual PlayerKillType playerkilledself(CPlayer &player, KillStyle style);
-		virtual void playerextraguy(CPlayer &player, short iType);
+        virtual void init();  //called once when the game is started
+        virtual void think();	//called once a frame
+        virtual void draw_background() {}
+        virtual void draw_foreground() {}
+        //called when a player stomps another player, after the p2p logic has run
+        //returns true if the other was deleted
+        virtual PlayerKillType playerkilledplayer(CPlayer &inflictor, CPlayer &other, KillStyle style);
+        virtual PlayerKillType playerkilledself(CPlayer &player, KillStyle style);
+        virtual void playerextraguy(CPlayer &player, short iType);
 
     virtual PlayerKillType CheckWinner(CPlayer *) {
         return PlayerKillType::Normal;
@@ -42,16 +41,16 @@ class CGameMode
         return true;
     }
 
-		void displayplayertext();
-		void playwarningsound();
+        void displayplayertext();
+        void playwarningsound();
 
-		short winningteam = -1;
-		bool gameover = false;
+        short winningteam = -1;
+        bool gameover = false;
 
     GameModeType getgamemode() {
         return gamemode;
     }
-		GameModeType gamemode;
+        GameModeType gamemode;
 
     const std::string& GetModeName() const {
         return szModeName;
@@ -63,29 +62,28 @@ class CGameMode
         return modeOptions;
     }
 
-		bool playedwarningsound = false;
-		short goal = 0;
+        bool playedwarningsound = false;
+        short goal = 0;
 
-		short GetClosestGoal(short iGoal);
     bool GetReverseScoring() {
         return fReverseScoring;
     }
 
 #ifdef _DEBUG
-		virtual void setdebuggoal() {};
+        virtual void setdebuggoal() {};
 #endif
 
-	protected:
-		std::string szModeName;
-		std::string szGoalName;
-		SModeOption modeOptions[GAMEMODE_NUM_OPTIONS];
+    protected:
+        std::string szModeName;
+        std::string szGoalName;
+        SModeOption modeOptions[GAMEMODE_NUM_OPTIONS];
 
-		void SetupModeStrings(const char * szMode, const char * szGoal, short iGoalSpacing);
+        void SetupModeStrings(const char * szMode, const char * szGoal, short iGoalSpacing);
 
-		CPlayer * GetHighestScorePlayer(bool fGetHighest);
-		short GetScoreRankedPlayerList(CPlayer * players[4], bool fGetHighest);
+        CPlayer * GetHighestScorePlayer(bool fGetHighest);
+        short GetScoreRankedPlayerList(CPlayer * players[4], bool fGetHighest);
 
-		bool fReverseScoring = false;
+        bool fReverseScoring = false;
 };
 
 void RemovePlayersButTeam(short teamid);

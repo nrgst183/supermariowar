@@ -13,7 +13,6 @@
 
 namespace fs = std::filesystem;
 
-
 void UpdateMusicWithOverrides(MusicList& musiclist, WorldMusicList& worldmusiclist)
 {
     std::vector<MapMusicOverride> mapmusicoverrides;
@@ -198,7 +197,6 @@ bool SimpleFileList::find(const std::string& name)
     return false;
 }
 
-
 AnnouncerList::AnnouncerList()
     : SimpleFileList(convertPath("sfx/announcer/"), ".txt")
 {}
@@ -227,7 +225,6 @@ FiltersList::FiltersList()
     : SimpleFileList(convertPath("filters/"), ".txt")
 {}
 
-
 ///////////// SkinList ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 SkinList::SkinList()
 {
@@ -243,7 +240,6 @@ SkinList::SkinList()
     });
 }
 
-
 ///////////// SimpleDirectoryList ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 SimpleDirectoryList::SimpleDirectoryList(const fs::path& path)
 {
@@ -253,12 +249,10 @@ SimpleDirectoryList::SimpleDirectoryList(const fs::path& path)
     }
     if (m_filelist.empty()) {
         printf("ERROR: Empty directory.  %s\n", path.generic_string().c_str());
-        //exit(0);
     }
 
     m_index = 0;
 }
-
 
 ///////////// MusicList ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 MusicList::MusicList()
@@ -306,7 +300,6 @@ void MusicList::updateEntriesWithOverrides(const std::vector<MapMusicOverride>& 
         entry.updateWithOverrides(overrides);
     }
 }
-
 
 ///////////// MusicPack///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 MusicPack::MusicPack(std::string name)
@@ -460,7 +453,6 @@ std::optional<MusicPack> MusicPack::load(const fs::path& musicdirectory)
         }
     }
 
-
     return self;
 }
 
@@ -539,7 +531,6 @@ void MusicPack::updateWithOverrides(const std::vector<MapMusicOverride>& overrid
     }
 }
 
-
 ///////////// MusicList ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 WorldMusicList::WorldMusicList()
 {
@@ -576,7 +567,6 @@ void WorldMusicList::updateEntriesWithOverrides(const std::vector<WorldMusicOver
         entry.updateWithOverrides(overrides);
     }
 }
-
 
 ///////////// WorldMusicPack ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 WorldMusicPack::WorldMusicPack(std::string name)

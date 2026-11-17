@@ -7,7 +7,6 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_Text.h"
 
-
 UI_PlayerControlsSelectMenu::UI_PlayerControlsSelectMenu()
     : UI_Menu()
 {
@@ -34,10 +33,6 @@ UI_PlayerControlsSelectMenu::UI_PlayerControlsSelectMenu()
     miPlayerControlsBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miPlayerControlsBackButton->SetCode(MENU_CODE_TO_MAIN_MENU);
 
-    miPlayerControlsLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miPlayerControlsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miPlayerControlsMenuHeaderText = new MI_HeaderText("Player Controls Menu", 320, 5);
-
     AddControl(miPlayer1ControlsButton, miPlayerControlsBackButton, miPlayer2ControlsButton, nullptr, miPlayerControlsBackButton);
     AddControl(miPlayer2ControlsButton, miPlayer1ControlsButton, miPlayer3ControlsButton, nullptr, miPlayerControlsBackButton);
     AddControl(miPlayer3ControlsButton, miPlayer2ControlsButton, miPlayer4ControlsButton, nullptr, miPlayerControlsBackButton);
@@ -45,9 +40,7 @@ UI_PlayerControlsSelectMenu::UI_PlayerControlsSelectMenu()
     AddControl(miButtonPromptsField, miPlayer4ControlsButton, miPlayerControlsBackButton, nullptr, miPlayerControlsBackButton);
     AddControl(miPlayerControlsBackButton, miButtonPromptsField, miPlayer1ControlsButton, miButtonPromptsField, nullptr);
 
-    AddNonControl(miPlayerControlsLeftHeaderBar);
-    AddNonControl(miPlayerControlsMenuRightHeaderBar);
-    AddNonControl(miPlayerControlsMenuHeaderText);
+    AddTitleBar("Player Controls Menu");
 
     setInitialFocus(miPlayer1ControlsButton);
     SetCancelCode(MENU_CODE_TO_MAIN_MENU);

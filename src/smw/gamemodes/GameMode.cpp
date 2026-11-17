@@ -322,19 +322,3 @@ short CGameMode::GetScoreRankedPlayerList(CPlayer * outPlayers[4], bool fGetHigh
 
     return iNumPlayersInList;
 }
-
-short CGameMode::GetClosestGoal(short iGoal)
-{
-    short iDifference = 16000;
-    short iOptionValue = 0;
-
-    for (short iOption = 0; iOption < GAMEMODE_NUM_OPTIONS - 1; iOption++) {
-        short iDiff = abs(modeOptions[iOption].iValue - iGoal);
-        if (iDiff < iDifference) {
-            iOptionValue = modeOptions[iOption].iValue;
-            iDifference = iDiff;
-        }
-    }
-
-    return iOptionValue;
-}

@@ -215,11 +215,9 @@ void CGameValues::init()
     poweruppreset   = 0;
     tournamentcontrolstyle = TournamentControlStyle::All;
 
-
     pfFilters.resize(NUM_AUTO_FILTERS + filterslist->count(), false);
     piFilterIcons.resize(NUM_AUTO_FILTERS + filterslist->count(), 0);
     fNeedWriteFilters = false;
-
 
     for (short iPlayer = 0; iPlayer < 4; iPlayer++) {
         storedpowerups[iPlayer] = -1;
@@ -408,9 +406,6 @@ void CGameConfig::ReadBinaryConfig() {
 
         options.read_raw(&gamemodemenusettings, sizeof(GameModeSettings));
 
-        // FIXME: See WriteConfig
-        //fread_or_exception(&teamcounts, sizeof(short), 4, fp);
-        //fread_or_exception(&teamids, sizeof(short), 12, fp);
         options.read_raw(&skinids, sizeof(short) * 4);
         options.read_raw(&randomskin, sizeof(bool) * 4);
         options.read_raw(&playercontrol, sizeof(short) * 4);
@@ -531,7 +526,6 @@ void CGameConfig::WriteInputConfig() const {
     }
 }
 
-
 void CGameConfig::ReadTomlConfig() {
     const std::string config_path(GetOptionsTomlPath());
     try {
@@ -627,7 +621,6 @@ void CGameConfig::ReadTomlConfig() {
         printf("[config][warning] %s: %s\n", config_path.c_str(), error.what());
     }
 }
-
 
 void CGameConfig::WriteTomlConfig() const {
     const std::string config_path(GetOptionsTomlPath());

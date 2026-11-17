@@ -2,21 +2,20 @@
 
 #include "PowerupBlock.h"
 
-
 class B_ViewBlock : public B_PowerupBlock {
 public:
-	B_ViewBlock(gfxSprite *nspr, Vec2s pos, bool fHidden, const short * piSettings);
+    B_ViewBlock(gfxSprite *nspr, Vec2s pos, bool fHidden, const short * piSettings);
 
-	void draw() override;
-	void update() override;
-	short SelectPowerup() override;
+    void draw() override;
+    void update() override;
+    short SelectPowerup() override;
 
 protected:
-	void GetNextPowerup();
+    void GetNextPowerup();
 
-	short poweruptimer;
-	short powerupindex;
+    short poweruptimer;
+    short powerupindex;
 
-	bool fNoPowerupsSelected;
-	short iCountWeight;
+    bool fNoPowerupsSelected;
+    short iCountWeight;
 };

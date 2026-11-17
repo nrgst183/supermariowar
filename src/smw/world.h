@@ -26,26 +26,26 @@ inline constexpr int WORLD_FOREGROUND_SPRITE_ANIMATED_OFFSET = 900;
 enum class WorldMusicCategory : unsigned char;
 
 struct WorldMapTile {
-	//Id is used for searching for AI
-	short iID;
+    //Id is used for searching for AI
+    short iID;
 
-	short iType;
-	short iBackgroundWater;
-	short iBackgroundSprite;
-	short iForegroundSprite;
+    short iType;
+    short iBackgroundWater;
+    short iBackgroundSprite;
+    short iForegroundSprite;
 
-	short iConnectionType;
-	bool fConnection[4];
+    short iConnectionType;
+    bool fConnection[4];
 
-	short iWarp;
+    short iWarp;
 
-	short iCompleted;
-	bool fAnimated;
+    short iCompleted;
+    bool fAnimated;
 
-	short iCol;
-	short iRow;
+    short iCol;
+    short iRow;
 
-	short iVehicleBoundary;
+    short iVehicleBoundary;
 };
 
 class WorldMap {

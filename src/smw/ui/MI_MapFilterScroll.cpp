@@ -4,7 +4,6 @@
 #include "GSGameplay.h"
 #include "ResourceManager.h"
 
-
 MI_MapFilterScroll::MI_MapFilterScroll(gfxSprite* nspr, short x, short y, short width, short numlines)
     : UI_Control(x, y)
     , spr(nspr)
@@ -76,7 +75,6 @@ MenuCodeEnum MI_MapFilterScroll::SendInput(CPlayerInput* playerInput)
             return MENU_CODE_NONE;
         }
 
-
         if (playerInput->outputControls[iPlayer].menu_cancel.fPressed) {
             return MENU_CODE_MAP_FILTER_EXIT;
         }
@@ -84,7 +82,6 @@ MenuCodeEnum MI_MapFilterScroll::SendInput(CPlayerInput* playerInput)
 
     return MENU_CODE_NONE;
 }
-
 
 void MI_MapFilterScroll::Update()
 {}
@@ -94,7 +91,7 @@ void MI_MapFilterScroll::Draw()
     if (!m_visible)
         return;
 
-           //Draw the background for the map preview
+    //Draw the background for the map preview
     rm->menu_dialog.draw(m_pos.x, m_pos.y, {0, 0, iWidth - 16, iNumLines * 32 + 32});
     rm->menu_dialog.draw(m_pos.x + iWidth - 16, m_pos.y, {496, 0, 16, iNumLines * 32 + 32});
     rm->menu_dialog.draw(m_pos.x, m_pos.y + iNumLines * 32 + 32, {0, 464, iWidth - 16, 16});
@@ -102,7 +99,7 @@ void MI_MapFilterScroll::Draw()
 
     rm->menu_font_large.drawCentered(m_pos.x + (iWidth >> 1), m_pos.y + 5, "Map Filters");
 
-           //Draw each filter field
+    //Draw each filter field
     for (short iLine = 0; iLine < iNumLines && static_cast<unsigned short>(iLine) < items.size(); iLine++) {
         if (iOffset + iLine >= NUM_AUTO_FILTERS) {
             short iHalfLineWidth = (iWidth - 64) >> 1;

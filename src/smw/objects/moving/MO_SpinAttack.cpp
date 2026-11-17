@@ -9,7 +9,6 @@
 #include "objects/carriable/CO_ThrowBlock.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-
 //------------------------------------------------------------------------------
 // class spin death (spinning cape or tail)
 //------------------------------------------------------------------------------
@@ -30,17 +29,6 @@ bool MO_SpinAttack::collide(CPlayer* player)
 
     return MO_AttackZone::collide(player);
 }
-
-/*
-void MO_SpinAttack::draw()
-{
-        if (iTimer <= 11 && !dead)
-        {
-                SDL_Rect r = {ix, iy, collisionWidth, collisionHeight};
-                SDL_FillRect(blitdest, &r, 0xff00);
-        }
-}
-*/
 
 void MO_SpinAttack::update()
 {

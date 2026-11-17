@@ -1,33 +1,13 @@
-#include "ai.h"
 #include "CmdArgs.h"
 #include "player.h"
 
 #include "eyecandy.h"
 #include "GameValues.h"
-#include "gfx.h"
-#include "GSGameplay.h"
-#include "map.h"
 #include "movingplatform.h"
-#include "ObjectContainer.h"
-#include "objectgame.h"
-#include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
-#include "Resimulation.h"
 #include "SimulationState.h"
 #include "gamemodes/Chicken.h"
-#include "gamemodes/ShyGuyTag.h"
-#include "gamemodes/Star.h"
-#include "gamemodes/Tag.h"
-#include "IO_Block.h"
-#include "objects/carriable/CO_Bomb.h"
-#include "objects/carriable/CO_Shell.h"
 #include "objects/carriable/CO_KuriboShoe.h"
-#include "objects/moving/MO_Boomerang.h"
-#include "objects/moving/MO_Explosion.h"
-#include "objects/moving/MO_Fireball.h"
-#include "objects/moving/MO_Hammer.h"
-#include "objects/moving/MO_IceBlast.h"
-#include "objects/moving/MO_Podobo.h"
 #include "rollback/MatchConfig.h"
 
 #include <cassert>
@@ -130,7 +110,6 @@ CScore& CPlayer::Score() {
 void CPlayer::SetCorpseType(short type) {
     diedas = type;
 }
-
 
 void CPlayer::update_waitingForRespawn()
 {
@@ -327,7 +306,6 @@ void CPlayer::SetupNewPlayer()
     StripPowerups();
     ClearPowerupStates();
 
-
     cape.reset(*this);
 
     frictionslidetimer = 0;
@@ -375,16 +353,7 @@ void CPlayer::StripPowerups()
 
 bool CPlayer::FindSpawnPoint()
 {
-    //Spawn the player at his flagbase if it is CTF
-    //if (game_values.gamemode->gamemode == game_mode_ctf && teamID < g_map->iNumFlagBases)
-    //{
-    //	ix = g_map->flagbaselocations[teamID].x + 16 - HALFPW;
-    //	iy = g_map->flagbaselocations[teamID].y + 16 - HALFPH;
-    //}
-    //else
-    //{
     bool fRet = g_map->findspawnpoint(teamID + 1, &ix, &iy, PW, PH, false);
-    //}
 
     fx = static_cast<float>(ix);
     fy = static_cast<float>(iy);

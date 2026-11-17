@@ -3,9 +3,11 @@
 #include "GameValues.h" // UI_Menu::SendInput
 #include "GSGameplay.h"
 #include "uicontrol.h"
+#include "ResourceManager.h"
+#include "ui/MI_Image.h"
+#include "ui/MI_Text.h"
 
 #include <cassert>
-
 
 namespace {
 constexpr MenuCodeEnum navDir2menuCode(MenuNavDirection direction)
@@ -21,7 +23,6 @@ constexpr MenuCodeEnum navDir2menuCode(MenuNavDirection direction)
 }
 } // namespace
 
-
 void UI_Menu::AddControl(UI_Control* control, UI_Control* up, UI_Control* down, UI_Control* left, UI_Control* right)
 {
     control->setParent(this);
@@ -36,6 +37,13 @@ void UI_Menu::AddNonControl(UI_Control* control)
 {
     control->setParent(this);
     controls.emplace_back(control);
+}
+
+void UI_Menu::AddTitleBar(const std::string& title)
+{
+    AddNonControl(new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0));
+    AddNonControl(new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0));
+    AddNonControl(new MI_HeaderText(title, 320, 5));
 }
 
 void UI_Menu::setInitialFocus(UI_Control* control)

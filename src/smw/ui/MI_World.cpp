@@ -16,7 +16,6 @@
 #include <format>
 #include <string>
 
-
 MI_World::MI_World()
     : UI_Control(0, 0)
 {
@@ -146,7 +145,7 @@ void MI_World::SetCurrentStageToCompleted(short iWinningTeam)
         game_values.tournament_scores[iWinningTeam].total += game_values.tourstops[tile->iType - 6]->iPoints * iBonusMult + iBonusAdd;
     }
 
-           //Only advance the turn if the players played a real game, no bonus houses
+    //Only advance the turn if the players played a real game, no bonus houses
     if (game_values.singleplayermode == -1)
         AdvanceTurn();
 }
@@ -164,8 +163,8 @@ void MI_World::AdvanceTurn()
 
     g_worldmap.MoveBridges();
 
-           //Update the map with the flipped bridges
-           //TODO:: Need to update just bridge tiles across both surfaces
+    //Update the map with the flipped bridges
+    //TODO:: Need to update just bridge tiles across both surfaces
 
     fNoInterestingMoves = false;
 }
@@ -206,7 +205,7 @@ void MI_World::Update()
         }
     }
 
-           //Player is moving from one tile to the next (up)
+    //Player is moving from one tile to the next (up)
     if (iPlayerState == 1) {
         if (g_worldmap.getHeight() > 15 && iMapOffsetY < 0 && iPlayerDrawPos.y < (g_worldmap.getHeight() << 5) - (App::screenHeight * 0.53f))
             iMapOffsetY += 2;
@@ -258,7 +257,7 @@ void MI_World::Update()
                     iItemPopupDrawY[iTeam] = 0;
                     iStateTransition[iTeam] = 0;
 
-                           //Shift down popup menus if one was removed that was below
+                    //Shift down popup menus if one was removed that was below
                     bool fStartShift = false;
                     for (short iMoveTeam = 0; iMoveTeam < iNumPopups - 1; iMoveTeam++) {
                         if (iPopupOrder[iMoveTeam] == iTeam) {
@@ -297,7 +296,6 @@ void MI_World::Update()
     else if (!iShowStoredItems && iStoredItemPopupDrawY > -48)
         iStoredItemPopupDrawY -= 8;
 
-
     if (iState == 4 || iState == 5) {
         iScreenfade += iScreenfadeRate;
 
@@ -306,8 +304,8 @@ void MI_World::Update()
             SetMapOffset();
             RepositionMapImage();
 
-                   //These 3 lines allow us to only refresh the entire map to one surface and sets it up so that the
-                   //other surface will update with the normal flow
+            //These 3 lines allow us to only refresh the entire map to one surface and sets it up so that the
+            //other surface will update with the normal flow
             iCurrentSurfaceIndex = 0;
             iCycleIndex = 0;
             g_worldmap.ResetDrawCycle();
@@ -315,7 +313,6 @@ void MI_World::Update()
             iDrawFullRefresh = 2; //Draw one full refresh to next surface
 
             g_worldmap.DrawMapToSurface(-1, true, map_sprites[0].getSurface(), iMapDrawOffsetCol, iMapDrawOffsetRow, iAnimationFrame);
-            //g_worldmap.DrawMapToSurface(-1, true, map_sprites[1].getSurface(), iMapDrawOffsetCol, iMapDrawOffsetRow, iAnimationFrame);
 
             iState = 5;
             iScreenfade = 255;
@@ -387,7 +384,6 @@ void MI_World::RepositionMapImage()
     iNextMapDrawOffsetRow = iMapDrawOffsetRow;
 }
 
-
 void MI_World::Draw()
 {
     if (!m_visible)
@@ -406,19 +402,19 @@ void MI_World::Draw()
 
     map_sprites[iCurrentSurfaceIndex].draw(rectSrcSurface, blitdest, rectDstSurface);
 
-           //Draw the world, vehicles and player
+    //Draw the world, vehicles and player
     g_worldmap.Draw(iMapOffsetX, iMapOffsetY, iState == -1 && !fUsingCloud, iSleepTurns > 0);
 
-           //Draw the cloud if the player is one
+    //Draw the cloud if the player is one
     if (fUsingCloud && iState == -1)
         rm->spr_worlditems.draw(iPlayerDrawPos.x + iMapOffsetX, iPlayerDrawPos.y + iMapOffsetY, {32, 0, 32, 32});
 
-           //If a points modifier is in place, display it
+    //If a points modifier is in place, display it
     if (game_values.worldpointsbonus >= 0) {
         rm->spr_worlditems.draw(603, 5, {(game_values.worldpointsbonus + 9) << 5, 0, 32, 32});
     }
 
-           //Draw the teleport/warp stars effect
+    //Draw the teleport/warp stars effect
     if (iState == -2 || iState >= 4) {
         for (short iStar = 0; iStar < 10; iStar++) {
             float dAngle = dTeleportStarAngle + (TWO_PI / 10.0f) * static_cast<float>(iStar);
@@ -429,7 +425,7 @@ void MI_World::Draw()
         }
     }
 
-           //If the item selector for a player is displayed
+    //If the item selector for a player is displayed
     if (iNumPopups > 0) {
         //Draw Spots and Stored Powerups
         short iPlayerCount = 0;
@@ -488,7 +484,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
     if (g_worldmap.IsVehicleMoving())
         return MENU_CODE_NONE;
 
-           //If the player and a vehicle collided, force the start of that level
+    //If the player and a vehicle collided, force the start of that level
     if (fForceStageStart) {
         iState = -1;
 
@@ -505,7 +501,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
 
     short iPlayerState = g_worldmap.GetPlayerState();
 
-           //Handle AI movement
+    //Handle AI movement
     bool fNeedAiControl = false;
     if (iState == -1 && iPlayerState == 0 && iNumPopups == 0) {
         if (!fNoInterestingMoves) {
@@ -523,7 +519,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
                     const Vec2s iPlayerCurrentTile = g_worldmap.GetPlayerCurrentTile();
                     short iNextMove = g_worldmap.GetNextInterestingMove(iPlayerCurrentTile.x, iPlayerCurrentTile.y);
 
-                           //Clear out all input from cpu controlled team
+                    //Clear out all input from cpu controlled team
                     COutputControl * playerKeys = nullptr;
                     short iTeamMember;
                     for (iTeamMember = 0; iTeamMember < game_values.teamcounts[iControllingTeam]; iTeamMember++) {
@@ -538,20 +534,19 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
 
                         if (iControllingTeam != 0)
                             playerKeys->menu_cancel.fPressed = false;
-
                     }
 
                     playerKeys = &game_values.playerInput.outputControls[game_values.teamids[iControllingTeam][0]];
 
-                           //If there are no AI moves to make
+                    //If there are no AI moves to make
                     if (iNextMove == -1) {
                         bool fUsedItem = false;
 
-                               //See if we are touching a door
+                        //See if we are touching a door
                         bool fDoor[4] = {false, false, false, false};
                         g_worldmap.IsTouchingDoor(iPlayerCurrentTile.x, iPlayerCurrentTile.y, fDoor);
 
-                               //See if we can use a key to keep going
+                        //See if we can use a key to keep going
                         for (short iPowerup = 0; iPowerup < game_values.worldpowerupcount[iControllingTeam]; iPowerup++) {
                             short iType = game_values.worldpowerups[iControllingTeam][iPowerup];
 
@@ -563,7 +558,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
                             }
                         }
 
-                               //if not, flag that there are no moves to make
+                        //if not, flag that there are no moves to make
                         fNoInterestingMoves = !fUsedItem;
                     }
                     if (iNextMove == 0)
@@ -618,7 +613,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
 
                         ifSoundOnPlay(rm->sfx_worldmove);
 
-                               //Start draw cycle over
+                        //Start draw cycle over
                         RestartDrawCycleIfNeeded();
                     } else {
                         if (playerKeys->menu_up.fPressed)
@@ -635,7 +630,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
 
                         iReturnDirection = 0;
 
-                               //Start draw cycle over
+                        //Start draw cycle over
                         RestartDrawCycleIfNeeded();
 
                         ifSoundOnPlay(rm->sfx_worldmove);
@@ -654,7 +649,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
 
                         iReturnDirection = 3;
 
-                               //Start draw cycle over
+                        //Start draw cycle over
                         RestartDrawCycleIfNeeded();
 
                         ifSoundOnPlay(rm->sfx_worldmove);
@@ -675,7 +670,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
 
                         iReturnDirection = 2;
 
-                               //Start draw cycle over
+                        //Start draw cycle over
                         RestartDrawCycleIfNeeded();
 
                         ifSoundOnPlay(rm->sfx_worldmove);
@@ -693,7 +688,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
                         return InitGame(iStage, iPlayer, fNeedAiControl);
                     }
 
-                           //if it is a stage, then load the stage
+                    //if it is a stage, then load the stage
                     WorldMapTile * tile = &g_worldmap.getTile(iPlayerCurrentTile.x, iPlayerCurrentTile.y);
 
                     short iType = tile->iType - 6;
@@ -821,7 +816,7 @@ void MI_World::RestartDrawCycleIfNeeded()
             iNextMapDrawOffsetRow = g_worldmap.getHeight() - 19;
     }
 
-           //Reset the draw cycle if the map offset col/row is going to move
+    //Reset the draw cycle if the map offset col/row is going to move
     if (iMapDrawOffsetCol != iNextMapDrawOffsetCol || iMapDrawOffsetRow != iNextMapDrawOffsetRow) {
         iCycleIndex = 0;
         g_worldmap.ResetDrawCycle();
@@ -837,14 +832,7 @@ bool MI_World::UsePowerup(short iPlayer, short iTeam, short iIndex, bool fPopupI
     bool fUsedItem = false;
 
     if (iPowerup < NUM_POWERUPS) {
-        /*
-        //Comment this in to give the powerup to all members of the team
-        for (short iPlayer = 0; iPlayer < game_values.teamcounts[iTeam]; iPlayer++)
-        {
-            game_values.storedpowerups[game_values.teamids[iTeam][iPlayer]] = iPowerup;
-        }*/
-
-               //Give the powerup only to the player that selected it
+        //Only to the player that selected it (not the whole team)
         game_values.storedpowerups[iPlayer] = iPowerup;
 
         ifSoundOnPlay(rm->sfx_collectpowerup);
@@ -966,7 +954,7 @@ MenuCodeEnum MI_World::InitGame(short iStage, short iPlayer, bool fNeedAiControl
     if (fBonusHouse)
         game_values.singleplayermode = iPlayer;
 
-           //If player was trying to get to his inventory menu, cancel that because a game is about to start
+    //If player was trying to get to his inventory menu, cancel that because a game is about to start
     for (short iTeam = 0; iTeam < 4; iTeam++)
         iPopupFlag[iTeam] = false;
 

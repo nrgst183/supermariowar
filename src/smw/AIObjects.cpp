@@ -1,25 +1,15 @@
-#include "ai.h"
 #include "AINav.h"
 
 #include "GameValues.h"
-#include "input.h"
-#include "map.h"
 #include "movingplatform.h"
-#include "ObjectContainer.h"
-#include "player.h"
-#include "RandomNumberGenerator.h"
 #include "SimulationState.h"
 #include "gamemodes/Chicken.h"
 #include "gamemodes/Race.h"
 #include "gamemodes/Star.h"
-#include "gamemodes/Tag.h"
 #include "objects/IO_FlameCannon.h"
 #include "objects/blocks/PowerupBlock.h"
 
-#include "objects/moving/MO_BonusHouseChest.h"
 #include "objects/moving/MO_Boomerang.h"
-#include "objects/moving/MO_CarriedObject.h"
-#include "objects/moving/MO_Coin.h"
 #include "objects/moving/MO_CollectionCard.h"
 #include "objects/moving/MO_Explosion.h"
 #include "objects/moving/MO_Fireball.h"
@@ -31,13 +21,10 @@
 #include "objects/moving/MO_Yoshi.h"
 
 #include "objects/carriable/CO_Flag.h"
-#include "objects/carriable/CO_Spring.h"
 #include "objects/carriable/CO_Bomb.h"
 #include "objects/carriable/CO_Egg.h"
-#include "objects/carriable/CO_PhantoKey.h"
 #include "objects/carriable/CO_Shell.h"
 #include "objects/carriable/CO_Star.h"
-#include "objects/carriable/CO_ThrowBlock.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
 #include "objects/overmap/WO_Area.h"
@@ -46,32 +33,6 @@
 #include "objects/overmap/WO_PipeCoin.h"
 #include "objects/overmap/WO_RaceGoal.h"
 
-#include "objects/powerup/PU_BobombPowerup.h"
-#include "objects/powerup/PU_BombPowerup.h"
-#include "objects/powerup/PU_BoomerangPowerup.h"
-#include "objects/powerup/PU_BulletBillPowerup.h"
-#include "objects/powerup/PU_ClockPowerup.h"
-#include "objects/powerup/PU_CoinPowerup.h"
-#include "objects/powerup/PU_ExtraGuyPowerup.h"
-#include "objects/powerup/PU_ExtraHeartPowerup.h"
-#include "objects/powerup/PU_ExtraTimePowerup.h"
-#include "objects/powerup/PU_FeatherPowerup.h"
-#include "objects/powerup/PU_FirePowerup.h"
-#include "objects/powerup/PU_HammerPowerup.h"
-#include "objects/powerup/PU_IceWandPowerup.h"
-#include "objects/powerup/PU_JailKeyPowerup.h"
-#include "objects/powerup/PU_LeafPowerup.h"
-#include "objects/powerup/PU_ModPowerup.h"
-#include "objects/powerup/PU_MysteryMushroomPowerup.h"
-#include "objects/powerup/PU_PodoboPowerup.h"
-#include "objects/powerup/PU_PoisonPowerup.h"
-#include "objects/powerup/PU_PowPowerup.h"
-#include "objects/powerup/PU_PWingsPowerup.h"
-#include "objects/powerup/PU_SecretPowerup.h"
-#include "objects/powerup/PU_StarPowerup.h"
-#include "objects/powerup/PU_Tanooki.h"
-#include "objects/powerup/PU_TreasureChestBonus.h"
-
 #include <memory>
 #include <cstdlib> // abs()
 
@@ -79,15 +40,23 @@ void CPlayerAI::GetNearestObjects()
 {
     nearestObjects.Reset();
 
+    ScanMiddleLayerObjects();
+    ScanBackLayerObjects();
+    ScanFrontLayerObjects();
+    ScanPlayers();
+    ScanPowerupBlocks();
+}
+
+// GetNearestObjects(): the middle layer's objects (most items and enemies)
+void CPlayerAI::ScanMiddleLayerObjects()
+{
     MO_CarriedObject * carriedItem = pPlayer->carriedItem;
     bool fInvincible = pPlayer->isInvincible() || pPlayer->isShielded() || pPlayer->shyguy;
     short iTeamID = pPlayer->teamID;
-
     std::map<int, AttentionObject*>::iterator lim = attentionObjects.end();
 
     for (const std::unique_ptr<CObject>& obj : g_sim.objectcontainer[1].list()) {
         if (attentionObjects.find(obj->networkId()) != lim) {
-            //DistanceToObject(object, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
             continue;
         }
 
@@ -279,10 +248,18 @@ void CPlayerAI::GetNearestObjects()
         }
         }
     }
+}
+
+// GetNearestObjects(): the back layer's objects
+void CPlayerAI::ScanBackLayerObjects()
+{
+    MO_CarriedObject * carriedItem = pPlayer->carriedItem;
+    bool fInvincible = pPlayer->isInvincible() || pPlayer->isShielded() || pPlayer->shyguy;
+    short iTeamID = pPlayer->teamID;
+    std::map<int, AttentionObject*>::iterator lim = attentionObjects.end();
 
     for (const std::unique_ptr<CObject>& obj : g_sim.objectcontainer[0].list()) {
         if (attentionObjects.find(obj->networkId()) != lim) {
-            //DistanceToObject(object, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
             continue;
         }
 
@@ -342,10 +319,18 @@ void CPlayerAI::GetNearestObjects()
         }
         }
     }
+}
+
+// GetNearestObjects(): the front layer's objects
+void CPlayerAI::ScanFrontLayerObjects()
+{
+    MO_CarriedObject * carriedItem = pPlayer->carriedItem;
+    bool fInvincible = pPlayer->isInvincible() || pPlayer->isShielded() || pPlayer->shyguy;
+    short iTeamID = pPlayer->teamID;
+    std::map<int, AttentionObject*>::iterator lim = attentionObjects.end();
 
     for (const std::unique_ptr<CObject>& obj : g_sim.objectcontainer[2].list()) {
         if (attentionObjects.find(obj->networkId()) != lim) {
-            //DistanceToObject(object, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
             continue;
         }
 
@@ -422,13 +407,18 @@ void CPlayerAI::GetNearestObjects()
             break;
         }
 
-
         default: {
             DistanceToObject(obj.get(), &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
             break;
         }
         }
     }
+}
+
+// GetNearestObjects(): the other players
+void CPlayerAI::ScanPlayers()
+{
+    short iTeamID = pPlayer->teamID;
 
     auto* gmChicken = dynamic_cast<CGM_Chicken*>(game_values.gamemode);
 
@@ -455,6 +445,12 @@ void CPlayerAI::GetNearestObjects()
 
         DistanceToPlayer(g_sim.players[iPlayer], &nearestObjects.player, &nearestObjects.playerdistance, &nearestObjects.playerwrap);
     }
+}
+
+// GetNearestObjects(): the ? blocks (improved CPUs)
+void CPlayerAI::ScanPowerupBlocks()
+{
+    std::map<int, AttentionObject*>::iterator lim = attentionObjects.end();
 
     //The ? blocks ready to give a power-up: a goal too (hit from the spot under them), a little
     //ahead of other things as far away: the power-ups are what the bots were missing out on
@@ -536,7 +532,6 @@ void CPlayerAI::DistanceToObjectCenter(CObject * object, CObject ** target, int 
         *wrap = fScreenWrap;
     }
 }
-
 
 void CPlayerAI::DistanceToPlayer(CPlayer * player, CPlayer ** target, int * nearest, bool * wrap)
 {

@@ -3,9 +3,7 @@
 #include "eyecandy.h"
 #include "GameMode.h"
 #include "GameValues.h"
-#include "gfx.h"
 #include "IO_Block.h"
-#include "map.h"
 #include "movingplatform.h"
 #include "player.h"
 #include "ResourceManager.h"
@@ -16,7 +14,6 @@
 #include "objects/carriable/CO_Star.h"
 #include "objects/carriable/CO_ThrowBox.h"
 #include "objects/moving/MO_Coin.h"
-
 
 //------------------------------------------------------------------------------
 // class MovingObject (all moving objects inheirit from this class)
@@ -82,12 +79,10 @@ IO_MovingObject::IO_MovingObject(gfxSprite* nspr, Vec2s pos, short iNumSpr, shor
     bounce = GRAVITATION;
 }
 
-
 void IO_MovingObject::draw()
 {
     spr->draw(ix - collisionOffsetX, iy - collisionOffsetY, {drawframe, animationOffsetY, iw, ih});
 }
-
 
 void IO_MovingObject::update()
 {
@@ -200,7 +195,6 @@ void IO_MovingObject::collision_detection_map()
     short ty = static_cast<short>(fy) / TILESIZE;
     short ty2 = (static_cast<short>(fy) + collisionHeight) / TILESIZE;
     short tx = -1;
-
 
     //-----------------------------------------------------------------
     //  x axis first (--)
@@ -445,7 +439,7 @@ void IO_MovingObject::collision_detection_map()
             }
         }
 
-        bool fSuperDeathTileUnderObject = fObjectDiesOnSuperDeathTiles && (((leftTile & tile_flag_super_death_top) && (rightTile & tile_flag_super_death_top)) || ((leftTile & tile_flag_super_death_top) && !(rightTile & tile_flag_solid)) || (!(leftTile & tile_flag_solid) && (rightTile & tile_flag_super_death_top)));
+        bool fSuperDeathTileUnderObject = fObjectDiesOnSuperDeathTiles && (pairIsDeadly(leftTile, rightTile, tile_flag_super_death_top));
 
         if (((leftTile & tile_flag_solid) || (rightTile & tile_flag_solid)) && !fSuperDeathTileUnderObject) {
             vely = BottomBounce();

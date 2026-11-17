@@ -40,11 +40,11 @@ WorldMapTile	copiedtiles[MAPWIDTH][MAPHEIGHT];
 int				mouse_x, mouse_y;
 
 int bound_to_window_w(int x) {
-	return std::max(0, std::min(x, 640 - 1));
+    return std::max(0, std::min(x, 640 - 1));
 }
 
 int bound_to_window_h(int y) {
-	return std::max(0, std::min(y, 480 - 1));
+    return std::max(0, std::min(y, 480 - 1));
 }
 
 void bound_mouse_motion_coords() {
@@ -133,7 +133,6 @@ sfxSound		sfx_transform;
 gfxSprite		**spr_player[4];
 CGameMode		*gamemodes[GAMEMODE_LAST];
 
-
 gfxSprite		spr_overlay, spr_overlayhole;
 
 void SDLCALL musicfinished(void*, MIX_Track* rawptr){}
@@ -143,7 +142,6 @@ gfxSprite		spr_frontmap[2];
 
 SimulationState g_sim;
 CPlayer::~CPlayer() {}
-
 
 short LookupTeamID(short id)
 {
@@ -155,7 +153,6 @@ gfxSprite		spr_poof;
 void CScore::AdjustScore(short iValue) {}
 #endif
 ///////
-
 
 bool CheckKey(const bool* keystate, SDL_Keycode key) {
     return keystate[SDL_GetScancodeFromKey(key, nullptr)];

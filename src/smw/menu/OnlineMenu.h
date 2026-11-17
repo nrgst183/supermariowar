@@ -38,9 +38,6 @@ private:
     MI_Button* miJoinButton;
     MI_Button* miBackButton;
 
-    MI_Image* miLeftHeaderBar;
-    MI_Image* miRightHeaderBar;
-    MI_Text* miHeaderText;
     MI_WrappedText* miMessage;
     MI_PromptStrip* miPrompts;
 };

@@ -203,7 +203,6 @@ class MI_ProgressBar : public UI_Control {
 public:
     MI_ProgressBar(short x, short y, short width, short height);
 
-    void SetFraction(float fraction);
     void Draw() override;
 
 private:

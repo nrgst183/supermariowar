@@ -25,13 +25,6 @@ using std::endl;
 #include <sys/stat.h>
 #endif
 
-#ifndef __EMSCRIPTEN__
-    inline void smallDelay() { SDL_Delay(10); }
-#else
-    inline void smallDelay() {}
-#endif
-
-
 gfxSprite CMap::createThumbnailSurface(bool fUseClassicPack)
 {
     gfxSprite sThumbnail = gfxSprite::blank(160, 120);
@@ -148,20 +141,12 @@ void CMap::preDrawPreviewMapItems(gfxSprite& targetSurface, bool fThumbnail)
 void CMap::preDrawPreviewBackground(gfxSprite& targetSurface, bool fThumbnail)
 {
     drawPreview(targetSurface, 0, fThumbnail);
-    smallDelay(); //Sleeps to help the music from skipping
-
     drawPreview(targetSurface, 1, fThumbnail);
-    smallDelay();
 
     if (!game_values.toplayer) {
         drawPreview(targetSurface, 2, fThumbnail);
-        smallDelay();
-
         drawPreview(targetSurface, 3, fThumbnail);
-        smallDelay();
     }
-
-    //drawPreviewBlocks(targetSurface, fThumbnail);
 }
 
 void CMap::preDrawPreviewBackground(const gfxSprite& background, gfxSprite& targetSurface, bool fThumbnail)
@@ -169,7 +154,7 @@ void CMap::preDrawPreviewBackground(const gfxSprite& background, gfxSprite& targ
     SDL_Rect srcrect;
     srcrect.x = 0;
     srcrect.y = 0;
-	srcrect.w = App::screenWidth;
+    srcrect.w = App::screenWidth;
     srcrect.h = App::screenHeight;
 
     SDL_Rect dstrect;
@@ -180,13 +165,12 @@ void CMap::preDrawPreviewBackground(const gfxSprite& background, gfxSprite& targ
         dstrect.w = 160;
         dstrect.h = 120;
     } else {
-		dstrect.w = App::screenWidth/2;
+        dstrect.w = App::screenWidth/2;
         dstrect.h = App::screenHeight/2;
     }
 
     background.drawStretch(srcrect, targetSurface.getSurface(), dstrect);
 
-    smallDelay();
     preDrawPreviewBackground(targetSurface, fThumbnail);
 }
 
@@ -195,26 +179,22 @@ void CMap::preDrawPreviewBlocks(gfxSprite& targetSurface, bool fThumbnail)
     if (!fThumbnail) {
         SDL_FillSurfaceRect(targetSurface.getSurface(), nullptr, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
         SDL_SetSurfaceColorKey(targetSurface.getSurface(), true, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
-        smallDelay();
     }
 
     drawPreviewBlocks(targetSurface, fThumbnail);
 }
-
 
 void CMap::preDrawPreviewForeground(gfxSprite& targetSurface, bool fThumbnail)
 {
     if (!fThumbnail) {
         SDL_FillSurfaceRect(targetSurface.getSurface(), nullptr, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
         SDL_SetSurfaceColorKey(targetSurface.getSurface(), true, SDL_MapSurfaceRGB(targetSurface.getSurface(), 255, 0, 255));
-        smallDelay();
     }
 
     if (!game_values.toplayer)
         return;
 
     drawPreview(targetSurface, 2, fThumbnail);
-    smallDelay();
     drawPreview(targetSurface, 3, fThumbnail);
 }
 
@@ -314,8 +294,8 @@ void CMap::predrawbackground(gfxSprite &background, gfxSprite &mapspr)
     SDL_Rect r;
     r.x = 0;
     r.y = 0;
-	r.w = App::screenWidth;
-	r.h = App::screenHeight;
+    r.w = App::screenWidth;
+    r.h = App::screenHeight;
 
     background.draw(mapspr.getSurface(), r);
 

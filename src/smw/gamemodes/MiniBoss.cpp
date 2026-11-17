@@ -12,7 +12,6 @@
 #include "objects/walkingenemy/WE_Koopa.h"
 #include "Score.h"
 
-
 //Boss Mode
 //Person to score fatal hit to boss wins!
 CGM_Boss_MiniGame::CGM_Boss_MiniGame() : CGameMode()
@@ -35,7 +34,6 @@ void CGM_Boss_MiniGame::init()
 
     g_sim.objectcontainer[0].add(new MO_SledgeBrother(&rm->spr_sledgebrothers, (iBossType == Boss::Hammer ? 256 : (iBossType == Boss::Bomb ? 256 : App::screenWidth/2)), iBossType));
 }
-
 
 void CGM_Boss_MiniGame::think()
 {
@@ -62,7 +60,6 @@ void CGM_Boss_MiniGame::think()
                 enemytimer = static_cast<short>(RANDOM_INT(120)) + 120;  //Spawn koopas slowly
             }
         } else if (iBossType == Boss::Bomb) {
-
         } else if (iBossType == Boss::Fire) {
             //Only create podobos if the difficulty is moderate or greater
             if (--enemytimer <= 0 && game_values.gamemodesettings.boss.difficulty >= 2) {
@@ -184,17 +181,6 @@ bool CGM_Boss_MiniGame::SetWinner(CPlayer * player)
 
         rm->backgroundmusic[1].play(true, false);
     }
-
-    //game_values.noexit = true;
-
-    /*
-    if (iBossType == 0)
-        objectcontainer[0].add(new PU_SledgeHammerPowerup(&rm->spr_sledgehammerpowerup, 304, -32, 1, 0, 30, 30, 1, 1));
-    else if (iBossType == 1)
-        objectcontainer[0].add(new PU_BombPowerup(&rm->spr_bombpowerup, 304, -32, 1, 0, 30, 30, 1, 1));
-    else if (iBossType == 2)
-        objectcontainer[0].add(new PU_PodoboPowerup(&rm->spr_podobopowerup, 304, -32, 1, 0, 30, 30, 1, 1));
-    */
 
     return true;
 }

@@ -7,7 +7,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-
 UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     : UI_Menu()
 {
@@ -188,10 +187,6 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miProjectileOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miProjectileOptionsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
-    miProjectileOptionsMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miProjectileOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miProjectileOptionsMenuHeaderText = new MI_HeaderText("Projectile & Weapon Options Menu", 320, 5);
-
     miFireballText = new MI_Text("Fireball", 10, 50, 0, true, TextAlign::LEFT);
     miFeatherText = new MI_Text("Feather", 10, 120, 0, true, TextAlign::LEFT);
     miBoomerangText = new MI_Text("Boomerang", 10, 190, 0, true, TextAlign::LEFT);
@@ -229,9 +224,7 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     AddNonControl(miWandText);
     AddNonControl(miBlueBlockText);
 
-    AddNonControl(miProjectileOptionsMenuLeftHeaderBar);
-    AddNonControl(miProjectileOptionsMenuRightHeaderBar);
-    AddNonControl(miProjectileOptionsMenuHeaderText);
+    AddTitleBar("Projectile & Weapon Options Menu");
 
     setInitialFocus(miFireballLifeField);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);

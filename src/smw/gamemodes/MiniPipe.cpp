@@ -10,7 +10,6 @@
 #include "objects/overmap/WO_PipeCoin.h"
 #include "Score.h"
 
-
 //Pipe Bonus Mini Game (used in world mode)
 //Collect coins and powerups that come out of a pipe
 CGM_Pipe_MiniGame::CGM_Pipe_MiniGame() : CGameMode()
@@ -33,7 +32,6 @@ void CGM_Pipe_MiniGame::init()
     iBonusTeam = 0;
     fSlowdown = false;
 }
-
 
 void CGM_Pipe_MiniGame::think()
 {
@@ -88,13 +86,11 @@ void CGM_Pipe_MiniGame::think()
 
 PlayerKillType CGM_Pipe_MiniGame::playerkilledplayer(CPlayer &player, CPlayer &other, KillStyle style)
 {
-    //other.Score().AdjustScore(-2);
     return PlayerKillType::Normal;
 }
 
 PlayerKillType CGM_Pipe_MiniGame::playerkilledself(CPlayer &player, KillStyle style)
 {
-    //player.Score().AdjustScore(-2);
     return PlayerKillType::Normal;
 }
 

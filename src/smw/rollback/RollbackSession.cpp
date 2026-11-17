@@ -24,18 +24,6 @@ int32_t msDiff(uint32_t a, uint32_t b)
 }
 } // namespace
 
-const char* stallReasonName(StallReason reason)
-{
-    switch (reason) {
-        case StallReason::None: return "none";
-        case StallReason::WaitingForInputs: return "waiting for inputs";
-        case StallReason::TimeSync: return "time sync";
-        case StallReason::Barrier: return "barrier";
-        case StallReason::Ended: return "ended";
-    }
-    return "?";
-}
-
 RollbackSession::RollbackSession(const SessionConfig& config, ITransport& transport, ISessionCallbacks& callbacks, uint32_t nowMs)
     : m_config(config)
     , m_transport(transport)

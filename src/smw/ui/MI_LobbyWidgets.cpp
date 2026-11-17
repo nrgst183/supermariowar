@@ -608,11 +608,6 @@ MI_ProgressBar::MI_ProgressBar(short x, short y, short width, short height)
     , m_height(height)
 {}
 
-void MI_ProgressBar::SetFraction(float fraction)
-{
-    m_fraction = std::clamp(fraction, 0.0f, 1.0f);
-}
-
 void MI_ProgressBar::Draw()
 {
     if (!m_visible)

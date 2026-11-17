@@ -14,7 +14,6 @@
 
 namespace fs = std::filesystem;
 
-
 namespace {
 // A constant transparency made part of the picture: the color key becomes transparent pixels and
 // every pixel's alpha is scaled by `alpha`. SDL blits per-pixel alpha with its fast (SIMD) blitters,
@@ -47,9 +46,11 @@ SdlSurfacePtr bakeAlpha(SdlSurfacePtr img, Uint8 alpha, std::optional<RGB> color
     return argb;
 }
 
+// (No RLE acceleration: SDL's RLE blits walk every row of the sheet up to the part drawn, so the
+// small pieces of wide sheets the game draws (glyphs, tiles, animation frames) cost far more than
+// with its plain blitters: drawing took about twice as long. The Xbox SDL ignores RLE anyway.)
 SdlSurfacePtr loadImage(
     const fs::path& path,
-    bool optimize = true,
     std::optional<RGB> color_key = std::nullopt,
     std::optional<Uint8> alpha = std::nullopt,
     bool bake = false)
@@ -87,12 +88,6 @@ SdlSurfacePtr loadImage(
     if (baked)
         img = bakeAlpha(std::move(img), *alpha, color_key);
 
-    if (optimize) {
-        if (!SDL_SetSurfaceRLE(img.get(), 1)) {
-            throw std::format("Couldn't set RLE acceleration for {}: {}", path_str, SDL_GetError());
-        }
-    }
-
     if (alpha && !baked) {
         if (!SDL_SetSurfaceBlendMode(img.get(), SDL_BLENDMODE_BLEND)) {
             throw std::format("Couldn't set blend mode for {}: {}", path_str, SDL_GetError());
@@ -113,7 +108,6 @@ void blitSurface(SDL_Surface* src, const SDL_Rect* srcArea, SDL_Surface* dst, SD
     }
 }
 } // namespace
-
 
 gfxSprite::gfxSprite(SdlSurfacePtr image, std::optional<int> wrap)
     : m_picture(std::move(image))
@@ -228,10 +222,9 @@ void gfxSprite::setWrap(short wrapsize)
     m_wrap_x = wrapsize;
 }
 
-
 gfxSprite ImageLoader::create() const
 {
-    gfxSprite sprite(loadImage(m_path, m_optimize, m_color_key, m_alpha, !m_changingAlpha), m_wrap_x);
+    gfxSprite sprite(loadImage(m_path, m_color_key, m_alpha, !m_changingAlpha), m_wrap_x);
     if (m_alpha && !m_changingAlpha && *m_alpha < 255)
         sprite.m_bakedAlpha = *m_alpha;
     return sprite;

@@ -27,19 +27,6 @@ std::string lowercase(std::string str)
     return str;
 }
 
-bool cstr_ci_equals(const char* const a, const char* const b)
-{
-    if (a == b)
-        return true;
-
-    for (const char *pa = a, *pb = b; *pa; pa++, pb++) {
-        if (::tolower(*pa) != ::tolower(*pb))
-            return false;
-    }
-
-    return true;
-}
-
 std::list<std::string_view> tokenize(std::string_view text, char delim, size_t maxsplit)
 {
     if (text.empty()) {

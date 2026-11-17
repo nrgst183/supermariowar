@@ -68,7 +68,6 @@ int drawPrompts(int cx, int y, const std::vector<Prompt>& row, int gap = 14);
 void fill(int x, int y, int w, int h, SDL_Color c);
 void frame(int x, int y, int w, int h, SDL_Color border, SDL_Color inside);
 void disc(int cx, int cy, int r, SDL_Color c);
-void triangle(int x, int y, int w, int h, bool right, SDL_Color c);    // pointing left or right
 void line(int x0, int y0, int x1, int y1, int thickness, SDL_Color c);
 
 // Pixel art: one string per row, one character per pixel (drawn `scale`

@@ -4,12 +4,8 @@
 #include "map.h"
 #include "gfx/gfxSprite.h"
 
-
 float CapFallingVelocity(float vel)
 {
-    //if (vel < -MAXVELY)
-    //    return -MAXVELY;
-
     if (vel > MAXVELY)
         return MAXVELY;
 
@@ -77,9 +73,4 @@ std::array<IO_Block*, 4> CObject::GetCollisionBlocks() const
     }
 
     return blocks;
-}
-
-bool CObject::GetWrap() const
-{
-    return spr ? spr->isWrapping() : true;
 }

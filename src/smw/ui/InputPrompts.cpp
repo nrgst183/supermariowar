@@ -23,8 +23,6 @@ constexpr float DEADZONE = 0.22f;
 
 constexpr SDL_Color WHITE {255, 255, 255, 255};
 constexpr SDL_Color BLACK {0, 0, 0, 255};
-constexpr SDL_Color DARK {44, 44, 60, 255};
-constexpr SDL_Color GREY {150, 150, 170, 255};
 
 float axis(Sint16 value)
 {
@@ -233,27 +231,6 @@ void disc(int cx, int cy, int r, SDL_Color c)
         }
     }
     blitGlyph(*glyph, cx - r, cy - r);
-}
-
-void triangle(int x, int y, int w, int h, bool right, SDL_Color c)
-{
-    if (w <= 0 || h <= 0)
-        return;
-    std::string key = right ? "tri>" : "tri<";
-    key += std::to_string(w) + "x" + std::to_string(h);
-    appendColor(key, c);
-    const GlyphSheet::Glyph* glyph = glyphSheet().find(key);
-    if (!glyph) {
-        glyph = glyphSheet().add(key, w, h);
-        if (!glyph)
-            return;
-        for (int row = 0; row < h; row++) {
-            const int fromMiddle = std::abs(2 * row - (h - 1));
-            const int len = std::max(1, w * (h - fromMiddle) / h);
-            plot(*glyph, right ? 0 : w - len, row, len, 1, c);
-        }
-    }
-    blitGlyph(*glyph, x, y);
 }
 
 void line(int x0, int y0, int x1, int y1, int thickness, SDL_Color c)

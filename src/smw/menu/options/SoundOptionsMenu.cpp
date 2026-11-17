@@ -12,7 +12,6 @@
 #include "ui/MI_SliderField.h"
 #include "ui/MI_Text.h"
 
-
 UI_SoundOptionsMenu::UI_SoundOptionsMenu()
     : UI_Menu()
 {
@@ -72,10 +71,6 @@ UI_SoundOptionsMenu::UI_SoundOptionsMenu()
     miSoundOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miSoundOptionsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
-    miSoundOptionsMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miSoundOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miSoundOptionsMenuHeaderText = new MI_HeaderText("Sound Options Menu", 320, 5);
-
     AddControl(miSoundVolumeField, miSoundOptionsMenuBackButton, miMusicVolumeField, nullptr, miSoundOptionsMenuBackButton);
     AddControl(miMusicVolumeField, miSoundVolumeField, miPlayNextMusicField, nullptr, miSoundOptionsMenuBackButton);
     AddControl(miPlayNextMusicField, miMusicVolumeField, miAnnouncerField, nullptr, miSoundOptionsMenuBackButton);
@@ -85,14 +80,11 @@ UI_SoundOptionsMenu::UI_SoundOptionsMenu()
     AddControl(miWorldMusicField, miPlaylistField, miSoundOptionsMenuBackButton, nullptr, miSoundOptionsMenuBackButton);
     AddControl(miSoundOptionsMenuBackButton, miWorldMusicField, miSoundVolumeField, miSoundPackField, nullptr);
 
-    AddNonControl(miSoundOptionsMenuLeftHeaderBar);
-    AddNonControl(miSoundOptionsMenuRightHeaderBar);
-    AddNonControl(miSoundOptionsMenuHeaderText);
+    AddTitleBar("Sound Options Menu");
 
     setInitialFocus(miSoundVolumeField);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 };
-
 
 short UI_SoundOptionsMenu::GetCurrentWorldMusicID() const
 {

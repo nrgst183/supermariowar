@@ -22,8 +22,4 @@ private:
     MI_SelectField<bool>* miTeamColorsField;
     MI_SelectField<TournamentControlStyle>* miTournamentControlField;
     MI_Button* miTeamOptionsMenuBackButton;
-
-    MI_Image* miTeamOptionsMenuLeftHeaderBar;
-    MI_Image* miTeamOptionsMenuRightHeaderBar;
-    MI_Text* miTeamOptionsMenuHeaderText;
 };

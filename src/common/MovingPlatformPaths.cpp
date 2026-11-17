@@ -9,7 +9,6 @@
 
 #include <cmath>
 
-
 namespace {
 Vec2f calcVelocity(float speed, float angle)
 {
@@ -55,7 +54,6 @@ void MovingPlatformPath::Reset()
             Move(1);
     }
 }
-
 
 //------------------------------------------------------------------------------
 // Straight Path
@@ -122,7 +120,6 @@ void StraightPath::Reset()
 
     MovingPlatformPath::Reset();
 }
-
 
 //------------------------------------------------------------------------------
 // Straight Path Continuous
@@ -298,7 +295,6 @@ void FallingPath::Reset()
         m_currentPos[type] = m_startPos;
     }
 
-    // Skip correctly setting the path "shadow" as a perf optimization
-    // This does have the risk of a player spawning inside a falling donut block by accident
-    // MovingPlatformPath::Reset();
+    // (MovingPlatformPath::Reset() isn't called: placing the path "shadow" is skipped for speed,
+    // at the risk of a player spawning inside a falling donut block)
 }

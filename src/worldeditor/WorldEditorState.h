@@ -56,9 +56,8 @@
 #include <ctype.h>
 
 #ifdef _WIN32
-	#include <windows.h>
+    #include <windows.h>
 #endif
-
 
 #ifdef SMW_EMBEDDED_EDITOR
 // Built into the game: the events, the input state and the screen flips go

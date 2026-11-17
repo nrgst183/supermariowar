@@ -16,8 +16,4 @@ public:
 
 private:
     MI_PowerupSelection* miPowerupSelection;
-
-    MI_Image* miPowerupSelectionLeftHeaderBar;
-    MI_Image* miPowerupSelectionMenuRightHeaderBar;
-    MI_Text* miPowerupSelectionMenuHeaderText;
 };

@@ -15,7 +15,6 @@ public:
     bool isActive() const;
 
     int8_t getColor() const;
-    void setColor(int8_t color);
 
     void escape(CPlayer& player);
     void free_by_teammate(CPlayer& player);

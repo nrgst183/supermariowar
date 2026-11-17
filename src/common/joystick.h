@@ -16,7 +16,6 @@ public:
     void handleEvent(const SDL_Event& event);
 
     const std::map<SDL_JoystickID, SDL_Joystick*>& openedDevices() const { return m_opened; }
-    bool isAttached(SDL_JoystickID deviceId) const;
 
     std::string nameFor(SDL_JoystickID deviceId) const;
     SDL_Joystick* handleFor(SDL_JoystickID deviceId);

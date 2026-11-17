@@ -17,56 +17,10 @@ using namespace std;
 
 namespace fs = std::filesystem;
 
-
 GraphicsSDL gfx;
 gfxPalette gfx_palette;
 
-
 namespace {
-void setRawPixel(SDL_Surface* surf, int x, int y, Uint32 value)
-{
-    assert(surf);
-    assert(0 <= x && x < surf->w);
-    assert(0 <= y && y < surf->h);
-
-    const Uint8 bpp = SDL_BYTESPERPIXEL(surf->format);
-    const size_t idx = y * surf->pitch + x * bpp;
-    auto* pixel8 = static_cast<Uint8*>(surf->pixels) + idx;
-
-    switch (bpp) {
-        case 1:
-            *pixel8 = value;
-            break;
-        case 2:
-            *reinterpret_cast<Uint16*>(pixel8) = value;
-            break;
-        case 3:
-            if (SDL_BYTEORDER == SDL_BIG_ENDIAN) {
-                pixel8[0] = (value >> 16) & 0xFF;
-                pixel8[1] = (value >>  8) & 0xFF;
-                pixel8[2] = (value >>  0) & 0xFF;
-            } else {
-                pixel8[0] = (value >>  0) & 0xFF;
-                pixel8[1] = (value >>  8) & 0xFF;
-                pixel8[2] = (value >> 16) & 0xFF;
-            }
-            break;
-        case 4:
-            *reinterpret_cast<Uint32*>(pixel8) = value;
-            break;
-        default:
-            assert(false);
-            break;
-    }
-}
-
-void setRgb(SDL_Surface* surf, int x, int y, const RGB& color)
-{
-    assert(surf);
-    const Uint32 rawPixel = SDL_MapSurfaceRGB(surf, color.r, color.g, color.b);
-    setRawPixel(surf, x, y, rawPixel);
-}
-
 /**
  * Makes team-colored skin surface frame from a loaded sprite strip.
  * @param  source       skin sprite strip surface
@@ -87,16 +41,23 @@ gfxSprite createSkinSurface(
     const size_t outFrameCount = allStates ? PlayerPalette::COUNT : 1;
 
     auto out = gfxSprite::blank(32 * outFrameCount, 32);
+    SDL_Surface* const dst = out.getSurface();    //(ARGB8888, see gfxSprite::blank)
 
-    if (SDL_MUSTLOCK(out.getSurface()))
-        SDL_LockSurface(out.getSurface());
+    if (SDL_MUSTLOCK(dst))
+        SDL_LockSurface(dst);
 
     if (SDL_MUSTLOCK(source.getSurface()))
         SDL_LockSurface(source.getSurface());
 
+    //(opaque ARGB8888: what SDL_MapSurfaceRGB gives for that format, without its lookup per pixel)
+    auto argb = [](const RGB& c) {
+        return 0xff000000u | (static_cast<Uint32>(c.r) << 16) | (static_cast<Uint32>(c.g) << 8) | static_cast<Uint32>(c.b);
+    };
+
     const int startX = sourceFrame * 32;
 
     for (int y = 0; y < 32; y++) {
+        Uint32* const row = reinterpret_cast<Uint32*>(static_cast<Uint8*>(dst->pixels) + static_cast<ptrdiff_t>(y) * dst->pitch);
         for (int srcX = 0; srcX < 32; srcX++) {
             const int dstX = mirrored ? (31 - srcX) : srcX;
 
@@ -105,27 +66,22 @@ gfxSprite createSkinSurface(
             const auto it = gfx_palette.colorSheets().find(pixelColor);
             if (it != gfx_palette.colorSheets().cend()) {
                 const ColorSheet& sheet = it->second;
-                for (size_t outFrame = 0; outFrame < outFrameCount; outFrame++) {
-                    const RGB paletteColor = sheet.replacementFor(team, static_cast<PlayerPalette>(outFrame));
-                    setRgb(out.getSurface(), outFrame * 32 + dstX, y, paletteColor);
-                }
+                for (size_t outFrame = 0; outFrame < outFrameCount; outFrame++)
+                    row[outFrame * 32 + dstX] = argb(sheet.replacementFor(team, static_cast<PlayerPalette>(outFrame)));
             } else {
-                for (size_t outFrame = 0; outFrame < outFrameCount; outFrame++) {
-                    setRgb(out.getSurface(), outFrame * 32 + dstX, y, pixelColor);
-                }
+                const Uint32 pixel = argb(pixelColor);
+                for (size_t outFrame = 0; outFrame < outFrameCount; outFrame++)
+                    row[outFrame * 32 + dstX] = pixel;
             }
         }
     }
 
     SDL_UnlockSurface(source.getSurface());
-    SDL_UnlockSurface(out.getSurface());
+    SDL_UnlockSurface(dst);
 
     const auto color_key = SDL_MapSurfaceRGB(out.getSurface(), colors::MAGENTA.r, colors::MAGENTA.g, colors::MAGENTA.b);
     if (!SDL_SetSurfaceColorKey(out.getSurface(), true, color_key)) {
         throw std::format("Couldn't set color key for new skin surface: {}", SDL_GetError());
-    }
-    if (!SDL_SetSurfaceRLE(out.getSurface(), 1)) {
-        throw std::format("Couldn't set RLE acceleration for new skin surface: {}", SDL_GetError());
     }
 
     return out;
@@ -166,7 +122,6 @@ RGB getRgb(SDL_Surface* surf, int x, int y)
     SDL_GetRGB(rawPixel, SDL_GetPixelFormatDetails(surf->format), SDL_GetSurfacePalette(surf), &color.r, &color.g, &color.b);
     return color;
 }
-
 
 bool gfx_init(int w, int h, bool fullscreen) {
     return gfx.init(fullscreen);
@@ -245,7 +200,7 @@ bool gfx_loadpalette(const std::filesystem::path& palette_path) {
 
 SpriteStrip gfx_loadmenuskin(const fs::path& path, short colorScheme, bool fLoadBothDirections)
 {
-    const gfxSprite skin = ImageLoader(path).withoutColorKey().withoutOptimization().create();
+    const gfxSprite skin = ImageLoader(path).withoutColorKey().create();
 
     if (!validSkinSurface(skin))
         throw std::format("Invalid skin file: {} has incorrect dimensions", path.generic_string());
@@ -267,7 +222,7 @@ SpriteStrip gfx_loadmenuskin(const fs::path& path, short colorScheme, bool fLoad
 
 SpriteStrip gfx_loadfullskin(const fs::path& path, short colorScheme)
 {
-    const gfxSprite skin = ImageLoader(path).withoutColorKey().withoutOptimization().create();
+    const gfxSprite skin = ImageLoader(path).withoutColorKey().create();
 
     if (!validSkinSurface(skin))
         throw std::format("Invalid skin file: {} has incorrect dimensions", path.generic_string());
@@ -301,9 +256,15 @@ bool gfx_darken(SDL_Surface* surface, Uint8 alpha)
     const Uint32 keep = 255u - alpha;
     const SDL_PixelFormatDetails* details = SDL_GetPixelFormatDetails(surface->format);
     const Uint32 alphaMask = details ? details->Amask : 0;
-    for (int y = 0; y < surface->h; y++) {
-        Uint32* row = reinterpret_cast<Uint32*>(static_cast<Uint8*>(surface->pixels) + static_cast<ptrdiff_t>(y) * surface->pitch);
-        for (int x = 0; x < surface->w; x++) {
+    //(the size in locals: the build has no strict aliasing, so the compiler would reload them after
+    //every pixel written instead of vectorizing the loop)
+    const int w = surface->w;
+    const int h = surface->h;
+    const int pitch = surface->pitch;
+    Uint8* const pixels = static_cast<Uint8*>(surface->pixels);
+    for (int y = 0; y < h; y++) {
+        Uint32* const row = reinterpret_cast<Uint32*>(pixels + static_cast<ptrdiff_t>(y) * pitch);
+        for (int x = 0; x < w; x++) {
             const Uint32 p = row[x];
             const Uint32 rb = (((p & 0x00ff00ffu) * keep + 0x00800080u) >> 8) & 0x00ff00ffu;
             const Uint32 ga = (((p >> 8) & 0x00ff00ffu) * keep + 0x00800080u) & 0xff00ff00u;
@@ -463,7 +424,6 @@ void gfx_drawpreview(
         }
     }
 }
-
 
 void gfx_setjoystickteamcolor(SDL_Joystick* joystick, short team, float brightness)
 {

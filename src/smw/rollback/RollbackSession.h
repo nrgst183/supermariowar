@@ -338,6 +338,4 @@ private:
     uint8_t m_dropPacket[3 + (net::MAX_PEERS - 1) * (9 + DROP_RELAY_FRAMES * INPUT_MAX_PLAYERS)] = {};
 };
 
-const char* stallReasonName(StallReason reason);
-
 } // namespace rollback

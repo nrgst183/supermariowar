@@ -17,10 +17,6 @@ bool autoPaint();
 // The world's name (its file's, without the folder and the extension)
 std::string worldName();
 
-// The whole world (the preview): its size in tiles, where the screen's top left is in
-// it (in pixels, 32 a tile), and the world drawn whole into a new surface (32 pixels a
-// tile; the caller frees it)
-void worldSize(int* cols, int* rows);
 void viewOrigin(int* x, int* y);
 SDL_Surface* drawWhole();
 

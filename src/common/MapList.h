@@ -30,12 +30,12 @@ class MapList {
 public:
     MapList(bool fWorldEditor);
 
-		//Adds maps in all world map directories to the map list so they can be edited in the map editor
-		void addWorldMaps();
+        //Adds maps in all world map directories to the map list so they can be edited in the map editor
+        void addWorldMaps();
 
         void add(const char * name);
         bool find(const std::string& name);
-		bool findexact(const char * name, bool fWorld);
+        bool findexact(const char * name, bool fWorld);
     bool startswith(char letter);
     bool startswith(const std::string& match);
 
@@ -46,9 +46,9 @@ public:
         return (*outercurrent).first;
     }
 
-		void prev(bool fUseFilters);
+        void prev(bool fUseFilters);
         void next(bool fUseFilters);
-		void random(bool fUseFilters);
+        void random(bool fUseFilters);
 
     std::string randomFilename() const;
 
@@ -78,8 +78,8 @@ public:
         outercurrent = current = itr;
     }
 
-		void WriteFilters();
-		void ReadFilters();
+        void WriteFilters();
+        void ReadFilters();
 
     bool GetFilter(size_t iFilter) const {
         return (*current).second.pfFilters[iFilter];
@@ -88,11 +88,11 @@ public:
         (*current).second.pfFilters[iFilter] = !(*current).second.pfFilters[iFilter];
     }
 
-		bool FindFilteredMap();
-		void ApplyFilters(const std::vector<bool>& pfFilters);
-		bool MapInFilteredSet();
+        bool FindFilteredMap();
+        void ApplyFilters(const std::vector<bool>& pfFilters);
+        bool MapInFilteredSet();
 
-		std::multimap<std::string, MapListNode>::iterator GetIteratorAt(unsigned short iIndex, bool fUseFilters);
+        std::multimap<std::string, MapListNode>::iterator GetIteratorAt(unsigned short iIndex, bool fUseFilters);
 
     void SaveCurrent() {
         savedcurrent = current;
@@ -101,8 +101,8 @@ public:
         current = savedcurrent;
     }
 
-		void ReloadMapAutoFilters();
-		void WriteMapSummaryCache();
+        void ReloadMapAutoFilters();
+        void WriteMapSummaryCache();
 
     private:
 

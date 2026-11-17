@@ -4,41 +4,40 @@
 void convertAll()
 {
     for (size_t k = 0; k < maplist->count(); k++) {
-		//g_map->convertMap();
-		g_map->saveMap(maplist->currentFilename());
-		maplist->next(false);
-		g_map->loadMap(maplist->currentFilename(), read_type_full);
-	}
+        //g_map->convertMap();
+        g_map->saveMap(maplist->currentFilename());
+        maplist->next(false);
+        g_map->loadMap(maplist->currentFilename(), read_type_full);
+    }
 }
 #endif
 
-
 void loadcurrentmap()
 {
-	g_map->loadMap(maplist->currentFilename(), read_type_full);
+    g_map->loadMap(maplist->currentFilename(), read_type_full);
 
     if (g_map->iNumRaceGoals == 0) {
         for (short iGoal = 0; iGoal < MAXRACEGOALS; iGoal++) {
-			g_map->racegoallocations[iGoal].x = iGoal * 80 + 20;
-			g_map->racegoallocations[iGoal].y = 18;
-		}
-	}
+            g_map->racegoallocations[iGoal].x = iGoal * 80 + 20;
+            g_map->racegoallocations[iGoal].y = 18;
+        }
+    }
 
     if (g_map->iNumFlagBases == 0) {
         for (short iBase = 0; iBase < 4; iBase++) {
-			g_map->flagbaselocations[iBase].x = iBase * 80 + 20;
-			g_map->flagbaselocations[iBase].y = 18;
-		}
-	}
+            g_map->flagbaselocations[iBase].x = iBase * 80 + 20;
+            g_map->flagbaselocations[iBase].y = 18;
+        }
+    }
 
-	std::string filename = "gfx/packs/Classic/backgrounds/" + g_map->szBackgroundFile;
-	std::string path = convertPath(filename);
+    std::string filename = "gfx/packs/Classic/backgrounds/" + g_map->szBackgroundFile;
+    std::string path = convertPath(filename);
     backgroundlist->setCurrentPath(filename);
 
     if (!FileExists(path)) {
-		path = convertPath("gfx/packs/Classic/backgrounds/Land_Classic.png");
+        path = convertPath("gfx/packs/Classic/backgrounds/Land_Classic.png");
         backgroundlist->setCurrentPath("gfx/packs/Classic/backgrounds/Land_Classic.png");
-	}
+    }
 
     rm->spr_background = ImageLoader(path).withoutColorKey().create();
 
@@ -51,79 +50,79 @@ void loadcurrentmap()
                     g_Platforms[iPlatform].tiles[iCol * MAPHEIGHT + iRow] = g_map->platforms[iPlatform]->tileAt(iCol, iRow);
                     g_Platforms[iPlatform].types[iCol * MAPHEIGHT + iRow] = g_map->platforms[iPlatform]->tileTypeAt(iCol, iRow);
                 } else {
-					ClearTilesetTile(&g_Platforms[iPlatform].tiles[iCol * MAPHEIGHT + iRow]);
-					g_Platforms[iPlatform].types[iCol * MAPHEIGHT + iRow] = TileType::NonSolid;
-				}
-			}
-		}
+                    ClearTilesetTile(&g_Platforms[iPlatform].tiles[iCol * MAPHEIGHT + iRow]);
+                    g_Platforms[iPlatform].types[iCol * MAPHEIGHT + iRow] = TileType::NonSolid;
+                }
+            }
+        }
 
-		g_Platforms[iPlatform].iDrawLayer = g_map->platforms[iPlatform]->iDrawLayer;
-		g_Platforms[iPlatform].iPathType = g_map->platforms[iPlatform]->pPath->typeId();
+        g_Platforms[iPlatform].iDrawLayer = g_map->platforms[iPlatform]->iDrawLayer;
+        g_Platforms[iPlatform].iPathType = g_map->platforms[iPlatform]->pPath->typeId();
 
         if (auto* path = dynamic_cast<StraightPath*>(g_map->platforms[iPlatform]->pPath)) {
-			g_Platforms[iPlatform].iVelocity = static_cast<int>(path->speed() * 4.0f);
-			g_Platforms[iPlatform].iStartX = static_cast<int>(path->startPos().x);
-			g_Platforms[iPlatform].iStartY = static_cast<int>(path->startPos().y);
-			g_Platforms[iPlatform].iEndX = static_cast<int>(path->endPos().x);
-			g_Platforms[iPlatform].iEndY = static_cast<int>(path->endPos().y);
+            g_Platforms[iPlatform].iVelocity = static_cast<int>(path->speed() * 4.0f);
+            g_Platforms[iPlatform].iStartX = static_cast<int>(path->startPos().x);
+            g_Platforms[iPlatform].iStartY = static_cast<int>(path->startPos().y);
+            g_Platforms[iPlatform].iEndX = static_cast<int>(path->endPos().x);
+            g_Platforms[iPlatform].iEndY = static_cast<int>(path->endPos().y);
         } else if (auto* path = dynamic_cast<StraightPathContinuous*>(g_map->platforms[iPlatform]->pPath)) {
-			g_Platforms[iPlatform].iVelocity = static_cast<int>(path->speed() * 4.0f);
-			g_Platforms[iPlatform].iStartX = static_cast<int>(path->startPos().x);
-			g_Platforms[iPlatform].iStartY = static_cast<int>(path->startPos().y);
-			g_Platforms[iPlatform].fAngle = path->angle();
+            g_Platforms[iPlatform].iVelocity = static_cast<int>(path->speed() * 4.0f);
+            g_Platforms[iPlatform].iStartX = static_cast<int>(path->startPos().x);
+            g_Platforms[iPlatform].iStartY = static_cast<int>(path->startPos().y);
+            g_Platforms[iPlatform].fAngle = path->angle();
         } else if (auto* path = dynamic_cast<EllipsePath*>(g_map->platforms[iPlatform]->pPath)) {
-			g_Platforms[iPlatform].iVelocity = static_cast<short>(path->speed() / 0.0030f);
-			g_Platforms[iPlatform].fRadiusX = path->radius().x;
-			g_Platforms[iPlatform].fRadiusY = path->radius().y;
-			g_Platforms[iPlatform].iStartX = static_cast<int>(path->centerPos().x);
-			g_Platforms[iPlatform].iStartY = static_cast<int>(path->centerPos().y);
-			g_Platforms[iPlatform].fAngle = path->startAngle();
-		}
+            g_Platforms[iPlatform].iVelocity = static_cast<short>(path->speed() / 0.0030f);
+            g_Platforms[iPlatform].fRadiusX = path->radius().x;
+            g_Platforms[iPlatform].fRadiusY = path->radius().y;
+            g_Platforms[iPlatform].iStartX = static_cast<int>(path->centerPos().x);
+            g_Platforms[iPlatform].iStartY = static_cast<int>(path->centerPos().y);
+            g_Platforms[iPlatform].fAngle = path->startAngle();
+        }
 
-		g_Platforms[iPlatform].UpdatePreview();
-	}
+        g_Platforms[iPlatform].UpdatePreview();
+    }
 }
 
 void SetPlatformToDefaults(short iPlatform)
 {
     for (short iCol = 0; iCol < MAPWIDTH; iCol++) {
         for (short iRow = 0; iRow < MAPHEIGHT; iRow++) {
-			ClearTilesetTile(&g_Platforms[iPlatform].tiles[iCol * MAPHEIGHT + iRow]);
-			g_Platforms[iPlatform].types[iCol * MAPHEIGHT + iRow] = TileType::NonSolid;
-		}
-	}
+            ClearTilesetTile(&g_Platforms[iPlatform].tiles[iCol * MAPHEIGHT + iRow]);
+            g_Platforms[iPlatform].types[iCol * MAPHEIGHT + iRow] = TileType::NonSolid;
+        }
+    }
 
-	g_Platforms[iPlatform].iVelocity = 4;
-	g_Platforms[iPlatform].iStartX = 320;
-	g_Platforms[iPlatform].iStartY = 240;
-	g_Platforms[iPlatform].iEndX = 352;
-	g_Platforms[iPlatform].iEndY = 240;
+    g_Platforms[iPlatform].iVelocity = 4;
+    g_Platforms[iPlatform].iStartX = 320;
+    g_Platforms[iPlatform].iStartY = 240;
+    g_Platforms[iPlatform].iEndX = 352;
+    g_Platforms[iPlatform].iEndY = 240;
 
-	g_Platforms[iPlatform].fAngle = 0.0f;
-	g_Platforms[iPlatform].fRadiusX = 128.0f;
-	g_Platforms[iPlatform].fRadiusY = 128.0f;
+    g_Platforms[iPlatform].fAngle = 0.0f;
+    g_Platforms[iPlatform].fRadiusX = 128.0f;
+    g_Platforms[iPlatform].fRadiusY = 128.0f;
 
-	g_Platforms[iPlatform].iDrawLayer = 2;
+    g_Platforms[iPlatform].iDrawLayer = 2;
 }
 
 int savecurrentmap()
 {
-	g_messagedisplaytimer = 60;
-	g_szMessageTitle = "Saved";
-	g_szMessageLine[0] = "Your map has";
-	g_szMessageLine[1] = "been saved.";
-	g_szMessageLine[2] = "";
+    g_messagedisplaytimer = 60;
+    g_szMessageTitle = "Saved";
+    g_szMessageLine[0] = "Your map has";
+    g_szMessageLine[1] = "been saved.";
+    g_szMessageLine[2] = "";
 
-	save_map(maplist->currentFilename());
-	return 0;
+    save_map(maplist->currentFilename());
+    return 0;
 }
 
 void insert_platforms_into_map()
 {
-	//First take the created platforms and move them into the actual map
-	g_map->clearPlatforms();
+    //First take the created platforms and move them into the actual map
+    g_map->clearPlatforms();
 
-	//g_map->iNumPlatforms = g_iNumPlatforms;
+    //g_map->iNumPlatforms = g_iNumPlatforms;
         g_map->platforms.reserve(g_iNumPlatforms);
 
     for (short iPlatform = 0; iPlatform < g_iNumPlatforms; iPlatform++) {
@@ -141,27 +140,27 @@ void insert_platforms_into_map()
             }
         }
 
-		short iDrawLayer = g_Platforms[iPlatform].iDrawLayer;
+        short iDrawLayer = g_Platforms[iPlatform].iDrawLayer;
 
-		float fStartX = static_cast<float>(g_Platforms[iPlatform].iStartX);
-		float fStartY = static_cast<float>(g_Platforms[iPlatform].iStartY);
+        float fStartX = static_cast<float>(g_Platforms[iPlatform].iStartX);
+        float fStartY = static_cast<float>(g_Platforms[iPlatform].iStartY);
 
-		MovingPlatformPath * path = nullptr;
+        MovingPlatformPath * path = nullptr;
 
         if (g_Platforms[iPlatform].iPathType == PlatformPathType::Straight) {
-			float fVelocity = static_cast<float>(g_Platforms[iPlatform].iVelocity) * 0.26f;
-			float fEndX = static_cast<float>(g_Platforms[iPlatform].iEndX);
-			float fEndY = static_cast<float>(g_Platforms[iPlatform].iEndY);
-			path = new StraightPath(fVelocity, Vec2f(fStartX, fStartY), Vec2f(fEndX, fEndY), false);
+            float fVelocity = static_cast<float>(g_Platforms[iPlatform].iVelocity) * 0.26f;
+            float fEndX = static_cast<float>(g_Platforms[iPlatform].iEndX);
+            float fEndY = static_cast<float>(g_Platforms[iPlatform].iEndY);
+            path = new StraightPath(fVelocity, Vec2f(fStartX, fStartY), Vec2f(fEndX, fEndY), false);
         } else if (g_Platforms[iPlatform].iPathType == PlatformPathType::StraightContinuous) {
-			float fVelocity = static_cast<float>(g_Platforms[iPlatform].iVelocity) * 0.26f;
-			path = new StraightPathContinuous(fVelocity, Vec2f(fStartX, fStartY), g_Platforms[iPlatform].fAngle, false);
+            float fVelocity = static_cast<float>(g_Platforms[iPlatform].iVelocity) * 0.26f;
+            path = new StraightPathContinuous(fVelocity, Vec2f(fStartX, fStartY), g_Platforms[iPlatform].fAngle, false);
         } else if (g_Platforms[iPlatform].iPathType == PlatformPathType::Ellipse) {
-			float fVelocity = static_cast<float>(g_Platforms[iPlatform].iVelocity) * 0.0030f;
-			float radiusX = g_Platforms[iPlatform].fRadiusX;
-			float radiusY = g_Platforms[iPlatform].fRadiusY;
-			path = new EllipsePath(fVelocity, g_Platforms[iPlatform].fAngle, Vec2f(radiusX, radiusY), Vec2f(fStartX, fStartY), false);
-		}
+            float fVelocity = static_cast<float>(g_Platforms[iPlatform].iVelocity) * 0.0030f;
+            float radiusX = g_Platforms[iPlatform].fRadiusX;
+            float radiusY = g_Platforms[iPlatform].fRadiusY;
+            path = new EllipsePath(fVelocity, g_Platforms[iPlatform].fAngle, Vec2f(radiusX, radiusY), Vec2f(fStartX, fStartY), false);
+        }
 
         g_map->AddPermanentPlatform(new MovingPlatform(std::move(tiles), std::move(types), iWidth, iHeight, iDrawLayer, path, false));
     }
@@ -169,119 +168,117 @@ void insert_platforms_into_map()
 
 void save_map(const std::string &file)
 {
-	insert_platforms_into_map();
+    insert_platforms_into_map();
 
-	//Then save the rest of the map
-	g_map->saveMap(file);
+    //Then save the rest of the map
+    g_map->saveMap(file);
 }
 
 void CalculatePlatformDims(short iPlatform, short * ix, short * iy, short * iw, short * ih)
 {
-	short iTop = MAPHEIGHT, iRight = -1, iBottom = -1, iLeft = MAPWIDTH;
-	//Calculate the height and width of the platform
+    short iTop = MAPHEIGHT, iRight = -1, iBottom = -1, iLeft = MAPWIDTH;
+    //Calculate the height and width of the platform
     for (short iCol = 0; iCol < MAPWIDTH; iCol++) {
         for (short iRow = 0; iRow < MAPHEIGHT; iRow++) {
             if (g_Platforms[iPlatform].tiles[iCol * MAPHEIGHT + iRow].iID != TILESETNONE) {
-				if (iTop > iRow)
-					iTop = iRow;
+                if (iTop > iRow)
+                    iTop = iRow;
 
-				if (iLeft > iCol)
-					iLeft = iCol;
+                if (iLeft > iCol)
+                    iLeft = iCol;
 
-				if (iBottom < iRow)
-					iBottom = iRow;
+                if (iBottom < iRow)
+                    iBottom = iRow;
 
-				if (iRight < iCol)
-					iRight = iCol;
-			}
-		}
-	}
+                if (iRight < iCol)
+                    iRight = iCol;
+            }
+        }
+    }
 
-	short iWidth = iRight - iLeft + 1;
-	short iHeight = iBottom - iTop + 1;
+    short iWidth = iRight - iLeft + 1;
+    short iHeight = iBottom - iTop + 1;
 
     if (iRight == -1 || iBottom == -1) {
-		iWidth = 1;
-		iHeight = 1;
-		iLeft = 0;
-		iTop = 0;
-	}
+        iWidth = 1;
+        iHeight = 1;
+        iLeft = 0;
+        iTop = 0;
+    }
 
-	*ix = iLeft;
-	*iy = iTop;
+    *ix = iLeft;
+    *iy = iTop;
 
-	*iw = iWidth;
-	*ih = iHeight;
+    *iw = iWidth;
+    *ih = iHeight;
 }
 
 int findcurrentstring()
 {
     if (!findstring.empty()) {
         if (maplist->find(findstring)) {
-			loadcurrentmap();
-		}
-	}
+            loadcurrentmap();
+        }
+    }
 
-	return 0;
+    return 0;
 }
 
 int newmap()
 {
-	char fileName[FILEBUFSIZE] = "";
+    char fileName[FILEBUFSIZE] = "";
 
     if (dialog("New Map", "Enter name:", fileName, 64)) {
-		std::string mapName = fileName;
-		g_map->clearMap();
-		g_map->clearPlatforms();
-		g_map->saveMap(convertPath("maps/" + mapName + ".map"));
-		mapName += ".map";
-		maplist->add(mapName.c_str());
-		maplist->find(mapName);
-		loadcurrentmap();
-	}
+        std::string mapName = fileName;
+        g_map->clearMap();
+        g_map->clearPlatforms();
+        g_map->saveMap(convertPath("maps/" + mapName + ".map"));
+        mapName += ".map";
+        maplist->add(mapName.c_str());
+        maplist->find(mapName);
+        loadcurrentmap();
+    }
 
-	return 0;
+    return 0;
 }
-
 
 bool ReadAnimatedTileTypeFile(const char * szFile)
 {
-	//Detect if the tiletype file already exists, if not create it
+    //Detect if the tiletype file already exists, if not create it
     if (FileExists(szFile)) {
-		BinaryFile tsf(szFile, "rb");
+        BinaryFile tsf(szFile, "rb");
         if (!tsf.is_open()) {
-			printf("ERROR: couldn't open tileset file: %s\n", szFile);
-			return false;
-		}
+            printf("ERROR: couldn't open tileset file: %s\n", szFile);
+            return false;
+        }
 
-		animatedtiletypes = new TileType[256];
+        animatedtiletypes = new TileType[256];
 
         for (short i = 0; i < 256; i++) {
-			animatedtiletypes[i] = (TileType)tsf.read_i32();
-		}
-
+            animatedtiletypes[i] = (TileType)tsf.read_i32();
+        }
     } else {
-		animatedtiletypes = new TileType[256];
+        animatedtiletypes = new TileType[256];
 
         for (short i = 0; i < 256; i++) {
-			animatedtiletypes[i] = TileType::NonSolid;
-		}
-	}
+            animatedtiletypes[i] = TileType::NonSolid;
+        }
+    }
 
-	return true;
+    return true;
 }
 
 bool WriteAnimatedTileTypeFile(const char * szFile)
 {
-	BinaryFile tsf(szFile, "wb");
+    BinaryFile tsf(szFile, "wb");
     if (!tsf.is_open()) {
-		printf("ERROR: couldn't open tileset file to save tile types: %s\n", szFile);
-		return false;
-	}
+        printf("ERROR: couldn't open tileset file to save tile types: %s\n", szFile);
+        return false;
+    }
 
     for (short i = 0; i < 256; i++) {
             tsf.write_i32(static_cast<int>(animatedtiletypes[i]));
-	}
+    }
 
-	return true;
+    return true;
 }

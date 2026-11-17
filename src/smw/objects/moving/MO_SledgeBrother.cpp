@@ -1,12 +1,7 @@
 #include "MO_SledgeBrother.h"
 
 #include "eyecandy.h"
-#include "Game.h"
-#include "GameMode.h"
 #include "GameValues.h"
-#include "ObjectContainer.h"
-#include "player.h"
-#include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "gamemodes/MiniBoss.h"
@@ -16,7 +11,6 @@
 #include "objects/moving/MO_SledgeHammer.h"
 #include "objects/moving/MO_SuperFireball.h"
 #include "objects/overmap/WO_Thwomp.h"
-
 
 namespace {
 void pushBombs(CObjectContainer& container, short x, short y)
@@ -166,7 +160,6 @@ void MO_SledgeBrother::update()
                     const float thwompVel = 2.0f + static_cast<float>(RANDOM_INT(20)) / 10.0f;
                     g_sim.objectcontainer[2].add(new OMO_Thwomp(&rm->spr_thwomp, thwompX, thwompVel));
                 }
-
             } else if (iType == 2) {
                 // Spawn lots of podobos
                 ifSoundOnPlay(rm->sfx_thunder);

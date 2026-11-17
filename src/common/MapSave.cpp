@@ -56,10 +56,6 @@ void CMap::saveMap(const std::string& file)
         for (i = 0; i < MAPWIDTH; i++)
             usedtile[i][j] = false;
 
-    //bool fAutoMapFilters[NUM_AUTO_FILTERS];
-    //for (short iFilter = 0; iFilter < NUM_AUTO_FILTERS; iFilter++)
-    //fAutoMapFilters[iFilter] = false;
-
     int iHazardCount = 0;
     int iWarpCount = 0;
     int iIceCount = 0;
@@ -75,7 +71,6 @@ void CMap::saveMap(const std::string& file)
     for (MovingPlatform* platform : platforms) {
         for (short iCol = 0; iCol < platform->iTileWidth; iCol++) {
             for (short iRow = 0; iRow < platform->iTileHeight; iRow++) {
-
                 //Set the tile type flags for each tile
                 TileType iType = platform->tileTypeAt(iCol, iRow);
                 unsigned short iFlags = tileToFlags(iType);
@@ -232,9 +227,6 @@ void CMap::saveMap(const std::string& file)
     for (j = 0; j < MAPHEIGHT; j++) {
         for (i = 0; i < MAPWIDTH; i++) {
             for (k = 0; k < MAPLAYERS; k++) {
-                //Tile sprites (4 layers)
-                //mapfile.write_i32(mapdata[i][j][k]);
-
                 TilesetTile * tile = &mapdata[i][j][k];
 
                 //Make sure the tile's col and row are within the tileset
@@ -415,7 +407,6 @@ void CMap::saveMap(const std::string& file)
                 else
                     movey = 1;
 
-
                 int numblocks = 0;
                 while (currentx < MAPWIDTH && currenty < MAPHEIGHT) {
                     if (warpdata[currentx][currenty].direction != warpdata[i][j].direction ||
@@ -468,7 +459,6 @@ void CMap::saveMap(const std::string& file)
                 mapfile.write_i32(i);
                 mapfile.write_i32(j);
                 mapfile.write_i32(numblocks);
-
             }
         }
     }

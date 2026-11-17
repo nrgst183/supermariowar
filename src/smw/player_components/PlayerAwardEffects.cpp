@@ -11,7 +11,6 @@
 #include <format>
 #include <string>
 
-
 struct STextAward {
     const char *name;
     bool large = false;
@@ -150,23 +149,6 @@ void PlayerAwardEffects::addKillerAward(CPlayer& killer, CPlayer* killed, KillSt
 {
     killer.killsinrow++;
 
-    /*
-    if (killer.killsinrow >= 10 && game_values.secrets)
-    {
-        if (RANDOM_INT(5) == 0)
-        {
-            if (!game_values.gamemode->gameover && game_values.bosspeeking == -1)
-            {
-                eyecandy[2].emplace<EC_BossPeeker>(&rm->spr_sledgebrothers, COSMETIC_RANDOM_INT(90) + 90, 2);
-
-                rm->backgroundmusic[0].stop();
-                ifsoundonstop(rm->sfx_invinciblemusic);
-                ifsoundonstop(rm->sfx_timewarning);
-            }
-        }
-    }
-    */
-
     if (killer.inair && (style == KillStyle::Stomp || style == KillStyle::Goomba || style == KillStyle::Koopa || style == KillStyle::CheepCheep || style == KillStyle::BulletBill || style == KillStyle::Feather))
         killer.killsinrowinair++;
 
@@ -214,7 +196,6 @@ void PlayerAwardEffects::addKillerAward(CPlayer& killer, CPlayer* killed, KillSt
                 killer.awardeffects.awards[(killer.killsinrow - 1) % MAXAWARDS] = 7; //soul id for koopa
             else
                 killer.awardeffects.awards[(killer.killsinrow - 1) % MAXAWARDS] = 8; //soul id for ?
-
         } else if (game_values.awardstyle == AwardStyle::Swirl)
             killer.awardeffects.addSwirling(killer);
         else if (game_values.awardstyle == AwardStyle::Fireworks)

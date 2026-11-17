@@ -36,7 +36,7 @@ int editor_backgrounds()
 {
     init_editor_backgrounds();
 
-		//handle messages
+        //handle messages
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_EVENT_QUIT:
@@ -56,25 +56,25 @@ int editor_backgrounds()
                     return EDITOR_EDIT;
                 } else if (event.key.key == SDLK_PAGEDOWN || event.key.key == SDLK_DOWN) {
                     if ((iPage + 1) * 16 < static_cast<int>(backgroundlist->count())) {
-							iPage++;
-							LoadBackgroundPage(sBackgrounds, iPage);
-						}
+                            iPage++;
+                            LoadBackgroundPage(sBackgrounds, iPage);
+                        }
                 } else if (event.key.key == SDLK_PAGEUP || event.key.key == SDLK_UP) {
                     if ((iPage - 1) * 16 >= 0) {
-							iPage--;
-							LoadBackgroundPage(sBackgrounds, iPage);
-						}
-					}
+                            iPage--;
+                            LoadBackgroundPage(sBackgrounds, iPage);
+                        }
+                    }
 
-				break;
+                break;
 
-				case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
                 if (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT) {
                     for (short iBackground = 0; iBackground < 16; iBackground++) {
                         if (iPage * 16 + iBackground >= static_cast<int>(backgroundlist->count()))
-								break;
+                                break;
 
-							if (event.button.x >= rDst[iBackground].x && event.button.x < rDst[iBackground].x + rDst[iBackground].w &&
+                            if (event.button.x >= rDst[iBackground].x && event.button.x < rDst[iBackground].x + rDst[iBackground].w &&
                                 event.button.y >= rDst[iBackground].y && event.button.y < rDst[iBackground].y + rDst[iBackground].h)
                             {
                                 backgroundlist->setCurrentIndex(iPage * 16 + iBackground);
@@ -83,54 +83,54 @@ int editor_backgrounds()
                                 g_map->szBackgroundFile = backgroundlist->currentPath().filename().string();
 
                                 if (event.button.button == SDL_BUTTON_LEFT) {
-									//Set music to background default
+                                    //Set music to background default
                                     for (short iCategory = 0; iCategory < MAXMUSICCATEGORY; iCategory++) {
                                         if (!strncmp(g_szMusicCategoryNames[iCategory], g_map->szBackgroundFile.c_str(), strlen(g_szMusicCategoryNames[iCategory]))) {
-											g_map->musicCategoryID = iCategory;
-											break;
-										}
-									}
-								}
+                                            g_map->musicCategoryID = iCategory;
+                                            break;
+                                        }
+                                    }
+                                }
 
                                 for (short iSurface = 0; iSurface < 16; iSurface++)
                                     sBackgrounds[iSurface] = gfxSprite();
 
                                 editor_backgrounds_initialized = false;
                                 return EDITOR_EDIT;
-							}
-						}
-					}
-				break;
+                            }
+                        }
+                    }
+                break;
 
-				case SDL_EVENT_MOUSE_MOTION:
-					bound_mouse_motion_coords();
-				break;
+                case SDL_EVENT_MOUSE_MOTION:
+                    bound_mouse_motion_coords();
+                break;
 
-				default:
-					break;
-			}
-		}
+                default:
+                    break;
+            }
+        }
 
-		SDL_Rect rect = {0, 0, 640, 480};
-		SDL_FillSurfaceRect(screen, &rect, 0x0);
+        SDL_Rect rect = {0, 0, 640, 480};
+        SDL_FillSurfaceRect(screen, &rect, 0x0);
 
         for (short iBackground = 0; iBackground < 16; iBackground++) {
             if (iPage * 16 + iBackground >= static_cast<int>(backgroundlist->count()))
-				break;
+                break;
 
-			sBackgrounds[iBackground].draw(rSrc, screen, rDst[iBackground]);
-		}
+            sBackgrounds[iBackground].draw(rSrc, screen, rDst[iBackground]);
+        }
 
-		if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight() * 2, "[Page Up] next page, [Page Down] previous page");
-		if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight(), "[LMB] choose background with music category, [RMB] choose just background");
+        if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight() * 2, "[Page Up] next page, [Page Down] previous page");
+        if (OLD_HUD) rm->menu_font_small.draw(0,480-rm->menu_font_small.getHeight(), "[LMB] choose background with music category, [RMB] choose just background");
 
-		int iID = mouse_x / 160 + mouse_y / 120 * 4 + iPage * 16;
+        int iID = mouse_x / 160 + mouse_y / 120 * 4 + iPage * 16;
 
         if (iID < static_cast<int>(backgroundlist->count()))
             if (OLD_HUD) rm->menu_font_small.draw(0, 0, backgroundlist->at(iID).string());
 
-		DrawMessage();
-		return EDITOR_BACKGROUNDS;
+        DrawMessage();
+        return EDITOR_BACKGROUNDS;
 }
 
 //short view_tileset_repeat_direction = -1;
@@ -138,27 +138,27 @@ int editor_backgrounds()
 
 void LoadBackgroundPage(std::array<gfxSprite, 16>& sBackgrounds, short iPage)
 {
-	SDL_Rect srcRectBackground = {0, 0, 640, 480};
-	SDL_Rect dstRectBackground = {0, 0, 160, 120};
+    SDL_Rect srcRectBackground = {0, 0, 640, 480};
+    SDL_Rect dstRectBackground = {0, 0, 160, 120};
 
-	for (short iIndex = 0; iIndex < 16; iIndex++) {
-		if (iPage * 16 + iIndex >= static_cast<int>(backgroundlist->count()))
-			break;
+    for (short iIndex = 0; iIndex < 16; iIndex++) {
+        if (iPage * 16 + iIndex >= static_cast<int>(backgroundlist->count()))
+            break;
 
-		const std::filesystem::path& path = backgroundlist->at(iPage * 16 + iIndex);
-		if (path.empty())
-			return;
+        const std::filesystem::path& path = backgroundlist->at(iPage * 16 + iIndex);
+        if (path.empty())
+            return;
 
-		gfxSprite temp = ImageLoader(path).withoutColorKey().create();
+        gfxSprite temp = ImageLoader(path).withoutColorKey().create();
 
-		SDL_FillSurfaceRect(sBackgrounds[iIndex].getSurface(), nullptr, 0x0);
+        SDL_FillSurfaceRect(sBackgrounds[iIndex].getSurface(), nullptr, 0x0);
 
-		if (temp.getWidth() != 640 || temp.getHeight() != 480) {
-			printf("WARNING: Background %s is %dx%d but must be 640x480. Skipping.\n",
-				path.generic_string().c_str(), temp.getWidth(), temp.getHeight());
-			continue;
-		}
+        if (temp.getWidth() != 640 || temp.getHeight() != 480) {
+            printf("WARNING: Background %s is %dx%d but must be 640x480. Skipping.\n",
+                path.generic_string().c_str(), temp.getWidth(), temp.getHeight());
+            continue;
+        }
 
-		temp.drawStretch(srcRectBackground, sBackgrounds[iIndex].getSurface(), dstRectBackground);
-	}
+        temp.drawStretch(srcRectBackground, sBackgrounds[iIndex].getSurface(), dstRectBackground);
+    }
 }

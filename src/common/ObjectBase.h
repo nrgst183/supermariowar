@@ -80,7 +80,6 @@ public:
 
     short GetState() const { return state; }
     bool isDead() const { return dead; }
-    bool GetWrap() const;
 
     // Deterministic per-match object id (the AI uses it to remember objects).
     // Ids restart at every match, so all peers assign the same ids.

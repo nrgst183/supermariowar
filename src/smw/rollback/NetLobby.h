@@ -482,7 +482,6 @@ private:
     size_t m_eventHead = 0;
     size_t m_eventCount = 0;
     std::array<uint8_t, 2048> m_buffer {};
-    bool m_closed = false;
     bool m_seriesLocked = false;
 };
 

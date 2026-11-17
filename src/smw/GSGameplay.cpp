@@ -2,64 +2,34 @@
 #include "GSGameplay.h"
 
 #include "CmdArgs.h"
-#include "ai.h"
 #include "eyecandy.h"
 #include "FileList.h"
-#include "GameMode.h"
 #include "GameValues.h"
-#include "gfx.h"
 #include "joystick.h"
 #include "GSMenu.h"
-#include "InputFrame.h"
 #include "map.h"
-#include "MapList.h"
-#include "ObjectContainer.h"
-#include "objecthazard.h"
-#include "player.h"
-#include "RandomNumberGenerator.h"
-#include "Resimulation.h"
 #include "ResourceManager.h"
-#include "Score.h"
-#include "sfx.h"
 #include "SimulationState.h"
 #include "WorldTourStop.h"
 #include "NetOverlay.h"
 #include "rollback/NetGame.h"
 #include "rollback/Replay.h"
-#include "rollback/Snapshot.h"
 #include "MatchHistory.h"
 #include "rollback/StateChecksum.h"
 #include "rollback/SyncTest.h"
 #include "gamemodes/Chicken.h"
-#include "gamemodes/MiniBoss.h"
 #include "gamemodes/Tag.h"
 #include "objects/MysteryMushroomTempPlayer.h"
 #include "objects/carriable/CO_KuriboShoe.h"
 #include "objects/carriable/CO_Shell.h"
 #include "objects/carriable/CO_Spike.h"
-#include "objects/carriable/CO_ThrowBlock.h"
 #include "objects/carriable/CO_ThrowBox.h"
-#include "objects/blocks/BounceBlock.h"
-#include "objects/blocks/BreakableBlock.h"
-#include "objects/blocks/DonutBlock.h"
-#include "objects/blocks/FlipBlock.h"
-#include "objects/blocks/NoteBlock.h"
-#include "objects/blocks/OnOffSwitchBlock.h"
-#include "objects/blocks/PowerupBlock.h"
-#include "objects/blocks/SwitchBlock.h"
-#include "objects/blocks/ThrowBlock.h"
-#include "objects/blocks/ViewBlock.h"
-#include "objects/blocks/WeaponBreakableBlock.h"
-#include "objects/moving/MO_BulletBill.h"
-#include "objects/moving/MO_Coin.h"
-#include "objects/moving/MO_PirhanaPlant.h"
 #include "objects/powerup/PU_BobombPowerup.h"
 #include "objects/powerup/PU_BombPowerup.h"
 #include "objects/powerup/PU_BoomerangPowerup.h"
 #include "objects/powerup/PU_BulletBillPowerup.h"
 #include "objects/powerup/PU_ClockPowerup.h"
 #include "objects/powerup/PU_ExtraGuyPowerup.h"
-#include "objects/powerup/PU_FeatherPowerup.h"
 #include "objects/powerup/PU_FirePowerup.h"
 #include "objects/powerup/PU_HammerPowerup.h"
 #include "objects/powerup/PU_IceWandPowerup.h"
@@ -72,7 +42,6 @@
 #include "objects/powerup/PU_PWingsPowerup.h"
 #include "objects/powerup/PU_StarPowerup.h"
 #include "objects/powerup/PU_Tanooki.h"
-#include "objects/walkingenemy/WalkingEnemy.h"
 
 #include <format>
 #include <string>
@@ -104,7 +73,6 @@ GameplayState::GameplayState()
         respawnanimationframe[p] = 0;
     }
 
-
     //Vars that keep track of spinning the screen
     spinangle = 0.0f;
     spinspeed = 0.0f;
@@ -122,7 +90,6 @@ GameplayState& GameplayState::instance() {
 //-----------------------------------------------------------------------------
 // THE GAME LOOP
 //-----------------------------------------------------------------------------
-
 
 constexpr short iCountDownTimes[28] = {3, 3, 3, 15, 3, 3, 3, 3, 3, 3, 15, 3, 3, 3, 3, 3, 3, 15, 3, 3, 3, 3, 3, 3, 45, 3, 3, 3};
 constexpr short iCountDownAnnounce[28] = {-1, -1, -1, 12, -1, -1, -1, -1, -1, -1, 13, -1, -1, -1, -1, -1, -1, 14, -1, -1, -1, -1, -1, -1, 15, -1, -1, -1};
@@ -658,8 +625,6 @@ void start_gameplay()
     CleanUp();
     SetGameModeSettingsFromMenu();
     game_values.appstate = AppState::Game;
-
-    //secretBoss();
 
     if (game_values.music) {
         musiclist->setRandomMusic(static_cast<MusicCategory>(g_map->musicCategoryID), "", "");

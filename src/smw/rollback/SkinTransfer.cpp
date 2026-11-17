@@ -443,16 +443,6 @@ std::string SkinExchange::pathOf(int peer, int localIndex) const
     return find(m_remote[static_cast<size_t>(peer)].skin[static_cast<size_t>(localIndex)].hash);
 }
 
-const SkinRef& SkinExchange::refOf(int peer, int localIndex) const
-{
-    static const SkinRef none;
-    if (peer < 0 || peer >= net::MAX_PEERS || localIndex < 0 || localIndex >= SKIN_PLAYERS)
-        return none;
-    if (peer == m_localPeer)
-        return static_cast<size_t>(localIndex) < m_localRef.size() ? m_localRef[static_cast<size_t>(localIndex)] : none;
-    return m_remote[static_cast<size_t>(peer)].skin[static_cast<size_t>(localIndex)];
-}
-
 bool SkinExchange::downloading(int peer, int localIndex) const
 {
     if (peer < 0 || peer >= net::MAX_PEERS || peer == m_localPeer || localIndex < 0 || localIndex >= SKIN_PLAYERS)

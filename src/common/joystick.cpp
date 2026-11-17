@@ -64,11 +64,6 @@ void JoystickManager::handleEvent(const SDL_Event& event)
     }
 }
 
-bool JoystickManager::isAttached(SDL_JoystickID deviceId) const
-{
-    return deviceId != DEVICE_KEYBOARD_ID && m_opened.contains(deviceId);
-}
-
 std::string JoystickManager::nameFor(SDL_JoystickID deviceId) const
 {
     if (const char* name = SDL_GetJoystickNameForID(deviceId))

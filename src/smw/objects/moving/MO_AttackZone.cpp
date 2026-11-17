@@ -7,7 +7,6 @@
 #include "objects/carriable/CO_ThrowBlock.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-
 //------------------------------------------------------------------------------
 // attack zone(invisible area that kills objects and players)
 //------------------------------------------------------------------------------
@@ -48,15 +47,6 @@ bool MO_AttackZone::collide(CPlayer* player)
 
     return true;
 }
-
-/*void MO_AttackZone::draw()
-{
-        if (!dead)
-        {
-                SDL_Rect r = {ix, iy, collisionWidth, collisionHeight};
-                SDL_FillRect(blitdest, &r, 0xf000);
-        }
-}*/
 
 void MO_AttackZone::update()
 {

@@ -10,7 +10,6 @@ enum class AwardStyle : unsigned char;
 enum class ScoreboardStyle : unsigned char;
 enum class SpawnStyle : unsigned char;
 
-
 class UI_EyeCandyOptionsMenu : public UI_Menu {
 public:
     UI_EyeCandyOptionsMenu();
@@ -26,8 +25,4 @@ private:
     MI_SelectField<bool>* miDeadTeamNoticeField;
 
     MI_Button* miEyeCandyOptionsMenuBackButton;
-
-    MI_Image* miEyeCandyOptionsMenuLeftHeaderBar;
-    MI_Image* miEyeCandyOptionsMenuRightHeaderBar;
-    MI_Text* miEyeCandyOptionsMenuHeaderText;
 };

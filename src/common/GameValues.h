@@ -80,7 +80,6 @@ struct GameplayFlags {
     bool spotlights = false;
 };
 
-
 // How often the game renders, stored in CGameConfig::framelimiter (a byte in
 // the old options.bin). The simulation always ticks every 16 ms (62.5 Hz).
 // Any other value (e.g. an old frame delay) means VSync.
@@ -157,7 +156,7 @@ public:
     short		shieldtime;
     ShieldStyle shieldstyle;
     bool		showwinningcrown;
-	short		skinids[4];
+    short		skinids[4];
     short		wandlimit;
     TournamentControlStyle tournamentcontrolstyle;  //ID for the player selected control style
     short		wandfreezetime;
@@ -250,7 +249,6 @@ public:
     short		loadedmusic;
 
     short		cputurn;
-
 
     //Player input used during game.  Reads SDL_Events and sets buttons that were pressed
 

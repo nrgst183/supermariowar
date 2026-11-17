@@ -12,7 +12,6 @@
 
 #include <cmath>
 
-
 MI_BonusWheel::MI_BonusWheel(short x, short y)
     : UI_Control(x, y)
 {
@@ -44,7 +43,7 @@ MenuCodeEnum MI_BonusWheel::Modify(bool fModify)
         float dWinddownAngle = dSelectionSpeed / 2.0f * dNumWinddownSteps;
         float dFinalAngle = dSelectionAngle + dWinddownAngle;
 
-               //Bring the radians back down to between 0 and TWO_PI to do comparisons to the powerups on the wheel
+        //Bring the radians back down to between 0 and TWO_PI to do comparisons to the powerups on the wheel
         while (dFinalAngle > TWO_PI)
             dFinalAngle -= TWO_PI;
 
@@ -54,7 +53,7 @@ MenuCodeEnum MI_BonusWheel::Modify(bool fModify)
                 iSelectedPowerup = iChosenPowerups[iSector + 1 >= NUMBONUSITEMSONWHEEL ? 0 : iSector + 1];
                 float dNewWinddownAngle = dWinddownAngle + (iSector + 1) * dSectorSize - dFinalAngle;
 
-                       //Determine the speed we need to exactly hit the selected powerup when the selector winds down
+                //Determine the speed we need to exactly hit the selected powerup when the selector winds down
                 dSelectionWinddownSpeed = dSelectionSpeed / (dNewWinddownAngle * 2.0f / dSelectionSpeed + 1.0f);
                 break;
             }
@@ -142,13 +141,13 @@ void MI_BonusWheel::Update()
                 miContinueButton->setVisible(true);
                 miContinueButton->Select(true);
 
-                       //Reset all player's stored item
+                //Reset all player's stored item
                 if (!game_values.keeppowerup) {
                     for (short iPlayer = 0; iPlayer < 4; iPlayer++)
                         game_values.storedpowerups[iPlayer] = -1;
                 }
 
-                       //Give the newly won stored item to the winning players
+                //Give the newly won stored item to the winning players
                 for (short iPlayer = 0; iPlayer < game_values.teamcounts[iWinningTeam]; iPlayer++)
                     game_values.storedpowerups[game_values.teamids[iWinningTeam][iPlayer]] = iSelectedPowerup;
 
@@ -158,7 +157,7 @@ void MI_BonusWheel::Update()
 
         dSelectionAngle += dSelectionSpeed;
 
-               //If we hit the next powerup, play a tick sound
+        //If we hit the next powerup, play a tick sound
         if (dSelectionAngle >= dSelectionSector[iNextSelectionSoundIndex]) {
             ifSoundOnPlay(rm->sfx_worldmove);
 
@@ -213,12 +212,12 @@ void MI_BonusWheel::Reset(bool fTournament)
     else
         iWinningTeam = game_values.gamemode->winningteam;
 
-           //Randomly display the powerups around the ring
+    //Randomly display the powerups around the ring
     short iCountWeight = 0;
     for (short iPowerup = 0; iPowerup < NUM_POWERUPS; iPowerup++)
         iCountWeight += game_values.powerupweights[iPowerup];
 
-           //Always have at least 1 poison mushroom to try to avoid
+    //Always have at least 1 poison mushroom to try to avoid
     short iPoisonMushroom = RANDOM_INT(NUMBONUSITEMSONWHEEL);
 
     for (short iPowerup = 0; iPowerup < NUMBONUSITEMSONWHEEL; iPowerup++) {
@@ -236,7 +235,7 @@ void MI_BonusWheel::Reset(bool fTournament)
         iChosenPowerups[iPowerup] = iChoosePowerup;
     }
 
-           //Setup player images on wheel
+    //Setup player images on wheel
     miPlayerImages.clear();
 
     iNumPlayers = game_values.teamcounts[iWinningTeam];
@@ -247,17 +246,17 @@ void MI_BonusWheel::Reset(bool fTournament)
         iPlayerX += 34;
     }
 
-           //Indicate that the player hasn't choosen a powerup yet
+    //Indicate that the player hasn't choosen a powerup yet
     iPressSelectTimer = 0;
     fPressedSelect = false;
     fPowerupSelectionDone = false;
     miContinueButton->setVisible(false);
 
-           //Counters to animate the selector's wings
+    //Counters to animate the selector's wings
     iSelectorAnimation = 0;
     iSelectorAnimationCounter = 0;
 
-           //Figure out the initial position and speed of the selector
+    //Figure out the initial position and speed of the selector
     dSelectionSpeed = static_cast<float>(RANDOM_INT(100) + 200) * 0.0005f;
     dSelectionAngle = static_cast<float>(RANDOM_INT(NUMBONUSITEMSONWHEEL)) * TWO_PI / static_cast<float>(NUMBONUSITEMSONWHEEL);
     dSelectionSpeedGoal = static_cast<float>(RANDOM_INT(100) + 200) * 0.0005f;
@@ -270,7 +269,7 @@ void MI_BonusWheel::Reset(bool fTournament)
             break;
     }
 
-           //Figure out if only cpus are on the winning team, if so, the wheel will be stopped early
+    //Figure out if only cpus are on the winning team, if so, the wheel will be stopped early
     fCpuControlled = true;
     for (short iPlayer = 0; iPlayer < game_values.teamcounts[iWinningTeam]; iPlayer++) {
         if (game_values.playercontrol[game_values.teamids[iWinningTeam][iPlayer]] == 1)

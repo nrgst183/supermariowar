@@ -8,7 +8,6 @@ class MI_Text;
 enum class BoomerangStyle : unsigned char;
 template<typename T> class MI_SelectField;
 
-
 class UI_ProjectileOptionsMenu : public UI_Menu {
 public:
     UI_ProjectileOptionsMenu();
@@ -37,8 +36,4 @@ private:
     MI_Text* miShellText;
     MI_Text* miWandText;
     MI_Text* miBlueBlockText;
-
-    MI_Image* miProjectileOptionsMenuLeftHeaderBar;
-    MI_Image* miProjectileOptionsMenuRightHeaderBar;
-    MI_Text* miProjectileOptionsMenuHeaderText;
 };

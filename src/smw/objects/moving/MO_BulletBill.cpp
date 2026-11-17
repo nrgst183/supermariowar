@@ -12,7 +12,6 @@
 #include "objects/carriable/CO_ThrowBox.h"
 #include "objects/moving/MO_Explosion.h"
 
-
 //------------------------------------------------------------------------------
 // class bulletbill
 //------------------------------------------------------------------------------
@@ -67,8 +66,7 @@ MO_BulletBill::MO_BulletBill(gfxSprite* nspr, gfxSprite* nsprdead, Vec2s pos, fl
 
 void MO_BulletBill::update()
 {
-    setXf(fx + velx);
-    // setYf(fy + vely);
+    setXf(fx + velx);    //(only sideways)
 
     animate();
 
@@ -129,7 +127,6 @@ bool MO_BulletBill::collide(CPlayer* player)
 
     return false;
 }
-
 
 bool MO_BulletBill::hittop(CPlayer* player)
 {

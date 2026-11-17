@@ -87,8 +87,6 @@ public:
 
     // The file of the skin of a peer's local player, "" while it isn't here (yet)
     std::string pathOf(int peer, int localIndex) const;
-    // The announced skin of a peer's local player (default: invalid)
-    const SkinRef& refOf(int peer, int localIndex) const;
     // True while the skin of this player is being downloaded
     bool downloading(int peer, int localIndex) const;
     // Grows whenever a skin became available or the announcements changed

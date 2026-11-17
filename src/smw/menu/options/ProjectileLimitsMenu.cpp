@@ -7,7 +7,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-
 UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     : UI_Menu()
 {
@@ -158,10 +157,6 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miProjectilesLimitsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miProjectilesLimitsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
-    miProjectilesLimitsMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miProjectilesLimitsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miProjectilesLimitsMenuHeaderText = new MI_HeaderText("Weapon Use Limits Menu", 320, 5);
-
     AddControl(miFireballLimitField, miProjectilesLimitsMenuBackButton, miHammerLimitField, nullptr, miProjectilesLimitsMenuBackButton);
     AddControl(miHammerLimitField, miFireballLimitField, miBoomerangLimitField, nullptr, miProjectilesLimitsMenuBackButton);
     AddControl(miBoomerangLimitField, miHammerLimitField, miFeatherLimitField, nullptr, miProjectilesLimitsMenuBackButton);
@@ -174,9 +169,7 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
 
     AddControl(miProjectilesLimitsMenuBackButton, miWandLimitField, miFireballLimitField, miWandLimitField, nullptr);
 
-    AddNonControl(miProjectilesLimitsMenuLeftHeaderBar);
-    AddNonControl(miProjectilesLimitsMenuRightHeaderBar);
-    AddNonControl(miProjectilesLimitsMenuHeaderText);
+    AddTitleBar("Weapon Use Limits Menu");
 
     setInitialFocus(miFireballLimitField);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);

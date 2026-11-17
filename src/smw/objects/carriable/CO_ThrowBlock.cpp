@@ -7,7 +7,6 @@
 #include "ResourceManager.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-
 //------------------------------------------------------------------------------
 // class throwable block projectile
 //------------------------------------------------------------------------------
@@ -223,15 +222,6 @@ void CO_ThrowBlock::Drop()
 
 void CO_ThrowBlock::Kick()
 {
-    /*
-    if (superkick)
-    {
-        vel = 12.0f;
-        fSmoking = true;
-        ifSoundOnPlay(rm->sfx_cannon);
-    }
-    */
-
     iDeathTime = 0;
 
     float fVel, fPlayerBonusVel = owner->velx / 2.0f;
@@ -239,16 +229,10 @@ void CO_ThrowBlock::Kick()
         fVel = 6.5f;
         if (fPlayerBonusVel > 0.0f)
             fVel += fPlayerBonusVel;
-
-        // if (fVel >= 9.0f)
-        //	fSmoking = true;
     } else {
         fVel = -6.5f;
         if (fPlayerBonusVel < 0.0f)
             fVel += fPlayerBonusVel;
-
-        // if (fVel <= -9.0f)
-        //	fSmoking = true;
     }
 
     velx = fVel;

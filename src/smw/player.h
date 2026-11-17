@@ -219,17 +219,17 @@ public:
 
 private:
 
-		void updateSprite();
-		void Jump(short iMove, float jumpModifier, bool fKuriboBounce);
+        void updateSprite();
+        void Jump(short iMove, float jumpModifier, bool fKuriboBounce);
 
-		void update_waitingForRespawn();
-		void update_respawning();
-		void update_usePowerup();
-		void updateFrozenStatus(int keymask);
+        void update_waitingForRespawn();
+        void update_respawning();
+        void update_usePowerup();
+        void updateFrozenStatus(int keymask);
 
-		void tryFallingThroughPlatform(short);
+        void tryFallingThroughPlatform(short);
 
-		void ClearPowerupStates();
+        void ClearPowerupStates();
 
         void setXf(float xf) {
             fx = xf;
@@ -249,42 +249,42 @@ private:
         }
 
         void trySuperJumping(short movement_direction);
-		void tryCapeDoubleJump(short movement_direction);
-		void tryStartFlying();
-		void tryShakingTail();
-		void tryReleasingPowerup();
-		void useSpecialPowerup();
-		void releaseCarriedItem();
-		void updateFlyingStatus();
-		void enableFreeFall();
+        void tryCapeDoubleJump(short movement_direction);
+        void tryStartFlying();
+        void tryShakingTail();
+        void tryReleasingPowerup();
+        void useSpecialPowerup();
+        void releaseCarriedItem();
+        void updateFlyingStatus();
+        void enableFreeFall();
 
-		void accelerate(float);
-		void accelerateRight();
-		void accelerateLeft();
-		void decreaseVelocity();
+        void accelerate(float);
+        void accelerateRight();
+        void accelerateLeft();
+        void decreaseVelocity();
 
-		bool FindSpawnPoint();
-		void collision_detection_map();
-		void flipsidesifneeded();
-		void makeinvincible();
-		void makefrozen(short iTime);
-		void turnslowdownon();
-		bool isstomping(CPlayer * o);
+        bool FindSpawnPoint();
+        void collision_detection_map();
+        void flipsidesifneeded();
+        void makeinvincible();
+        void makefrozen(short iTime);
+        void turnslowdownon();
+        bool isstomping(CPlayer * o);
 
-		void mapcolldet_handlePlatformVelocity(float &fPlatformVelX, float &fPlatformVelY);
-		bool mapcolldet_handleOutOfScreen();
-		void mapcolldet_moveHorizontally(short direction);
-		void mapcolldet_moveUpward(short, short, short, short, short, float);
-		void mapcolldet_moveDownward(short, short, short, short, short, float);
+        void mapcolldet_handlePlatformVelocity(float &fPlatformVelX, float &fPlatformVelY);
+        bool mapcolldet_handleOutOfScreen();
+        void mapcolldet_moveHorizontally(short direction);
+        void mapcolldet_moveUpward(short, short, short, short, short, float);
+        void mapcolldet_moveDownward(short, short, short, short, short, float);
 
-		PlayerCollisions collisions;
-		PlayerAwardEffects awardeffects;
+        PlayerCollisions collisions;
+        PlayerAwardEffects awardeffects;
 
-		PlayerKillType KillPlayerMapHazard(bool fForce, KillStyle ks, bool fKillCarriedItem, short iPlayerId = -1);
+        PlayerKillType KillPlayerMapHazard(bool fForce, KillStyle ks, bool fKillCarriedItem, short iPlayerId = -1);
 
-		bool canSuperStomp() const;
-		bool wantsToSuperStomp() const;
-		bool highJumped() const;
+        bool canSuperStomp() const;
+        bool wantsToSuperStomp() const;
+        bool highJumped() const;
 
         void draw_spotlight();
         void draw_powerupRing();
@@ -292,269 +292,267 @@ private:
 
         void triggerPowerup();
 
-		COutputControl * playerKeys;
-		SDL_JoystickID playerDevice;
+        COutputControl * playerKeys;
+        SDL_JoystickID playerDevice;
 
         // tanooki
         PlayerTanookiSuit tanookisuit;
 
-		CScore *score;
-		short killsinrow;
-		short killsinrowinair;
+        CScore *score;
+        short killsinrow;
+        short killsinrowinair;
 
-		short localID;
-		short subTeamID;
-		short colorID;
+        short localID;
+        short subTeamID;
+        short colorID;
 
-		short ix, iy;			//x, y coordinate (top left of the player rectangle)
-		float fx, fy;
-		float velx, vely;	//velocity on x, y axis
-		float fOldX, fOldY;
-		float fPrecalculatedY = 0.0f;
-		float oldvelx;
+        short ix, iy;			//x, y coordinate (top left of the player rectangle)
+        float fx, fy;
+        float velx, vely;	//velocity on x, y axis
+        float fOldX, fOldY;
+        float fPrecalculatedY = 0.0f;
+        float oldvelx;
 
-		float fNewSwapX, fNewSwapY; //For moving players around during player swap effect
-		float fOldSwapX, fOldSwapY;
-		short iSrcOffsetX;
+        float fNewSwapX, fNewSwapY; //For moving players around during player swap effect
+        float fOldSwapX, fOldSwapY;
+        short iSrcOffsetX;
 
-		short iNewPowerupX, iNewPowerupY;  //For moving powerups around during player swap effect
-		short iOldPowerupX, iOldPowerupY;
+        short iNewPowerupX, iNewPowerupY;  //For moving powerups around during player swap effect
+        short iOldPowerupX, iOldPowerupY;
 
-		bool inair;			//true... player is in the air, false... player is on the ground
-							//inair is set in CPlayer::collision_detection_map()
-		bool onice;			//on ice... friction goes way down
+        bool inair;			//true... player is in the air, false... player is on the ground
+                            //inair is set in CPlayer::collision_detection_map()
+        bool onice;			//on ice... friction goes way down
 
-		bool lockjump;		//is the player allowed to jump
-		bool lockfall;		//on PC verion, the down key makes player fall through solid_on_top tiles
-		bool lockfire;		//the player is allowed to shoot a fireball
-		short throw_star;
+        bool lockjump;		//is the player allowed to jump
+        bool lockfall;		//on PC verion, the down key makes player fall through solid_on_top tiles
+        bool lockfire;		//the player is allowed to shoot a fireball
+        short throw_star;
 
-		short extrajumps;	//true when player has used a feather jump in air (only allow one feather jump per time in air)
-		bool flying = false;
-		short flyingtimer = 0;
+        short extrajumps;	//true when player has used a feather jump in air (only allow one feather jump per time in air)
+        bool flying = false;
+        short flyingtimer = 0;
 
-		PlayerTail tail;
-		PlayerSpinStatus spin;
-		PlayerWings wings;
+        PlayerTail tail;
+        PlayerSpinStatus spin;
+        PlayerWings wings;
 
-		short superjumptimer;		//this is true when a player is able to do a super jump off a note block
-		short superjumptype;		//type of the note block they hit
-		short hammertimer;		//Only allow the player to throw powerful hammers so fast
+        short superjumptimer;		//this is true when a player is able to do a super jump off a note block
+        short superjumptype;		//type of the note block they hit
+        short hammertimer;		//Only allow the player to throw powerful hammers so fast
 
-		short frictionslidetimer;  //this controls how much friction smoke is generated when sliding
-		short rainsteptimer;
+        short frictionslidetimer;  //this controls how much friction smoke is generated when sliding
+        short rainsteptimer;
 
-		CPlayerAI * pPlayerAI;
+        CPlayerAI * pPlayerAI;
 
-		SpriteStrip* sprites;
+        SpriteStrip* sprites;
 
-		uint8_t sprite_state;
-		short sprswitch;
+        uint8_t sprite_state;
+        short sprswitch;
 
-		PlayerInvincibility invincibility;
-		PlayerShield shield;
+        PlayerInvincibility invincibility;
+        PlayerShield shield;
 
-		bool frozen;
-		short frozentimer;
+        bool frozen;
+        short frozentimer;
 
-		PlayerKuriboShoe kuriboshoe;
-		PlayerSecretCode secretcode;
-		PlayerCardCollection cardcollection;
+        PlayerKuriboShoe kuriboshoe;
+        PlayerSecretCode secretcode;
+        PlayerCardCollection cardcollection;
 
-		PlayerSuperStomp superstomp;
-		PlayerBurnupTimer burnup;
-		PlayerOutOfArenaTimer outofarena;
-		PlayerSuicideTimer suicidetimer;
+        PlayerSuperStomp superstomp;
+        PlayerBurnupTimer burnup;
+        PlayerOutOfArenaTimer outofarena;
+        PlayerSuicideTimer suicidetimer;
 
-		PlayerAction action;
+        PlayerAction action;
 
-		short powerup;
-		short projectilelimit;
-		int projectiles;
+        short powerup;
+        short projectilelimit;
+        int projectiles;
 
-		bool bobomb;
+        bool bobomb;
 
-		PlayerCape cape;
+        PlayerCape cape;
 
-		PlayerState state;
-		float spawnradius;
-		float spawnangle;
-		short spawntimer;
+        PlayerState state;
+        float spawnradius;
+        float spawnangle;
+        short spawntimer;
 
-		short waittimer;
-		short * respawncounter;
+        short waittimer;
+        short * respawncounter;
 
-		PlayerWarpStatus warpstatus;
+        PlayerWarpStatus warpstatus;
 
-		std::optional<PowerupType> powerupused;
-		float powerupradius;
-		float powerupangle;
+        std::optional<PowerupType> powerupused;
+        float powerupradius;
+        float powerupangle;
 
-		//Pointer to the object the player is carrying
-		bool fAcceptingItem;
-		bool fPressedAcceptItem;
-		MO_CarriedObject * carriedItem;
+        //Pointer to the object the player is carrying
+        bool fAcceptingItem;
+        bool fPressedAcceptItem;
+        MO_CarriedObject * carriedItem;
 
-		//Pointer to the platform the player is riding
-		MovingPlatform * platform;
-		short iHorizontalPlatformCollision;
-		short iVerticalPlatformCollision;
-		short iPlatformCollisionPlayerId;
+        //Pointer to the platform the player is riding
+        MovingPlatform * platform;
+        short iHorizontalPlatformCollision;
+        short iVerticalPlatformCollision;
+        short iPlatformCollisionPlayerId;
 
-		//ID of the player that owns this player for Owned mode
-		short ownerPlayerID;
-		short ownerColorOffsetX;
+        //ID of the player that owns this player for Owned mode
+        short ownerPlayerID;
+        short ownerColorOffsetX;
 
-		//If greater than 0, the player is jailed and moves slowly for Jail mode
-		PlayerJail jail;
+        //If greater than 0, the player is jailed and moves slowly for Jail mode
+        PlayerJail jail;
 
+        bool fallthrough;
 
-		bool fallthrough;
+        short diedas;  //What sprite the player died as 0 == mario, 1 == chocobo, 2 == bobomb
 
-		short diedas;  //What sprite the player died as 0 == mario, 1 == chocobo, 2 == bobomb
+        short spawntext;
 
-		short spawntext;
+        short iSuicideCreditPlayerID;
+        short iSuicideCreditTimer;
 
-		short iSuicideCreditPlayerID;
-		short iSuicideCreditTimer;
+        void TransferTag(CPlayer * o2);
+        void TransferShyGuy(CPlayer * o2);
+        void BounceAssistPlayer(CPlayer * o2);
 
-		void TransferTag(CPlayer * o2);
-		void TransferShyGuy(CPlayer * o2);
-		void BounceAssistPlayer(CPlayer * o2);
+        friend bool coldec_player2player(CPlayer * o1, CPlayer * o2);
+        friend bool coldec_player2obj(CPlayer * o1, CObject * o2);
+        friend bool collisionhandler_p2o(CPlayer * o1, CObject * o2);
 
-		friend bool coldec_player2player(CPlayer * o1, CPlayer * o2);
-		friend bool coldec_player2obj(CPlayer * o1, CObject * o2);
-		friend bool collisionhandler_p2o(CPlayer * o1, CObject * o2);
+        friend PlayerKillType PlayerKilledPlayer(short iKiller, CPlayer * killed, PlayerDeathStyle deathstyle, KillStyle style, bool fForce, bool fKillCarriedItem);
+        PlayerKillType KilledPlayer(CPlayer * killed, PlayerDeathStyle deathstyle, KillStyle style, bool fForce, bool fKillCarriedItem);
 
-		friend PlayerKillType PlayerKilledPlayer(short iKiller, CPlayer * killed, PlayerDeathStyle deathstyle, KillStyle style, bool fForce, bool fKillCarriedItem);
-		PlayerKillType KilledPlayer(CPlayer * killed, PlayerDeathStyle deathstyle, KillStyle style, bool fForce, bool fKillCarriedItem);
+        friend void RemovePlayersButHighestScoring();
+        friend void RemovePlayersButTeam(short teamID);
+        friend bool RemoveTeam(short teamid);
+        friend short CountAliveTeams(short * lastteam);
+            friend void shakeScreen();
+            friend void handleP2PCollisions();
+            friend void handleP2ObjCollisions();
+            friend void drawScoreboard(short int*);
+            friend void drawPlayerSwap();
 
-		friend void RemovePlayersButHighestScoring();
-		friend void RemovePlayersButTeam(short teamID);
-		friend bool RemoveTeam(short teamid);
-		friend short CountAliveTeams(short * lastteam);
-			friend void shakeScreen();
-			friend void handleP2PCollisions();
-			friend void handleP2ObjCollisions();
-			friend void drawScoreboard(short int*);
-			friend void drawPlayerSwap();
+        friend class CObjectContainer;
 
-		friend class CObjectContainer;
+        friend class OMO_KingOfTheHillZone; // update()
 
-		friend class OMO_KingOfTheHillZone; // update()
+        friend class CGM_CaptureTheFlag; // playerkilledself()
+        friend class CGM_Chase; // think()
+        friend class CGM_Chicken; // think()
+        friend class CGM_Eggs; // playerkilledself()
+        friend class CGM_Frenzy; // think()
+        friend class CGM_Owned; // think()
+        friend class CGM_ShyGuyTag; // init()
+        friend class CGM_Star; // think()
 
-		friend class CGM_CaptureTheFlag; // playerkilledself()
-		friend class CGM_Chase; // think()
-		friend class CGM_Chicken; // think()
-		friend class CGM_Eggs; // playerkilledself()
-		friend class CGM_Frenzy; // think()
-		friend class CGM_Owned; // think()
-		friend class CGM_ShyGuyTag; // init()
-		friend class CGM_Star; // think()
+        friend class IO_Block;
+        friend class B_NoteBlock;
+        friend class B_BreakableBlock;
+        friend class B_PowerupBlock;
+        friend class B_DonutBlock;
+        friend class B_FlipBlock;
+        friend class B_BounceBlock;
+        friend class B_ThrowBlock;
+        friend class B_OnOffSwitchBlock;
+        friend class B_SwitchBlock;
+        friend class B_WeaponBreakableBlock;
 
-		friend class IO_Block;
-		friend class B_NoteBlock;
-		friend class B_BreakableBlock;
-		friend class B_PowerupBlock;
-		friend class B_DonutBlock;
-		friend class B_FlipBlock;
-		friend class B_BounceBlock;
-		friend class B_ThrowBlock;
-		friend class B_OnOffSwitchBlock;
-		friend class B_SwitchBlock;
-		friend class B_WeaponBreakableBlock;
-
-		friend class PU_ExtraGuyPowerup;
-		friend class PU_StarPowerup;
-		friend class PU_PoisonPowerup;
-		friend class PU_MysteryMushroomPowerup;
+        friend class PU_ExtraGuyPowerup;
+        friend class PU_StarPowerup;
+        friend class PU_PoisonPowerup;
+        friend class PU_MysteryMushroomPowerup;
         friend class PU_Tanooki;
-		friend class PU_ExtraHeartPowerup;
-		friend class MysteryMushroomTempPlayer;
-		friend class PU_TreasureChestBonus;
-		friend class PU_CoinPowerup;
+        friend class PU_ExtraHeartPowerup;
+        friend class MysteryMushroomTempPlayer;
+        friend class PU_TreasureChestBonus;
+        friend class PU_CoinPowerup;
 
-		friend class CO_Star;
-		friend class CO_Flag;
+        friend class CO_Star;
+        friend class CO_Flag;
 
-		friend class IO_MovingObject;
+        friend class IO_MovingObject;
 
-		friend class MO_Yoshi;
-		friend class OMO_Thwomp;
-		friend class MO_Podobo;
-		friend class OMO_BowserFire;
-		friend class OMO_Area;
-		friend class OMO_RaceGoal;
-		friend class MO_Explosion;
-		friend class MO_SpinAttack;
-		friend class MO_AttackZone;
-		friend class OMO_OrbitHazard;
-		friend class OMO_StraightPathHazard;
-		friend class IO_FlameCannon;
-		friend class MO_PirhanaPlant;
-		friend class OMO_PipeCoin;
-		friend class OMO_PipeBonus;
-		friend class OMO_Phanto;
+        friend class MO_Yoshi;
+        friend class OMO_Thwomp;
+        friend class MO_Podobo;
+        friend class OMO_BowserFire;
+        friend class OMO_Area;
+        friend class OMO_RaceGoal;
+        friend class MO_Explosion;
+        friend class MO_SpinAttack;
+        friend class MO_AttackZone;
+        friend class OMO_OrbitHazard;
+        friend class OMO_StraightPathHazard;
+        friend class IO_FlameCannon;
+        friend class MO_PirhanaPlant;
+        friend class OMO_PipeCoin;
+        friend class OMO_PipeBonus;
+        friend class OMO_Phanto;
 
-		friend class MO_CarriedObject;
+        friend class MO_CarriedObject;
 
 //		friend class MO_Fireball;
 //		friend class MO_SuperFireball;
-		friend class MO_Hammer;
-		friend class MO_IceBlast;
-		friend class MO_Boomerang;
-		friend class CO_Shell;
-		friend class CO_ThrowBlock;
-		friend class CO_Spring;
-		friend class CO_Spike;
-		friend class CO_Bomb;
-		friend class CO_KuriboShoe;
-		friend class CO_ThrowBox;
+        friend class MO_Hammer;
+        friend class MO_IceBlast;
+        friend class MO_Boomerang;
+        friend class CO_Shell;
+        friend class CO_ThrowBlock;
+        friend class CO_Spring;
+        friend class CO_Spike;
+        friend class CO_Bomb;
+        friend class CO_KuriboShoe;
+        friend class CO_ThrowBox;
 
-		friend class MO_SuperFireball;
-		friend class MO_SledgeHammer;
+        friend class MO_SuperFireball;
+        friend class MO_SledgeHammer;
 
-		friend class MO_WalkingEnemy;
-		friend class MO_Goomba;
-		friend class MO_Koopa;
-		friend class MO_BuzzyBeetle;
-		friend class MO_Spiny;
-		friend class MO_SledgeBrother;
-		friend class MO_CheepCheep;
-		friend class MO_BulletBill;
-		friend class MO_FlagBase;
+        friend class MO_WalkingEnemy;
+        friend class MO_Goomba;
+        friend class MO_Koopa;
+        friend class MO_BuzzyBeetle;
+        friend class MO_Spiny;
+        friend class MO_SledgeBrother;
+        friend class MO_CheepCheep;
+        friend class MO_BulletBill;
+        friend class MO_FlagBase;
 
-		friend class MO_BonusHouseChest;
+        friend class MO_BonusHouseChest;
 
-		friend class FallingPath;
-		friend class MovingPlatform;
+        friend class FallingPath;
+        friend class MovingPlatform;
 
-		friend bool SwapPlayers(short iUsingPlayerID);
-		friend CPlayer * GetPlayerFromGlobalID(short iGlobalID);
+        friend bool SwapPlayers(short iUsingPlayerID);
+        friend CPlayer * GetPlayerFromGlobalID(short iGlobalID);
 
-		friend class CPlayerAI;
-		friend class CSimpleAI;
+        friend class CPlayerAI;
+        friend class CSimpleAI;
 
+        friend class GameplayState;
 
-		friend class GameplayState;
+        friend class PlayerAwardEffects;
+        friend class PlayerBurnupTimer;
+        friend class PlayerCollisions;
+        friend class PlayerCape;
+        friend class PlayerJail;
+        friend class PlayerKuriboShoe;
+        friend class PlayerTanookiSuit;
+        friend class PlayerOutOfArenaTimer;
+        friend class PlayerSpinStatus;
+        friend class PlayerSuicideTimer;
+        friend class PlayerSuperStomp;
+        friend class PlayerTail;
+        friend class PlayerWarpStatus;
+        friend class PlayerWings;
+        friend class PlayerInvincibility;
 
-		friend class PlayerAwardEffects;
-		friend class PlayerBurnupTimer;
-		friend class PlayerCollisions;
-		friend class PlayerCape;
-		friend class PlayerJail;
-		friend class PlayerKuriboShoe;
-		friend class PlayerTanookiSuit;
-		friend class PlayerOutOfArenaTimer;
-		friend class PlayerSpinStatus;
-		friend class PlayerSuicideTimer;
-		friend class PlayerSuperStomp;
-		friend class PlayerTail;
-		friend class PlayerWarpStatus;
-		friend class PlayerWings;
-		friend class PlayerInvincibility;
-
-		friend struct rollback::PeerChecksumAccess;
+        friend struct rollback::PeerChecksumAccess;
 };
 
 // Owning list of the players of the current match. Access is non-owning:

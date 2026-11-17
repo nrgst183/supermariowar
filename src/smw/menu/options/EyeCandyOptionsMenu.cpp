@@ -7,7 +7,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-
 UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     : UI_Menu()
 {
@@ -73,10 +72,6 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miEyeCandyOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miEyeCandyOptionsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
-    miEyeCandyOptionsMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miEyeCandyOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miEyeCandyOptionsMenuHeaderText = new MI_HeaderText("Eye Candy Options Menu", 320, 5);
-
     AddControl(miSpawnStyleField, miEyeCandyOptionsMenuBackButton, miAwardStyleField, nullptr, miEyeCandyOptionsMenuBackButton);
     AddControl(miAwardStyleField, miSpawnStyleField, miScoreStyleField, nullptr, miEyeCandyOptionsMenuBackButton);
     AddControl(miScoreStyleField, miAwardStyleField, miCrunchField, nullptr, miEyeCandyOptionsMenuBackButton);
@@ -88,9 +83,7 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
 
     AddControl(miEyeCandyOptionsMenuBackButton, miDeadTeamNoticeField, miSpawnStyleField, miDeadTeamNoticeField, nullptr);
 
-    AddNonControl(miEyeCandyOptionsMenuLeftHeaderBar);
-    AddNonControl(miEyeCandyOptionsMenuRightHeaderBar);
-    AddNonControl(miEyeCandyOptionsMenuHeaderText);
+    AddTitleBar("Eye Candy Options Menu");
 
     setInitialFocus(miSpawnStyleField);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);

@@ -70,11 +70,11 @@ short			y_shake = 0;
 int				mouse_x, mouse_y;
 
 int bound_to_window_w(int x) {
-	return std::max(0, std::min(x, 640 - 1));
+    return std::max(0, std::min(x, 640 - 1));
 }
 
 int bound_to_window_h(int y) {
-	return std::max(0, std::min(y, 480 - 1));
+    return std::max(0, std::min(y, 480 - 1));
 }
 
 void bound_mouse_motion_coords() {
@@ -126,14 +126,14 @@ std::string g_szMessageLine[3];
 
 void SetTilesetTile(TilesetTile * tile, short iTileset, short iCol, short iRow)
 {
-	tile->iID = iTileset;
-	tile->iCol = iCol;
-	tile->iRow = iRow;
+    tile->iID = iTileset;
+    tile->iCol = iCol;
+    tile->iRow = iRow;
 }
 
 void ClearTilesetTile(TilesetTile * tile)
 {
-	SetTilesetTile(tile, TILESETNONE, 0, 0);
+    SetTilesetTile(tile, TILESETNONE, 0, 0);
 }
 
 bool g_fFullScreen = false;

@@ -10,9 +10,7 @@
 
 namespace fs = std::filesystem;
 
-
 std::string SMW_Root_Data_Dir;
-
 
 std::string GetHomeDirectory()
 {
@@ -84,12 +82,11 @@ bool FileExists(const std::string& path)
 #include <iostream>
 #include <CoreFoundation/CoreFoundation.h>
 
-
 /* Call this when your application launches */
 void Initialize_Paths()
 {
     if (!SMW_Root_Data_Dir.empty())
-		return;
+        return;
 
 #ifdef APPBUNDLE
     UInt8 temp[PATH_MAX];
@@ -101,7 +98,7 @@ void Initialize_Paths()
         return;
     }
 
-	dirURL = CFBundleCopyBundleURL(mainBundle);
+    dirURL = CFBundleCopyBundleURL(mainBundle);
 
     if (!CFURLGetFileSystemRepresentation(dirURL, TRUE, temp,
         PATH_MAX)) {
@@ -113,9 +110,9 @@ void Initialize_Paths()
 
     CFRelease(dirURL);
 #else
-	SMW_Root_Data_Dir = "./";
+    SMW_Root_Data_Dir = "./";
 #endif
-	printf("Located data folder at: %s\n", SMW_Root_Data_Dir.c_str());
+    printf("Located data folder at: %s\n", SMW_Root_Data_Dir.c_str());
 }
 #endif
 
@@ -128,18 +125,18 @@ std::string convertPath(const std::string& source)
 
     if (!are_paths_initialized) {
 //		#ifdef PREFIXPATH
-			SMW_Root_Data_Dir = RootDataDirectory;
+            SMW_Root_Data_Dir = RootDataDirectory;
 //		#endif
 
-		#ifdef __APPLE__
-			Initialize_Paths();
-		#endif
+        #ifdef __APPLE__
+            Initialize_Paths();
+        #endif
 
         size_t last_slash_pos = SMW_Root_Data_Dir.find_last_of("/");
         if (last_slash_pos != SMW_Root_Data_Dir.length() - 1)
             SMW_Root_Data_Dir += "/";
 
-		are_paths_initialized = true;
+        are_paths_initialized = true;
     }
 
     return SMW_Root_Data_Dir + source;

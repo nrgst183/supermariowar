@@ -2,13 +2,10 @@
 // lobby to the usual match menus and back. The backend is rollback/NetGame.h and NetLobby.h.
 #include "GSMenu.h"
 
-#include "rollback/MatchConfig.h"
 #include "rollback/NetGame.h"
 
-#include "GameMode.h"
 #include "GameValues.h"
 #include "MapList.h"
-#include "ResourceManager.h"
 #include "gamemodes/MiniBoss.h"
 #include "gamemodes/MiniBoxes.h"
 #include "gamemodes/MiniPipe.h"
@@ -37,7 +34,6 @@ std::string trimmed(const std::string& text)
 }
 
 } // namespace
-
 
 void MenuState::HostOnlineGame()
 {

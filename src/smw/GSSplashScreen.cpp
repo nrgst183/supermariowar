@@ -13,7 +13,6 @@
 #include "path.h"
 #include "ResourceManager.h"
 
-
 //-----------------------------------------------------------------------------
 // THE LOAD UP SEQUENCE + SPLASH SCREEN
 //-----------------------------------------------------------------------------
@@ -41,12 +40,8 @@ bool SplashScreenState::init()
 {
     rm->loadStartGraphics();
 
-//  gfx_loadimagenocolorkey(&rm->menu_dpi_logo, convertPath("gfx/packs/menu/splash_72dpi.png", menugraphicspacklist->current_name()));
-//  gfx_loadimagenocolorkey(&rm->menu_contest_winners, convertPath("gfx/packs/menu/splash_contest_winners.png", menugraphicspacklist->current_name()));
-
     menu_credits = std::make_unique<gfxSprite>();
     *menu_credits = ImageLoader(convertPath("gfx/packs/menu/splash_credits.png", menugraphicspacklist->currentPath())).create();
-
 
     return true;
 }
@@ -59,7 +54,6 @@ void SplashScreenState::update()
 
     while (SDL_PollEvent(&loop_event)) {
         switch (loop_event.type) {
-
         case SDL_EVENT_QUIT: {
             game_values.appstate = AppState::Quit;
             return;
@@ -131,7 +125,6 @@ void SplashScreenState::update()
         }
     }
 
-
     SDL_FillSurfaceRect(screen, nullptr, 0x0);
 
     if (state == 6 || state == 7 || state == 8) {
@@ -145,23 +138,19 @@ void SplashScreenState::update()
         rm->menu_version.draw(628 - rm->menu_version.getWidth(), 10); //smw logo
 
         rm->menu_font_large.setAlpha(static_cast<Uint8>(alpha));
-        //rm->menu_font_large.drawRightJustified(App::screenWidth * 0.98f, 45, "WIP");
 
         menu_credits->setalpha(static_cast<Uint8>(alpha));
         menu_credits->draw(227, 200);
     }
 
     if (state == 7) {
-//            _load_drawmsg("Loading...");
         rm->menu_font_large.drawCentered(App::screenWidth/2, App::screenHeight * 0.875f, "Loading...");
     } else if (state == 8) {
-//            _load_drawmsg("Press Any Key To Continue");
         rm->menu_font_large.drawCentered(App::screenWidth/2, App::screenHeight * 0.875f, "Press Any Key To Continue");
 
         eyecandy[2].cleanDeadObjects();
         eyecandy[2].update();
         eyecandy[2].draw();
-
     }
 
     // Only start loading after we displayed something, in the 2nd frame
@@ -189,7 +178,6 @@ void SplashScreenState::update()
         maplist->ApplyFilters(game_values.pfFilters);
 
         ifSoundOnPlay(rm->sfx_coin);
-
 
         state++;
     }

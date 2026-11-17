@@ -13,7 +13,6 @@
 
 #include <cmath>
 
-
 //------------------------------------------------------------------------------
 // class IO_PirhanaPlant - pirhana plant that appears on a certain frequency
 //------------------------------------------------------------------------------
@@ -29,9 +28,6 @@ MO_PirhanaPlant::MO_PirhanaPlant(Vec2s pos, short type, short freq, short direct
 
     movingObjectType = movingobject_pirhanaplant;
 
-    // iHiddenPlane = y;
-    // iHiddenDirection = 2 - ((direction / 2) * 2);
-
     state = 0;
     SetNewTimer();
 
@@ -44,19 +40,6 @@ MO_PirhanaPlant::MO_PirhanaPlant(Vec2s pos, short type, short freq, short direct
         iy += 32;
     else if (direction == 2)
         ix += 32;
-
-    /*
-    if (iType == 0 || iType == 1)
-    {
-        iSrcX = iDirection * 128;
-        iSrcY = iType * 48;
-    }
-    else if (iType == 2 || iType == 3)
-    {
-        iSrcX = iDirection * 64;
-        iSrcY = iType * 48 + (iType == 3 ? 16 : 0);
-    }
-    */
 
     if (iDirection <= 1) {
         if (iType == 2)
@@ -82,7 +65,6 @@ MO_PirhanaPlant::MO_PirhanaPlant(Vec2s pos, short type, short freq, short direct
     collisionOffsetY = 0;
 
     iAnimationTimer = 0;
-    // iAnimationX = 0;
 
     iActionTimer = RANDOM_INT(8);
     iFrame = 0;
@@ -135,7 +117,6 @@ void MO_PirhanaPlant::update()
             SetNewTimer();
         }
     }
-
 
     if (iType == 1) {  // face the plant towards the nearest player
         // Don't do this every frame, just once every 8 frames
@@ -201,9 +182,6 @@ void MO_PirhanaPlant::draw()
             rm->spr_hazard_pirhanaplant[0].draw(ix, iy, {rect->x, rect->y, collisionWidth, 32});
         else
             rm->spr_hazard_pirhanaplant[0].draw(ix, iy, {rect->x + iw - collisionWidth, rect->y, collisionWidth, 32});
-
-        // SDL_Rect r = {ix, iy, collisionWidth, collisionHeight};
-        // SDL_FillRect(blitdest, &r, 0xf000);
     }
 }
 
@@ -338,7 +316,6 @@ float MO_PirhanaPlant::GetFireballAngle()
         else if (iFrame == 3)
             return 0.4202f;
     } else {
-
         if (iFrame == 0)
             return -1.9910f;
         else if (iFrame == 1)

@@ -1,12 +1,8 @@
 #include "objectgame.h"
 
 #include "eyecandy.h"
-#include "Game.h"
 #include "GameMode.h"
 #include "GameValues.h"
-#include "ObjectContainer.h"
-#include "player.h"
-#include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "objects/moving/MO_Coin.h"
@@ -21,7 +17,6 @@
 #include "objects/powerup/PU_ExtraGuyPowerup.h"
 #include "objects/powerup/PU_ExtraHeartPowerup.h"
 #include "objects/powerup/PU_ExtraTimePowerup.h"
-#include "objects/powerup/PU_FeatherPowerup.h"
 #include "objects/powerup/PU_FirePowerup.h"
 #include "objects/powerup/PU_HammerPowerup.h"
 #include "objects/powerup/PU_IceWandPowerup.h"
@@ -36,7 +31,6 @@
 #include "objects/powerup/PU_SecretPowerup.h"
 #include "objects/powerup/PU_StarPowerup.h"
 #include "objects/powerup/PU_Tanooki.h"
-
 
 namespace {
 IO_MovingObject* spawnRegularPowerup(PowerupType type, Vec2s spawnPos, bool movesRight)
@@ -106,7 +100,6 @@ IO_MovingObject* spawnSpecialPowerup(short type, Vec2s spawnPos)
 }
 } // namespace
 
-
 void removeifprojectile(IO_MovingObject * object, bool playsound, bool forcedead)
 {
     if (object->dead)
@@ -122,10 +115,10 @@ void removeifprojectile(IO_MovingObject * object, bool playsound, bool forcedead
         }
 
         if (fDie || forcedead) {
-        	CPlayer * player = GetPlayerFromGlobalID(iPlayerID);
+            CPlayer * player = GetPlayerFromGlobalID(iPlayerID);
 
             if (player != nullptr)
-        		player->decreaseProjectilesCount();
+                player->decreaseProjectilesCount();
 
             object->dead = true;
             eyecandy[2].emplace<EC_SingleAnimation>(&rm->spr_fireballexplosion, object->x() + (object->iw >> 1) - 16, object->y() + (object->ih >> 1) - 16, 3, 4);

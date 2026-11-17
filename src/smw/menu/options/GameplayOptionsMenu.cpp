@@ -7,7 +7,6 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
-
 UI_GameplayOptionsMenu::UI_GameplayOptionsMenu()
     : UI_Menu()
 {
@@ -135,10 +134,6 @@ UI_GameplayOptionsMenu::UI_GameplayOptionsMenu()
     miGameplayOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miGameplayOptionsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
-    miGameplayOptionsMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miGameplayOptionsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miGameplayOptionsMenuHeaderText = new MI_HeaderText("Gameplay Options Menu", 320, 5);
-
     AddControl(miRespawnField, miGameplayOptionsMenuBackButton, miShieldStyleField, nullptr, miGameplayOptionsMenuBackButton);
     AddControl(miShieldStyleField, miRespawnField, miShieldTimeField, nullptr, miGameplayOptionsMenuBackButton);
     AddControl(miShieldTimeField, miShieldStyleField, miBoundsTimeField, nullptr, miGameplayOptionsMenuBackButton);
@@ -152,9 +147,7 @@ UI_GameplayOptionsMenu::UI_GameplayOptionsMenu()
 
     AddControl(miGameplayOptionsMenuBackButton, miSecretsField, miRespawnField, miSecretsField, nullptr);
 
-    AddNonControl(miGameplayOptionsMenuLeftHeaderBar);
-    AddNonControl(miGameplayOptionsMenuRightHeaderBar);
-    AddNonControl(miGameplayOptionsMenuHeaderText);
+    AddTitleBar("Gameplay Options Menu");
 
     setInitialFocus(miRespawnField);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);

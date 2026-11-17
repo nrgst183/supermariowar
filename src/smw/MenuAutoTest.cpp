@@ -4,12 +4,8 @@
 
 #include "CmdArgs.h"
 #include "FileList.h"
-#include "Game.h"
-#include "GameMode.h"
 #include "GameValues.h"
-#include "gfx.h"
 #include "GSGameplay.h"
-#include "menu/MatchHistoryMenu.h"
 #include "menu/EditorsMenu.h"
 #ifdef SMW_HAS_EDITORS
 #include "editors/CoEdit.h"
@@ -17,57 +13,18 @@
 #ifdef SMW_HAS_EDITORS
 #include "editors/EditorInput.h"
 #endif
-#include "GameplayStyles.h"
-#include "joystick.h"
-#include "map.h"
 #include "MapList.h"
-#include "path.h"
-#include "RandomNumberGenerator.h"
-#include "ResourceManager.h"
-#include "Score.h"
 #include "SimulationState.h"
-#include "gamemodes/BonusHouse.h"
-#include "gamemodes/MiniBoss.h"
-#include "gamemodes/MiniBoxes.h"
 #include "gamemodes/MiniPipe.h"
-#include "ui/MI_BonusWheel.h"
-#include "ui/MI_MapBrowser.h"
 #include "ui/MI_MapField.h"
-#include "ui/MI_MapFilterScroll.h"
 #include "ui/MI_SelectField.h"
-#include "ui/MI_TournamentScoreboard.h"
-#include "ui/MI_TourStop.h"
-#include "ui/MI_World.h"
-#include "Version.h"
-#include "world.h"
-#include "WorldTourStop.h"
-#include "world/WorldMapIO.h"
 
-#include "menu/BonusWheelMenu.h"
 #include "menu/GameSettingsMenu.h"
 #include "menu/MainMenu.h"
-#include "menu/MapFilterEditMenu.h"
 #include "menu/MatchHistoryMenu.h"
 #include "menu/MatchSelectionMenu.h"
 #include "menu/ModeOptionsMenu.h"
-#include "menu/OptionsMenu.h"
-#include "menu/PlayerControlsMenu.h"
-#include "menu/PlayerControlsSelectMenu.h"
 #include "menu/TeamSelectMenu.h"
-#include "menu/TournamentScoreboardMenu.h"
-#include "menu/TourStopMenu.h"
-#include "menu/WorldMenu.h"
-
-#include "menu/options/EyeCandyOptionsMenu.h"
-#include "menu/options/GameplayOptionsMenu.h"
-#include "menu/options/GraphicsOptionsMenu.h"
-#include "menu/options/PowerupDropRatesMenu.h"
-#include "menu/options/PowerupSettingsMenu.h"
-#include "menu/options/ProjectileLimitsMenu.h"
-#include "menu/options/ProjectileOptionsMenu.h"
-#include "menu/options/SoundOptionsMenu.h"
-#include "menu/options/TeamOptionsMenu.h"
-
 
 #include "menu/OnlineLobbyMenu.h"
 #include "menu/OnlineMenu.h"
@@ -294,7 +251,6 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
         }
     }
 }
-
 
 //---------------------------------------------------------------
 // --autotest --at-match shots: screenshots of the online menus
@@ -822,6 +778,52 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             shot("g1_graphics_menu");
             step = 1000;
             t = 0;
+        }
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role modeopts: every game mode's settings menu (and the boss minigame's), the d-pad
+    //going down through all of it
+    if (at.shotsRole == "modeopts" && step == 1) {
+        const int mode = (t - 1) / 40;
+        const int phase = (t - 1) % 40;
+        if (mode > GAMEMODE_LAST) {
+            step = 1000;
+            t = 0;
+            return MENU_CODE_NONE;
+        }
+        if (phase == 0) {
+            mCurrentMenu = mode < GAMEMODE_LAST ? mModeOptionsMenu->GetOptionsMenu(mode) : mModeOptionsMenu->GetBossOptionsMenu();
+            mCurrentMenu->ResetMenu();
+        }
+        if (phase >= 3 && phase % 3 == 0)
+            game_values.playerInput.outputControls[0].menu_down.fPressed = true;
+        if (phase >= 2 && phase % 3 == 2) {
+            char name[32];
+            snprintf(name, sizeof(name), "m%02d_%02d", mode, phase / 3);
+            g_pendingShot = name;
+        }
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role optmenus: the options menus, the online menu, the team selection
+    if (at.shotsRole == "optmenus" && step == 1) {
+        static const MenuCodeEnum MENUS[] = {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU, MENU_CODE_TO_TEAM_OPTIONS_MENU,
+            MENU_CODE_TO_POWERUP_SELECTION_MENU, MENU_CODE_TO_POWERUP_SETTINGS_MENU, MENU_CODE_TO_PROJECTILES_OPTIONS_MENU,
+            MENU_CODE_TO_PROJECTILES_LIMITS_MENU, MENU_CODE_TO_GRAPHICS_OPTIONS_MENU, MENU_CODE_TO_EYECANDY_OPTIONS_MENU,
+            MENU_CODE_TO_SOUND_OPTIONS_MENU, MENU_CODE_TO_CONTROLS_MENU, MENU_CODE_TO_ONLINE_MENU, MENU_CODE_TO_MATCH_SELECTION_MENU};
+        const int k = (t - 1) / 20;
+        if (k >= static_cast<int>(sizeof(MENUS) / sizeof(MENUS[0]))) {
+            step = 1000;
+            t = 0;
+            return MENU_CODE_NONE;
+        }
+        if ((t - 1) % 20 == 0)
+            return MENUS[k];
+        if ((t - 1) % 20 == 15) {
+            char name[32];
+            snprintf(name, sizeof(name), "o%02d", k);
+            g_pendingShot = name;
         }
         return MENU_CODE_NONE;
     }

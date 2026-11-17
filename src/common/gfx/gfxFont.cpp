@@ -7,11 +7,9 @@
 #include <format>
 #include <iostream>
 
-
 namespace {
 constexpr int ASCII_FIRST_PRINTABLE = 33;
 } // namespace
-
 
 gfxFont::gfxFont(const std::filesystem::path& path)
 {
@@ -74,9 +72,6 @@ gfxFont::gfxFont(const std::filesystem::path& path)
     auto surf_opti = SdlSurfacePtr(SDL_ConvertSurface(surf.get(), screen->format));
     if (!surf_opti)
         throw std::format("Couldn't convert {} to the display's pixel format: {}", path_str, SDL_GetError());
-
-    if (!SDL_SetSurfaceRLE(surf_opti.get(), 1))
-        throw std::format("Couldn't set RLE acceleration for {}: {}", path_str, SDL_GetError());
 
     m_sprite = gfxSprite(std::move(surf_opti), std::nullopt);
     std::cout << "done" << std::endl;

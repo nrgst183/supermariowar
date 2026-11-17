@@ -8,7 +8,6 @@
 #include "ui/MI_StoredPowerupResetButton.h"
 #include "ui/MI_Text.h"
 
-
 UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     : UI_Menu()
 {
@@ -82,10 +81,6 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miPowerupSettingsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miPowerupSettingsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
-    miPowerupSettingsMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miPowerupSettingsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miPowerupSettingsMenuHeaderText = new MI_HeaderText("Item Settings Menu", 320, 5);
-
     AddControl(miStoredPowerupDelayField, miPowerupSettingsMenuBackButton, miItemRespawnField, nullptr, miPowerupSettingsMenuBackButton);
     AddControl(miItemRespawnField, miStoredPowerupDelayField, miHiddenBlockRespawnField, nullptr, miPowerupSettingsMenuBackButton);
     AddControl(miHiddenBlockRespawnField, miItemRespawnField, miSwapStyleField, nullptr, miPowerupSettingsMenuBackButton);
@@ -96,9 +91,7 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
 
     AddControl(miPowerupSettingsMenuBackButton, miStoredPowerupResetButton, miStoredPowerupDelayField, miStoredPowerupResetButton, nullptr);
 
-    AddNonControl(miPowerupSettingsMenuLeftHeaderBar);
-    AddNonControl(miPowerupSettingsMenuRightHeaderBar);
-    AddNonControl(miPowerupSettingsMenuHeaderText);
+    AddTitleBar("Item Settings Menu");
 
     setInitialFocus(miStoredPowerupDelayField);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);

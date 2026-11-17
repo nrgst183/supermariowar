@@ -16,11 +16,9 @@
 #include <format>
 #include <string>
 
-
 namespace {
 const short iScoreboardPlayerOffsetsX[3][3] = {{40, 0, 0}, {19, 59, 0}, {6, 40, 74}};
 } // namespace
-
 
 //Call with x = 70 and y == 80
 MI_TournamentScoreboard::MI_TournamentScoreboard(gfxSprite* spr_background, short x, short y)
@@ -165,7 +163,7 @@ void MI_TournamentScoreboard::Draw()
         miIconImages[iSwirlIconTeam][iSwirlIconGame]->Draw();
     }
 
-           //Draw tour totals
+    //Draw tour totals
     if (game_values.matchtype == MatchType::Tour) {
         for (short iTeam = 0; iTeam < iNumTeams; iTeam++)
             tourScores[iTeam]->Draw();
@@ -284,8 +282,6 @@ void MI_TournamentScoreboard::CreateScoreboard(short numTeams, short numGames, g
 
             if (game_values.tourstops[iGame]->iBonusType)
                 tourBonus[iGame] = std::make_unique<MI_Image>(sprBackground, iTourPointX - 19, GetYFromPlace(0) - 12, 372, 128, 38, 31, 2, 1, 8);
-            //else
-            //	tourBonus[iGame] = new MI_Image(sprBackground, iTourPointX - 11, GetYFromPlace(0) - 3, 448, 128, 22, 22, 1, 1, 0);
         }
 
         miTourPointBar = std::make_unique<MI_Image>(sprBackground, m_pos.x + 88, GetYFromPlace(0) - 8, 0, 128, 372, 32, 1, 1, 0);
@@ -430,7 +426,7 @@ void MI_TournamentScoreboard::DetermineScoreboardWinners()
         }
     }
 
-           //Adjust tied scores so display is right
+    //Adjust tied scores so display is right
     for (short iMyTeam = 0; iMyTeam < iNumTeams; iMyTeam++) {
         for (short iTheirTeam = 0; iTheirTeam < iNumTeams; iTheirTeam++) {
             if (iMyTeam == iTheirTeam)
@@ -442,7 +438,7 @@ void MI_TournamentScoreboard::DetermineScoreboardWinners()
         }
     }
 
-           //There was a single team winner
+    //There was a single team winner
     if (game_values.tournamentwinner != -1) {
         if (iNumWinningTeams == 1)
             iTournamentWinner = iWinningTeams[0];
@@ -451,7 +447,7 @@ void MI_TournamentScoreboard::DetermineScoreboardWinners()
 
         game_values.tournamentwinner = iTournamentWinner;
 
-               //Flash the background of the winning teams
+        //Flash the background of the winning teams
         for (short iTeam = 0; iTeam < iNumWinningTeams; iTeam++) {
             miTeamImages[iWinningTeams[iTeam]]->SetAnimationSpeed(20);
 

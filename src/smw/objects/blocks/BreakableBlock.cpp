@@ -9,7 +9,6 @@
 #include "ResourceManager.h"
 #include "objects/carriable/CO_ThrowBox.h"
 
-
 //------------------------------------------------------------------------------
 // class breakable block
 //------------------------------------------------------------------------------
@@ -54,7 +53,6 @@ void B_BreakableBlock::update()
     }
 }
 
-
 bool B_BreakableBlock::hittop(CPlayer * player, bool useBehavior)
 {
     IO_Block::hittop(player, useBehavior);
@@ -83,11 +81,7 @@ bool B_BreakableBlock::hitbottom(CPlayer * player, bool useBehavior)
     if (useBehavior && state == 0) {
         triggerBehavior();
 
-        //When breaking a block, you smash through with a small velocity, but this allows for breaking two blocks at once
-        /*
-        if (player->vely < -VELMAXBREAKBLOCK)
-        	player->vely = -VELMAXBREAKBLOCK;
-        */
+        //(the bounce's speed isn't capped: a player can break two blocks at once)
         player->vely = CapFallingVelocity(-player->vely * BOUNCESTRENGTH);
         player->setYf(static_cast<float>(iposy + ih) + 0.2f);
 
