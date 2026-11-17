@@ -770,7 +770,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
-    //--at-role graphics: the graphics options menu (its "Run-Ahead" option)
+    //--at-role graphics: the graphics options menu
     if (at.shotsRole == "graphics" && step == 1) {
         if (t == 1)
             return MENU_CODE_BACK_TO_GRAPHIC_OPTIONS_MENU;

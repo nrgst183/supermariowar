@@ -64,13 +64,35 @@ std::vector<TileType> readTileTypeFile(const fs::path& path)
     return tiletypes;
 }
 
-gfxSprite loadImageOrDownscale(const std::filesystem::path& path, const gfxSprite& largeRes)
+// The size of a PNG image from its header (without decoding it)
+bool readPngSize(const fs::path& path, int& width, int& height)
+{
+    FILE* file = fopen(path.generic_string().c_str(), "rb");
+    if (!file)
+        return false;
+    unsigned char header[24];
+    const bool read = fread(header, 1, sizeof(header), file) == sizeof(header);
+    fclose(file);
+    if (!read || memcmp(header, "\x89PNG\r\n\x1a\n", 8) != 0 || memcmp(header + 12, "IHDR", 4) != 0)
+        return false;
+    auto be32 = [&](int at) {
+        return static_cast<int>((header[at] << 24) | (header[at + 1] << 16) | (header[at + 2] << 8) | header[at + 3]);
+    };
+    width = be32(16);
+    height = be32(20);
+    return width > 0 && height > 0;
+}
+
+// `larger`: the image of the size above (loads it only if this one is missing)
+template <typename Larger>
+gfxSprite loadImageOrDownscale(const std::filesystem::path& path, Larger larger)
 {
     try {
         return ImageLoader(path).create();
     } catch (const std::string& err) {
         printf("\nwarning: %s -> falling back to downscaled image\n", err.c_str());
 
+        const gfxSprite& largeRes = larger();
         auto image = gfxSprite::blank(largeRes.getWidth() / 2, largeRes.getHeight() / 2, std::nullopt);
         if (!SDL_BlitSurfaceScaled(largeRes.getSurface(), nullptr, image.getSurface(), nullptr, SDL_SCALEMODE_PIXELART)) {
             fprintf(stderr, "SDL_BlitSurface error: %s\n", SDL_GetError());
@@ -93,17 +115,32 @@ CTileset::CTileset(std::filesystem::path dir)
 
 void CTileset::ensureLoaded()
 {
-    if (isLoaded())
+    if (m_loaded)
         return;
+    m_loaded = true;
 
     m_tiletypes = readTileTypeFile(m_tileset_dir / "tileset.tls");
 
-    m_sprite_large = ImageLoader(m_tileset_dir / "large.png").create();
-    m_sprite_medium = loadImageOrDownscale(m_tileset_dir / "medium.png", m_sprite_large);
-    m_sprite_small = loadImageOrDownscale(m_tileset_dir / "small.png", m_sprite_medium);
+    int width = 0, height = 0;
+    if (!readPngSize(m_tileset_dir / "large.png", width, height)) {
+        const gfxSprite& large = sprite(DrawSize::Ingame);
+        width = large.getWidth();
+        height = large.getHeight();
+    }
 
-    m_width = std::min(m_sprite_large.getWidth() / TILESIZE, MAX_TILES_PER_AXIS);
-    m_height = std::min(m_sprite_large.getHeight() / TILESIZE, MAX_TILES_PER_AXIS);
+    m_width = std::min(width / TILESIZE, MAX_TILES_PER_AXIS);
+    m_height = std::min(height / TILESIZE, MAX_TILES_PER_AXIS);
+}
+
+
+size_t CTileset::loadedBytes() const
+{
+    size_t bytes = 0;
+    for (const gfxSprite* image : {&m_sprite_large, &m_sprite_medium, &m_sprite_small}) {
+        if (const SDL_Surface* surface = image->getSurface())
+            bytes += static_cast<size_t>(surface->pitch) * surface->h;
+    }
+    return bytes;
 }
 
 
@@ -117,12 +154,21 @@ void CTileset::unload()
 
 const gfxSprite& CTileset::sprite(DrawSize size) const
 {
-    assert(m_sprite_large); // call ensureLoaded first!
+    assert(m_loaded); // call ensureLoaded first!
     switch (size) {
-        case DrawSize::Ingame: return m_sprite_large;
-        case DrawSize::Preview: return m_sprite_medium;
-        case DrawSize::Thumbnail: return m_sprite_small;
+        case DrawSize::Preview:
+            if (!m_sprite_medium)
+                m_sprite_medium = loadImageOrDownscale(m_tileset_dir / "medium.png", [this]() -> const gfxSprite& { return sprite(DrawSize::Ingame); });
+            return m_sprite_medium;
+        case DrawSize::Thumbnail:
+            if (!m_sprite_small)
+                m_sprite_small = loadImageOrDownscale(m_tileset_dir / "small.png", [this]() -> const gfxSprite& { return sprite(DrawSize::Preview); });
+            return m_sprite_small;
+        case DrawSize::Ingame:
+            break;
     }
+    if (!m_sprite_large)
+        m_sprite_large = ImageLoader(m_tileset_dir / "large.png").create();
     return m_sprite_large;
 }
 
@@ -274,22 +320,42 @@ CTileset* CTilesetManager::tileset(size_t index)
 }
 
 
+void CTilesetManager::beginMap()
+{
+#ifdef SMW_XBOX
+    m_map++;
+#endif
+}
+
+
 #ifdef SMW_XBOX
 void CTilesetManager::trackUse(size_t index)
 {
+    if (m_last_map.size() != m_tilesets.size())
+        m_last_map.assign(m_tilesets.size(), m_map);
+    m_last_map[index] = m_map;
+
     if (!m_recently_used.empty() && m_recently_used.back() == index)
         return;
 
     std::erase(m_recently_used, index);
     m_recently_used.push_back(index);
 
-    // Unload the least recently used tilesets over the limit. The callers only
-    // keep a tileset pointer for the call at hand, so this is safe here.
-    while (m_recently_used.size() > MAX_LOADED_TILESETS) {
-        const size_t oldest = m_recently_used.front();
-        m_recently_used.erase(m_recently_used.begin());
-        if (!m_tilesets[oldest].isModified())
-            m_tilesets[oldest].unload();
+    // Over the budget: unload the least recently used tilesets that the
+    // current map doesn't use. The callers only keep a tileset pointer for the
+    // call at hand, so this is safe here.
+    size_t total = 0;
+    for (size_t i : m_recently_used)
+        total += m_tilesets[i].loadedBytes();
+    for (auto it = m_recently_used.begin(); total > MAX_LOADED_BYTES && it != m_recently_used.end();) {
+        const size_t i = *it;
+        if (m_last_map[i] == m_map || m_tilesets[i].isModified()) {
+            ++it;
+            continue;
+        }
+        total -= m_tilesets[i].loadedBytes();
+        m_tilesets[i].unload();
+        it = m_recently_used.erase(it);
     }
 }
 #endif

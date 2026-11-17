@@ -6,9 +6,11 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_LobbyWidgets.h"
 #include "ui/MI_MenuPanel.h"
+#include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 #include "ui/MI_TextField.h"
 
+#include <algorithm>
 #include <cstdlib>
 
 namespace {
@@ -23,27 +25,39 @@ UI_OnlineMenu::UI_OnlineMenu()
     AddTitleBar("Online");
 
     //Three panels (under their fields): you, hosting, joining
-    AddNonControl(new MI_MenuPanel(36, 42, 568, 78, "You", "Your name in the lobby and the matches"));
-    AddNonControl(new MI_MenuPanel(36, 126, 568, 118, "Host a game", "The others join this computer's address"));
-    AddNonControl(new MI_MenuPanel(36, 250, 568, 118, "Join a game", "At the address the host gives you"));
+    AddNonControl(new MI_MenuPanel(36, 42, 568, 112, "You", "Your name, and how far ahead you see"));
+    AddNonControl(new MI_MenuPanel(36, 158, 568, 108, "Host a game", "The others join this computer's address"));
+    AddNonControl(new MI_MenuPanel(36, 270, 568, 108, "Join a game", "At the address the host gives you"));
 
     miNameField = new MI_TextField(&rm->spr_selectfield, 64, 78, "Nickname", 512, 150);
     miNameField->SetData(game_values.onlinename, MAX_NAME_CHARS);
 
-    miPortField = new MI_TextField(&rm->spr_selectfield, 64, 162, "Port", 512, 150);
+    //Run-ahead: online matches are drawn this many ticks ahead of the real state, so your buttons
+    //answer sooner (GameplayTick.cpp). Offline there's no network delay to hide: it isn't used.
+    miRunAheadField = new MI_SelectField<short>(&rm->spr_selectfield, 64, 114, "Run-Ahead", 512, 150);
+    miRunAheadField->add("Off", 0);
+    miRunAheadField->add("1 Frame", 1);
+    miRunAheadField->add("2 Frames", 2);
+    miRunAheadField->add("3 Frames", 3);
+    game_values.runahead = std::clamp<short>(game_values.runahead, 0, 3);
+    miRunAheadField->setOutputPtr(&game_values.runahead);
+    miRunAheadField->setCurrentValue(game_values.runahead);
+    miRunAheadField->setAutoAdvance(true);
+
+    miPortField = new MI_TextField(&rm->spr_selectfield, 64, 194, "Port", 512, 150);
     miPortField->SetData(game_values.onlineport, MAX_PORT_CHARS);
     miPortField->SetDisallowedChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ !@#$%^&*()-_=+`~[]{}\\|;:'\",<>./?");
-    miHostButton = new MI_Button(&rm->spr_selectfield, 170, 202, "Host game", 300, TextAlign::CENTER);
+    miHostButton = new MI_Button(&rm->spr_selectfield, 170, 230, "Host game", 300, TextAlign::CENTER);
     miHostButton->SetCode(MENU_CODE_ONLINE_HOST);
 
-    miAddressField = new MI_TextField(&rm->spr_selectfield, 64, 286, "Address", 512, 150);
+    miAddressField = new MI_TextField(&rm->spr_selectfield, 64, 306, "Address", 512, 150);
     miAddressField->SetData(game_values.onlineaddress, MAX_ADDRESS_CHARS);
     miAddressField->SetDisallowedChars(" ");
-    miJoinButton = new MI_Button(&rm->spr_selectfield, 170, 326, "Join game", 300, TextAlign::CENTER);
+    miJoinButton = new MI_Button(&rm->spr_selectfield, 170, 342, "Join game", 300, TextAlign::CENTER);
     miJoinButton->SetCode(MENU_CODE_ONLINE_JOIN);
 
     //What went wrong (or what's happening), under the panels
-    miMessage = new MI_WrappedText(320, 376, 580, 3);
+    miMessage = new MI_WrappedText(320, 384, 580, 3);
 
     //What the buttons do here (a controller's, or the keys), and back
     miPrompts = new MI_PromptStrip(16, 434, 512, "", []() {
@@ -55,8 +69,9 @@ UI_OnlineMenu::UI_OnlineMenu()
     miBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miBackButton->SetCode(MENU_CODE_TO_MAIN_MENU);
 
-    AddControl(miNameField, miBackButton, miPortField, nullptr, nullptr);
-    AddControl(miPortField, miNameField, miHostButton, nullptr, nullptr);
+    AddControl(miNameField, miBackButton, miRunAheadField, nullptr, nullptr);
+    AddControl(miRunAheadField, miNameField, miPortField, nullptr, nullptr);
+    AddControl(miPortField, miRunAheadField, miHostButton, nullptr, nullptr);
     AddControl(miHostButton, miPortField, miAddressField, nullptr, nullptr);
     AddControl(miAddressField, miHostButton, miJoinButton, nullptr, nullptr);
     AddControl(miJoinButton, miAddressField, miBackButton, nullptr, nullptr);

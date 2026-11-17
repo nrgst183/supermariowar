@@ -3,7 +3,6 @@
 #include "FileList.h"
 #include "GameValues.h"
 #include "ResourceManager.h"
-#include <algorithm>
 
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
@@ -54,31 +53,27 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miSmoothMotionField->setCurrentValue(game_values.smoothmotion ? 1 : 0);
     miSmoothMotionField->setAutoAdvance(true);
 
-    //Run-ahead: the match drawn a few ticks ahead, so the buttons answer sooner (GameplayTick.cpp)
-    miRunAheadField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 220, "Run-Ahead", 500, 220);
-    miRunAheadField->add("Off", 0);
-    miRunAheadField->add("1 Frame", 1);
-    miRunAheadField->add("2 Frames", 2);
-    miRunAheadField->add("3 Frames", 3);
-    game_values.runahead = std::clamp<short>(game_values.runahead, 0, 3);
-    miRunAheadField->setOutputPtr(&game_values.runahead);
-    miRunAheadField->setCurrentValue(game_values.runahead);
-    miRunAheadField->setAutoAdvance(true);
-
-    miFullscreenField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 256, "Screen Size", 500, 220);
+#ifdef SMW_XBOX
+    //The Xbox is always full screen: no Screen Size field (the fields below move up)
+    miFullscreenField = nullptr;
+    constexpr short Y_SHIFT = 36;
+#else
+    miFullscreenField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 220, "Screen Size", 500, 220);
     miFullscreenField->add("Windowed", false);
     miFullscreenField->add("Fullscreen", true);
     miFullscreenField->setOutputPtr(&game_values.fullscreen);
     miFullscreenField->setCurrentValue(game_values.fullscreen ? 1 : 0);
     miFullscreenField->setAutoAdvance(true);
     miFullscreenField->setItemChangedCode(MENU_CODE_TOGGLE_FULLSCREEN);
+    constexpr short Y_SHIFT = 0;
+#endif
 
-    miMenuGraphicsPackField = new MI_PacksField(&rm->spr_selectfield, 70, 292, "Menu Graphics", 500, 220, menugraphicspacklist, MENU_CODE_MENU_GRAPHICS_PACK_CHANGED);
-    miWorldGraphicsPackField = new MI_PacksField(&rm->spr_selectfield, 70, 328, "World Graphics", 500, 220, worldgraphicspacklist, MENU_CODE_WORLD_GRAPHICS_PACK_CHANGED);
-    miGameGraphicsPackField = new MI_PacksField(&rm->spr_selectfield, 70, 364, "Game Graphics", 500, 220, gamegraphicspacklist, MENU_CODE_GAME_GRAPHICS_PACK_CHANGED);
+    miMenuGraphicsPackField = new MI_PacksField(&rm->spr_selectfield, 70, 256 - Y_SHIFT, "Menu Graphics", 500, 220, menugraphicspacklist, MENU_CODE_MENU_GRAPHICS_PACK_CHANGED);
+    miWorldGraphicsPackField = new MI_PacksField(&rm->spr_selectfield, 70, 292 - Y_SHIFT, "World Graphics", 500, 220, worldgraphicspacklist, MENU_CODE_WORLD_GRAPHICS_PACK_CHANGED);
+    miGameGraphicsPackField = new MI_PacksField(&rm->spr_selectfield, 70, 328 - Y_SHIFT, "Game Graphics", 500, 220, gamegraphicspacklist, MENU_CODE_GAME_GRAPHICS_PACK_CHANGED);
 
     //Online matches only (F3 in a match toggles it too)
-    miNetStatsField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 400, "Network Stats", 500, 220);
+    miNetStatsField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 364 - Y_SHIFT, "Network Stats", 500, 220);
     miNetStatsField->add("Off", false);
     miNetStatsField->add("On", true);
     miNetStatsField->setOutputPtr(&game_values.shownetstats);
@@ -93,10 +88,14 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     AddControl(miTopLayerField, miOverlayColorsField, miFrameRateField, nullptr, miGraphicsOptionsMenuBackButton);
 
     AddControl(miFrameRateField, miTopLayerField, miSmoothMotionField, nullptr, miGraphicsOptionsMenuBackButton);
-    AddControl(miSmoothMotionField, miFrameRateField, miRunAheadField, nullptr, miGraphicsOptionsMenuBackButton);
-    AddControl(miRunAheadField, miSmoothMotionField, miFullscreenField, nullptr, miGraphicsOptionsMenuBackButton);
-    AddControl(miFullscreenField, miRunAheadField, miMenuGraphicsPackField, nullptr, miGraphicsOptionsMenuBackButton);
+#ifdef SMW_XBOX
+    AddControl(miSmoothMotionField, miFrameRateField, miMenuGraphicsPackField, nullptr, miGraphicsOptionsMenuBackButton);
+    AddControl(miMenuGraphicsPackField, miSmoothMotionField, miWorldGraphicsPackField, nullptr, miGraphicsOptionsMenuBackButton);
+#else
+    AddControl(miSmoothMotionField, miFrameRateField, miFullscreenField, nullptr, miGraphicsOptionsMenuBackButton);
+    AddControl(miFullscreenField, miSmoothMotionField, miMenuGraphicsPackField, nullptr, miGraphicsOptionsMenuBackButton);
     AddControl(miMenuGraphicsPackField, miFullscreenField, miWorldGraphicsPackField, nullptr, miGraphicsOptionsMenuBackButton);
+#endif
 
     AddControl(miWorldGraphicsPackField, miMenuGraphicsPackField, miGameGraphicsPackField, nullptr, miGraphicsOptionsMenuBackButton);
     AddControl(miGameGraphicsPackField, miWorldGraphicsPackField, miNetStatsField, nullptr, miGraphicsOptionsMenuBackButton);

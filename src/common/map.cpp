@@ -118,6 +118,8 @@ void CMap::ClearAnimatedTiles()
 void CMap::loadMap(const std::string& file, ReadType iReadType)
 {
     szLoadedFile = file;
+    if (g_tilesetmanager)
+        g_tilesetmanager->beginMap();
     iTileAnimationTimer = 0;
     iTileAnimationFrame = 0;
 

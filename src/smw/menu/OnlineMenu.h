@@ -8,12 +8,13 @@ class MI_Button;
 class MI_Image;
 class MI_Text;
 class MI_TextField;
+template <typename T> class MI_SelectField;
 class MI_WrappedText;
 class MI_PromptStrip;
 
 /*
-    The entry of the online (rollback netplay) mode: your nickname, hosting a lobby on a port and
-    joining one by address. Errors of hosting and joining are shown at the bottom.
+    The entry of the online (rollback netplay) mode: your nickname and run-ahead, hosting a lobby
+    on a port and joining one by address. Errors of hosting and joining are shown at the bottom.
 */
 class UI_OnlineMenu : public UI_Menu {
 public:
@@ -32,6 +33,7 @@ public:
 
 private:
     MI_TextField* miNameField;
+    MI_SelectField<short>* miRunAheadField;
     MI_TextField* miPortField;
     MI_Button* miHostButton;
     MI_TextField* miAddressField;

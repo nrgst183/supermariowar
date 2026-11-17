@@ -90,11 +90,10 @@ void GameplayState::advanceTick(const InputFrame& input)
 }
 
 //-----------------------------------------------------------------------------
-// RUN-AHEAD
+// RUN-AHEAD (online matches only)
 //
-// The frame's real tick runs, its state is saved, and then the match runs a few
-// ticks further with the same input (online: the players' last known input, ours
-// the newest). That state is drawn, so a button's effect shows those ticks
+// After the frame's real ticks, the state is saved and the match runs a few
+// ticks further with the players' last known input (ours the newest). That state is drawn, so a button's effect shows those ticks
 // sooner, as in an emulator's run-ahead. The next frame goes back to the saved
 // state before anything else and runs the real tick; when the player kept the
 // same buttons (nearly always), the result is the one already shown.
@@ -161,7 +160,8 @@ void GameplayState::runAhead(const InputFrame& input)
         rollback::loadState(*aheadReal);
 }
 
-// A tick of the match run for real (offline): one already shown ahead is a re-simulation
+// A tick of the match run for real (offline). Offline nothing runs ahead, but a tick already
+// shown ahead is a re-simulation (its sounds were heard then).
 void GameplayState::runRealTick(const InputFrame& input)
 {
     const int tick = g_sim.tick;

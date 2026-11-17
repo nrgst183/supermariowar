@@ -58,7 +58,7 @@ void print_help(const char* title, const char* version)
     printf("      --at-resim <0|1>    1: run every gameplay tick as a re-simulation (sounds,\n"
            "                          eyecandy and other side effects suppressed); the\n"
            "                          results must match a normal run\n");
-    printf("      --at-runahead <N>   Run-ahead: show the match N ticks (0..3) ahead; the\n"
+    printf("      --at-runahead <N>   Run-ahead (online): show the match N ticks (0..3) ahead; the\n"
            "                          simulation (and its checksums) must be unaffected\n");
     printf("      --at-shots <DIR>    --at-match shots: save screenshots of the main, online and lobby menus\n"
            "                          to DIR (with --at-role host|join|orig, --at-addr IP[:PORT], --at-nick NAME)\n");

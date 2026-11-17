@@ -128,7 +128,12 @@ bool gfx_init(int w, int h, bool fullscreen) {
 }
 
 void gfx_changefullscreen(bool fullscreen) {
+#ifdef SMW_XBOX
+    //(the Xbox is always full screen: Alt+Enter and a saved setting do nothing)
+    (void)fullscreen;
+#else
     gfx.changeFullScreen(fullscreen);
+#endif
 }
 
 void gfx_eventtoscreen(SDL_Event* event)

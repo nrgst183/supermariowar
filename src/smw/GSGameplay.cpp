@@ -869,8 +869,6 @@ void GameplayState::update()
             simulateTick(input);
         } else {
             runRealTick(input);
-            lastUpdateTicked = true;    //(drawn between the ticks of the state ahead too)
-            runAhead(input);
         }
         lastUpdateTicked = true;
     }

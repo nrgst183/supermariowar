@@ -60,5 +60,13 @@ void LoadCurrentMapBackground()
         path = convertPath("gfx/packs/backgrounds/Land_Classic.png", gamegraphicspacklist->currentPath());
     }
 
+    //The same background as last time (many maps share one): it is still loaded
+    static std::string s_loadedPath;
+    static const SDL_Surface* s_loadedSurface = nullptr;
+    if (path == s_loadedPath && rm->spr_background.getSurface() && rm->spr_background.getSurface() == s_loadedSurface)
+        return;
+
     rm->spr_background = ImageLoader(path).withoutColorKey().create();
+    s_loadedPath = path;
+    s_loadedSurface = rm->spr_background.getSurface();
 }

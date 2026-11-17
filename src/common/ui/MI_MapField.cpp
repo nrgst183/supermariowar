@@ -40,6 +40,9 @@ MenuCodeEnum MI_MapField::Modify(bool modify)
     if (fDisable)
         return MENU_CODE_UNSELECT_ITEM;
 
+    if (!modify && iPendingLoadTimer > 0)
+        LoadCurrentMap();
+
     miModifyImageLeft->setVisible(modify);
     miModifyImageRight->setVisible(modify);
 
@@ -71,6 +74,8 @@ MenuCodeEnum MI_MapField::SendInput(CPlayerInput * playerInput)
         }
 
         if (playerInput->outputControls[iPlayer].menu_select.fPressed || playerInput->outputControls[iPlayer].menu_cancel.fPressed) {
+            if (iPendingLoadTimer > 0)
+                LoadCurrentMap();
             miModifyImageLeft->setVisible(false);
             miModifyImageRight->setVisible(false);
 
@@ -93,7 +98,7 @@ MenuCodeEnum MI_MapField::SendInput(CPlayerInput * playerInput)
                 }
 
                 if (iOldIndex != maplist->GetCurrent()->second.iIndex) {
-                    LoadCurrentMap();
+                    RequestMapLoad();
                     return MENU_CODE_MAP_CHANGED;
                 }
 
@@ -111,15 +116,37 @@ MenuCodeEnum MI_MapField::ChooseRandomMap()
     maplist->random(true);
 
     if (iOldIndex != maplist->GetCurrent()->second.iIndex) {
-        LoadCurrentMap();
+        RequestMapLoad();
         return MENU_CODE_MAP_CHANGED;
     }
 
     return MENU_CODE_NONE;
 }
 
+void MI_MapField::LoadCurrentMap()
+{
+    iPendingLoadTimer = 0;
+    MI_MapPreview::LoadCurrentMap();
+}
+
+void MI_MapField::RequestMapLoad()
+{
+    if (iRecentLoadTimer > 0) {
+        szMapName = maplist->currentShortmapname();
+        iPendingLoadTimer = MAP_LOAD_SETTLE_FRAMES;
+    } else {
+        LoadCurrentMap();
+    }
+    iRecentLoadTimer = MAP_LOAD_SETTLE_FRAMES;
+}
+
 void MI_MapField::Update()
 {
+    if (iRecentLoadTimer > 0)
+        iRecentLoadTimer--;
+    if (iPendingLoadTimer > 0 && --iPendingLoadTimer == 0)
+        LoadCurrentMap();
+
     //Empty out the search string after a certain time
     if (iSearchStringTimer > 0) {
         if (--iSearchStringTimer == 0) {
@@ -227,7 +254,7 @@ bool MI_MapField::Move(bool fNext, bool fScrollFast)
     }
 
     if (iOldIndex != maplist->GetCurrent()->second.iIndex) {
-        LoadCurrentMap();
+        RequestMapLoad();
         return true;
     }
 

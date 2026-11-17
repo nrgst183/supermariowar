@@ -22,10 +22,14 @@ public:
     static constexpr int MAX_TILES = MAX_TILES_PER_AXIS * MAX_TILES_PER_AXIS;
 
     explicit CTileset(std::filesystem::path dir);
+    // Reads the tile types and the size. Each size of the images loads when it
+    // is first drawn (the menus' previews only need the medium one).
     void ensureLoaded();
     // Frees the images (they load again on the next use); the tile types stay
     void unload();
-    bool isLoaded() const { return m_sprite_large.operator bool(); }
+    bool isLoaded() const { return m_loaded; }
+    // The memory of the images that are loaded
+    size_t loadedBytes() const;
     bool isModified() const { return m_modified; }
 
     void saveTileset() const;
@@ -49,12 +53,13 @@ private:
     std::filesystem::path m_tileset_dir;
     std::vector<TileType> m_tiletypes;
 
-    gfxSprite m_sprite_large;
-    gfxSprite m_sprite_medium;
-    gfxSprite m_sprite_small;
+    mutable gfxSprite m_sprite_large;
+    mutable gfxSprite m_sprite_medium;
+    mutable gfxSprite m_sprite_small;
 
     short m_width = 0;
     short m_height = 0;
+    bool m_loaded = false;
     bool m_modified = false;
 };
 
@@ -76,6 +81,10 @@ public:
         short iDstTileCol, short iDstTileRow);
     void saveTilesets() const;
 
+    // A map is about to load: the tilesets it uses from now on stay loaded
+    // (on the Xbox, older ones can be freed to stay in the memory budget)
+    void beginMap();
+
     size_t classicTilesetIndex() const {
         return m_classicTilesetIndex;
     }
@@ -91,10 +100,14 @@ private:
     size_t m_classicTilesetIndex = SIZE_MAX;
 
 #ifdef SMW_XBOX
-    // The Xbox has 64 MB of RAM, and a tileset takes ~5.5 MB in all three sizes:
-    // keep only the most recently used ones loaded
-    static constexpr size_t MAX_LOADED_TILESETS = 4;
+    // The Xbox has 64 MB of RAM: tileset images (~4 MB in game, ~1 MB for a
+    // menu preview) stay loaded up to this much, the least recently used ones
+    // going first. The tilesets of the current map always stay (else drawing
+    // it would load them again and again).
+    static constexpr size_t MAX_LOADED_BYTES = 20u << 20;
     std::vector<size_t> m_recently_used;  // most recent last
+    std::vector<unsigned> m_last_map;     // per tileset: the map it was last used in
+    unsigned m_map = 0;
     void trackUse(size_t index);
 #endif
 

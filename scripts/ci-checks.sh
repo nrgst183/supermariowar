@@ -4,12 +4,12 @@
 #
 #  1. Rollback sync test, every game mode: every tick rolls back up to 8 ticks,
 #     re-simulates them and checks that the state is identical.
-#     Run-ahead: the same checksums with it as without.
 #  2. Replays: matches recorded with CPU players play back exactly (all stored
 #     checksums match), with random jumps in the timeline.
 #  3. Netplay over 127.0.0.1 (scripts/netplay-test.sh): 2 and 3 peers, without
 #     and with simulated lag and loss, then the disconnect tests (a joiner
-#     killed, a joiner leaving, the host killed: the CPU takes over).
+#     killed, a joiner leaving, the host killed: the CPU takes over), and
+#     run-ahead: a host running ahead must compute the same match as joiners that don't.
 #
 # Usage: scripts/ci-checks.sh [BUILD_DIR]   (default: build; needs its smw binary)
 # The netplay logs go to $CHECKS_LOGS (default: a temporary folder, removed after).
@@ -47,18 +47,6 @@ for mode in $(seq 0 21); do
     fi
 done
 
-echo "== Run-ahead (the simulation must be the same with it)"
-for mode in 0 9 15; do
-    base=$(smw --at-mode "$mode" --at-frames 1200 --at-seed 7 --at-humans 2 --at-peersum 50 2>&1 | grep "^peersum")
-    ahead=$(smw --at-mode "$mode" --at-frames 1200 --at-seed 7 --at-humans 2 --at-peersum 50 --at-runahead 3 2>&1 | grep "^peersum")
-    if [ -z "$base" ] || [ "$base" != "$ahead" ]; then
-        echo "FAIL mode $mode: the checksums differ with run-ahead"
-        fails=$((fails + 1))
-    else
-        echo "ok   mode $mode"
-    fi
-done
-
 echo "== Replays (CPU players, random jumps)"
 for mode in 0 3 9 15; do
     rm -rf "$WORK/home"
@@ -80,6 +68,10 @@ done
 echo "== Netplay (127.0.0.1)"
 bash "$ROOT/scripts/netplay-test.sh" --builds "$BUILD" --peers "2 3" --conditions "a c" --matches 1 --out "$LOGS/net" \
     || fails=$((fails + 1))
+
+echo "== Run-ahead online (the host runs 3 ticks ahead, the joiners don't: the match must be the same)"
+NETPLAY_HOST_ARGS="--at-runahead 3" bash "$ROOT/scripts/netplay-test.sh" --builds "$BUILD" --peers "2 3" --conditions "a b" \
+    --matches 1 --out "$LOGS/runahead" || fails=$((fails + 1))
 
 echo "== Netplay disconnects"
 bash "$ROOT/scripts/netplay-test.sh" --builds "$BUILD" --disconnect --peers "3" --conditions "a" --out "$LOGS/disconnect" \

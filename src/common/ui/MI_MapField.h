@@ -30,10 +30,21 @@ public:
     bool MovePrev(bool fScrollFast);
     bool MoveNext(bool fScrollFast);
 
+    // Loads the current map's preview now (also one that was waiting)
+    void LoadCurrentMap();
+
     void SetDimensions(short iWidth, short iIndent) override;
 
 protected:
     bool Move(bool fNext, bool fScrollFast);
+
+    // The current map changed: its name shows at once, and its preview loads
+    // now, or while scrolling through the maps, once the scrolling stops
+    // (loading a map takes a while, so each step would stall the menu)
+    void RequestMapLoad();
+    static constexpr short MAP_LOAD_SETTLE_FRAMES = 8;
+    short iRecentLoadTimer = 0;   // frames since the last change (counting down)
+    short iPendingLoadTimer = 0;  // frames until the waiting load (0: none)
 
     std::string szName;
 
