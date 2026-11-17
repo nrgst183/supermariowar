@@ -314,6 +314,27 @@ int SDL_XboxStartNetwork(void)
     return started;
 }
 
+int SDL_XboxGetNickname(char* name, int size)
+{
+    if (!name || size <= 0)
+        return 0;
+    name[0] = 0;
+
+    //The nicknames of every title (not only this one's), the last used first
+    WCHAR wide[MAX_NICKNAME + 1];
+    memset(wide, 0, sizeof(wide));
+    const HANDLE find = XFindFirstNickname(FALSE, wide, MAX_NICKNAME);
+    if (find == INVALID_HANDLE_VALUE)
+        return 0;
+    XFindClose(find);
+
+    int length = 0;
+    for (int i = 0; i < MAX_NICKNAME && wide[i] && length < size - 1; i++)
+        name[length++] = wide[i] >= 32 && wide[i] < 127 ? static_cast<char>(wide[i]) : '?';
+    name[length] = 0;
+    return length > 0;
+}
+
 SDL_XboxNetworkStatus SDL_XboxGetNetworkStatus(char* address, int size)
 {
     if (address && size > 0)

@@ -28,11 +28,13 @@ UI_MainMenu::UI_MainMenu()
 #ifndef SMW_NO_ONLINE
     // Online (rollback netplay); web builds have no network code
 #ifdef SMW_XBOX
+    //(the Xbox: straight to the games on the network, where it hosts too)
     miOnlineButton = new MI_Button(&rm->spr_selectfield, 120, 322, "System Link", 200);
+    miOnlineButton->SetCode(MENU_CODE_TO_SYSTEM_LINK_MENU);
 #else
     miOnlineButton = new MI_Button(&rm->spr_selectfield, 120, 322, "Online", 200);
-#endif
     miOnlineButton->SetCode(MENU_CODE_TO_ONLINE_MENU);
+#endif
     miHistoryButton = new MI_Button(&rm->spr_selectfield, 320, 322, "History", 200);
 #else
     miHistoryButton = new MI_Button(&rm->spr_selectfield, 120, 322, "History", 400);

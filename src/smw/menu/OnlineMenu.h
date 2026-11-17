@@ -14,8 +14,9 @@ class MI_PromptStrip;
 
 /*
     The entry of the online (rollback netplay) mode: your nickname and run-ahead, hosting a lobby
-    on a port and joining one by address (or from the games found on the local network: the
-    System Link menu; the only way to join on the Xbox). Errors of hosting and joining are shown at the bottom.
+    on a port and joining one by address (or the LAN games: the System Link menu, which hosts too).
+    Not on the Xbox: its main menu opens the System Link menu. Errors of hosting and joining are
+    shown at the bottom.
 */
 class UI_OnlineMenu : public UI_Menu {
 public:
@@ -37,12 +38,11 @@ private:
     MI_SelectField<short>* miRunAheadField;
     MI_TextField* miPortField;
     MI_Button* miHostButton;
-    MI_TextField* miAddressField;              // null on the Xbox (no keyboard)
-    MI_Button* miJoinButton;                   // null on the Xbox
+    MI_TextField* miAddressField;
+    MI_Button* miJoinButton;
     MI_Button* miFindGamesButton = nullptr;    // the system link / LAN games menu (builds with the network)
     MI_Button* miBackButton;
 
     MI_WrappedText* miMessage;
     MI_PromptStrip* miPrompts;
-    bool m_showingStatus = true;  // no message: the Xbox shows its network's state there
 };

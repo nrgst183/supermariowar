@@ -11,8 +11,8 @@ class MI_Button;
 class MI_WrappedText;
 
 /// The list of the games found on the network (a row each: the host, the mode and map, how
-/// many are in, the connection), and under it the chosen game's details: whether it can be
-/// joined, and if not why. Up and down choose (it scrolls past five games), A joins, B goes back.
+/// many are in, the connection). Up and down choose (it scrolls past four games; down from the
+/// last one leaves it, to the Host button under it), A joins, B goes back.
 class MI_LanGameList : public UI_Control {
 public:
     struct Game {
@@ -41,8 +41,12 @@ public:
     const Game* Selected() const;
     /// Whether the search is running (else the list says it can't search)
     void SetSearching(bool searching) { m_searching = searching; }
+    /// Down from the last game (or with none): the focus goes to what's under the list
+    void SetLeaveDown(std::function<void()> leave) { m_leaveDown = std::move(leave); }
+    /// What B does (back to the Online menu, or on the Xbox to the main menu)
+    void SetBackCode(MenuCodeEnum code) { m_backCode = code; }
 
-    static constexpr int ROWS = 5;
+    static constexpr int ROWS = 4;
 
 private:
     std::vector<Game> m_games;
@@ -51,17 +55,22 @@ private:
     int m_scroll = 0;
     int m_tick = 0;
     bool m_searching = true;
+    std::function<void()> m_leaveDown;
+    MenuCodeEnum m_backCode = MENU_CODE_TO_ONLINE_MENU;
 
     void move(int direction);
     void drawRow(int x, int y, const Game& game, bool selected) const;
     void drawEmpty() const;
-    void drawDetails(const Game& game) const;
 };
 
 /*
-    The games hosted on the local network (system link; LAN games on a PC), found as the menu
-    is up (rollback/LanDiscovery.h), in a list (MI_LanGameList). A joins the chosen one, B goes
-    back to the Online menu. Errors (and on the Xbox, the state of its network) show at the bottom.
+    System link (LAN games on a PC): the games hosted on the local network, found as the menu is
+    up (rollback/LanDiscovery.h), in a list (MI_LanGameList) to join, and under it the button that
+    hosts a game here (the others' lists then show it, under this computer's name: on the Xbox
+    the console's nickname). Under the list, the chosen game's details or what hosting does.
+    On the Xbox it is the whole of system link (the main menu opens it; it has the run-ahead
+    setting too), B goes back to the main menu; on a PC the Online menu opens it.
+    Errors (and on the Xbox, the state of its network) show at the bottom.
 */
 class UI_SystemLinkMenu : public UI_Menu {
 public:
@@ -83,9 +92,15 @@ public:
 
 private:
     MI_LanGameList* m_list = nullptr;
+    MI_Button* m_host = nullptr;
+    UI_Control* m_runAhead = nullptr;   // (the Xbox's; on a PC it's in the Online menu)
     MI_WrappedText* m_message = nullptr;
+    bool m_moved = false;               // the player moved: a game showing up doesn't take the focus
     bool m_showingStatus = true;  // no message: on the Xbox, the state of its network shows there
     unsigned m_frames = 0;
+
+    void focus(UI_Control* control);
+    void drawDetails() const;
 };
 
 /// Not drawn: calls a function every frame (a menu's controls are updated while it is up)
@@ -103,3 +118,7 @@ private:
 
 /// The Xbox: the state of its network, for a menu's message line ("" elsewhere)
 std::string systemLinkNetworkStatus();
+/// The name this computer goes by in a lobby (and the games it hosts, in the others' lists): on the
+/// Xbox the console's nickname (else "Xbox" and its address's last number), elsewhere the Online
+/// menu's nickname (empty: the lobby says "Player N")
+std::string systemLinkPlayerName();

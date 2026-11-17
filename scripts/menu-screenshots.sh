@@ -79,7 +79,10 @@ run join "$JOIN_DATA" --at-role join --at-map "$MAP_NAME" --at-nick Luigi --at-a
 JOIN=$!
 wait $HOST $JOIN
 
-# The LAN games (system link) list: two lobbies on this computer, found (and one joined) by a third game
+# The LAN games (system link) list: alone (it hosts from there), then two lobbies on this computer,
+# found (and one joined) by a third game
+mkdir -p "$OUT/syslink_alone"
+run syslink_alone "$HOST_DATA" --at-role syslink --at-shots "$OUT/syslink_alone"
 LAN_HOSTS=()
 for n in 1 2; do
     mkdir -p "$WORK/home_lan$n"
@@ -92,7 +95,7 @@ sleep 4
 run syslink "$HOST_DATA" --at-role syslink
 wait "${LAN_HOSTS[@]}"
 
-for name in errors host join syslink; do
+for name in errors host join syslink_alone syslink; do
     echo "== $name"
     grep -E "^shots:" "$WORK/$name.log"
 done

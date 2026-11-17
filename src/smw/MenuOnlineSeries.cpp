@@ -24,6 +24,7 @@
 #include "WorldTourStop.h"
 #include "world/WorldMapIO.h"
 
+#include "menu/SystemLinkMenu.h"
 #include "menu/BonusWheelMenu.h"
 #include "menu/GameSettingsMenu.h"
 #include "menu/MainMenu.h"
@@ -263,7 +264,8 @@ SeriesScreen MenuState::OnlineSeriesHostScreen() const
         return SeriesScreen::TourStop;
     if (menu == mWorldMenu.get())
         return SeriesScreen::World;
-    if (menu == mMainMenu.get() || menu == mOnlineLobbyMenu.get() || menu == mOnlineMenu.get() || menu == mMatchSelectionMenu.get() ||
+    if (menu == mMainMenu.get() || menu == mOnlineLobbyMenu.get() || menu == mOnlineMenu.get() || menu == mSystemLinkMenu.get() ||
+            menu == mMatchSelectionMenu.get() ||
             menu == mTeamSelectMenu.get())
         return SeriesScreen::None;
     return SeriesScreen::Choosing;

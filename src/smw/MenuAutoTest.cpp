@@ -770,8 +770,9 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
-    //--at-role syslink: the LAN games (system link) menu, searching and then with what it found
-    //(scripts/menu-screenshots.sh runs hosts on the network for it)
+    //--at-role syslink: the LAN games (system link) menu, searching and then with what it found, then
+    //A (scripts/menu-screenshots.sh runs hosts on the network for it: it joins the second; with no
+    //hosts, it hosts a game from the menu)
     if (at.shotsRole == "syslink" && step == 1) {
         if (t == 1)
             return MENU_CODE_TO_SYSTEM_LINK_MENU;
@@ -783,11 +784,11 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             game_values.playerInput.outputControls[0].menu_down.fPressed = true;
         if (t == 290)
             shot("s3_second_game");
-        //(and it joins it: the lobby of that host)
+        //(and A: it joins that game, or with none found, the Host button hosts one)
         if (t == 300)
             game_values.playerInput.outputControls[0].menu_select.fPressed = true;
         if (t == 480) {
-            shot("s4_joined");
+            shot("s4_lobby");
             step = 1000;
             t = 0;
         }

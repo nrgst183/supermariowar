@@ -118,10 +118,13 @@ class MenuState : public GameState
         void HostOnlineGame();
         void JoinOnlineGame();
         void JoinSystemLinkGame();
+        void HostSystemLinkGame();
+        bool HostLobby(int port, std::string& error);
         void EnterOnlineLobby();
         void LeaveOnlineLobby(const std::string& message);
         void LeaveOnlineLobbyNow();
         void HandleOnlineEvents();
+        bool mLobbyFromSystemLink = false;  // the lobby was entered from the System Link (LAN games) menu: leaving goes back there
         void OpenOnlineMatchSettings();
         void OpenOnlineGameSettings();
         void ReturnToOnlineLobby();

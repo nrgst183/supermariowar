@@ -803,6 +803,7 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         } else {
             iDisplayError = DISPLAY_ERROR_NONE;
             iDisplayErrorTimer = 0;
+            mSystemLinkMenu->Close();    //(the Xbox's System Link menu goes back here: its search stops)
             mCurrentMenu = mMainMenu.get();
         }
     } else if (MENU_CODE_TO_HISTORY_MENU == code) {
@@ -861,6 +862,8 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         mCurrentMenu = mSystemLinkMenu.get();
     } else if (MENU_CODE_SYSTEM_LINK_JOIN == code) {
         JoinSystemLinkGame();
+    } else if (MENU_CODE_SYSTEM_LINK_HOST == code) {
+        HostSystemLinkGame();
     } else if (MENU_CODE_ONLINE_LOBBY_CHANGED == code) {
         mOnlineLobbyMenu->ApplyChanges();
     } else if (MENU_CODE_ONLINE_OPTIONS == code) {

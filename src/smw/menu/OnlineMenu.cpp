@@ -14,12 +14,8 @@
 #include <algorithm>
 #include <cstdlib>
 
-//The Xbox joins over system link: the games hosted on the local network are listed in a menu
-//of their own (SystemLinkMenu.h; there's no keyboard to type an address). A PC has it too, as LAN
-//games, beside the address to type.
-#if defined(SMW_XBOX) && !defined(NETWORK_DISABLED)
-#define SMW_SYSTEM_LINK
-#endif
+//The games hosted on the local network have a menu of their own (SystemLinkMenu.h: LAN games,
+//where hosting is too), beside the address to type. (The Xbox has only that one: system link.)
 #ifndef NETWORK_DISABLED
 #define SMW_LAN_GAMES
 #include "SystemLinkMenu.h"
@@ -28,19 +24,13 @@
 namespace {
 constexpr short MAX_NAME_CHARS = 17;       // the field takes one character less than this (MAX_NAME_LENGTH is 16)
 constexpr short MAX_PORT_CHARS = 6;
-#ifndef SMW_SYSTEM_LINK
 constexpr short MAX_ADDRESS_CHARS = 64;
-#endif
 } // namespace
 
 UI_OnlineMenu::UI_OnlineMenu()
     : UI_Menu()
 {
-#ifdef SMW_SYSTEM_LINK
-    AddTitleBar("System Link");
-#else
     AddTitleBar("Online");
-#endif
 
     //Three panels (under their fields): you, hosting, joining
     AddNonControl(new MI_MenuPanel(36, 42, 568, 112, "You", "Your name, and how far ahead you see"));
@@ -54,11 +44,7 @@ UI_OnlineMenu::UI_OnlineMenu()
         return "Others join " + address + ":" + std::to_string(port > 0 ? port : 7300);
     });
     AddNonControl(hostPanel);
-#ifdef SMW_SYSTEM_LINK
-    AddNonControl(new MI_MenuPanel(36, 270, 568, 108, "Join a game", "Hosted on a console or PC of your network"));
-#else
     AddNonControl(new MI_MenuPanel(36, 270, 568, 108, "Join a game", "At the address the host gives you"));
-#endif
 
     miNameField = new MI_TextField(&rm->spr_selectfield, 64, 78, "Nickname", 512, 150);
     miNameField->SetData(game_values.onlinename, MAX_NAME_CHARS);
@@ -81,13 +67,6 @@ UI_OnlineMenu::UI_OnlineMenu()
     miHostButton = new MI_Button(&rm->spr_selectfield, 170, 230, "Host game", 300, TextAlign::CENTER);
     miHostButton->SetCode(MENU_CODE_ONLINE_HOST);
 
-#ifdef SMW_SYSTEM_LINK
-    //The games found on the network, in their own menu (instead of an address to type)
-    miAddressField = nullptr;
-    miJoinButton = nullptr;
-    miFindGamesButton = new MI_Button(&rm->spr_selectfield, 170, 306, "Find games", 300, TextAlign::CENTER);
-    miFindGamesButton->SetCode(MENU_CODE_TO_SYSTEM_LINK_MENU);
-#else
     miAddressField = new MI_TextField(&rm->spr_selectfield, 64, 306, "Address", 512, 150);
     miAddressField->SetData(game_values.onlineaddress, MAX_ADDRESS_CHARS);
     miAddressField->SetDisallowedChars(" ");
@@ -100,7 +79,6 @@ UI_OnlineMenu::UI_OnlineMenu()
     miJoinButton = new MI_Button(&rm->spr_selectfield, 170, 342, "Join game", 300, TextAlign::CENTER);
 #endif
     miJoinButton->SetCode(MENU_CODE_ONLINE_JOIN);
-#endif
 
     //What went wrong (or what's happening), under the panels, in a panel of its own
     miMessage = new MI_WrappedText(320, 390, 512, 3);
@@ -119,11 +97,7 @@ UI_OnlineMenu::UI_OnlineMenu()
     AddControl(miNameField, miBackButton, miRunAheadField, nullptr, nullptr);
     AddControl(miRunAheadField, miNameField, miPortField, nullptr, nullptr);
     AddControl(miPortField, miRunAheadField, miHostButton, nullptr, nullptr);
-#ifdef SMW_SYSTEM_LINK
-    AddControl(miHostButton, miPortField, miFindGamesButton, nullptr, nullptr);
-    AddControl(miFindGamesButton, miHostButton, miBackButton, nullptr, nullptr);
-    AddControl(miBackButton, miFindGamesButton, miNameField, nullptr, nullptr);
-#elif defined(SMW_LAN_GAMES)
+#ifdef SMW_LAN_GAMES
     AddControl(miHostButton, miPortField, miAddressField, nullptr, nullptr);
     AddControl(miAddressField, miHostButton, miJoinButton, nullptr, nullptr);
     AddControl(miJoinButton, miAddressField, miBackButton, nullptr, miFindGamesButton);
@@ -138,13 +112,6 @@ UI_OnlineMenu::UI_OnlineMenu()
 
     AddNonControl(miMessage);
     AddNonControl(miPrompts);
-#ifdef SMW_SYSTEM_LINK
-    //No message: the state of the console's network
-    AddNonControl(new MI_EveryFrame([this, frames = 0u]() mutable {
-        if (m_showingStatus && frames++ % 30 == 0)
-            miMessage->SetText(systemLinkNetworkStatus());
-    }));
-#endif
 
     setInitialFocus(miHostButton);
     SetCancelCode(MENU_CODE_TO_MAIN_MENU);
@@ -154,16 +121,12 @@ void UI_OnlineMenu::Open()
 {
     miNameField->Refresh();
     miPortField->Refresh();
-    if (miAddressField)
-        miAddressField->Refresh();
+    miAddressField->Refresh();
     ResetMenu();
 }
 
 void UI_OnlineMenu::ShowMessage(std::string text)
 {
-    //(an empty message: the network's state shows again, on the Xbox)
-    m_showingStatus = text.empty();
-
     //Its icon: a problem, or just news (e.g. "The host closed the lobby")
     using Tone = MI_WrappedText::Tone;
     const bool problem = text.rfind("Can't", 0) == 0 || text.rfind("Could not", 0) == 0 || text.rfind("Lost", 0) == 0
@@ -174,7 +137,6 @@ void UI_OnlineMenu::ShowMessage(std::string text)
 
 void UI_OnlineMenu::ClearMessage()
 {
-    m_showingStatus = true;
     miMessage->SetText({});
 }
 

@@ -36,29 +36,50 @@ std::string trimmed(const std::string& text)
 
 } // namespace
 
-void MenuState::HostOnlineGame()
+// Opens a lobby on the port (0: the default), under this computer's name; false and why if it can't
+bool MenuState::HostLobby(int port, std::string& error)
 {
     rollback::NetGame& net = rollback::NetGame::instance();
-    mOnlineMenu->ClearMessage();
-
-    const std::string portText = trimmed(game_values.onlineport);
-    const int port = mOnlineMenu->port();
     if (port < 0 || port > 65535) {
-        mOnlineMenu->ShowMessage("The port must be a number from 1 to 65535");
-        return;
+        error = "The port must be a number from 1 to 65535";
+        return false;
     }
-
-    std::string error;
     if (!net.host(static_cast<uint16_t>(port), error)) {
-        mOnlineMenu->ShowMessage("Can't host a game: " + error);
-        return;
+        error = "Can't host a game: " + error;
+        return false;
     }
 
-    game_values.onlinename = trimmed(game_values.onlinename);
-    if (portText.empty())
+    if (trimmed(game_values.onlineport).empty())
         game_values.onlineport = "7300";
-    net.lobby()->setName(game_values.onlinename);
+    game_values.onlinename = trimmed(game_values.onlinename);
+    net.lobby()->setName(systemLinkPlayerName());
     game_values.WriteConfig();
+    return true;
+}
+
+void MenuState::HostOnlineGame()
+{
+    mOnlineMenu->ClearMessage();
+    std::string error;
+    if (!HostLobby(mOnlineMenu->port(), error)) {
+        mOnlineMenu->ShowMessage(error);
+        return;
+    }
+    mLobbyFromSystemLink = false;
+    EnterOnlineLobby();
+}
+
+// "Host a game" in the System Link (LAN games) menu: found there by the others on the network
+void MenuState::HostSystemLinkGame()
+{
+    mSystemLinkMenu->ClearMessage();
+    std::string error;
+    if (!HostLobby(atoi(game_values.onlineport.c_str()), error)) {
+        mSystemLinkMenu->ShowMessage(error);
+        return;
+    }
+    mSystemLinkMenu->Close();
+    mLobbyFromSystemLink = true;
     EnterOnlineLobby();
 }
 
@@ -80,8 +101,9 @@ void MenuState::JoinOnlineGame()
     }
 
     game_values.onlinename = trimmed(game_values.onlinename);
-    net.lobby()->setName(game_values.onlinename);
+    net.lobby()->setName(systemLinkPlayerName());
     game_values.WriteConfig();
+    mLobbyFromSystemLink = false;
     EnterOnlineLobby();
 }
 
@@ -108,8 +130,9 @@ void MenuState::JoinSystemLinkGame()
     //(the Online menu's address field shows it next time)
     game_values.onlineaddress = address;
     game_values.onlinename = trimmed(game_values.onlinename);
-    net.lobby()->setName(game_values.onlinename);
+    net.lobby()->setName(systemLinkPlayerName());
     game_values.WriteConfig();
+    mLobbyFromSystemLink = true;
     EnterOnlineLobby();
 }
 
@@ -126,7 +149,8 @@ void MenuState::EnterOnlineLobby()
     mOnlineLobbyMenu->Open();
 }
 
-// The lobby is over (we left it, it was closed or we couldn't join): the Online menu, with the reason
+// The lobby is over (we left it, it was closed or we couldn't join): the menu it was entered from
+// (the Online menu, or the System Link one), with the reason
 void MenuState::LeaveOnlineLobby(const std::string& message)
 {
     mOnlineSetup = false;
@@ -137,6 +161,13 @@ void MenuState::LeaveOnlineLobby(const std::string& message)
     mGameSettingsMenu->SetOnlineView(UI_GameSettingsMenu::OnlineView::Off);
     mOnlineLobbyMenu->CloseDialog();
 
+    if (mLobbyFromSystemLink) {
+        mSystemLinkMenu->Open();
+        if (!message.empty())
+            mSystemLinkMenu->ShowMessage(message);
+        mCurrentMenu = mSystemLinkMenu.get();
+        return;
+    }
     mOnlineMenu->Open();
     mOnlineMenu->ShowMessage(message);
     mCurrentMenu = mOnlineMenu.get();

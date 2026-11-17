@@ -830,6 +830,10 @@ typedef enum SDL_XboxNetworkStatus {
 } SDL_XboxNetworkStatus;
 // `address` (at least 16 characters) gets the console's address when READY
 SDL_XboxNetworkStatus SDL_XboxGetNetworkStatus(char* address, int size);
+// The console's name for system link: the nickname last used on it (the nicknames the
+// games share, XFindFirstNickname), in ASCII (other characters as '?'). 0 (and "") if it
+// has none.
+int SDL_XboxGetNickname(char* name, int size);
 
 #ifdef __cplusplus
 }

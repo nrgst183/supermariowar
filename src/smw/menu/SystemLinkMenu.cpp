@@ -1,13 +1,16 @@
 #include "SystemLinkMenu.h"
 
+#include "GameValues.h"
 #include "input.h"
 #include "ResourceManager.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_LobbyWidgets.h"
 #include "ui/MI_MenuPanel.h"
+#include "ui/MI_SelectField.h"
 #include "ui/SmwTheme.h"
 
 #include <algorithm>
+#include <cstring>
 
 #ifndef NETWORK_DISABLED
 #include "rollback/LanDiscovery.h"
@@ -19,18 +22,32 @@
 #endif
 
 namespace {
-// The list: the panel, its rows, and the details panel under it
+// The list: the panel, its rows; under it the details panel, and the Host button
 constexpr int PANEL_X = 36;
 constexpr int PANEL_Y = 42;
 constexpr int PANEL_W = 568;
-constexpr int PANEL_H = 272;
+constexpr int PANEL_H = 226;
 constexpr int ROW_X = 52;
 constexpr int ROW_Y = 76;
 constexpr int ROW_W = 536;
 constexpr int ROW_H = 42;
 constexpr int ROW_STEP = 46;
-constexpr int DETAILS_Y = 320;
+constexpr int DETAILS_Y = 274;
 constexpr int DETAILS_H = 62;
+constexpr short HOST_Y = 344;
+
+// Draws with a function (a menu's part that depends on more than one control)
+class MI_DrawFn : public UI_Control {
+public:
+    explicit MI_DrawFn(std::function<void()> fn)
+        : UI_Control(0, 0)
+        , m_fn(std::move(fn))
+    {}
+    void Draw() override { m_fn(); }
+
+private:
+    std::function<void()> m_fn;
+};
 
 #ifdef SMW_XBOX
 constexpr const char* TITLE = "System Link Games";
@@ -59,7 +76,34 @@ std::string shortBuild(const std::string& build)
 {
     return build.empty() ? "unknown" : build.substr(0, 8);
 }
+
+std::string trimmed(const std::string& text)
+{
+    const size_t first = text.find_first_not_of(" \t");
+    if (first == std::string::npos)
+        return {};
+    return text.substr(first, text.find_last_not_of(" \t") - first + 1);
+}
 } // namespace
+
+std::string systemLinkPlayerName()
+{
+#ifdef SMW_XBOX
+    //The console's nickname (the games share them), else "Xbox" and its address's last number
+    char name[17];
+    if (SDL_XboxGetNickname(name, sizeof(name)))
+        return trimmed(name).empty() ? "Xbox" : trimmed(name);
+    char address[32];
+    if (SDL_XboxGetNetworkStatus(address, sizeof(address)) == SDL_XBOX_NETWORK_READY) {
+        const char* last = std::strrchr(address, '.');
+        if (last && last[1])
+            return std::string("Xbox ") + (last + 1);
+    }
+    return "Xbox";
+#else
+    return trimmed(game_values.onlinename);
+#endif
+}
 
 std::string systemLinkNetworkStatus()
 {
@@ -120,7 +164,7 @@ void MI_LanGameList::move(int direction)
     if (m_games.empty())
         return;
     const int count = static_cast<int>(m_games.size());
-    m_selected = (m_selected + direction + count) % count;    //(round the ends)
+    m_selected = std::clamp(m_selected + direction, 0, count - 1);
     m_selectedAddress = m_games[static_cast<size_t>(m_selected)].address;
     if (m_selected < m_scroll)
         m_scroll = m_selected;
@@ -133,13 +177,20 @@ MenuCodeEnum MI_LanGameList::SendInput(CPlayerInput* playerInput)
     for (int p = 0; p < 4; p++) {
         const COutputControl& keys = playerInput->outputControls[p];
         if (keys.menu_cancel.fPressed)
-            return MENU_CODE_TO_ONLINE_MENU;
+            return m_backCode;
         if (keys.menu_select.fPressed)
-            return MENU_CODE_SYSTEM_LINK_JOIN;
-        if (keys.menu_up.fPressed)
+            return m_games.empty() ? MENU_CODE_NONE : MENU_CODE_SYSTEM_LINK_JOIN;
+        if (keys.menu_up.fPressed) {
             move(-1);
-        else if (keys.menu_down.fPressed)
+        } else if (keys.menu_down.fPressed) {
+            //(down from the last game: the Host button)
+            if (m_selected + 1 >= static_cast<int>(m_games.size())) {
+                if (m_leaveDown)
+                    m_leaveDown();
+                return MENU_CODE_NONE;
+            }
             move(1);
+        }
     }
     return MENU_CODE_NONE;
 }
@@ -170,15 +221,13 @@ void MI_LanGameList::Draw()
     }
 
     for (int i = 0; i < ROWS && m_scroll + i < count; i++)
-        drawRow(ROW_X, ROW_Y + i * ROW_STEP, m_games[static_cast<size_t>(m_scroll + i)], m_scroll + i == m_selected);
+        drawRow(ROW_X, ROW_Y + i * ROW_STEP, m_games[static_cast<size_t>(m_scroll + i)], fSelected && m_scroll + i == m_selected);
 
     //More above or below: a marker at the panel's edge
     if (m_scroll > 0)
         rm->menu_font_small.drawCentered(320, ROW_Y - 9, "- more above -");
     if (m_scroll + ROWS < count)
         rm->menu_font_small.drawCentered(320, ROW_Y + ROWS * ROW_STEP - 4, "- more below -");
-
-    drawDetails(m_games[static_cast<size_t>(m_selected)]);
 }
 
 void MI_LanGameList::drawRow(int x, int y, const Game& game, bool selected) const
@@ -211,25 +260,173 @@ void MI_LanGameList::drawRow(int x, int y, const Game& game, bool selected) cons
 void MI_LanGameList::drawEmpty() const
 {
     if (!m_searching) {
-        rm->menu_font_large.drawCentered(320, 150, "Can't search the network");
-        rm->menu_font_small.drawCentered(320, 180, "Join by address from the Online menu instead");
+        rm->menu_font_large.drawCentered(320, 130, "Can't search the network");
         return;
     }
-    theme::spinner(320, 130, m_tick);
-    rm->menu_font_large.drawCentered(320, 166, "Looking for games...");
-    rm->menu_font_small.drawCentered(320, 200, std::string("Games hosted on the ") + WHERE + " of this network");
-    rm->menu_font_small.drawCentered(320, 218, "show up here by themselves, within a second or two.");
+    theme::spinner(320, 116, m_tick);
+    rm->menu_font_large.drawCentered(320, 150, "Looking for games...");
+    rm->menu_font_small.drawCentered(320, 184, std::string("Games hosted on the ") + WHERE + " of this network");
+    rm->menu_font_small.drawCentered(320, 202, "show up here by themselves, within a second or two.");
+    rm->menu_font_small.drawCentered(320, 228, "None? Host one with the button below.");
+}
+
+// ---- UI_SystemLinkMenu
+
+UI_SystemLinkMenu::UI_SystemLinkMenu()
+    : UI_Menu()
+{
+    AddTitleBar(TITLE);
 #ifdef SMW_XBOX
-    rm->menu_font_small.drawCentered(320, 248, "Connect the consoles with a cable, a hub or a router,");
-    rm->menu_font_small.drawCentered(320, 266, "or host a game yourself from the System Link menu.");
+    const MenuCodeEnum back = MENU_CODE_TO_MAIN_MENU;    //(the Xbox: the main menu opens this one)
 #else
-    rm->menu_font_small.drawCentered(320, 248, "Nothing? Host one from the Online menu, or join");
-    rm->menu_font_small.drawCentered(320, 266, "a game over the internet by its address there.");
+    const MenuCodeEnum back = MENU_CODE_TO_ONLINE_MENU;
+#endif
+
+    m_list = new MI_LanGameList();
+    m_list->SetBackCode(back);
+    m_list->SetLeaveDown([this] {
+        m_moved = true;
+        focus(m_host);
+    });
+
+    //Under the list: hosting (and on the Xbox, beside it, the run-ahead: there's no Online menu there)
+#ifdef SMW_XBOX
+    m_host = new MI_Button(&rm->spr_selectfield, 64, HOST_Y, "Host a game", 250, TextAlign::CENTER);
+    MI_SelectField<short>* runAhead = new MI_SelectField<short>(&rm->spr_selectfield, 326, HOST_Y, "Run-Ahead", 250, 130);
+    runAhead->add("Off", 0);
+    runAhead->add("1 Frame", 1);
+    runAhead->add("2 Frames", 2);
+    runAhead->add("3 Frames", 3);
+    game_values.runahead = std::clamp<short>(game_values.runahead, 0, 3);
+    runAhead->setOutputPtr(&game_values.runahead);
+    runAhead->setCurrentValue(game_values.runahead);
+    runAhead->setAutoAdvance(true);
+    m_runAhead = runAhead;
+#else
+    m_host = new MI_Button(&rm->spr_selectfield, 170, HOST_Y, "Host a game", 300, TextAlign::CENTER);
+#endif
+    m_host->SetCode(MENU_CODE_SYSTEM_LINK_HOST);
+
+    //What went wrong (or on the Xbox, the state of its network), at the bottom
+    m_message = new MI_WrappedText(320, 392, 512, 2);
+    m_message->SetBoxed(true);
+
+    MI_PromptStrip* prompts = new MI_PromptStrip(16, 434, 512, "", [this]() {
+        using prompts::Pad;
+        using prompts::menuKey;
+        std::vector<prompts::Prompt> row;
+        const prompts::Prompt choose {{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"};
+        if (m_currentFocus == m_list && m_list->Selected()) {
+            row.push_back(choose);
+            row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "join"});
+        } else if (m_currentFocus == m_host) {
+            if (m_list->Selected())
+                row.push_back(choose);
+            row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "host"});
+        } else if (m_runAhead && m_currentFocus == m_runAhead) {
+            row.push_back({{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"});
+        } else {
+            row.push_back(choose);
+        }
+        row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"});
+        return row;
+    });
+    MI_Button* backButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
+    backButton->SetCode(back);
+
+    //(the list takes up and down itself: down from its last game comes to the Host button)
+    AddControl(m_list, nullptr, nullptr, nullptr, nullptr);
+    if (m_runAhead) {
+        AddControl(m_host, m_list, nullptr, nullptr, m_runAhead);
+        AddControl(m_runAhead, m_list, nullptr, m_host, nullptr);
+    } else {
+        AddControl(m_host, m_list, nullptr, nullptr, nullptr);
+    }
+    AddNonControl(new MI_DrawFn([this] { drawDetails(); }));
+    AddNonControl(backButton);
+    AddNonControl(m_message);
+    AddNonControl(prompts);
+    AddNonControl(new MI_EveryFrame([this] { RefreshGames(); }));
+
+    setInitialFocus(m_host);
+    SetCancelCode(back);
+}
+
+void UI_SystemLinkMenu::focus(UI_Control* control)
+{
+    if (m_currentFocus == control)
+        return;
+    if (m_currentFocus) {
+        m_currentFocus->Modify(false);
+        m_currentFocus->Select(false);
+    }
+    m_currentFocus = control;
+    fModifyingItem = control ? control->Select(true) : false;
+}
+
+void UI_SystemLinkMenu::Open()
+{
+#ifndef NETWORK_DISABLED
+    s_browser.close();
+    const bool searching = s_browser.open();
+    m_list->SetSearching(searching);
+    if (!searching)
+        ShowMessage("Can't search the network (no UDP socket)");
+    else
+        ClearMessage();
+#else
+    m_list->SetSearching(false);
+    ShowMessage("This build has no network support");
+#endif
+    m_list->SetGames({});
+    m_frames = 0;
+    m_moved = false;
+    ResetMenu();
+}
+
+void UI_SystemLinkMenu::Close()
+{
+#ifndef NETWORK_DISABLED
+    s_browser.close();
 #endif
 }
 
-void MI_LanGameList::drawDetails(const Game& game) const
+void UI_SystemLinkMenu::ShowMessage(std::string text)
 {
+    m_showingStatus = text.empty();
+    const bool problem = text.rfind("Can't", 0) == 0 || text.rfind("That game", 0) == 0 || text.find("no network") != std::string::npos;
+    m_message->SetText(std::move(text), problem ? MI_WrappedText::Tone::Error : MI_WrappedText::Tone::Warn);
+}
+
+void UI_SystemLinkMenu::ClearMessage()
+{
+    m_showingStatus = true;
+    m_message->SetText({});
+}
+
+// Under the list: the chosen game (who, where, whether it can be joined), or what hosting does
+void UI_SystemLinkMenu::drawDetails() const
+{
+    const MI_LanGameList::Game* chosen = m_list->Selected();
+    if (m_currentFocus != m_list || !chosen) {
+        menupanel::box(PANEL_X, DETAILS_Y, PANEL_W, DETAILS_H);
+        const std::string name = systemLinkPlayerName();
+        rm->menu_font_large.draw(PANEL_X + 20, DETAILS_Y + 9, "Your game");
+#ifdef SMW_XBOX
+        const std::string where = systemLinkNetworkStatus();
+        rm->menu_font_small.drawRightJustified(PANEL_X + PANEL_W - 20, DETAILS_Y + 13, fit(rm->menu_font_small, where.rfind("System link: this console is ", 0) == 0 ? where.substr(29) : std::string(), 250));
+#else
+        const int port = atoi(game_values.onlineport.c_str());
+        rm->menu_font_small.drawRightJustified(PANEL_X + PANEL_W - 20, DETAILS_Y + 13, "Port " + std::to_string(port > 0 ? port : 7300));
+#endif
+        //(no nickname: the lobby's "Player 1", as the others' lists show it)
+        theme::statusIcon(PANEL_X + 20, DETAILS_Y + 36, theme::Status::Info);
+        const std::string text = "Others on this network see it as \"" + (name.empty() ? std::string("Player 1") : name) + "\"";
+        rm->menu_font_small.draw(PANEL_X + 44, DETAILS_Y + 40, fit(rm->menu_font_small, text, PANEL_W - 64));
+        return;
+    }
+    const MI_LanGameList::Game& game = *chosen;
+
     //The chosen game: who, where, and whether (and how) it can be joined
     menupanel::box(PANEL_X, DETAILS_Y, PANEL_W, DETAILS_H);
     const std::string name = game.name.empty() ? "A game" : game.name + "'s game";
@@ -253,84 +450,6 @@ void MI_LanGameList::drawDetails(const Game& game) const
     }
     theme::statusIcon(PANEL_X + 20, DETAILS_Y + 36, status);
     rm->menu_font_small.draw(PANEL_X + 44, DETAILS_Y + 40, fit(rm->menu_font_small, text, PANEL_W - 64));
-}
-
-
-// ---- UI_SystemLinkMenu
-
-UI_SystemLinkMenu::UI_SystemLinkMenu()
-    : UI_Menu()
-{
-    AddTitleBar(TITLE);
-
-    m_list = new MI_LanGameList();
-
-    //What went wrong (or on the Xbox, the state of its network), at the bottom
-    m_message = new MI_WrappedText(320, 396, 512, 2);
-    m_message->SetBoxed(true);
-
-    MI_PromptStrip* prompts = new MI_PromptStrip(16, 434, 512, "", [this]() {
-        using prompts::Pad;
-        using prompts::menuKey;
-        std::vector<prompts::Prompt> row;
-        if (m_list->Selected()) {
-            row.push_back({{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"});
-            row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "join"});
-        }
-        row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"});
-        return row;
-    });
-    //(B goes back: the list has the focus, always)
-    MI_Button* back = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
-    back->SetCode(MENU_CODE_TO_ONLINE_MENU);
-
-    AddControl(m_list, nullptr, nullptr, nullptr, nullptr);
-    AddNonControl(back);
-    AddNonControl(m_message);
-    AddNonControl(prompts);
-    AddNonControl(new MI_EveryFrame([this] { RefreshGames(); }));
-
-    setInitialFocus(m_list);
-    SetCancelCode(MENU_CODE_TO_ONLINE_MENU);
-}
-
-void UI_SystemLinkMenu::Open()
-{
-#ifndef NETWORK_DISABLED
-    s_browser.close();
-    const bool searching = s_browser.open();
-    m_list->SetSearching(searching);
-    if (!searching)
-        ShowMessage("Can't search the network (no UDP socket)");
-    else
-        ClearMessage();
-#else
-    m_list->SetSearching(false);
-    ShowMessage("This build has no network support");
-#endif
-    m_list->SetGames({});
-    m_frames = 0;
-    ResetMenu();
-}
-
-void UI_SystemLinkMenu::Close()
-{
-#ifndef NETWORK_DISABLED
-    s_browser.close();
-#endif
-}
-
-void UI_SystemLinkMenu::ShowMessage(std::string text)
-{
-    m_showingStatus = text.empty();
-    const bool problem = text.rfind("Can't", 0) == 0 || text.rfind("That game", 0) == 0 || text.find("no network") != std::string::npos;
-    m_message->SetText(std::move(text), problem ? MI_WrappedText::Tone::Error : MI_WrappedText::Tone::Warn);
-}
-
-void UI_SystemLinkMenu::ClearMessage()
-{
-    m_showingStatus = true;
-    m_message->SetText({});
 }
 
 std::string UI_SystemLinkMenu::SelectedAddress(std::string& why) const
@@ -379,7 +498,14 @@ void UI_SystemLinkMenu::RefreshGames()
                 return a.sameBuild;
             return a.name < b.name;
         });
+        const bool first = !m_list->Selected() && !games.empty();
         m_list->SetGames(std::move(games));
+        //The first game found takes the focus, only just after the menu opened (later, a game showing
+        //up as A is pressed on Host would join it instead); none left: the Host button
+        if (first && !m_moved && m_frames < 120 && m_currentFocus == m_host)
+            focus(m_list);
+        if (!m_list->Selected() && m_currentFocus == m_list)
+            focus(m_host);
 
         //No message: the Xbox's network (if it isn't ready, a warning)
         if (m_showingStatus) {
