@@ -45,16 +45,14 @@ See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 
 ### Map and world editors in the game
 
-![The map editor: three players editing a map together with the blocks palette open, the tools menu (undo, redo, copy an area, paste, fill), pasting a copied area, and the tile picker](docs/gfx/fork/map_editor.png)
-
-![The world editor](docs/gfx/fork/world_editor.png)
+![The map editor: three players editing a map together with the blocks palette open, the tools menu (undo, redo, copy an area, paste, fill), and pasting a copied area; and the world editor with its modes menu open](docs/gfx/fork/map_editor.png)
 
 - **Make and edit maps and worlds right in the game** (**Main menu, Editors**), with a mouse and keyboard or a controller: rectangles, fill, copy and paste, and undo.
 - **Edit together**: one player hosts a map or a world, the others join and edit it with them at the same time, online or on one computer.
 
 ### Theater: replays of every match
 
-![The theater: jumping to the next kill, paused with a controller, the controls, and the leave prompt](docs/gfx/fork/theater.png)
+![A replay playing in the theater with its timeline, the match history (five matches, each with its mode, map and winner), the theater's controls, and the end of the replay](docs/gfx/fork/theater.png)
 
 - Every match is saved as a small replay (the inputs, not a video), with the skins, the music and the players' pings. **Main menu, History** lists your matches.
 - The **theater** plays them back with a timeline (score changes and kills marked on it), pause, frame stepping, fast forward and rewind, smooth slow motion, a camera that follows any player, and jumping to any moment, with a controller or the mouse and keyboard.
