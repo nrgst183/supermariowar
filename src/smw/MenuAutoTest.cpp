@@ -770,6 +770,53 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
+    //--at-role locallobby: Start (the lobby of a local game), its options, a CPU, Continue to the local
+    //match menus, back to the lobby (as it was), others let in (LAN), then a local match
+    if (at.shotsRole == "locallobby" && step == 1) {
+        rollback::NetGame& net = rollback::NetGame::instance();
+        switch (t) {
+            case 1: return MENU_CODE_TO_LOCAL_LOBBY;
+            case 20: shot("l1_lobby"); break;
+            case 25: return MENU_CODE_ONLINE_OPTIONS;
+            case 30:
+                if (net.lobby())
+                    net.lobby()->setCpuCount(2);
+                break;
+            case 45: shot("l2_options"); break;
+            case 50: return MENU_CODE_ONLINE_OPTIONS_BACK;
+            case 65: shot("l3_lobby_cpus"); break;
+            case 70: return MENU_CODE_ONLINE_MATCH_SETTINGS;
+            case 85: shot("l4_match_type"); break;
+            case 90: return MENU_CODE_MATCH_SELECTION_START;
+            case 105: shot("l5_game_settings"); break;
+            case 110: return MENU_CODE_BACK_TEAM_SELECT_MENU;
+            case 125: shot("l6_back_match_type"); break;
+            case 130: return MENU_CODE_TO_MAIN_MENU;
+            case 145: shot("l7_lobby_again"); break;
+            case 150: {
+                std::string error;
+                if (!net.setAccess(rollback::LobbyAccess::Lan, error))
+                    printf("shots: can't open the lobby: %s\n", error.c_str());
+                break;
+            }
+            case 170: shot("l8_lobby_lan"); break;
+            case 175: {
+                std::string error;
+                net.setAccess(rollback::LobbyAccess::Nobody, error);
+                break;
+            }
+            case 180: return MENU_CODE_ONLINE_MATCH_SETTINGS;
+            case 190: return MENU_CODE_MATCH_SELECTION_START;
+            case 200:
+                printf("shots: local game: %d teams, players %d %d %d %d, lobby open: %d\n", g_sim.score_cnt, game_values.playercontrol[0],
+                    game_values.playercontrol[1], game_values.playercontrol[2], game_values.playercontrol[3], net.active() ? 1 : 0);
+                step = 1000;
+                t = 0;
+                return MENU_CODE_START_GAME;
+        }
+        return MENU_CODE_NONE;
+    }
+
     //--at-role syslink: the LAN games (system link) menu, searching and then with what it found, then
     //A (scripts/menu-screenshots.sh runs hosts on the network for it: it joins the second; with no
     //hosts, it hosts a game from the menu)

@@ -156,7 +156,7 @@
 namespace rollback {
 
 constexpr int LOBBY_SLOTS = 4;
-constexpr int MAX_LOCAL_PLAYERS = 2;
+constexpr int MAX_LOCAL_PLAYERS = 4;    // players on one machine (a local game: all four)
 constexpr uint16_t DEFAULT_LOBBY_PORT = 7300;
 constexpr size_t MAX_NAME_LENGTH = 16;
 constexpr uint32_t MAP_MAX_BYTES = 1024 * 1024;

@@ -76,6 +76,7 @@ enum MenuCodeEnum {
     MENU_CODE_MATCH_SELECTION_START,
     MENU_CODE_MATCH_SELECTION_MATCH_CHANGED,
     MENU_CODE_TO_MATCH_SELECTION_MENU,
+    MENU_CODE_TO_LOCAL_LOBBY,           // the main menu's Start: the lobby, of a local game (nobody else can join yet)
     MENU_CODE_BACK_TO_MATCH_SELECTION_MENU,
     MENU_CODE_EXIT_WORLD_YES,
     MENU_CODE_EXIT_WORLD_NO,

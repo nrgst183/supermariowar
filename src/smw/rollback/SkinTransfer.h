@@ -31,7 +31,7 @@
 // a sanitized, unique name (never overwriting anything); the name a peer sends is never used as a path.
 namespace rollback {
 
-constexpr int SKIN_PLAYERS = 2;               // skins announced per peer (MAX_LOCAL_PLAYERS)
+constexpr int SKIN_PLAYERS = 4;               // skins announced per peer (MAX_LOCAL_PLAYERS)
 constexpr uint32_t SKIN_MAX_BYTES = 128 * 1024;
 constexpr size_t SKIN_CHUNK_BYTES = 1000;
 constexpr int SKIN_CHUNKS_PER_FRAME = 4;      // per 16 ms, over all uploads

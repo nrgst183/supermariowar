@@ -293,12 +293,16 @@ bool MI_OnlineTeamSelect::gather(int s, Info& info) const
             break;
         case rollback::SlotKind::Human:
             info.name = peer->name;
-            if (slot.localIndex > 0)
-                info.name += std::format(" ({})", slot.localIndex + 1);
-            if (info.mine)
-                info.role = slot.peer == 0 ? "You, host" : "You";
+            //(no nickname: "Player" and the slot's number; else the nickname, and which of its players)
+            if (info.name.empty() || info.name.rfind("Player ", 0) == 0)
+                info.name = std::format("Player {}", s + 1);
             else if (slot.localIndex > 0)
-                info.role = "2nd player";
+                info.name += std::format(" ({})", slot.localIndex + 1);
+            //(the second, third, fourth player of a computer: which one)
+            if (slot.localIndex > 0)
+                info.role = slot.localIndex == 1 ? "2nd player" : slot.localIndex == 2 ? "3rd player" : "4th player";
+            else if (info.mine)
+                info.role = slot.peer == 0 ? "You, host" : "You";
             else
                 info.role = slot.peer == 0 ? "Host" : "Player";
             info.pingMs = info.mine ? -1 : peer->pingMs;
@@ -378,7 +382,7 @@ void MI_OnlineTeamSelect::Draw()
         }
         rm->spr_player_select_ready.draw(cardX, 368, {0, 0, 128, 96});
         rm->spr_menu_boxed_numbers.draw(cardX + 16, 388, {s * 16, i.color * 16, 16, 16});
-        const bool host = i.human && lobby->slot(s).peer == 0;
+        const bool host = i.human && lobby->slot(s).peer == 0 && lobby->slot(s).localIndex == 0;
         const int nameW = host ? 62 : 80;
         rm->menu_font_small.drawChopRight(cardX + 36, 404 - rm->menu_font_small.getHeight(), nameW, i.name);
         if (host)
@@ -395,7 +399,7 @@ void MI_OnlineTeamSelect::Draw()
         }
 
         std::string line = i.role;
-        const bool showPing = i.human && !i.mine && i.role != "2nd player";
+        const bool showPing = i.human && !i.mine && lobby->slot(s).localIndex == 0;
         if (i.downloadingSkin)
             line = "skin...";
         if (showPing) {

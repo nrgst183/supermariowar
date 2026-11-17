@@ -66,6 +66,10 @@ private:
     MI_LobbyButton* miContinueButton = nullptr;
 
     // The options page
+    MI_SelectField<short>* miWhoCanJoin = nullptr;     // host: nobody (a local game), the network, anyone
+    int m_pendingAccess = 0;
+    UI_Control* FirstOption();
+    bool LocalGame() const;    // where the options page starts: who can join (the host), else my players
     MI_SelectField<short>* miLocalPlayers = nullptr;
     MI_SelectField<short>* miCpuPlayers = nullptr;
     MI_SelectField<short>* miInputDelay = nullptr;
@@ -73,7 +77,7 @@ private:
     MI_SelectField<short>* miKickWho = nullptr;
     MI_LobbyButton* miKickButton = nullptr;
     MI_LobbyButton* miOptionsDone = nullptr;
-    MI_LockTag* miHostTag[4] {};
+    MI_LockTag* miHostTag[5] {};
 
     MI_Image* miDialogImage = nullptr;
     MI_Text* miDialogLine1 = nullptr;

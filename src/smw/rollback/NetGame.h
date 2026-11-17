@@ -50,13 +50,24 @@ namespace rollback {
 // the --autotest frame limit). The session never runs past such a frame
 // and only reports it once it is confirmed, so every peer leaves at the
 // same frame, with the same final state (see RollbackSession.h).
+// Who can join a lobby: nobody (a local game: no network at all), the local network (system
+// link: found by the others' LAN games lists), or anyone (and the router's port is opened, UPnP)
+enum class LobbyAccess : uint8_t { Nobody, Lan, Internet };
+
 class NetGame : public ISessionCallbacks {
 public:
     static NetGame& instance();
 
     // ---- lobby (menus; see the MENU CONTRACT in NetLobby.h)
-    // Opens a lobby on a UDP port (0: DEFAULT_LOBBY_PORT). False with a message on failure.
-    bool host(uint16_t port, std::string& error);
+    // Opens a lobby on a UDP port (0: DEFAULT_LOBBY_PORT), open to `access`. False with a message
+    // on failure. (Nobody: no network is used, in any build: the lobby of a local game.)
+    bool host(uint16_t port, std::string& error, LobbyAccess access = LobbyAccess::Internet);
+    // Host: who can join now (opens or closes the network). Nobody only while nobody else is in.
+    // False and why if it can't (the port is in use, ...).
+    bool setAccess(LobbyAccess access, std::string& error);
+    LobbyAccess access() const { return m_access; }
+    // Whether another machine is in the lobby
+    bool hasOthers() const;
     // Joins a lobby: "ip:port", "name:port", or just the address (DEFAULT_LOBBY_PORT)
     bool join(const std::string& address, std::string& error);
     // Leaves the lobby (the host closes it for everyone); in a match, leaves the match too
@@ -212,7 +223,9 @@ public:
 private:
     NetGame() = default;
 
-    bool open(bool asHost, uint16_t port, const std::string& joinHost, uint16_t joinPort, std::string& error);
+    bool open(bool asHost, uint16_t port, const std::string& joinHost, uint16_t joinPort, LobbyAccess access, std::string& error);
+    std::unique_ptr<IMeshTransport> createNetwork(uint16_t port, std::string& error) const;
+    void openRouterPort(uint16_t port);
     void handle(const LobbyGameEvent& event, uint32_t nowMs);
     void handleMessage(int peer, const uint8_t* data, size_t size, uint32_t nowMs);
     void processConfig();
@@ -237,7 +250,9 @@ private:
     void applySeriesSlots(std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot);
     void sendSeries(int peer, const net::ByteWriter& w);
 
-    std::unique_ptr<IMeshTransport> m_transport;
+    std::unique_ptr<SwitchableTransport> m_transport;
+    LobbyAccess m_access = LobbyAccess::Internet;
+    uint16_t m_hostPort = 0;   // the port a host's lobby opens (or opened) the network on
     std::unique_ptr<NetLobby> m_lobby;
     std::unique_ptr<RollbackSession> m_session;
     bool m_cliDone = false;
@@ -262,7 +277,7 @@ private:
     uint32_t m_lastInfoMs = 0;
     std::deque<SettingRequest> m_settingRequests;
     bool m_skinsAnnounced = false;   // our skins were handed to the lobby
-    uint32_t m_skinKey = 0;          // the skin ids they were made from
+    uint64_t m_skinKey = 0;          // the skin ids they were made from (and how many)
     uint32_t m_skinRevision = 0;     // of the lobby: when it changes, a running match reloads the sprites
     std::string m_closeAfterMatch;   // the host closed the lobby during the match
     std::string m_abortText;         // why the running match is being aborted

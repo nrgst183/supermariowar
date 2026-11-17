@@ -57,6 +57,7 @@ class FPSLimiter
         FrameRateMode   mode = FrameRateMode::VSync;
         bool            modeApplied = false;
         bool            vsyncActive = false;   // the renderer waits for the display
+        bool            lockedToDisplay = false;   // one tick per refresh (see applyFrameRateMode)
         uint64_t        renderPeriodNs = 0;    // paces renders when VSync is not available
 
         uint64_t        frameStartNs = 0;

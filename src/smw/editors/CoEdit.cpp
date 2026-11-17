@@ -1,6 +1,9 @@
 #include "CoEdit.h"
 
+#include "rollback/Transport.h"
+#ifndef NETWORK_DISABLED
 #include "rollback/EnetTransport.h"
+#endif
 #include "rollback/NetConditionSim.h"
 
 #include <algorithm>
@@ -45,7 +48,7 @@ struct Session {
     State state = State::Off;
     bool host = false;
     Editor editor = Editor::Level;
-    std::unique_ptr<rollback::EnetTransport> transport;
+    std::unique_ptr<rollback::IMeshTransport> transport;    //(ENet's; none in the builds without the network)
     int hostConnection = -1;
     int myId = 0;
     std::string myName;
@@ -358,8 +361,14 @@ void handleMessage(int connection, const uint8_t* data, size_t size)
 
 bool openTransport(uint16_t port, std::string& error)
 {
+#ifdef NETWORK_DISABLED
+    (void)port;
+    error = "this build has no network support";
+    return false;
+#else
     g.transport = rollback::EnetTransport::create(port, rollback::NetConditions(), error);
     return g.transport != nullptr;
+#endif
 }
 
 void reset()

@@ -114,21 +114,14 @@ lan::Responder& lanResponder()
 } // namespace
 #endif
 
-bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint16_t joinPort, std::string& error)
+// The network of a lobby: ENet's UDP socket on the port (0: any free one), with the simulated
+// conditions of the tests
+std::unique_ptr<IMeshTransport> NetGame::createNetwork(uint16_t port, std::string& error) const
 {
-    if (inMatch()) {
-        error = "a match is running";
-        return false;
-    }
-    shutdown();
-
 #ifdef NETWORK_DISABLED
-    (void)asHost;
     (void)port;
-    (void)joinHost;
-    (void)joinPort;
     error = "this build has no network support";
-    return false;
+    return nullptr;
 #else
     const cmd::NetArgs& args = cmd::g_net;
     NetConditions conditions;
@@ -137,11 +130,43 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
     conditions.lossPercent = std::clamp(args.simLossPercent, 0.0f, 100.0f);
     conditions.seed = 0x5eed0000u ^ static_cast<uint32_t>(args.hostPort * 31 + args.port + static_cast<int>(monotonicMs()));
 
-    std::unique_ptr<EnetTransport> transport = EnetTransport::create(asHost ? port : static_cast<uint16_t>(std::max(0, args.port)), conditions, error);
-    if (!transport)
-        return false;
-    if (conditions.active())
+    std::unique_ptr<EnetTransport> transport = EnetTransport::create(port, conditions, error);
+    if (transport && conditions.active())
         printf("netplay: simulating %d ms latency, +-%d ms jitter, %.1f%% loss on packets sent\n", conditions.latencyMs, conditions.jitterMs, conditions.lossPercent);
+    return transport;
+#endif
+}
+
+// Friends join without a port forwarded by hand where the router lets us open it (UPnP)
+void NetGame::openRouterPort(uint16_t port)
+{
+#ifndef NETWORK_DISABLED
+    const cmd::NetArgs& args = cmd::g_net;
+    if (args.upnp > 0 || (args.upnp < 0 && !cmd::g_autotest.enabled))
+        upnp::openPort(port);
+#else
+    (void)port;
+#endif
+}
+
+bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint16_t joinPort, LobbyAccess access, std::string& error)
+{
+    if (inMatch()) {
+        error = "a match is running";
+        return false;
+    }
+    shutdown();
+
+    //A host's lobby nobody can join has no network at all (no socket: no firewall prompt, and the
+    //builds without the network have it too); the network comes when the host opens it
+    const cmd::NetArgs& args = cmd::g_net;
+    auto transport = std::make_unique<SwitchableTransport>();
+    if (!asHost || access != LobbyAccess::Nobody) {
+        std::unique_ptr<IMeshTransport> network = createNetwork(asHost ? port : static_cast<uint16_t>(std::max(0, args.port)), error);
+        if (!network)
+            return false;
+        transport->setInner(std::move(network));
+    }
 
     NetLobby::Options options;
     options.mesh.host = asHost;
@@ -163,18 +188,79 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
         error = m_lobby->statusText();
         return false;
     }
+    m_access = asHost ? access : LobbyAccess::Internet;
+    m_hostPort = asHost ? port : 0;
     if (asHost && args.delay >= 0)
         m_lobby->setInputDelay(args.delay);
-    //Friends join without a port forwarded by hand where the router lets us open it (UPnP)
-    if (asHost && (args.upnp > 0 || (args.upnp < 0 && !cmd::g_autotest.enabled)))
-        upnp::openPort(port);
+#ifndef NETWORK_DISABLED
+    if (asHost && access == LobbyAccess::Internet)
+        openRouterPort(port);
     //System link: the games on the local network find this one
-    if (asHost)
+    if (asHost && access != LobbyAccess::Nobody)
         lanResponder().open();
+#endif
     m_wasClosed = false;
     m_lastMatchError.clear();
     return true;
+}
+
+bool NetGame::hasOthers() const
+{
+    if (!m_lobby)
+        return false;
+    for (int p = 0; p < net::MAX_PEERS; p++) {
+        if (p != m_lobby->localPeer() && m_lobby->peer(p).present)
+            return true;
+    }
+    return false;
+}
+
+bool NetGame::setAccess(LobbyAccess access, std::string& error)
+{
+    if (!m_lobby || !isHost()) {
+        error = "only the host changes who can join";
+        return false;
+    }
+    if (access == m_access)
+        return true;
+    if (inMatch()) {
+        error = "a match is running";
+        return false;
+    }
+
+    //Nobody: the network goes (only with nobody else in: they'd be cut off)
+    if (access == LobbyAccess::Nobody) {
+        if (hasOthers()) {
+            error = "The others are in: kick them first";
+            return false;
+        }
+#ifndef NETWORK_DISABLED
+        upnp::closePort();
+        lanResponder().close();
 #endif
+        m_transport->setInner(nullptr);
+        m_access = access;
+        return true;
+    }
+
+    //The network comes (from Nobody), or only the router's port changes
+    if (!m_transport->hasInner()) {
+        std::unique_ptr<IMeshTransport> network = createNetwork(m_hostPort, error);
+        if (!network)
+            return false;
+        m_transport->setInner(std::move(network));
+#ifndef NETWORK_DISABLED
+        lanResponder().open();
+#endif
+    }
+#ifndef NETWORK_DISABLED
+    if (access == LobbyAccess::Internet)
+        openRouterPort(m_hostPort);
+    else
+        upnp::closePort();
+#endif
+    m_access = access;
+    return true;
 }
 
 std::string NetGame::routerNote(bool& good) const
@@ -183,7 +269,7 @@ std::string NetGame::routerNote(bool& good) const
 #ifdef NETWORK_DISABLED
     return {};
 #else
-    if (!m_lobby || !isHost())
+    if (!m_lobby || !isHost() || m_access == LobbyAccess::Nobody)
         return {};
 #ifdef SMW_XBOX
     //No router to open on the Xbox: system link, on the local network
@@ -241,9 +327,9 @@ uint16_t NetGame::lobbyPort() const
     return m_transport ? m_transport->localPort() : 0;
 }
 
-bool NetGame::host(uint16_t port, std::string& error)
+bool NetGame::host(uint16_t port, std::string& error, LobbyAccess access)
 {
-    return open(true, port ? port : DEFAULT_LOBBY_PORT, "", 0, error);
+    return open(true, port ? port : DEFAULT_LOBBY_PORT, "", 0, access, error);
 }
 
 bool NetGame::join(const std::string& address, std::string& error)
@@ -263,7 +349,7 @@ bool NetGame::join(const std::string& address, std::string& error)
         error = "the port (after the ':') must be a number from 1 to 65535";
         return false;
     }
-    return open(false, 0, hostName, static_cast<uint16_t>(port), error);
+    return open(false, 0, hostName, static_cast<uint16_t>(port), LobbyAccess::Internet, error);
 }
 
 bool NetGame::init(const cmd::NetArgs& args)
@@ -273,8 +359,8 @@ bool NetGame::init(const cmd::NetArgs& args)
     m_cliDone = true;
 
     std::string error;
-    const bool ok = args.hostPort > 0 ? open(true, static_cast<uint16_t>(args.hostPort), "", 0, error)
-                                      : open(false, 0, args.joinHost, static_cast<uint16_t>(args.joinPort), error);
+    const bool ok = args.hostPort > 0 ? open(true, static_cast<uint16_t>(args.hostPort), "", 0, LobbyAccess::Internet, error)
+                                      : open(false, 0, args.joinHost, static_cast<uint16_t>(args.joinPort), LobbyAccess::Internet, error);
     if (!ok)
         printf("netplay: ERROR: %s\n", error.c_str());
     return ok;
@@ -400,12 +486,16 @@ void NetGame::updateSkins()
     }
 
     const auto valid = [](short id) { return id >= 0 && id < static_cast<short>(skinlist->count()); };
-    const uint32_t key = (static_cast<uint32_t>(static_cast<uint16_t>(game_values.skinids[0])) << 16) | static_cast<uint16_t>(game_values.skinids[1]);
+    //(two at least, as builds with at most two players on a machine announce; more if more play here)
+    const int announced = std::max(2, m_lobby->peer(std::max(0, m_lobby->localPeer())).localPlayers);
+    uint64_t key = static_cast<uint64_t>(announced);
+    for (int i = 0; i < MAX_LOCAL_PLAYERS; i++)
+        key = (key << 16) | static_cast<uint16_t>(game_values.skinids[i]);
     if (!m_skinsAnnounced || key != m_skinKey) {
         m_skinsAnnounced = true;
         m_skinKey = key;
         std::vector<LocalSkinFile> skins;
-        for (int i = 0; i < MAX_LOCAL_PLAYERS; i++) {
+        for (int i = 0; i < announced; i++) {
             const short id = game_values.skinids[i];
             const SkinListNode& node = skinlist->at(valid(id) ? static_cast<size_t>(id) : 0);
             skins.push_back({node.name, node.path.string()});

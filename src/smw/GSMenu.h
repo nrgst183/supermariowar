@@ -7,6 +7,10 @@
 #endif
 #include "MatchTypes.h"
 #include "rollback/NetSeries.h"
+
+namespace rollback {
+enum class LobbyAccess : uint8_t;
+}
 #include "ui/MenuCode.h"
 
 #include <memory>
@@ -119,12 +123,32 @@ class MenuState : public GameState
         void JoinOnlineGame();
         void JoinSystemLinkGame();
         void HostSystemLinkGame();
-        bool HostLobby(int port, std::string& error);
+        bool HostLobby(int port, rollback::LobbyAccess access, std::string& error);
         void EnterOnlineLobby();
         void LeaveOnlineLobby(const std::string& message);
         void LeaveOnlineLobbyNow();
         void HandleOnlineEvents();
-        bool mLobbyFromSystemLink = false;  // the lobby was entered from the System Link (LAN games) menu: leaving goes back there
+        // Where the lobby was entered from (leaving it goes back there): the main menu's Start (a local
+        // game), the Online menu, or the System Link (LAN games) menu
+        enum class LobbyOrigin { MainMenu, OnlineMenu, SystemLink };
+        LobbyOrigin mLobbyOrigin = LobbyOrigin::OnlineMenu;
+
+        // A local game set up in the lobby (who can join: nobody) is played offline: the lobby closes
+        // for its menus and matches, and opens again as it was when they're backed out of
+        struct LocalSetup {
+            bool valid = false;
+            int localPlayers = 1;
+            int cpus = 0;
+            int team[4] = {};
+            int color[4] = {};
+        };
+        LocalSetup mLocalSetup;
+        bool mLocalFromLobby = false;   // the match menus (and matches) of a local game from the lobby
+        short mLocalTeams = 0;
+        void OpenLocalLobby();
+        void StartLocalFromLobby();
+        void ResetOnlineMenus();
+        void LeaveLobbyQuietly();
         void OpenOnlineMatchSettings();
         void OpenOnlineGameSettings();
         void ReturnToOnlineLobby();

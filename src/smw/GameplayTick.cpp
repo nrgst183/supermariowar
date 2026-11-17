@@ -17,6 +17,7 @@
 #include <string>
 
 #include "GSGameplayInternal.h"
+#include "rollback/NetGame.h"
 
 //-----------------------------------------------------------------------------
 // ONE TICK OF GAMEPLAY
@@ -106,8 +107,8 @@ void GameplayState::advanceTick(const InputFrame& input)
 
 int GameplayState::runAheadFrames() const
 {
-    const int frames = cmd::g_autotest.enabled ? cmd::g_autotest.runahead : game_values.runahead;
-    return std::clamp(frames, 0, 3);
+    const int setting = cmd::g_autotest.enabled ? cmd::g_autotest.runahead : game_values.runahead;
+    return runAheadSetting(setting, rollback::NetGame::instance().inputDelay());
 }
 
 void GameplayState::leaveRunAhead()

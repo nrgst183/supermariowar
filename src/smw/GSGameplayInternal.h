@@ -7,6 +7,14 @@
 
 constexpr int COUNTDOWN_START_INDEX = 4;
 
+// The run-ahead (ticks, 0..3) of a setting: -1 is Auto, as much as the input delay (what hides
+// the delay, and no more: past it, the run-ahead only guesses)
+constexpr int runAheadSetting(int setting, int inputDelay)
+{
+    const int ticks = setting < 0 ? inputDelay : setting;
+    return ticks < 0 ? 0 : ticks > 3 ? 3 : ticks;
+}
+
 #ifdef _DEBUG
 extern int exitgametimer;
 #endif
@@ -40,6 +48,10 @@ void handleObj2ObjCollisions();
 // Defined in GameplayPause.cpp
 void drawExitPauseDialog();
 bool updateExitPauseDialog(short iCountDownState); // true on exit
+// Online, the pause button opens a panel instead (the match goes on): ping, input delay, run-ahead
+bool onlinePanelOpen();
+void closeOnlinePanel();
+void drawOnlinePanel();
 
 // Defined in GameplayScoreboard.cpp
 void updateScoreboardAnimation();

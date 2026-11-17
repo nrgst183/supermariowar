@@ -1,10 +1,13 @@
 #include "GSGameplay.h"
 
+#include "CmdArgs.h"
 #include "GameValues.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "rollback/NetGame.h"
 #include "gamemodes/Tag.h"
+#include "ui/InputPrompts.h"
+#include "ui/MI_MenuPanel.h"
 
 #include <format>
 #include <string>
@@ -54,6 +57,90 @@ void drawExitPauseDialog()
     }
 }
 
+// ---- The online panel (the pause button online: the match can't wait, so it goes on behind it)
+
+namespace {
+bool s_onlinePanel = false;
+
+// The run-ahead settings, in the order left/right go through them (-1: Auto)
+constexpr short RUN_AHEAD_SETTINGS[] = {-1, 0, 1, 2, 3};
+
+void changeRunAhead(int direction)
+{
+    const short* begin = std::begin(RUN_AHEAD_SETTINGS);
+    const short* end = std::end(RUN_AHEAD_SETTINGS);
+    const short* at = std::find(begin, end, game_values.runahead);
+    const long index = std::clamp<long>((at == end ? 0 : at - begin) + direction, 0, (end - begin) - 1);
+    game_values.runahead = begin[index];
+}
+
+std::string framesText(int frames)
+{
+    return frames == 1 ? "1 frame" : std::to_string(frames) + " frames";
+}
+} // namespace
+
+bool onlinePanelOpen()
+{
+    //(auto-play: open by --at-online-panel, for its screenshots)
+    if (cmd::g_autotest.enabled && cmd::g_autotest.onlinePanel && rollback::NetGame::instance().inMatch())
+        s_onlinePanel = true;
+    return s_onlinePanel;
+}
+
+void closeOnlinePanel()
+{
+    if (s_onlinePanel)
+        game_values.WriteConfig();    //(the run-ahead chosen: next time too)
+    s_onlinePanel = false;
+}
+
+void drawOnlinePanel()
+{
+    rollback::NetGame& net = rollback::NetGame::instance();
+    if (!onlinePanelOpen() || !net.inMatch())
+        return;
+
+    //The worst connection: the others' inputs come that late (rollback hides it, the input delay too)
+    int ping = -1;
+    for (int peer = 0; peer < rollback::net::MAX_PEERS; peer++)
+        ping = std::max(ping, net.peerPingMs(peer));
+    const int delay = net.inputDelay();
+    const int ahead = runAheadSetting(game_values.runahead, delay);
+    const int late = std::max(0, delay - ahead);
+
+    const int x = 100, y = 116, w = 440, h = 204;
+    menupanel::box(x, y, w, h);
+    rm->menu_font_large.drawCentered(320, y + 10, "Online");
+
+    //From the ping: how late the others' moves come (half the round trip; rollback corrects them)
+    std::string lag = "Ping -";
+    if (ping >= 0) {
+        const int othersLate = (ping / 2 + 15) / 16;
+        lag = "Ping " + std::to_string(ping) + " ms: the others are " + (othersLate == 0 ? "in time" : framesText(othersLate) + " behind");
+    }
+    rm->menu_font_small.drawCentered(320, y + 40, lag);
+
+    //The setting, with its arrows
+    const std::string setting = game_values.runahead < 0 ? "Auto (" + std::to_string(ahead) + ")" : game_values.runahead == 0 ? "Off" : framesText(game_values.runahead);
+    menupanel::row(x + 20, y + 62, w - 40, 36, true);
+    rm->menu_font_large.draw(x + 34, y + 70, "Run-Ahead");
+    rm->menu_font_large.drawRightJustified(x + w - 34, y + 70, "< " + setting + " >");
+
+    //Ours: the input delay holds them back, the run-ahead wins that back
+    const std::string own = "Input delay " + std::to_string(delay) + ": your buttons answer " + (late == 0 ? "at once" : framesText(late) + " late");
+    rm->menu_font_small.drawCentered(320, y + 112, own);
+    const char* note = ahead > delay ? "Past the input delay it only guesses: more corrections"
+        : game_values.runahead < 0 ? "Auto: as much run-ahead as input delay"
+        : "Each frame of it costs one more tick of work";
+    rm->menu_font_small.drawCentered(320, y + 132, note);
+
+    using prompts::Pad;
+    using prompts::menuKey;
+    prompts::drawPrompts(320, y + 164, {{{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
+        {{Pad::Start}, {menuKey(prompts::MENU_CANCEL)}, "close"}});
+}
+
 bool IsPauseAllowed()
 {
     //Online, the match can't wait for one player
@@ -79,6 +166,28 @@ bool updateExitPauseDialog(short iCountDownState) // true on exit
     if (game_values.screenfade == 0 && iCountDownState <= COUNTDOWN_START_INDEX) {
         for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
             COutputControl * playerKeys = &game_values.playerInput.outputControls[iPlayer];
+
+            //Online: the pause button opens the online panel (and while it's up, it has the keys)
+            if (rollback::NetGame::instance().inMatch() && !game_values.gamemode->gameover) {
+                if (s_onlinePanel) {
+                    if (playerKeys->game_start.fPressed || playerKeys->game_cancel.fPressed || playerKeys->menu_cancel.fPressed) {
+                        closeOnlinePanel();
+                        ifSoundOnPlay(rm->sfx_pause);
+                        game_values.playerInput.ResetKeys();
+                        break;
+                    }
+                    if (playerKeys->menu_left.fPressed)
+                        changeRunAhead(-1);
+                    else if (playerKeys->menu_right.fPressed)
+                        changeRunAhead(1);
+                    continue;
+                }
+                if (playerKeys->game_start.fPressed && !game_values.flags.exitinggame && !game_values.flags.showscoreboard) {
+                    s_onlinePanel = true;
+                    ifSoundOnPlay(rm->sfx_pause);
+                    continue;
+                }
+            }
 
             //If the start key is pressed (pause key)
             if (playerKeys->game_start.fPressed && IsPauseAllowed()) {

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 
 // The connection layer under the rollback netplay: connections to other
@@ -57,6 +58,51 @@ public:
     // The remote address of a connection
     virtual bool address(int connection, uint32_t& ipv4, uint16_t& port) const = 0;
     virtual uint16_t localPort() const = 0;
+};
+
+// A transport that can be swapped while it's in use: a local lobby's (who can join: nobody) has no
+// network at all, and gets one (the inner transport) when the host opens it to the others. The lobby
+// keeps its reference to this one. Without an inner transport nothing is sent or received.
+class SwitchableTransport : public IMeshTransport {
+public:
+    // The inner transport (null: none); the old one is closed and dropped
+    void setInner(std::unique_ptr<IMeshTransport> inner)
+    {
+        if (m_inner)
+            m_inner->close(200);
+        m_inner = std::move(inner);
+    }
+    bool hasInner() const { return m_inner != nullptr; }
+
+    void send(int connection, Channel channel, const uint8_t* data, size_t size) override
+    {
+        if (m_inner)
+            m_inner->send(connection, channel, data, size);
+    }
+    bool poll(TransportEvent& event) override { return m_inner && m_inner->poll(event); }
+    void flush() override
+    {
+        if (m_inner)
+            m_inner->flush();
+    }
+    void disconnect(int connection) override
+    {
+        if (m_inner)
+            m_inner->disconnect(connection);
+    }
+    bool idle() const override { return !m_inner || m_inner->idle(); }
+    void close(uint32_t timeoutMs) override
+    {
+        if (m_inner)
+            m_inner->close(timeoutMs);
+    }
+    int connect(const std::string& host, uint16_t port) override { return m_inner ? m_inner->connect(host, port) : -1; }
+    int connect(uint32_t ipv4, uint16_t port) override { return m_inner ? m_inner->connect(ipv4, port) : -1; }
+    bool address(int connection, uint32_t& ipv4, uint16_t& port) const override { return m_inner && m_inner->address(connection, ipv4, port); }
+    uint16_t localPort() const override { return m_inner ? m_inner->localPort() : 0; }
+
+private:
+    std::unique_ptr<IMeshTransport> m_inner;
 };
 
 // Milliseconds of a monotonic clock (wraps after 49 days: compare differences)

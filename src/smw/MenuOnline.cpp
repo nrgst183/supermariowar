@@ -13,6 +13,7 @@
 #include "ui/MI_SelectField.h"
 
 #include "menu/GameSettingsMenu.h"
+#include "menu/MainMenu.h"
 #include "menu/MatchSelectionMenu.h"
 #include "menu/OnlineLobbyMenu.h"
 #include "menu/OnlineMenu.h"
@@ -36,15 +37,16 @@ std::string trimmed(const std::string& text)
 
 } // namespace
 
-// Opens a lobby on the port (0: the default), under this computer's name; false and why if it can't
-bool MenuState::HostLobby(int port, std::string& error)
+// Opens a lobby on the port (0: the default), open to `access`, under this computer's name; false
+// and why if it can't
+bool MenuState::HostLobby(int port, rollback::LobbyAccess access, std::string& error)
 {
     rollback::NetGame& net = rollback::NetGame::instance();
     if (port < 0 || port > 65535) {
         error = "The port must be a number from 1 to 65535";
         return false;
     }
-    if (!net.host(static_cast<uint16_t>(port), error)) {
+    if (!net.host(static_cast<uint16_t>(port), error, access)) {
         error = "Can't host a game: " + error;
         return false;
     }
@@ -61,11 +63,11 @@ void MenuState::HostOnlineGame()
 {
     mOnlineMenu->ClearMessage();
     std::string error;
-    if (!HostLobby(mOnlineMenu->port(), error)) {
+    if (!HostLobby(mOnlineMenu->port(), rollback::LobbyAccess::Internet, error)) {
         mOnlineMenu->ShowMessage(error);
         return;
     }
-    mLobbyFromSystemLink = false;
+    mLobbyOrigin = LobbyOrigin::OnlineMenu;
     EnterOnlineLobby();
 }
 
@@ -74,12 +76,12 @@ void MenuState::HostSystemLinkGame()
 {
     mSystemLinkMenu->ClearMessage();
     std::string error;
-    if (!HostLobby(atoi(game_values.onlineport.c_str()), error)) {
+    if (!HostLobby(atoi(game_values.onlineport.c_str()), rollback::LobbyAccess::Lan, error)) {
         mSystemLinkMenu->ShowMessage(error);
         return;
     }
     mSystemLinkMenu->Close();
-    mLobbyFromSystemLink = true;
+    mLobbyOrigin = LobbyOrigin::SystemLink;
     EnterOnlineLobby();
 }
 
@@ -103,7 +105,7 @@ void MenuState::JoinOnlineGame()
     game_values.onlinename = trimmed(game_values.onlinename);
     net.lobby()->setName(systemLinkPlayerName());
     game_values.WriteConfig();
-    mLobbyFromSystemLink = false;
+    mLobbyOrigin = LobbyOrigin::OnlineMenu;
     EnterOnlineLobby();
 }
 
@@ -132,7 +134,7 @@ void MenuState::JoinSystemLinkGame()
     game_values.onlinename = trimmed(game_values.onlinename);
     net.lobby()->setName(systemLinkPlayerName());
     game_values.WriteConfig();
-    mLobbyFromSystemLink = true;
+    mLobbyOrigin = LobbyOrigin::SystemLink;
     EnterOnlineLobby();
 }
 
@@ -149,9 +151,8 @@ void MenuState::EnterOnlineLobby()
     mOnlineLobbyMenu->Open();
 }
 
-// The lobby is over (we left it, it was closed or we couldn't join): the menu it was entered from
-// (the Online menu, or the System Link one), with the reason
-void MenuState::LeaveOnlineLobby(const std::string& message)
+// The online state of the match menus goes (back to a local game's)
+void MenuState::ResetOnlineMenus()
 {
     mOnlineSetup = false;
     mOnlineView = false;
@@ -160,8 +161,20 @@ void MenuState::LeaveOnlineLobby(const std::string& message)
     mGameSettingsMenu->SetHeaderText("Single Game Menu");
     mGameSettingsMenu->SetOnlineView(UI_GameSettingsMenu::OnlineView::Off);
     mOnlineLobbyMenu->CloseDialog();
+}
 
-    if (mLobbyFromSystemLink) {
+// The lobby is over (we left it, it was closed or we couldn't join): the menu it was entered from
+// (the main menu, the Online menu, or the System Link one), with the reason
+void MenuState::LeaveOnlineLobby(const std::string& message)
+{
+    ResetOnlineMenus();
+
+    if (mLobbyOrigin == LobbyOrigin::MainMenu) {
+        mLocalSetup.valid = false;
+        mCurrentMenu = mMainMenu.get();
+        return;
+    }
+    if (mLobbyOrigin == LobbyOrigin::SystemLink) {
         mSystemLinkMenu->Open();
         if (!message.empty())
             mSystemLinkMenu->ShowMessage(message);
@@ -173,19 +186,126 @@ void MenuState::LeaveOnlineLobby(const std::string& message)
     mCurrentMenu = mOnlineMenu.get();
 }
 
+// The main menu's Start: the lobby of a local game (who can join: nobody; no network). Its players
+// are the main menu's (players and CPUs), or as they were (backing out of a local game's menus).
+void MenuState::OpenLocalLobby()
+{
+    rollback::NetGame& net = rollback::NetGame::instance();
+    std::string error;
+    if (!net.host(0, error, rollback::LobbyAccess::Nobody)) {
+        //(can't be: there's no network to fail; the menus as they were, then)
+        printf("lobby: %s\n", error.c_str());
+        mMatchSelectionMenu->WorldMapChanged();
+        mCurrentMenu = mMatchSelectionMenu.get();
+        mCurrentMenu->ResetMenu();
+        return;
+    }
+    rollback::NetLobby* lobby = net.lobby();
+    lobby->setName(systemLinkPlayerName());
+
+    LocalSetup setup = mLocalSetup;
+    if (!setup.valid) {
+        setup = {};
+        setup.localPlayers = 0;
+        for (int k = 0; k < 4; k++) {
+            setup.localPlayers += game_values.playercontrol[k] == 1;
+            setup.cpus += game_values.playercontrol[k] == 2;
+        }
+        setup.localPlayers = std::clamp(setup.localPlayers, 1, rollback::MAX_LOCAL_PLAYERS);
+        setup.cpus = std::clamp(setup.cpus, 0, 4 - setup.localPlayers);
+    }
+    lobby->setLocalPlayers(setup.localPlayers);
+    lobby->setCpuCount(setup.cpus);
+    if (setup.valid) {
+        for (int k = 0; k < 4; k++) {
+            if (lobby->slot(k).kind == rollback::SlotKind::Empty)
+                continue;
+            lobby->setSlotTeam(k, setup.team[k]);
+            lobby->setSlotColor(k, setup.color[k]);
+        }
+    }
+
+    mLocalFromLobby = false;
+    mLobbyOrigin = LobbyOrigin::MainMenu;
+    EnterOnlineLobby();
+}
+
+// Continue in a local game's lobby: its players, teams and colors go to the local match menus
+// (the team select's work is done), and the lobby closes while they're up
+void MenuState::StartLocalFromLobby()
+{
+    rollback::NetGame& net = rollback::NetGame::instance();
+    rollback::NetLobby* lobby = net.lobby();
+    if (!lobby)
+        return;
+    std::string why;
+    if (!lobby->canStart(why)) {
+        if (!why.empty())
+            why[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(why[0])));
+        mOnlineLobbyMenu->SetNotice(why);
+        return;
+    }
+
+    //What to open again (backing out), and the players of the matches
+    LocalSetup setup;
+    setup.valid = true;
+    setup.localPlayers = lobby->peer(lobby->localPeer()).localPlayers;
+    for (int team = 0; team < 4; team++)
+        game_values.teamcounts[team] = 0;
+    for (int k = 0; k < 4; k++) {
+        const rollback::LobbySlot& slot = lobby->slot(k);
+        setup.cpus += slot.kind == rollback::SlotKind::Cpu;
+        setup.team[k] = slot.team;
+        setup.color[k] = slot.color;
+        game_values.playercontrol[k] = slot.kind == rollback::SlotKind::Human ? 1 : slot.kind == rollback::SlotKind::Cpu ? 2 : 0;
+        game_values.colorids[k] = static_cast<short>(game_values.teamcolors ? slot.team : slot.color);
+        if (slot.kind == rollback::SlotKind::Human) {
+            //(the lobby's local players are 0..n-1, in the slots 0..n-1: their skins are theirs)
+            game_values.randomskin[k] = false;
+            if (slot.localIndex != k)
+                game_values.skinids[k] = game_values.skinids[slot.localIndex];
+        }
+    }
+    short teams = 0;
+    for (int team = 0; team < 4; team++) {
+        short members = 0;
+        for (int k = 0; k < 4; k++) {
+            const rollback::LobbySlot& slot = lobby->slot(k);
+            if (slot.kind != rollback::SlotKind::Empty && slot.team == team && members < 3)
+                game_values.teamids[teams][members++] = static_cast<short>(k);
+        }
+        if (members > 0)
+            game_values.teamcounts[teams++] = members;
+    }
+    mLocalSetup = setup;
+    mLocalTeams = teams;
+
+    //The lobby closes (a match with it open would be an online one); the local match menus
+    LeaveLobbyQuietly();
+    ResetOnlineMenus();
+    mLocalFromLobby = true;
+    mMatchSelectionMenu->WorldMapChanged();
+    mCurrentMenu = mMatchSelectionMenu.get();
+    mCurrentMenu->ResetMenu();
+}
+
 // The player leaves on purpose
 void MenuState::LeaveOnlineLobbyNow()
 {
+    LeaveLobbyQuietly();
+    LeaveOnlineLobby({});
+}
+
+// Closes (or leaves) the lobby; its events aren't news
+void MenuState::LeaveLobbyQuietly()
+{
     rollback::NetGame& net = rollback::NetGame::instance();
     net.leave();
-
-    //Leaving closes the lobby: its events aren't news
     if (rollback::NetLobby* lobby = net.lobby()) {
         rollback::LobbyEvent event;
         while (lobby->pollEvent(event)) {
         }
     }
-    LeaveOnlineLobby({});
 }
 
 void MenuState::HandleOnlineEvents()
@@ -232,6 +352,11 @@ void MenuState::HandleOnlineEvents()
 // and map in the game menu; both lead back to the lobby. A tournament's games are chosen as it goes.
 void MenuState::OpenOnlineMatchSettings()
 {
+    //A local game (who can join: nobody): its matches are played offline
+    if (rollback::NetGame::instance().access() == rollback::LobbyAccess::Nobody && rollback::NetGame::instance().isHost()) {
+        StartLocalFromLobby();
+        return;
+    }
     mOnlineSetup = true;
     mMatchSelectionMenu->SetOnlineMode(true, mOnlineMinigame);
     if (mOnlineSeriesType != MatchType::SingleGame)

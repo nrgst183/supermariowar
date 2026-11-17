@@ -293,11 +293,12 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
 #ifdef SMW_XBOX
     m_host = new MI_Button(&rm->spr_selectfield, 64, HOST_Y, "Host a game", 250, TextAlign::CENTER);
     MI_SelectField<short>* runAhead = new MI_SelectField<short>(&rm->spr_selectfield, 326, HOST_Y, "Run-Ahead", 250, 130);
+    runAhead->add("Auto", -1);    //(as much as the input delay)
     runAhead->add("Off", 0);
     runAhead->add("1 Frame", 1);
     runAhead->add("2 Frames", 2);
     runAhead->add("3 Frames", 3);
-    game_values.runahead = std::clamp<short>(game_values.runahead, 0, 3);
+    game_values.runahead = std::clamp<short>(game_values.runahead, -1, 3);
     runAhead->setOutputPtr(&game_values.runahead);
     runAhead->setCurrentValue(game_values.runahead);
     runAhead->setAutoAdvance(true);

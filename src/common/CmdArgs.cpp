@@ -58,7 +58,8 @@ void print_help(const char* title, const char* version)
     printf("      --at-resim <0|1>    1: run every gameplay tick as a re-simulation (sounds,\n"
            "                          eyecandy and other side effects suppressed); the\n"
            "                          results must match a normal run\n");
-    printf("      --at-runahead <N>   Run-ahead (online): show the match N ticks (0..3) ahead; the\n"
+    printf("      --at-online-panel 1 Online matches: the online panel (the pause button's) open\n");
+    printf("      --at-runahead <N>   Run-ahead (online): show the match N ticks (0..3, -1 Auto) ahead; the\n"
            "                          simulation (and its checksums) must be unaffected\n");
     printf("      --at-shots <DIR>    --at-match shots: save screenshots of the main, online and lobby menus\n"
            "                          to DIR (with --at-role host|join|orig, --at-addr IP[:PORT], --at-nick NAME)\n");
@@ -156,6 +157,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-shot-ticks") at.shotTicks = atoi(val.c_str()) != 0;
             else if (arg == "--at-resim") at.resim = atoi(val.c_str()) != 0;
             else if (arg == "--at-runahead") at.runahead = atoi(val.c_str());
+            else if (arg == "--at-online-panel") at.onlinePanel = atoi(val.c_str()) != 0;
             else if (arg == "--at-realtime") at.realtime = atoi(val.c_str());
             else if (arg == "--at-humans") at.humans = atoi(val.c_str());
             else if (arg == "--at-synctest") at.synctest = atoi(val.c_str());

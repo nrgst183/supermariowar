@@ -1,6 +1,7 @@
 #!/bin/bash
 # Screenshots of the online menus (main menu, Online menu and its error messages, the lobby as
-# host and as joiner, the match menus, the leave dialog, the map download, the LAN games list).
+# host and as joiner, the match menus, the leave dialog, the map download, the LAN games list, the
+# local game's lobby).
 #
 # Runs real game processes on 127.0.0.1 with SDL's dummy video driver and the scripted menu walk
 # `--autotest --at-match shots` (see MenuAutoTest.cpp): one process hosts, a second joins (its data
@@ -79,6 +80,11 @@ run join "$JOIN_DATA" --at-role join --at-map "$MAP_NAME" --at-nick Luigi --at-a
 JOIN=$!
 wait $HOST $JOIN
 
+# The main menu's Start: the lobby of a local game, its options, the local match menus, back to the
+# lobby, others let in (LAN), and a local match
+mkdir -p "$OUT/local_lobby"
+run locallobby "$HOST_DATA" --at-role locallobby --at-shots "$OUT/local_lobby"
+
 # The LAN games (system link) list: alone (it hosts from there), then two lobbies on this computer,
 # found (and one joined) by a third game
 mkdir -p "$OUT/syslink_alone"
@@ -95,7 +101,7 @@ sleep 4
 run syslink "$HOST_DATA" --at-role syslink
 wait "${LAN_HOSTS[@]}"
 
-for name in errors host join syslink_alone syslink; do
+for name in errors host join locallobby syslink_alone syslink; do
     echo "== $name"
     grep -E "^shots:" "$WORK/$name.log"
 done

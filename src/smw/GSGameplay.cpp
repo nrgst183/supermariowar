@@ -363,6 +363,7 @@ void GameplayState::CleanDeadPlayers()
 
 void CleanUp()
 {
+    closeOnlinePanel();
     //delete object list
     g_sim.players.clear();
 
@@ -940,6 +941,8 @@ void GameplayState::updateNetplay()
         }
         if (cmd::g_autotest.enabled && cmd::g_autotest.humans > 0)
             input.players[slot] = autoTestNetHumanInput(slot);
+        else if (onlinePanelOpen())
+            input.players[slot] = 0;    //(the online panel has the buttons: this computer's players stand still)
         else
             input.players[slot] = toInputByte(game_values.playerInput.outputControls[device]);
         device++;
@@ -1005,6 +1008,7 @@ void GameplayState::render(float alpha)
     }
 
     drawNetOverlay();    //online only; pure drawing
+    drawOnlinePanel();
     drawReplayOverlay();
 
 #ifdef _DEBUG

@@ -52,11 +52,12 @@ UI_OnlineMenu::UI_OnlineMenu()
     //Run-ahead: online matches are drawn this many ticks ahead of the real state, so your buttons
     //answer sooner (GameplayTick.cpp). Offline there's no network delay to hide: it isn't used.
     miRunAheadField = new MI_SelectField<short>(&rm->spr_selectfield, 64, 114, "Run-Ahead", 512, 150);
+    miRunAheadField->add("Auto", -1);    //(as much as the input delay)
     miRunAheadField->add("Off", 0);
     miRunAheadField->add("1 Frame", 1);
     miRunAheadField->add("2 Frames", 2);
     miRunAheadField->add("3 Frames", 3);
-    game_values.runahead = std::clamp<short>(game_values.runahead, 0, 3);
+    game_values.runahead = std::clamp<short>(game_values.runahead, -1, 3);
     miRunAheadField->setOutputPtr(&game_values.runahead);
     miRunAheadField->setCurrentValue(game_values.runahead);
     miRunAheadField->setAutoAdvance(true);

@@ -797,10 +797,18 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
     if (MENU_CODE_EXIT_APPLICATION == code) {
         Exit();
         return false;
+    } else if (MENU_CODE_TO_LOCAL_LOBBY == code) {
+        //The main menu's Start: the lobby (of a local game, until others are let in)
+        mLocalSetup.valid = false;
+        OpenLocalLobby();
     } else if (MENU_CODE_TO_MAIN_MENU == code) {
         if (mOnlineSetup) {
             ReturnToOnlineLobby();
+        } else if (mLocalFromLobby && mCurrentMenu == mMatchSelectionMenu.get()) {
+            //(a local game's match type: back to its lobby, as it was)
+            OpenLocalLobby();
         } else {
+            mLocalFromLobby = false;
             iDisplayError = DISPLAY_ERROR_NONE;
             iDisplayErrorTimer = 0;
             mSystemLinkMenu->Close();    //(the Xbox's System Link menu goes back here: its search stops)
@@ -880,7 +888,8 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         OpenOnlineMatchSettings();
     } else if (MENU_CODE_ONLINE_LEAVE == code) {
         const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
-        if (!lobby || lobby->phase() == rollback::NetLobby::Phase::Joining || lobby->phase() == rollback::NetLobby::Phase::Closed)
+        const bool alone = rollback::NetGame::instance().access() == rollback::LobbyAccess::Nobody && !rollback::NetGame::instance().hasOthers();
+        if (!lobby || alone || lobby->phase() == rollback::NetLobby::Phase::Joining || lobby->phase() == rollback::NetLobby::Phase::Closed)
             LeaveOnlineLobbyNow();
         else
             mOnlineLobbyMenu->OpenDialog(UI_OnlineLobbyMenu::Dialog::Leave);
@@ -916,21 +925,26 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         else
             OpenOnlineGameSettings();
     } else if (MENU_CODE_MATCH_SELECTION_START == code || MENU_CODE_QUICK_GAME_START == code) {
-        printf("itt vagyok\n");
-
+    
         if (MENU_CODE_QUICK_GAME_START == code)
             game_values.matchtype = MatchType::QuickGame;
         else
             game_values.matchtype = mMatchSelectionMenu->GetSelectedMatchType();
-
-        mTeamSelectMenu->ResetTeamSelect();
-        mCurrentMenu = mTeamSelectMenu.get();
-        mCurrentMenu->ResetMenu();
-        printf("Hello\n");
+        if (MENU_CODE_QUICK_GAME_START == code)
+            mLocalFromLobby = false;
 
         if (game_values.matchtype != MatchType::Tournament) {
             game_values.tournamentcontrolteam = -1;
             SetControllingTeamForSettingsMenu(game_values.tournamentcontrolteam, false);
+        }
+
+        if (mLocalFromLobby) {
+            //A local game from the lobby: its players and teams are set, straight to the game setup
+            EnterGameSetup();
+        } else {
+            mTeamSelectMenu->ResetTeamSelect();
+            mCurrentMenu = mTeamSelectMenu.get();
+            mCurrentMenu->ResetMenu();
         }
     } else if (MENU_CODE_MATCH_SELECTION_MATCH_CHANGED == code) {
         mMatchSelectionMenu->SelectionChanged();
@@ -1034,6 +1048,9 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
 
             if (iTournamentAITimer > 0)
                 SetControllingTeamForSettingsMenu(-1, false);
+        } else if (mLocalFromLobby) {
+            //(a local game from the lobby has no team select: its teams are the lobby's)
+            mCurrentMenu = mMatchSelectionMenu.get();
         } else {
             mCurrentMenu = mTeamSelectMenu.get();
             mCurrentMenu->ResetMenu();
@@ -1251,8 +1268,9 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
 void MenuState::EnterGameSetup()
 {
     printf("MENU_CODE_TO_GAME_SETUP_MENU\n");
-    //Moves teams to the first arrays in the list and counts the number of teams
-    g_sim.score_cnt = mTeamSelectMenu->GetTeamCount();
+    //Moves teams to the first arrays in the list and counts the number of teams (a local game from
+    //the lobby: they're there already)
+    g_sim.score_cnt = mLocalFromLobby ? mLocalTeams : mTeamSelectMenu->GetTeamCount();
     iDisplayError = DISPLAY_ERROR_NONE;
     iDisplayErrorTimer = 0;
     bool fErrorReadingTourFile = false;

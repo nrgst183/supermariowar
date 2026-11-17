@@ -18,7 +18,7 @@ UI_MainMenu::UI_MainMenu()
         0, 0, rm->menu_version.getWidth(), rm->menu_version.getHeight(), 1, 1, 0);
 
     miMainStartButton = new MI_Button(&rm->spr_selectfield, 120, 210, "Start", 310);
-    miMainStartButton->SetCode(MENU_CODE_TO_MATCH_SELECTION_MENU);
+    miMainStartButton->SetCode(MENU_CODE_TO_LOCAL_LOBBY);
 
     miQuickGameButton = new MI_Button(&rm->spr_selectfield, 440, 210, "Go!", 80);
     miQuickGameButton->SetCode(MENU_CODE_QUICK_GAME_START);
