@@ -52,6 +52,12 @@
 
 #include "GSGameplayInternal.h"
 
+// main.cpp: --at-perf
+namespace perfstats {
+void reset();
+void report(const std::string& map, int mode);
+}
+
 SimulationState g_sim;
 
 CEyecandyContainer eyecandy[3];
@@ -784,6 +790,8 @@ bool GameplayState::updateAutoTest()
 
     if (cmd::g_autotest.aiBench)
         aibench::print();
+    if (cmd::g_autotest.perf)
+        perfstats::report(g_map->szLoadedFile, game_values.gamemode ? game_values.gamemode->gamemode : -1);
 
     CleanUp();
     game_values.flags.exitinggame = false;

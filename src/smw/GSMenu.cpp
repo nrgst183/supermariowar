@@ -827,6 +827,7 @@ void MenuState::LaunchMatch()
 
     g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
     g_map->predrawforeground(rm->spr_frontmap[1]);
+    g_map->fitDrawAreas(rm->spr_frontmap[0]);    //(only where it shows)
 
     g_map->SetupAnimatedTiles();
     LoadMapObjects(false);

@@ -55,6 +55,12 @@ enum TileTypeFlag {
 };
 
 
+// A tile type read from a map file: one the game doesn't know (a damaged file) is a plain empty tile
+constexpr TileType tileTypeFromFile(int value) {
+    return value >= static_cast<int>(TileType::NonSolid) && value <= static_cast<int>(TileType::Gap)
+        ? static_cast<TileType>(value) : TileType::NonSolid;
+}
+
 constexpr unsigned short tileToFlags(TileType tiletype) {
     switch (tiletype) {
         case TileType::NonSolid: return tile_flag_nonsolid;

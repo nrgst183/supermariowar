@@ -177,7 +177,7 @@ void MapReader1800::read_warp_locations(CMap& map, BinaryFile& mapfile)
 {
     for (unsigned short j = 0; j < MAPHEIGHT; j++) {
         for (unsigned short i = 0; i < MAPWIDTH; i++) {
-            map.mapdatatop[i][j] = (TileType)mapfile.read_i32();;
+            map.mapdatatop[i][j] = tileTypeFromFile(mapfile.read_i32());
 
             map.warpdata[i][j].direction = (WarpEnterDirection)mapfile.read_i32();
             map.warpdata[i][j].connection = static_cast<short>(mapfile.read_i32());
@@ -273,19 +273,30 @@ void MapReader1800::read_platforms(CMap& map, BinaryFile& mapfile, bool fPreview
 {
     map.clearPlatforms();
 
-    //Load moving platforms
-    const size_t iNumPlatforms = static_cast<short>(mapfile.read_i32());
-    map.platforms.reserve(iNumPlatforms);
+    //Load moving platforms (a broken map's numbers: none, rather than reading past them; a negative
+    //count used to become a huge one and the game quit)
+    const int iNumPlatforms = mapfile.read_i32();
+    if (iNumPlatforms < 0 || iNumPlatforms > MAX_MAP_PLATFORMS) {
+        fprintf(stderr, "[map] %d moving platforms: the map is broken, none loaded\n", iNumPlatforms);
+        return;
+    }
+    map.platforms.reserve(static_cast<size_t>(iNumPlatforms));
 
-    for (size_t idx = 0; idx < iNumPlatforms; idx++) {
+    for (int idx = 0; idx < iNumPlatforms; idx++) {
         short iWidth = static_cast<short>(mapfile.read_i32());
         short iHeight = static_cast<short>(mapfile.read_i32());
+        if (iWidth <= 0 || iHeight <= 0 || iWidth > MAX_PLATFORM_TILES || iHeight > MAX_PLATFORM_TILES) {
+            fprintf(stderr, "[map] A moving platform %d x %d tiles: the map is broken, no more platforms loaded\n", iWidth, iHeight);
+            return;
+        }
 
         auto [tiles, types] = read_platform_tiles(map, mapfile, iWidth, iHeight);
 
         short iDrawLayer = 2;
         if (patch_version >= 1)
             iDrawLayer = static_cast<short>(mapfile.read_i32());
+        if (iDrawLayer < 0 || iDrawLayer >= PLATFORMDRAWLAYERS)
+            iDrawLayer = 2;
 
         short iPathType = 0;
         iPathType = mapfile.read_i32();
@@ -333,7 +344,7 @@ MapReader1800::read_platform_tiles(CMap& map, BinaryFile& mapfile, short iWidth,
                     tile.iID = translationid[tile.iID];
             }
 
-            TileType type = static_cast<TileType>(mapfile.read_i32());
+            TileType type = tileTypeFromFile(mapfile.read_i32());
 
             tiles.emplace_back(std::move(tile));
             types.emplace_back(std::move(type));

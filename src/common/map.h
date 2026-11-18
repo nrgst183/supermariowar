@@ -241,6 +241,9 @@ class CMap
 
         void predrawbackground(gfxSprite &background, gfxSprite &mapspr);
         void predrawforeground(gfxSprite &foregroundspr);
+        /// The front layer's draw areas fitted to the front image drawn for the match (only the
+        /// cells it shows something in)
+        void fitDrawAreas(const gfxSprite& front);
 
         void SetupAnimatedTiles();
 
@@ -373,6 +376,8 @@ class CMap
 
         SDL_Rect	drawareas[MAXDRAWAREAS];
         short		numdrawareas = 0;
+        void computeDrawAreas();
+        void buildDrawAreas(const bool skip[MAPWIDTH][MAPHEIGHT]);
 
         std::array<short, 4> iSwitches;
         std::list<IO_Block*> switchBlocks[8];
@@ -394,7 +399,7 @@ class CMap
         short iAnimatedVectorIndices[NUM_FRAMES_BETWEEN_TILE_ANIMATION + 1];
         SDL_Surface * animatedBackmapSurface = nullptr;
 
-        std::list<MovingPlatform*> platformdrawlayer[5];
+        std::list<MovingPlatform*> platformdrawlayer[PLATFORMDRAWLAYERS];
 
         void AnimateTiles(short iFrame);
         void ClearAnimatedTiles();

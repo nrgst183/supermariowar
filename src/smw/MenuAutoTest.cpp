@@ -38,6 +38,12 @@
 #include <cassert>
 #include <sstream>
 
+// main.cpp: --at-perf
+namespace perfstats {
+void reset();
+void report(const std::string& map, int mode);
+}
+
 // Opt-in --autotest harness (see cmd::AutoTestArgs): drives the menus without human input.
 // Returns a menu code to use instead of the current menu's own input, or MENU_CODE_NONE.
 MenuCodeEnum MenuState::AutoTestMenuUpdate()
@@ -213,6 +219,7 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
             mGameSettingsMenu->miMapField->LoadCurrentMap();
 
             printf("autotest: match %d, mode %d, map %s, %d players\n", scenario, mode, maplist->currentShortmapname().c_str(), g_sim.score_cnt);
+            perfstats::reset();
 
             phase = 2;
             timer = 0;

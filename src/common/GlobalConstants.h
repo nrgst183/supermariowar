@@ -93,6 +93,9 @@ constexpr int NUMMAPHAZARDPARAMS = 5;
 
 constexpr int NUMSPAWNAREATYPES = 6;
 constexpr int MAXSPAWNAREAS = 128;
+constexpr int MAX_MAP_PLATFORMS = 64;   // moving platforms a map may have (the editors make far fewer)
+constexpr int MAX_PLATFORM_TILES = 64;  // a moving platform's width or height, in tiles
+constexpr int PLATFORMDRAWLAYERS = 5;  // the layers moving platforms are drawn in
 constexpr int MAXDRAWAREAS = MAPWIDTH * MAPHEIGHT;  // at most one per tile (some old maps have up to 300)
 
 constexpr int MAX_BONUS_CHESTS = 5;

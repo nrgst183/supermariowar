@@ -33,7 +33,8 @@ struct AutoTestArgs {
     int peersum = 0;         // print the cross-machine state checksum every N frames; 0 = off
     int colors = -1;         // --at-colors N: the "Overlay Colors" option (0 night, 1 pipe, 2 castle, 3 SMB3)
     int prompts = -1;        // --at-prompts N: the "Button prompts" option (0 auto, 1 Xbox, 2 original Xbox)
-    bool pad = false;        // --at-pad 1: the prompts as for a controller (as if one had been used last)
+    bool pad = false;
+    bool perf = false;       // --at-perf 1: each match's cost per tick and per frame (perf: lines)        // --at-pad 1: the prompts as for a controller (as if one had been used last)
     int replaySeeks = 0;     // --replay: jump to a random tick every N frames (tests the theater's seeking)
     bool norender = false;   // skip drawing and presenting (much faster under valgrind or sanitizers)
     int shotEvery = 0;       // save a PNG of the screen every N drawn frames of an online match; 0 = off

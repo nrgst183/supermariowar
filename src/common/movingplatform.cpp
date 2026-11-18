@@ -210,21 +210,19 @@ void MovingPlatform::draw()
 
         if (rWrapRect.x != rDstRect.x)
             customSprite->draw(rSrcRect, blitdest, rWrapRect);
-    } else if (iWidth >= App::screenWidth) {
-        sprites[1 - g_iCurrentDrawIndex].draw(rSrcRect, blitdest, rDstRect);
     } else {
-        //Each part where the whole would put it, and its copy wrapped around the screen's edge
-        //when that shows (as the sprite's own wrapping does for the whole)
+        //Each part where the whole would put it, and its copies wrapped around the screen's edges
+        //where they show (a platform as wide as the screen can show on both sides)
         SDL_Surface* surface = sprites[1 - g_iCurrentDrawIndex].getSurface();
+        const int w = App::screenWidth;
         for (const SDL_Rect& part : drawParts) {
             const int x = rDstRect.x + part.x;
             const int y = rDstRect.y + part.y;
-            SDL_Rect src = part;
-            SDL_Rect dst = {x, y, part.w, part.h};
-            SDL_BlitSurface(surface, &src, blitdest, &dst);
-            if (x + part.w > App::screenWidth || x < 0) {
-                src = part;
-                dst = {x < 0 ? x + App::screenWidth : x - App::screenWidth, y, part.w, part.h};
+            for (const int at : {x, x - w, x + w}) {
+                if (at >= w || at + part.w <= 0)
+                    continue;
+                SDL_Rect src = part;
+                SDL_Rect dst = {at, y, part.w, part.h};
                 SDL_BlitSurface(surface, &src, blitdest, &dst);
             }
         }

@@ -25,6 +25,119 @@ using std::endl;
 #include <sys/stat.h>
 #endif
 
+// The front layer's rectangles (where layers 2 and 3 have tiles): drawing the front layer image only
+// there spares the rest of the screen. Worked out from the tiles when a map loads (the counts saved
+// in older maps can be wrong: some cover the whole screen, maps before 1.6 have none) and when one
+// is saved.
+void CMap::computeDrawAreas()
+{
+    bool skip[MAPWIDTH][MAPHEIGHT];
+    for (int j = 0; j < MAPHEIGHT; j++)
+        for (int i = 0; i < MAPWIDTH; i++)
+            skip[i][j] = mapdata[i][j][2].iID <= TILESETNONE && mapdata[i][j][3].iID <= TILESETNONE;
+    buildDrawAreas(skip);
+}
+
+// The same from the front layer image itself, once it's drawn for a match: a tile whose pixels are
+// all see-through (some maps have many) draws nothing, so its cell needn't be drawn every frame. The
+// cells with animated tiles stay (their next frames may show).
+void CMap::fitDrawAreas(const gfxSprite& front)
+{
+    SDL_Surface* surface = front.getSurface();
+    if (!surface || SDL_BYTESPERPIXEL(surface->format) != 4 || surface->w < MAPWIDTH * TILESIZE || surface->h < MAPHEIGHT * TILESIZE)
+        return;
+    const SDL_PixelFormatDetails* details = SDL_GetPixelFormatDetails(surface->format);
+    if (!details || !details->Amask)
+        return;
+    if (!SDL_LockSurface(surface))
+        return;
+    bool skip[MAPWIDTH][MAPHEIGHT];
+    for (int j = 0; j < MAPHEIGHT; j++) {
+        for (int i = 0; i < MAPWIDTH; i++) {
+            const bool tiles = mapdata[i][j][2].iID > TILESETNONE || mapdata[i][j][3].iID > TILESETNONE;
+            const bool animated = mapdata[i][j][2].iID == TILESETANIMATED || mapdata[i][j][3].iID == TILESETANIMATED;
+            bool shows = animated;
+            for (int y = 0; y < TILESIZE && tiles && !shows; y++) {
+                const Uint32* row = reinterpret_cast<const Uint32*>(static_cast<const Uint8*>(surface->pixels) +
+                    static_cast<ptrdiff_t>(j * TILESIZE + y) * surface->pitch) + i * TILESIZE;
+                for (int x = 0; x < TILESIZE && !shows; x++)
+                    shows = (row[x] & details->Amask) != 0;
+            }
+            skip[i][j] = !(tiles && shows);
+        }
+    }
+    SDL_UnlockSurface(surface);
+    buildDrawAreas(skip);
+}
+
+// The rectangles (as few as it finds) covering the cells not skipped
+void CMap::buildDrawAreas(const bool skip[MAPWIDTH][MAPHEIGHT])
+{
+    int i, j;
+    bool usedtile[MAPWIDTH][MAPHEIGHT];
+    for (j = 0; j < MAPHEIGHT; j++)
+        for (i = 0; i < MAPWIDTH; i++)
+            usedtile[i][j] = skip[i][j];
+
+    //Figure out where the overlayer draw rects are
+    numdrawareas = 0;
+    for (j = 0; j < MAPHEIGHT; j++) {
+        for (i = 0; i < MAPWIDTH; i++) {
+            if (!usedtile[i][j]) {
+                bool fDownDone = false;
+                bool fRightDone = false;
+
+                int downsize = j + 1;
+                int rightsize = i + 1;
+                int attempt = 1;
+
+                while (true) {
+                    if (!fRightDone) {
+                        for (int right = i; right < rightsize; right++) {
+                            if (right >= MAPWIDTH || j + attempt >= MAPHEIGHT || usedtile[right][j + attempt])
+                                fRightDone = true;
+                        }
+
+                        if (!fRightDone)
+                            downsize++;
+                    }
+
+                    if (!fDownDone) {
+                        for (int down = j; down < downsize; down++) {
+                            if (i + attempt >= MAPWIDTH || down >= MAPHEIGHT || usedtile[i + attempt][down])
+                                fDownDone = true;
+                        }
+
+                        if (!fDownDone)
+                            rightsize++;
+                    }
+
+                    if (fDownDone && fRightDone) {
+                        if (numdrawareas < MAXDRAWAREAS) {
+                            drawareas[numdrawareas].x = static_cast<Sint16>(i << 5);
+                            drawareas[numdrawareas].y = static_cast<Sint16>(j << 5);
+                            drawareas[numdrawareas].w = static_cast<Uint16>((rightsize - i) << 5);
+                            drawareas[numdrawareas].h = static_cast<Uint16>((downsize - j) << 5);
+
+                            numdrawareas++;
+                        }
+
+                        for (int down = j; down < downsize; down++) {
+                            for (int right = i; right < rightsize; right++) {
+                                usedtile[right][down] = true;
+                            }
+                        }
+
+                        break;
+                    }
+
+                    attempt++;
+                }
+            }
+        }
+    }
+}
+
 void CMap::saveMap(const std::string& file)
 {
     int i, j, k;
@@ -489,75 +602,7 @@ void CMap::saveMap(const std::string& file)
         }
     }
 
-    for (j = 0; j < MAPHEIGHT; j++)
-        for (i = 0; i < MAPWIDTH; i++)
-            usedtile[i][j] = false;
-
-    //Figure out areas that contain tiles in layers 2 and 3
-    for (j = 0; j < MAPHEIGHT; j++) {
-        for (i = 0; i < MAPWIDTH; i++) {
-            if (mapdata[i][j][2].iID <= TILESETNONE && mapdata[i][j][3].iID <= TILESETNONE)
-                usedtile[i][j] = true;
-        }
-    }
-
-    //Figure out where the overlayer draw rects are
-    numdrawareas = 0;
-    for (j = 0; j < MAPHEIGHT; j++) {
-        for (i = 0; i < MAPWIDTH; i++) {
-            if (!usedtile[i][j]) {
-                bool fDownDone = false;
-                bool fRightDone = false;
-
-                int downsize = j + 1;
-                int rightsize = i + 1;
-                int attempt = 1;
-
-                while (true) {
-                    if (!fRightDone) {
-                        for (int right = i; right < rightsize; right++) {
-                            if (right >= MAPWIDTH || j + attempt >= MAPHEIGHT || usedtile[right][j + attempt])
-                                fRightDone = true;
-                        }
-
-                        if (!fRightDone)
-                            downsize++;
-                    }
-
-                    if (!fDownDone) {
-                        for (int down = j; down < downsize; down++) {
-                            if (i + attempt >= MAPWIDTH || down >= MAPHEIGHT || usedtile[i + attempt][down])
-                                fDownDone = true;
-                        }
-
-                        if (!fDownDone)
-                            rightsize++;
-                    }
-
-                    if (fDownDone && fRightDone) {
-                        if (numdrawareas < MAXDRAWAREAS) {
-                            drawareas[numdrawareas].x = static_cast<Sint16>(i << 5);
-                            drawareas[numdrawareas].y = static_cast<Sint16>(j << 5);
-                            drawareas[numdrawareas].w = static_cast<Uint16>((rightsize - i) << 5);
-                            drawareas[numdrawareas].h = static_cast<Uint16>((downsize - j) << 5);
-
-                            numdrawareas++;
-                        }
-
-                        for (int down = j; down < downsize; down++) {
-                            for (int right = i; right < rightsize; right++) {
-                                usedtile[right][down] = true;
-                            }
-                        }
-
-                        break;
-                    }
-
-                    attempt++;
-                }
-            }
-        }
-    }
+    computeDrawAreas();
 
     //Write draw areas
     mapfile.write_i32(numdrawareas);

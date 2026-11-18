@@ -59,8 +59,8 @@ std::string mapBackgroundPath(const CMap& map)
 {
     std::string path = convertPath("gfx/packs/backgrounds/" + map.szBackgroundFile, gamegraphicspacklist->currentPath());
 
-    //if the background file doesn't exist, use the classic background
-    if (!FileExists(path)) {
+    //if the background file doesn't exist (or a broken map names none: its folder), use the classic background
+    if (map.szBackgroundFile.empty() || map.szBackgroundFile.back() == '/' || !FileExists(path)) {
         fprintf(stderr, "[map] Background '%s' isn't installed: using the classic one\n", map.szBackgroundFile.c_str());
         path = convertPath("gfx/packs/backgrounds/Land_Classic.png", gamegraphicspacklist->currentPath());
     }

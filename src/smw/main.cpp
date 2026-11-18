@@ -17,6 +17,7 @@
 #include "FileList.h"
 #include "GameMode.h"
 #include "GameValues.h"
+#include "GSGameplay.h"
 #include "GSMenu.h"
 #include "ui/InputPrompts.h"
 #include "map.h"
@@ -68,6 +69,10 @@
 #include <string>
 #include <ctime>
 #include <cmath>
+#if defined(__linux__)
+#include <dlfcn.h>
+#include <time.h>
+#endif
 #include <cstdlib>
 #include <vector>
 
@@ -165,6 +170,76 @@ short currentgamemode = 0;
 //  MAIN LOOP
 //*************************************
 
+// --at-perf: what the matches cost, the ticks and the frames (drawing, then showing it), in this
+// thread's CPU time where there is one (runs side by side don't count each other's)
+namespace perfstats {
+namespace {
+struct Part {
+    double total = 0, worst = 0;
+    long count = 0;
+    void add(double ns)
+    {
+        total += ns;
+        worst = ns > worst ? ns : worst;
+        count++;
+    }
+};
+Part s_tick, s_draw, s_flip;
+unsigned long long s_pixels0 = 0, s_fills0 = 0, s_blits0 = 0;
+
+double nowNs()
+{
+#if defined(__linux__)
+    timespec ts;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+    return static_cast<double>(ts.tv_sec) * 1e9 + static_cast<double>(ts.tv_nsec);
+#else
+    return static_cast<double>(SDL_GetTicksNS());
+#endif
+}
+
+// The pixel counts of work/perf/blitcount.so, when it's preloaded
+unsigned long long counter(const char* name)
+{
+#if defined(__linux__)
+    const auto* p = static_cast<const unsigned long long*>(dlsym(RTLD_DEFAULT, name));
+    return p ? *p : 0;
+#else
+    (void)name;
+    return 0;
+#endif
+}
+} // namespace
+
+bool inMatch()
+{
+    return cmd::g_autotest.enabled && cmd::g_autotest.perf && GameStateManager::instance().currentState == &GameplayState::instance();
+}
+
+void reset()
+{
+    s_tick = s_draw = s_flip = Part();
+    s_pixels0 = counter("smw_blit_pixels");
+    s_fills0 = counter("smw_fill_pixels");
+    s_blits0 = counter("smw_blits");
+}
+
+void report(const std::string& map, int mode)
+{
+    if (!cmd::g_autotest.perf)
+        return;
+    const long frames = s_draw.count > 0 ? s_draw.count : 1;
+    printf("perf: mode %d ticks %ld tick_avg_us %.1f tick_max_us %.1f frames %ld draw_avg_us %.1f draw_max_us %.1f flip_avg_us %.1f "
+           "blit_px_per_frame %.0f fill_px_per_frame %.0f blits_per_frame %.1f map %s\n",
+        mode, s_tick.count, s_tick.count ? s_tick.total / s_tick.count / 1e3 : 0.0, s_tick.worst / 1e3, s_draw.count,
+        s_draw.total / frames / 1e3, s_draw.worst / 1e3, s_flip.count ? s_flip.total / s_flip.count / 1e3 : 0.0,
+        static_cast<double>(counter("smw_blit_pixels") - s_pixels0) / frames, static_cast<double>(counter("smw_fill_pixels") - s_fills0) / frames,
+        static_cast<double>(counter("smw_blits") - s_blits0) / frames, map.c_str());
+    fflush(stdout);
+    reset();
+}
+} // namespace perfstats
+
 #ifdef __EMSCRIPTEN__
 void gameloop_frame();
 #endif
@@ -177,6 +252,7 @@ void gameloop()
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(gameloop_frame, 0, 1);
 }
+
 
 void gameloop_frame()
 #else
@@ -196,20 +272,34 @@ void gameloop_frame()
         }
         net.pump();
 
-        for (int i = 0; i < ticks && game_values.appstate != AppState::Quit; i++)
+        for (int i = 0; i < ticks && game_values.appstate != AppState::Quit; i++) {
+            const bool measured = perfstats::inMatch();
+            const double t0 = measured ? perfstats::nowNs() : 0;
             GameStateManager::instance().currentState->update();
+            if (measured && perfstats::inMatch())
+                perfstats::s_tick.add(perfstats::nowNs() - t0);
+        }
 
         GameState* state = GameStateManager::instance().currentState;
         if (cmd::g_autotest.enabled && cmd::g_autotest.norender) {
             // Headless test runs: skip drawing entirely (and wait for the next tick when paced)
             limiter.idle();
         } else if (limiter.shouldRender(ticks, state->rendersBetweenTicks())) {
+            const bool measured = perfstats::inMatch();
+            double t0 = measured ? perfstats::nowNs() : 0;
             if (state->rendersBetweenTicks())
                 state->render(limiter.alpha());
+            if (measured) {
+                const double t1 = perfstats::nowNs();
+                perfstats::s_draw.add(t1 - t0);
+                t0 = t1;
+            }
 
             limiter.beforeFlip();
             autoScreenshot();
             gfx_flipscreen();
+            if (measured)
+                perfstats::s_flip.add(perfstats::nowNs() - t0);
             limiter.afterFlip();
         } else {
             limiter.idle();

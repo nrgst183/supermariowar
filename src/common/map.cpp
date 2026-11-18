@@ -165,14 +165,33 @@ void CMap::loadMap(const std::string& file, ReadType iReadType)
     }
 
     MapReader* reader = MapReader::getLoaderByVersion(version);
-    if (!reader->load(*this, mapfile, iReadType))
-        fprintf(stderr, "[map] %s couldn't be read completely (see above)\n", file.c_str());
+    //(a damaged map file, cut short say: what was read stays, rather than the game quitting)
+    try {
+        if (!reader->load(*this, mapfile, iReadType))
+            fprintf(stderr, "[map] %s couldn't be read completely (see above)\n", file.c_str());
+    } catch (const std::exception& e) {
+        fprintf(stderr, "[map] %s is damaged: %s\n", file.c_str(), e.what());
+    } catch (const std::string& e) {
+        fprintf(stderr, "[map] %s is damaged: %s\n", file.c_str(), e.c_str());
+    }
     delete reader;
     reader = nullptr;
+
+    //(the counts as the arrays allow: a damaged file's, cut short before the reader checked them,
+    //sent everything that walks them past their ends)
+    if (numwarpexits < 0 || numwarpexits > MAXWARPS)
+        numwarpexits = numwarpexits < 0 ? 0 : MAXWARPS;
+    for (short& count : numspawnareas)
+        if (count < 0 || count > MAXSPAWNAREAS)
+            count = count < 0 ? 0 : MAXSPAWNAREAS;
+    if (maxConnection < 0 || maxConnection > 9)
+        maxConnection = maxConnection < 0 ? 0 : 9;
 
     if (iReadType == read_type_summary)
         return;
 
+    //(from the tiles, not the file's: some are wrong, and old maps have none)
+    computeDrawAreas();
     clearWarpLocks();
     cout << " done" << endl;
 }
@@ -507,6 +526,9 @@ WarpExit * CMap::getRandomWarpExit(int connection, int currentID)
     WarpExit * currentWarp = nullptr;
 
     for (int k = 0; k < numwarpexits; k++) {
+        //(an exit pointing nowhere, in a damaged map, isn't one)
+        if (warpexits[k].direction < WARP_EXIT_UP || warpexits[k].direction > WARP_EXIT_LEFT)
+            continue;
         if (warpexits[k].connection == connection) {
             if (warpexits[k].id == currentID)
                 currentWarp = &warpexits[k];
@@ -686,11 +708,20 @@ bool CMap::checkforwarp(short iData1, short iData2, short iData3, short iDirecti
         warp2 = &warpdata[iData1][iData3];
     }
 
-    return warp1->direction == warp2->direction
-        && warp1->id == warp2->id
-        && warp1->direction == iDirection
-        && !warplocked[warp1->connection]
-        && warpexits[warp1->id].locktimer <= 0;
+    if (warp1->direction != warp2->direction || warp1->id != warp2->id || warp1->direction != iDirection)
+        return false;
+
+    //(a broken map's warp: out of range, or with no exit to come out of, is no warp: entering it
+    //crashed the game)
+    if (warp1->id < 0 || warp1->id >= numwarpexits || warp1->connection < 0 || warp1->connection >= 10)
+        return false;
+    bool exit = false;
+    for (int k = 0; k < numwarpexits && !exit; k++)
+        exit = warpexits[k].connection == warp1->connection && warpexits[k].direction >= WARP_EXIT_UP && warpexits[k].direction <= WARP_EXIT_LEFT;
+    if (!exit)
+        return false;
+
+    return !warplocked[warp1->connection] && warpexits[warp1->id].locktimer <= 0;
 }
 
 void CMap::optimize()
