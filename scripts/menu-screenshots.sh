@@ -85,6 +85,10 @@ wait $HOST $JOIN
 mkdir -p "$OUT/local_lobby"
 run locallobby "$HOST_DATA" --at-role locallobby --at-shots "$OUT/local_lobby"
 
+# The options menu, and its Online page
+mkdir -p "$OUT/options"
+run options "$HOST_DATA" --at-role options --at-shots "$OUT/options"
+
 # The LAN games (system link) list: alone (it hosts from there), then two lobbies on this computer,
 # found (and one joined) by a third game
 mkdir -p "$OUT/syslink_alone"

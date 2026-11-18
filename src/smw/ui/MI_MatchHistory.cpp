@@ -1,5 +1,8 @@
 #include "MI_MatchHistory.h"
 
+#include "ui/MI_MenuPanel.h"
+#include "ui/SmwTheme.h"
+
 #include "GameMode.h"
 #include "input.h"
 #include "ui/InputPrompts.h"
@@ -135,15 +138,10 @@ MenuCodeEnum MI_MatchHistory::SendInput(CPlayerInput* playerInput)
     return MENU_CODE_NONE;
 }
 
-// A dialog frame of any width (menu_dialog is 512 x 480)
+// A panel, in the menus' colors
 void MI_MatchHistory::drawBox(short x, short y, short w, short h) const
 {
-    const short left = w / 2;
-    const short right = w - left;
-    rm->menu_dialog.draw(x, y, {0, 0, left, h});
-    rm->menu_dialog.draw(x + left, y, {512 - right, 0, right, h});
-    rm->menu_dialog.draw(x, y + h, {0, 464, left, 16});
-    rm->menu_dialog.draw(x + left, y + h, {512 - right, 464, right, 16});
+    menupanel::box(x, y, w, h);
 }
 
 void MI_MatchHistory::Draw()
@@ -151,27 +149,30 @@ void MI_MatchHistory::Draw()
     if (!m_visible)
         return;
 
-    const short listH = static_cast<short>(m_lines * LINE_H + 32);
-    drawBox(m_pos.x, m_pos.y, m_width, listH);
-    rm->menu_font_large.drawCentered(m_pos.x + m_width / 2, m_pos.y + 5, "Match History");
+    // The header bar, as on every menu of the game
+    rm->menu_plain_field.draw(0, 0, {0, 0, 320, 32});
+    rm->menu_plain_field.draw(320, 0, {192, 0, 320, 32});
+    rm->menu_font_large.drawCentered(320, 5, "Match History");
+    if (!m_entries.empty())
+        rm->menu_font_small.drawRightJustified(620, 10, std::to_string(m_index + 1) + " / " + std::to_string(m_entries.size()));
+
+    const short top = 40;
+    const short listH = static_cast<short>(m_lines * LINE_H + 20);
+    drawBox(m_pos.x, top, m_width, listH);
 
     if (m_entries.empty()) {
-        rm->menu_font_large.drawCentered(m_pos.x + m_width / 2, m_pos.y + 32 + LINE_H * 2, "No matches yet");
-        rm->menu_font_small.drawCentered(m_pos.x + m_width / 2, m_pos.y + 32 + LINE_H * 3 + 4, "Every match you play is listed here, with its replay");
-    } else {
-        rm->menu_font_small.drawRightJustified(m_pos.x + m_width - 20, m_pos.y + 10,
-            std::to_string(m_index + 1) + " / " + std::to_string(m_entries.size()));
+        theme::statusIcon(m_pos.x + m_width / 2 - 8, top + LINE_H * 2, theme::Status::Info);
+        rm->menu_font_large.drawCentered(m_pos.x + m_width / 2, top + LINE_H * 3, "No matches yet");
+        rm->menu_font_small.drawCentered(m_pos.x + m_width / 2, top + LINE_H * 4, "Every match you play is listed here, with its replay");
     }
 
-    const short lineW = m_width - 32;
-    const short half = lineW / 2;
+    const short lineW = m_width - 24;
     for (int line = 0; line < m_lines && m_offset + line < static_cast<int>(m_entries.size()); line++) {
         const history::Entry& e = m_entries[static_cast<size_t>(m_offset + line)];
         const bool selected = m_offset + line == m_index;
-        const short x = m_pos.x + 16;
-        const short y = static_cast<short>(m_pos.y + 32 + line * LINE_H);
-        rm->spr_selectfield.draw(x, y, {0, static_cast<short>(selected ? 32 : 0), half, 32});
-        rm->spr_selectfield.draw(x + half, y, {static_cast<short>(512 - (lineW - half)), static_cast<short>(selected ? 32 : 0), static_cast<short>(lineW - half), 32});
+        const short x = m_pos.x + 12;
+        const short y = static_cast<short>(top + 10 + line * LINE_H);
+        menupanel::row(x, y + 1, lineW, LINE_H - 2, selected);
 
         const short icon = modeIcon(e.modeId);
         if (icon >= 0)
@@ -182,21 +183,21 @@ void MI_MatchHistory::Draw()
         rm->menu_font_small.drawChopLeft(x + lineW - 12, y + 9, 160, resultText(e));
     }
 
-    drawDetails(static_cast<short>(m_pos.y + listH + 24));
+    drawDetails(static_cast<short>(top + listH + 6));
 }
 
 void MI_MatchHistory::drawDetails(short y) const
 {
-    const short h = static_cast<short>(480 - 16 - 16 - y);
+    const short h = static_cast<short>(442 - y);    //(the footer under it)
     if (h < 64)
         return;
     drawBox(m_pos.x, y, m_width, h);
     const short x = m_pos.x + 20;
     const short right = m_pos.x + m_width - 20;
-    const short bottom = static_cast<short>(y + h - 6);
+    const short bottom = static_cast<short>(y + h - 10);
 
     if (m_entries.empty() || m_index >= static_cast<int>(m_entries.size())) {
-        rm->menu_font_small.drawCentered(m_pos.x + m_width / 2, bottom - 14, "Cancel: back");
+        menupanel::footer({{{prompts::Pad::B}, {prompts::menuKey(prompts::MENU_CANCEL)}, "back"}});
         return;
     }
     const history::Entry& e = m_entries[static_cast<size_t>(m_index)];
@@ -206,16 +207,16 @@ void MI_MatchHistory::drawDetails(short y) const
         title += ", goal " + std::to_string(e.goal);
     if (!e.map.empty())
         title += "  -  " + e.map;
-    rm->menu_font_large.drawChopRight(x, y + 8, m_width - 40, title);
+    rm->menu_font_large.drawChopRight(x, y + 12, m_width - 40, title);
     std::string info = e.matchType + (e.online ? " (online)" : "") + "    " + history::formatDuration(e.ticks) + "    " + history::formatTime(e.time);
-    rm->menu_font_small.drawChopRight(x, y + 28, m_width - 40, info);
+    rm->menu_font_small.drawChopRight(x, y + 34, m_width - 40, info);
 
     //The teams, by place
     std::vector<size_t> order(e.teams.size());
     for (size_t k = 0; k < order.size(); k++)
         order[k] = k;
     std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return e.teams[a].place < e.teams[b].place; });
-    short ty = static_cast<short>(y + 46);
+    short ty = static_cast<short>(y + 54);
     for (size_t t : order) {
         if (ty + 14 > bottom - 16)
             break;
@@ -231,20 +232,17 @@ void MI_MatchHistory::drawDetails(short y) const
         ty += 15;
     }
 
-    if (!m_message.empty()) {
-        rm->menu_font_small.drawRightJustified(right, bottom - 14, m_message);
-        return;
-    }
-    //What the buttons do: the controller's or the keys (as the other menus show them)
+    //What the buttons do: the controller's or the keys, in the footer (as on the other menus)
     using prompts::Pad;
     using prompts::menuKey;
     std::vector<prompts::Prompt> row;
-    if (e.replay.empty())
-        rm->menu_font_small.drawRightJustified(right - prompts::promptsWidth({{{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}}, 12) - 16,
-                                               bottom - 14, "No replay");
-    else
+    if (!e.replay.empty())
         row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "watch the replay"});
     row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"});
-    const int w = prompts::promptsWidth(row, 12);
-    prompts::drawPrompts(right - w / 2, bottom - 16, row, 12);
+    menupanel::footer(row);
+
+    if (!m_message.empty())
+        rm->menu_font_small.drawRightJustified(right, bottom - 14, m_message);
+    else if (e.replay.empty())
+        rm->menu_font_small.drawRightJustified(right, bottom - 14, "No replay");
 }

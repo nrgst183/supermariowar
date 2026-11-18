@@ -53,6 +53,13 @@ protected:
     gfxSprite surfaceMapForeground;
     SDL_Rect rectDst;
 
+    //The three layers in one, for a map without moving platforms or hazards (most): one blit a frame
+    //instead of three. Made again when the layers change (a map loaded) or the top layer is turned
+    //on or off.
+    gfxSprite m_layers;
+    bool m_layersStale = true;
+    bool m_layersTop = false;
+
     short iWidth, iIndent;
     std::string szMapName;
 

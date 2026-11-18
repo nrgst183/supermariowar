@@ -65,6 +65,7 @@ private:
     SdlSurfacePtr m_picture;
     std::optional<int> m_wrap_x = std::nullopt;
     Uint8 m_bakedAlpha = 255;    // the loading alpha, made part of the pixels (ImageLoader::withAlpha)
+    bool m_opaque = false;       // loaded opaque all over: copied when not see-through (setalpha 255)
     friend class ImageLoader;
 
     void blit(const SDL_Rect* srcRect, SDL_Surface* dst, Vec2i dstPos) const;

@@ -14,13 +14,6 @@
 #include <algorithm>
 #include <cstdlib>
 
-//The games hosted on the local network have a menu of their own (SystemLinkMenu.h: LAN games,
-//where hosting is too), beside the address to type. (The Xbox has only that one: system link.)
-#ifndef NETWORK_DISABLED
-#define SMW_LAN_GAMES
-#include "SystemLinkMenu.h"
-#endif
-
 namespace {
 constexpr short MAX_NAME_CHARS = 17;       // the field takes one character less than this (MAX_NAME_LENGTH is 16)
 constexpr short MAX_PORT_CHARS = 6;
@@ -30,28 +23,30 @@ constexpr short MAX_ADDRESS_CHARS = 64;
 UI_OnlineMenu::UI_OnlineMenu()
     : UI_Menu()
 {
-    AddTitleBar("Online");
     SetHints(false);    //(its own prompts, at the bottom)
 
-    //Three panels (under their fields): you, hosting, joining
-    AddNonControl(new MI_MenuPanel(36, 42, 568, 112, "You", "Your name, and how far ahead you see"));
-    //(the host's panel says the address the others on this network join)
-    MI_MenuPanel* hostPanel = new MI_MenuPanel(36, 158, 568, 108, "Host a game");
-    hostPanel->SetNoteSource([]() -> std::string {
+    // The title bar: the page's name
+    AddNonControl(new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0));
+    AddNonControl(new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0));
+    miTitle = new MI_HeaderText("Online Options", 320, 5);
+    AddNonControl(miTitle);
+
+    // Settings: you, and hosting
+    miYouPanel = new MI_MenuPanel(36, 42, 568, 112, "You", "Your name, and how far ahead you see");
+    miHostPanel = new MI_MenuPanel(36, 158, 568, 76, "Hosting", "The port the others join");
+    miHostPanel->SetNoteSource([]() -> std::string {
         const std::string address = rollback::NetGame::lanAddress();
         if (address.empty())
-            return "The others join this computer's address";
+            return "The port the others join";
         const int port = atoi(game_values.onlineport.c_str());
         return "Others join " + address + ":" + std::to_string(port > 0 ? port : 7300);
     });
-    AddNonControl(hostPanel);
-    AddNonControl(new MI_MenuPanel(36, 270, 568, 108, "Join a game", "At the address the host gives you"));
+    AddNonControl(miYouPanel);
+    AddNonControl(miHostPanel);
 
     miNameField = new MI_TextField(&rm->spr_selectfield, 64, 78, "Nickname", 512, 150);
     miNameField->SetData(game_values.onlinename, MAX_NAME_CHARS);
 
-    //Run-ahead: online matches are drawn this many ticks ahead of the real state, so your buttons
-    //answer sooner (GameplayTick.cpp). Offline there's no network delay to hide: it isn't used.
     miRunAheadField = new MI_SelectField<short>(&rm->spr_selectfield, 64, 114, "Run-Ahead", 512, 150);
     miRunAheadField->add("Auto", -1);    //(as much as the input delay)
     miRunAheadField->add("Off", 0);
@@ -66,24 +61,25 @@ UI_OnlineMenu::UI_OnlineMenu()
     miPortField = new MI_TextField(&rm->spr_selectfield, 64, 194, "Port", 512, 150);
     miPortField->SetData(game_values.onlineport, MAX_PORT_CHARS);
     miPortField->SetDisallowedChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ !@#$%^&*()-_=+`~[]{}\\|;:'\",<>./?");
-    miHostButton = new MI_Button(&rm->spr_selectfield, 170, 230, "Host game", 300, TextAlign::CENTER);
-    miHostButton->SetCode(MENU_CODE_ONLINE_HOST);
 
-    miAddressField = new MI_TextField(&rm->spr_selectfield, 64, 306, "Address", 512, 150);
+    miSettingsBack = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
+    miSettingsBack->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
+
+    // Join by address (from the games list: a game that isn't on this network)
+    miJoinPanel = new MI_MenuPanel(36, 42, 568, 112, "Join a game", "At the address the host gives you");
+    AddNonControl(miJoinPanel);
+
+    miAddressField = new MI_TextField(&rm->spr_selectfield, 64, 78, "Address", 512, 150);
     miAddressField->SetData(game_values.onlineaddress, MAX_ADDRESS_CHARS);
     miAddressField->SetDisallowedChars(" ");
-#ifdef SMW_LAN_GAMES
-    //Beside it, the games found on the local network
-    miJoinButton = new MI_Button(&rm->spr_selectfield, 64, 342, "Join game", 250, TextAlign::CENTER);
-    miFindGamesButton = new MI_Button(&rm->spr_selectfield, 326, 342, "LAN games", 250, TextAlign::CENTER);
-    miFindGamesButton->SetCode(MENU_CODE_TO_SYSTEM_LINK_MENU);
-#else
-    miJoinButton = new MI_Button(&rm->spr_selectfield, 170, 342, "Join game", 300, TextAlign::CENTER);
-#endif
+    miJoinButton = new MI_Button(&rm->spr_selectfield, 170, 114, "Join game", 300, TextAlign::CENTER);
     miJoinButton->SetCode(MENU_CODE_ONLINE_JOIN);
 
+    miJoinBack = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
+    miJoinBack->SetCode(MENU_CODE_TO_SYSTEM_LINK_MENU);
+
     //What went wrong (or what's happening), under the panels, in a panel of its own
-    miMessage = new MI_WrappedText(320, 390, 512, 3);
+    miMessage = new MI_WrappedText(320, 170, 512, 3);
     miMessage->SetBoxed(true);
 
     //What the buttons do here (a controller's, or the keys), and back
@@ -93,37 +89,42 @@ UI_OnlineMenu::UI_OnlineMenu()
         return std::vector<prompts::Prompt> {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"},
             {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select / type"}, {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}};
     });
-    miBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
-    miBackButton->SetCode(MENU_CODE_TO_MAIN_MENU);
 
-    AddControl(miNameField, miBackButton, miRunAheadField, nullptr, nullptr);
-    AddControl(miRunAheadField, miNameField, miPortField, nullptr, nullptr);
-    AddControl(miPortField, miRunAheadField, miHostButton, nullptr, nullptr);
-#ifdef SMW_LAN_GAMES
-    AddControl(miHostButton, miPortField, miAddressField, nullptr, nullptr);
-    AddControl(miAddressField, miHostButton, miJoinButton, nullptr, nullptr);
-    AddControl(miJoinButton, miAddressField, miBackButton, nullptr, miFindGamesButton);
-    AddControl(miFindGamesButton, miAddressField, miBackButton, miJoinButton, nullptr);
-    AddControl(miBackButton, miJoinButton, miNameField, nullptr, nullptr);
-#else
-    AddControl(miHostButton, miPortField, miAddressField, nullptr, nullptr);
-    AddControl(miAddressField, miHostButton, miJoinButton, nullptr, nullptr);
-    AddControl(miJoinButton, miAddressField, miBackButton, nullptr, nullptr);
-    AddControl(miBackButton, miJoinButton, miNameField, nullptr, nullptr);
-#endif
+    AddControl(miNameField, miSettingsBack, miRunAheadField, nullptr, miSettingsBack);
+    AddControl(miRunAheadField, miNameField, miPortField, nullptr, miSettingsBack);
+    AddControl(miPortField, miRunAheadField, miSettingsBack, nullptr, miSettingsBack);
+    AddControl(miSettingsBack, miPortField, miNameField, miPortField, nullptr);
+
+    AddControl(miAddressField, miJoinBack, miJoinButton, nullptr, miJoinBack);
+    AddControl(miJoinButton, miAddressField, miJoinBack, nullptr, miJoinBack);
+    AddControl(miJoinBack, miJoinButton, miAddressField, miJoinButton, nullptr);
 
     AddNonControl(miMessage);
     AddNonControl(miPrompts);
 
-    setInitialFocus(miHostButton);
-    SetCancelCode(MENU_CODE_TO_MAIN_MENU);
+    ShowMode(Mode::Join);
 }
 
-void UI_OnlineMenu::Open()
+void UI_OnlineMenu::ShowMode(Mode mode)
+{
+    m_mode = mode;
+    const bool settings = mode == Mode::Settings;
+    miTitle->SetText(settings ? "Online Options" : "Join by Address");
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miYouPanel, miHostPanel, miNameField, miRunAheadField, miPortField, miSettingsBack})
+        control->setVisible(settings);
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miJoinPanel, miAddressField, miJoinButton, miJoinBack})
+        control->setVisible(!settings);
+    setInitialFocus(settings ? static_cast<UI_Control*>(miNameField) : static_cast<UI_Control*>(miAddressField));
+    SetCancelCode(settings ? MENU_CODE_BACK_TO_OPTIONS_MENU : MENU_CODE_TO_SYSTEM_LINK_MENU);
+}
+
+void UI_OnlineMenu::Open(Mode mode)
 {
     miNameField->Refresh();
     miPortField->Refresh();
     miAddressField->Refresh();
+    miRunAheadField->setCurrentValue(game_values.runahead);
+    ShowMode(mode);
     ResetMenu();
 }
 

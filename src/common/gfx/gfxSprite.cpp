@@ -49,6 +49,28 @@ SdlSurfacePtr bakeAlpha(SdlSurfacePtr img, Uint8 alpha, std::optional<RGB> color
 // (No RLE acceleration: SDL's RLE blits walk every row of the sheet up to the part drawn, so the
 // small pieces of wide sheets the game draws (glyphs, tiles, animation frames) cost far more than
 // with its plain blitters: drawing took about twice as long. The Xbox SDL ignores RLE anyway.)
+// Every pixel's alpha full (a surface in the screen's format, 32 bits a pixel)
+bool isOpaque(SDL_Surface* surface)
+{
+    const SDL_PixelFormatDetails* details = SDL_GetPixelFormatDetails(surface->format);
+    if (!details || details->bits_per_pixel != 32 || details->Amask == 0)
+        return false;
+    if (!SDL_LockSurface(surface))
+        return false;
+    bool opaque = true;
+    for (int y = 0; y < surface->h && opaque; y++) {
+        const Uint32* row = reinterpret_cast<const Uint32*>(static_cast<const Uint8*>(surface->pixels) + y * surface->pitch);
+        for (int x = 0; x < surface->w; x++) {
+            if ((row[x] & details->Amask) != details->Amask) {
+                opaque = false;
+                break;
+            }
+        }
+    }
+    SDL_UnlockSurface(surface);
+    return opaque;
+}
+
 SdlSurfacePtr loadImage(
     const fs::path& path,
     std::optional<RGB> color_key = std::nullopt,
@@ -87,6 +109,13 @@ SdlSurfacePtr loadImage(
     const bool baked = alpha && bake && *alpha < 255;
     if (baked)
         img = bakeAlpha(std::move(img), *alpha, color_key);
+
+    //Opaque all over (no key, no alpha asked for, every pixel's alpha full: the backgrounds): copied,
+    //not blended. Converted to the screen's format, with its alpha channel, it would blend by
+    //default, to the same pixels, but far slower: the game's back layer and the menus' backdrop are
+    //a whole screen each, every frame (the Xbox's SDL blends a pixel at a time; a copy is a memcpy)
+    if (!alpha && !color_key && !SDL_SurfaceHasColorKey(img.get()) && isOpaque(img.get()))
+        SDL_SetSurfaceBlendMode(img.get(), SDL_BLENDMODE_NONE);
 
     if (alpha && !baked) {
         if (!SDL_SetSurfaceBlendMode(img.get(), SDL_BLENDMODE_BLEND)) {
@@ -207,6 +236,13 @@ void gfxSprite::setalpha(Uint8 alpha)
     if (m_bakedAlpha < 255)
         alpha = static_cast<Uint8>(std::min(255, alpha * 255 / std::max<int>(1, m_bakedAlpha)));
 
+    //(opaque, and not see-through any more: copied again, not blended: the menus' backdrop after the
+    //splash screen fades it in)
+    if (m_opaque && alpha == 255) {
+        SDL_SetSurfaceAlphaMod(m_picture.get(), 255);
+        SDL_SetSurfaceBlendMode(m_picture.get(), SDL_BLENDMODE_NONE);
+        return;
+    }
     if (!SDL_SetSurfaceBlendMode(m_picture.get(), SDL_BLENDMODE_BLEND)) {
         fprintf(stderr, "\n ERROR: couldn't set blend mode on sprite: %s\n", SDL_GetError());
         return;
@@ -227,5 +263,7 @@ gfxSprite ImageLoader::create() const
     gfxSprite sprite(loadImage(m_path, m_color_key, m_alpha, !m_changingAlpha), m_wrap_x);
     if (m_alpha && !m_changingAlpha && *m_alpha < 255)
         sprite.m_bakedAlpha = *m_alpha;
+    SDL_BlendMode mode = SDL_BLENDMODE_BLEND;
+    sprite.m_opaque = sprite.m_picture && SDL_GetSurfaceBlendMode(sprite.m_picture.get(), &mode) && mode == SDL_BLENDMODE_NONE;
     return sprite;
 }

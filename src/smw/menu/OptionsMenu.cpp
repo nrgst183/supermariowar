@@ -4,42 +4,58 @@
 #include "ResourceManager.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
+#include "ui/MI_MenuPanel.h"
 #include "ui/MI_Text.h"
 
 UI_OptionsMenu::UI_OptionsMenu()
     : UI_Menu()
 {
-    miGameplayOptionsMenuButton = new MI_Button(&rm->spr_selectfield, 120, 40, "Gameplay", 400, TextAlign::CENTER);
+    // The settings in groups, two to a row: the game, the items and weapons, the look and sound
+    // (and online: the nickname, run-ahead and port; builds with the network, not the Xbox's)
+    constexpr short LEFT_X = 64;
+    constexpr short RIGHT_X = 326;
+    constexpr short BUTTON_W = 250;
+    AddNonControl(new MI_MenuPanel(36, 42, 568, 76, "Game", "The rules of every match"));
+    AddNonControl(new MI_MenuPanel(36, 122, 568, 112, "Items and Weapons", "What turns up, and what it does"));
+    AddNonControl(new MI_MenuPanel(36, 238, 568, 112, "Look and Sound"));
+
+    miGameplayOptionsMenuButton = new MI_Button(&rm->spr_selectfield, LEFT_X, 78, "Gameplay", BUTTON_W, TextAlign::CENTER);
     miGameplayOptionsMenuButton->SetCode(MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU);
 
-    miTeamOptionsMenuButton = new MI_Button(&rm->spr_selectfield, 120, 80, "Team", 400, TextAlign::CENTER);
+    miTeamOptionsMenuButton = new MI_Button(&rm->spr_selectfield, RIGHT_X, 78, "Team", BUTTON_W, TextAlign::CENTER);
     miTeamOptionsMenuButton->SetCode(MENU_CODE_TO_TEAM_OPTIONS_MENU);
 
-    miPowerupOptionsMenuButton = new MI_Button(&rm->spr_selectfield, 120, 120, "Item Selection", 400, TextAlign::CENTER);
+    miPowerupOptionsMenuButton = new MI_Button(&rm->spr_selectfield, LEFT_X, 158, "Item Selection", BUTTON_W, TextAlign::CENTER);
     miPowerupOptionsMenuButton->SetCode(MENU_CODE_TO_POWERUP_SELECTION_MENU);
 
-    miPowerupSettingsMenuButton = new MI_Button(&rm->spr_selectfield, 120, 160, "Item Settings", 400, TextAlign::CENTER);
+    miPowerupSettingsMenuButton = new MI_Button(&rm->spr_selectfield, RIGHT_X, 158, "Item Settings", BUTTON_W, TextAlign::CENTER);
     miPowerupSettingsMenuButton->SetCode(MENU_CODE_TO_POWERUP_SETTINGS_MENU);
 
-    miProjectilesOptionsMenuButton = new MI_Button(&rm->spr_selectfield, 120, 200, "Weapons & Projectiles", 400, TextAlign::CENTER);
+    miProjectilesOptionsMenuButton = new MI_Button(&rm->spr_selectfield, LEFT_X, 194, "Weapons & Projectiles", BUTTON_W, TextAlign::CENTER);
     miProjectilesOptionsMenuButton->SetCode(MENU_CODE_TO_PROJECTILES_OPTIONS_MENU);
 
-    miProjectilesLimitsMenuButton = new MI_Button(&rm->spr_selectfield, 120, 240, "Weapon Use Limits", 400, TextAlign::CENTER);
+    miProjectilesLimitsMenuButton = new MI_Button(&rm->spr_selectfield, RIGHT_X, 194, "Weapon Use Limits", BUTTON_W, TextAlign::CENTER);
     miProjectilesLimitsMenuButton->SetCode(MENU_CODE_TO_PROJECTILES_LIMITS_MENU);
 
-    miGraphicsOptionsMenuButton = new MI_Button(&rm->spr_selectfield, 120, 280, "Graphics", 400, TextAlign::CENTER);
+    miGraphicsOptionsMenuButton = new MI_Button(&rm->spr_selectfield, LEFT_X, 274, "Graphics", BUTTON_W, TextAlign::CENTER);
     miGraphicsOptionsMenuButton->SetCode(MENU_CODE_TO_GRAPHICS_OPTIONS_MENU);
 
-    miEyeCandyOptionsMenuButton = new MI_Button(&rm->spr_selectfield, 120, 320, "Eye Candy", 400, TextAlign::CENTER);
+    miEyeCandyOptionsMenuButton = new MI_Button(&rm->spr_selectfield, RIGHT_X, 274, "Eye Candy", BUTTON_W, TextAlign::CENTER);
     miEyeCandyOptionsMenuButton->SetCode(MENU_CODE_TO_EYECANDY_OPTIONS_MENU);
 
-    miSoundOptionsMenuButton = new MI_Button((game_values.soundcapable ? &rm->spr_selectfield : &rm->spr_selectfielddisabled), 120, 360, "Music & Sound", 400, TextAlign::CENTER);
+    miSoundOptionsMenuButton = new MI_Button((game_values.soundcapable ? &rm->spr_selectfield : &rm->spr_selectfielddisabled), LEFT_X, 310, "Music & Sound", BUTTON_W, TextAlign::CENTER);
 
     if (game_values.soundcapable)
         miSoundOptionsMenuButton->SetCode(MENU_CODE_TO_SOUND_OPTIONS_MENU);
 
-    miGenerateMapThumbsButton = new MI_Button(&rm->spr_selectfield, 120, 400, "Refresh Maps", 400, TextAlign::CENTER);
+    miGenerateMapThumbsButton = new MI_Button(&rm->spr_selectfield, RIGHT_X, 310, "Refresh Maps", BUTTON_W, TextAlign::CENTER);
     miGenerateMapThumbsButton->SetCode(MENU_CODE_SAVE_ALL_MAP_THUMBNAILS);
+
+#if !defined(NETWORK_DISABLED) && !defined(SMW_XBOX) && !defined(__EMSCRIPTEN__)
+    AddNonControl(new MI_MenuPanel(36, 354, 568, 76, "Online", "Your nickname, run-ahead and port"));
+    miOnlineOptionsMenuButton = new MI_Button(&rm->spr_selectfield, 170, 390, "Online", 300, TextAlign::CENTER);
+    miOnlineOptionsMenuButton->SetCode(MENU_CODE_TO_ONLINE_OPTIONS_MENU);
+#endif
 
     miOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miOptionsMenuBackButton->SetCode(MENU_CODE_TO_MAIN_MENU);
@@ -59,18 +75,23 @@ UI_OptionsMenu::UI_OptionsMenu()
     miGenerateThumbsDialogYesButton->setVisible(false);
     miGenerateThumbsDialogNoButton->setVisible(false);
 
-    AddControl(miGameplayOptionsMenuButton, miOptionsMenuBackButton, miTeamOptionsMenuButton, nullptr, miOptionsMenuBackButton);
-    AddControl(miTeamOptionsMenuButton, miGameplayOptionsMenuButton, miPowerupOptionsMenuButton, nullptr, miOptionsMenuBackButton);
-    AddControl(miPowerupOptionsMenuButton, miTeamOptionsMenuButton, miPowerupSettingsMenuButton, nullptr, miOptionsMenuBackButton);
-    AddControl(miPowerupSettingsMenuButton, miPowerupOptionsMenuButton, miProjectilesOptionsMenuButton, nullptr, miOptionsMenuBackButton);
-    AddControl(miProjectilesOptionsMenuButton, miPowerupSettingsMenuButton, miProjectilesLimitsMenuButton, nullptr, miOptionsMenuBackButton);
-    AddControl(miProjectilesLimitsMenuButton, miProjectilesOptionsMenuButton, miGraphicsOptionsMenuButton, nullptr, miOptionsMenuBackButton);
-    AddControl(miGraphicsOptionsMenuButton, miProjectilesLimitsMenuButton, miEyeCandyOptionsMenuButton, nullptr, miOptionsMenuBackButton);
-    AddControl(miEyeCandyOptionsMenuButton, miGraphicsOptionsMenuButton, miSoundOptionsMenuButton, nullptr, miOptionsMenuBackButton);
-    AddControl(miSoundOptionsMenuButton, miEyeCandyOptionsMenuButton, miGenerateMapThumbsButton, nullptr, miOptionsMenuBackButton);
-    AddControl(miGenerateMapThumbsButton, miSoundOptionsMenuButton, miOptionsMenuBackButton, nullptr, miOptionsMenuBackButton);
+    // Up and down in a column, left and right in a row; right of the right column: Back
+    UI_Control* const last = miOnlineOptionsMenuButton ? static_cast<UI_Control*>(miOnlineOptionsMenuButton) : nullptr;
+    UI_Control* const back = miOptionsMenuBackButton;
+    AddControl(miGameplayOptionsMenuButton, back, miPowerupOptionsMenuButton, nullptr, miTeamOptionsMenuButton);
+    AddControl(miTeamOptionsMenuButton, back, miPowerupSettingsMenuButton, miGameplayOptionsMenuButton, back);
+    AddControl(miPowerupOptionsMenuButton, miGameplayOptionsMenuButton, miProjectilesOptionsMenuButton, nullptr, miPowerupSettingsMenuButton);
+    AddControl(miPowerupSettingsMenuButton, miTeamOptionsMenuButton, miProjectilesLimitsMenuButton, miPowerupOptionsMenuButton, back);
+    AddControl(miProjectilesOptionsMenuButton, miPowerupOptionsMenuButton, miGraphicsOptionsMenuButton, nullptr, miProjectilesLimitsMenuButton);
+    AddControl(miProjectilesLimitsMenuButton, miPowerupSettingsMenuButton, miEyeCandyOptionsMenuButton, miProjectilesOptionsMenuButton, back);
+    AddControl(miGraphicsOptionsMenuButton, miProjectilesOptionsMenuButton, miSoundOptionsMenuButton, nullptr, miEyeCandyOptionsMenuButton);
+    AddControl(miEyeCandyOptionsMenuButton, miProjectilesLimitsMenuButton, miGenerateMapThumbsButton, miGraphicsOptionsMenuButton, back);
+    AddControl(miSoundOptionsMenuButton, miGraphicsOptionsMenuButton, last ? last : back, nullptr, miGenerateMapThumbsButton);
+    AddControl(miGenerateMapThumbsButton, miEyeCandyOptionsMenuButton, last ? last : back, miSoundOptionsMenuButton, back);
+    if (miOnlineOptionsMenuButton)
+        AddControl(miOnlineOptionsMenuButton, miSoundOptionsMenuButton, back, nullptr, back);
 
-    AddControl(miOptionsMenuBackButton, miGenerateMapThumbsButton, miGameplayOptionsMenuButton, miGenerateMapThumbsButton, nullptr);
+    AddControl(miOptionsMenuBackButton, last ? last : miGenerateMapThumbsButton, miGameplayOptionsMenuButton, last ? last : miGenerateMapThumbsButton, nullptr);
 
     AddTitleBar("Options Menu");
 

@@ -3,39 +3,146 @@
 #include "ResourceManager.h"
 #include "ui/SmwTheme.h"
 
+#include <algorithm>
 #include <cmath>
+#include <initializer_list>
+#include <utility>
 #include <utility>
 
 namespace menupanel {
 namespace {
-// A rounded box, filled
-void roundedFill(int x, int y, int w, int h, int r, SDL_Color c)
+// Rounded boxes, one in another, each drawn over the one before: the colors that end up showing,
+// filled once each (rows alike merged into one rectangle), not a box over a box a row at a time
+struct Layer {
+    int inset;      // from the outer edge
+    int radius;
+    SDL_Color color;
+};
+
+// How far a rounded box's row is in from its sides
+int roundInset(int row, int h, int r)
 {
+    const int d = row < r ? r - row : (row >= h - r ? row - (h - r - 1) : 0);
+    if (d <= 0)
+        return 0;
+    return r - static_cast<int>(std::sqrt(static_cast<float>(r * r) - (d - 0.5f) * (d - 0.5f)) + 0.5f);
+}
+
+void layered(int x, int y, int w, int h, std::initializer_list<Layer> layers)
+{
+    struct Run {
+        int x0, x1;
+        SDL_Color color;
+        bool operator==(const Run& o) const
+        {
+            return x0 == o.x0 && x1 == o.x1 && color.r == o.color.r && color.g == o.color.g && color.b == o.color.b;
+        }
+    };
+    constexpr int MAX_RUNS = 8;
+    Run previous[MAX_RUNS];
+    int previousCount = -1;
+    int previousFrom = 0;
+    const auto flush = [&](int toRow) {
+        for (int i = 0; i < previousCount; i++)
+            prompts::fill(previous[i].x0, y + previousFrom, previous[i].x1 - previous[i].x0, toRow - previousFrom, previous[i].color);
+    };
+
     for (int row = 0; row < h; row++) {
-        int inset = 0;
-        const int d = row < r ? r - row : (row >= h - r ? row - (h - r - 1) : 0);
-        if (d > 0)
-            inset = r - static_cast<int>(std::sqrt(static_cast<float>(r * r) - (d - 0.5f) * (d - 0.5f)) + 0.5f);
-        prompts::fill(x + inset, y + row, w - 2 * inset, 1, c);
+        //Each box's span on this row (the later over the earlier)
+        int from[4], to[4];
+        int count = 0;
+        for (const Layer& layer : layers) {
+            if (count == 4)
+                break;    //(four at most)
+            const int lh = h - 2 * layer.inset;
+            const int lrow = row - layer.inset;
+            from[count] = to[count] = 0;
+            if (lrow >= 0 && lrow < lh) {
+                const int in = roundInset(lrow, lh, layer.radius);
+                from[count] = x + layer.inset + in;
+                to[count] = x + w - layer.inset - in;
+            }
+            ++count;
+        }
+        //The row's pieces: from edge to edge of the spans, each the color of the last box over it
+        int edges[8];
+        int edgeCount = 0;
+        for (int i = 0; i < count; i++) {
+            if (to[i] > from[i]) {
+                edges[edgeCount++] = from[i];
+                edges[edgeCount++] = to[i];
+            }
+        }
+        //(a few: in order by insertion)
+        for (int e = 1; e < edgeCount; e++) {
+            for (int f = e; f > 0 && edges[f - 1] > edges[f]; f--)
+                std::swap(edges[f - 1], edges[f]);
+        }
+        Run runs[MAX_RUNS];
+        int runCount = 0;
+        for (int e = 0; e + 1 < edgeCount; e++) {
+            const int x0 = edges[e], x1 = edges[e + 1];
+            if (x1 <= x0)
+                continue;
+            const SDL_Color* color = nullptr;
+            int i = 0;
+            for (const Layer& layer : layers) {
+                if (i == count)
+                    break;
+                if (from[i] <= x0 && x1 <= to[i])
+                    color = &layer.color;
+                ++i;
+            }
+            if (!color)
+                continue;
+            if (runCount > 0 && runs[runCount - 1].x1 == x0 && runs[runCount - 1].color.r == color->r && runs[runCount - 1].color.g == color->g
+                && runs[runCount - 1].color.b == color->b)
+                runs[runCount - 1].x1 = x1;
+            else if (runCount < MAX_RUNS)
+                runs[runCount++] = {x0, x1, *color};
+        }
+        //(alike the row before: one rectangle on)
+        bool same = runCount == previousCount;
+        for (int i = 0; same && i < runCount; i++)
+            same = runs[i] == previous[i];
+        if (!same) {
+            flush(row);
+            std::copy(runs, runs + runCount, previous);
+            previousCount = runCount;
+            previousFrom = row;
+        }
     }
+    flush(h);
 }
 } // namespace
 
 void box(int x, int y, int w, int h)
 {
-    roundedFill(x, y, w, h, 8, {248, 248, 248, 255});
-    roundedFill(x + 2, y + 2, w - 4, h - 4, 6, {0, 40, 104, 255});
-    roundedFill(x + 3, y + 3, w - 6, h - 6, 5, {0, 95, 177, 255});
+    layered(x, y, w, h, {{0, 8, {248, 248, 248, 255}}, {2, 6, {0, 40, 104, 255}}, {3, 5, {0, 95, 177, 255}}});
 }
 
 void row(int x, int y, int w, int h, bool selected, bool dim)
 {
-    if (selected) {
-        roundedFill(x, y, w, h, 6, {248, 248, 248, 255});
-        roundedFill(x + 2, y + 2, w - 4, h - 4, 4, dim ? SDL_Color {104, 112, 136, 255} : SDL_Color {32, 144, 232, 255});
-    } else {
-        roundedFill(x, y, w, h, 6, dim ? SDL_Color {56, 64, 88, 255} : SDL_Color {0, 64, 136, 255});
+    if (selected)
+        layered(x, y, w, h, {{0, 6, {248, 248, 248, 255}}, {2, 4, dim ? SDL_Color {104, 112, 136, 255} : SDL_Color {32, 144, 232, 255}}});
+    else
+        layered(x, y, w, h, {{0, 6, dim ? SDL_Color {56, 64, 88, 255} : SDL_Color {0, 64, 136, 255}}});
+}
+
+void footer(const std::vector<prompts::Prompt>& row, const std::string& label)
+{
+    //A dark strip along the bottom of the screen, the prompts from its left
+    prompts::fill(0, 450, 640, 30, {0, 0, 0, 255});
+    prompts::fill(0, 452, 640, 28, {16, 28, 84, 255});
+    int left = 24;
+    if (!label.empty()) {
+        rm->menu_font_small.draw(left, 458, label);
+        left += rm->menu_font_small.getWidth(label) + 14;
     }
+    if (row.empty())
+        return;
+    const int w = prompts::promptsWidth(row, 18);
+    prompts::drawPrompts(left + w / 2, 458, row, 18);
 }
 } // namespace menupanel
 
@@ -78,13 +185,6 @@ void MI_PromptStrip::Draw()
 {
     if (!m_visible || !m_row)
         return;
-    menupanel::box(m_pos.x, m_pos.y - 2, m_w, 34);
-    int left = m_pos.x + 12;
-    if (!m_label.empty()) {
-        theme::font().draw(left, m_pos.y + 6, m_label);
-        left += theme::font().getWidth(m_label) + 14;
-    }
-    const std::vector<prompts::Prompt> row = m_row();
-    const int w = prompts::promptsWidth(row, 14);
-    prompts::drawPrompts(left + w / 2, m_pos.y + 7, row);
+    //(the footer, as on every menu: its place is the bottom of the screen)
+    menupanel::footer(m_row(), m_label);
 }

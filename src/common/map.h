@@ -310,6 +310,15 @@ class CMap
         void AddTemporaryPlatform(MovingPlatform * platform);
 
         const std::vector<MovingPlatform*>& permanentPlatforms() const { return platforms; }
+        /// Any platform drawPlatforms(x, y, layer) draws, on any layer
+        bool hasPlatformsToDraw() const
+        {
+            for (const auto& layer : platformdrawlayer) {
+                if (!layer.empty())
+                    return true;
+            }
+            return false;
+        }
         const sim::list<MovingPlatform*>& temporaryPlatforms() const { return tempPlatforms; }
 
         // Calls fn(void* data, size_t size, const char* name) for each part of

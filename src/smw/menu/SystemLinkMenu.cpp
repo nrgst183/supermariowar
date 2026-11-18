@@ -277,11 +277,7 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
 {
     AddTitleBar(TITLE);
     SetHints(false);    //(its own prompts, at the bottom)
-#ifdef SMW_XBOX
-    const MenuCodeEnum back = MENU_CODE_TO_MAIN_MENU;    //(the Xbox: the main menu opens this one)
-#else
-    const MenuCodeEnum back = MENU_CODE_TO_ONLINE_MENU;
-#endif
+    const MenuCodeEnum back = MENU_CODE_TO_MAIN_MENU;    //(the main menu's Join a game opens it)
 
     m_list = new MI_LanGameList();
     m_list->SetBackCode(back);
@@ -290,7 +286,8 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
         focus(m_host);
     });
 
-    //Under the list: hosting (and on the Xbox, beside it, the run-ahead: there's no Online menu there)
+    //Under the list: hosting, and beside it on a PC joining by address (on the Xbox the run-ahead:
+    //a PC's is in Options > Online)
 #ifdef SMW_XBOX
     m_host = new MI_Button(&rm->spr_selectfield, 64, HOST_Y, "Host a game", 250, TextAlign::CENTER);
     MI_SelectField<short>* runAhead = new MI_SelectField<short>(&rm->spr_selectfield, 326, HOST_Y, "Run-Ahead", 250, 130);
@@ -305,7 +302,9 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
     runAhead->setAutoAdvance(true);
     m_runAhead = runAhead;
 #else
-    m_host = new MI_Button(&rm->spr_selectfield, 170, HOST_Y, "Host a game", 300, TextAlign::CENTER);
+    m_host = new MI_Button(&rm->spr_selectfield, 64, HOST_Y, "Host a game", 250, TextAlign::CENTER);
+    m_joinAddress = new MI_Button(&rm->spr_selectfield, 326, HOST_Y, "Join by address", 250, TextAlign::CENTER);
+    m_joinAddress->SetCode(MENU_CODE_TO_ONLINE_MENU);
 #endif
     m_host->SetCode(MENU_CODE_SYSTEM_LINK_HOST);
 
@@ -325,6 +324,8 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
             if (m_list->Selected())
                 row.push_back(choose);
             row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "host"});
+        } else if (m_joinAddress && m_currentFocus == m_joinAddress) {
+            row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "type an address"});
         } else if (m_runAhead && m_currentFocus == m_runAhead) {
             row.push_back({{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"});
         } else {
@@ -333,7 +334,7 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
         row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"});
         return row;
     });
-    MI_Button* backButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
+    MI_Button* backButton = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
     backButton->SetCode(back);
 
     //(the list takes up and down itself: down from its last game comes to the Host button)
@@ -341,6 +342,9 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
     if (m_runAhead) {
         AddControl(m_host, m_list, nullptr, nullptr, m_runAhead);
         AddControl(m_runAhead, m_list, nullptr, m_host, nullptr);
+    } else if (m_joinAddress) {
+        AddControl(m_host, m_list, nullptr, nullptr, m_joinAddress);
+        AddControl(m_joinAddress, m_list, nullptr, m_host, nullptr);
     } else {
         AddControl(m_host, m_list, nullptr, nullptr, nullptr);
     }

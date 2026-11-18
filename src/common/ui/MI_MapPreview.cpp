@@ -131,8 +131,14 @@ void MI_MapPreview::Draw()
 
     short iMapBoxX = m_pos.x + (iWidth >> 1) - 176 - iSlideListOut;
 
-    //Draw the background for the map preview
-    rm->menu_dialog.draw(iMapBoxX, m_pos.y + 30, {0, 0, 336, 254});
+    //Draw the background for the map preview: its frame (the map, opaque, covers the rest of it: its
+    //background is copied, not blended)
+    if (rectDst.y == m_pos.y + 44) {
+        rm->menu_dialog.draw(iMapBoxX, m_pos.y + 30, {0, 0, 336, 14});
+        rm->menu_dialog.draw(iMapBoxX, m_pos.y + 44, {0, 14, 16, 240});
+    } else {
+        rm->menu_dialog.draw(iMapBoxX, m_pos.y + 30, {0, 0, 336, 254});
+    }
     rm->menu_dialog.draw(iMapBoxX + 336, m_pos.y + 30, {496, 0, 16, 254});
     rm->menu_dialog.draw(iMapBoxX, m_pos.y + 284, {0, 464, 336, 16});
     rm->menu_dialog.draw(iMapBoxX + 336, m_pos.y + 284, {496, 464, 16, 16});
@@ -144,6 +150,32 @@ void MI_MapPreview::Draw()
 
 void MI_MapPreview::DrawContent()
 {
+    //Nothing moving over the map, or between its layers: the three layers in one
+    bool still = !g_map->hasPlatformsToDraw();
+    for (const std::unique_ptr<CObject>& obj : g_sim.objectcontainer[1].list()) {
+        CObject* o = obj.get();
+        if (dynamic_cast<OMO_OrbitHazard*>(o) || dynamic_cast<OMO_StraightPathHazard*>(o) || dynamic_cast<IO_FlameCannon*>(o)
+            || dynamic_cast<MO_BulletBill*>(o) || dynamic_cast<MO_PirhanaPlant*>(o)) {
+            still = false;
+            break;
+        }
+    }
+    if (still) {
+        if (m_layersStale || m_layersTop != game_values.toplayer || !m_layers.getSurface()) {
+            if (!m_layers.getSurface())
+                m_layers = gfxSprite::blank(App::screenWidth / 2, App::screenHeight / 2);
+            SDL_Surface* layers = m_layers.getSurface();
+            surfaceMapBackground.draw(layers, Vec2i {0, 0});
+            surfaceMapBlockLayer.draw(layers, Vec2i {0, 0});
+            if (game_values.toplayer)
+                surfaceMapForeground.draw(layers, Vec2i {0, 0});
+            m_layersStale = false;
+            m_layersTop = game_values.toplayer;
+        }
+        m_layers.draw(blitdest, rectDst);
+        return;
+    }
+
     surfaceMapBackground.draw(blitdest, rectDst);
 
     g_map->drawPlatforms(rectDst.x, rectDst.y, 0);
@@ -237,6 +269,7 @@ void MI_MapPreview::ApplyBackgroundLoad()
             std::swap(surfaceMapBackground, job->background);
             std::swap(surfaceMapBlockLayer, job->blocks);
             std::swap(surfaceMapForeground, job->foreground);
+            m_layersStale = true;
             if (job->backgroundImage.getSurface())
                 setLoadedMapBackground(job->backgroundPath, std::move(job->backgroundImage));
             //The map: the worker's is g_map now (the old one goes with the job)
@@ -275,6 +308,7 @@ void MI_MapPreview::LoadMap(const std::string& szMapPath)
     g_map->preDrawPreviewForeground(surfaceMapForeground, false);
 
     g_map->preDrawPreviewWarps(game_values.toplayer ? surfaceMapForeground : surfaceMapBackground, false);
+    m_layersStale = true;
 
     LoadMapHazards(true);
 }

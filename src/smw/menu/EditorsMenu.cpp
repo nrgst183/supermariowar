@@ -184,7 +184,7 @@ UI_EditorsMenu::UI_EditorsMenu()
                                 {{prompts::Pad::Back}, {}, "leave"}}
                           : std::vector<prompts::Prompt> {{{}, {"Tab"}, "tools"}, {{}, {"F1"}, "help"}, {{}, {"Esc"}, "leave"}};
     }));
-    miBack = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
+    miBack = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
 
     const std::pair<MI_Button*, Action> buttons[] = {{miMaps, Action::Maps}, {miWorlds, Action::Worlds}, {miLocal, Action::Local},
         {miOnline, Action::Online}, {miHost, Action::Host}, {miJoin, Action::Join}, {miStart, Action::Start}, {miBack, Action::None}};

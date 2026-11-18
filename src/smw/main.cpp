@@ -213,7 +213,11 @@ unsigned long long counter(const char* name)
 
 bool inMatch()
 {
-    return cmd::g_autotest.enabled && cmd::g_autotest.perf && GameStateManager::instance().currentState == &GameplayState::instance();
+    //(the menus too, for --at-role menuperf, which reports a screen at a time; otherwise the match
+    //alone: its loading, in the menu, is not the match)
+    const GameState* state = GameStateManager::instance().currentState;
+    const bool menus = cmd::g_autotest.shotsRole == "menuperf";
+    return cmd::g_autotest.enabled && cmd::g_autotest.perf && (state == &GameplayState::instance() || (menus && state == &MenuState::instance()));
 }
 
 void reset()
@@ -509,6 +513,8 @@ void main_game()
     game_values.ReadConfig();
     if (cmd::g_autotest.enabled && cmd::g_autotest.prompts >= 0)
         game_values.buttonprompts = static_cast<short>(cmd::g_autotest.prompts);
+    if (cmd::g_autotest.enabled && cmd::g_autotest.itemRespawn >= 0)
+        game_values.itemrespawntime = static_cast<short>(cmd::g_autotest.itemRespawn);
     if (cmd::g_autotest.enabled && cmd::g_autotest.pad)
         prompts::setLastDevice(prompts::Device::Controller);
     if (cmd::g_autotest.enabled && cmd::g_autotest.colors >= 0)

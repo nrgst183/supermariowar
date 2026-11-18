@@ -18,6 +18,7 @@
 #include "objects/carriable/CO_Bomb.h"
 #include "objects/carriable/CO_Egg.h"
 #include "objects/carriable/CO_Star.h"
+#include "objects/powerup/PU_FeatherPowerup.h"
 
 #include <memory>
 #include <cstdio>
@@ -289,6 +290,21 @@ void CPlayerAI::Think(COutputControl * playerKeys)
             actionType = ACTION_FIGHT;
         else
             actionType = ACTION_GOAL;
+
+        if (improved() && nearestObjects.goalValue >= 0 && nearestObjects.player) {
+            // An item: what we have and what it gives decide. With a star or as a bob-omb we're the
+            // danger: after them (an item can wait). Unarmed, a strong item (a star, a weapon) is
+            // worth getting first unless they're right on us; a weak one not if they're close.
+            const bool strong = pPlayer->isInvincible() || pPlayer->bobomb;
+            const int value = nearestObjects.goalValue;
+            if (strong)
+                actionType = ACTION_FIGHT;
+            else if (value >= 60 && pPlayer->powerup <= 0 && !strong && nearestObjects.playerdistance >= 48 * 48 &&
+                     nearestObjects.goaldistance < nearestObjects.playerdistance * 4)
+                actionType = ACTION_GOAL;
+            else if (value < 30 && nearestObjects.playerdistance < 120 * 120)
+                actionType = ACTION_FIGHT;
+        }
     } else {
         actionType = ACTION_FIGHT;
     }
@@ -706,7 +722,30 @@ void CPlayerAI::AvoidJumpingIntoDeath(COutputControl * playerKeys, short iy, sho
 // Think(): the power-up kept in the item box, used when it helps now
 void CPlayerAI::UseStoredPowerup(COutputControl * playerKeys, PowerupType powerup, MO_CarriedObject * carriedItem, short iTeamID)
 {
-    const auto canUse = [this, carriedItem, iTeamID](PowerupType powerup) -> bool {
+    // The opponents a POW (on the ground) or a MOd (in the air) would get now: their shake kills
+    // whoever is so while it lasts
+    const auto shakeWouldHit = [this, iTeamID](bool inAir) -> bool {
+        for (CPlayer* other : g_sim.players) {
+            if (!other || other == pPlayer || !other->isready() || other->IsInvincibleOnBottom())
+                continue;
+            if (game_values.teamcollision != TeamCollisionStyle::On && other->teamID == iTeamID)
+                continue;
+            if (other->inair == inAir)
+                return true;
+        }
+        return false;
+    };
+    const auto canUse = [this, carriedItem, iTeamID, &shakeWouldHit](PowerupType powerup) -> bool {
+        if (improved()) {
+            switch (powerup) {
+                case PowerupType::Pow:
+                    return shakeWouldHit(false);
+                case PowerupType::Mod:
+                    return shakeWouldHit(true);
+                default:
+                    break;
+            }
+        }
         switch (powerup) {
             case PowerupType::PoisonMushroom:
                 return false;
@@ -946,19 +985,36 @@ void CPlayerAI::HitGoalBlock(COutputControl * playerKeys, short ix, short iy)
 void CPlayerAI::GoForGoal(COutputControl * playerKeys, short ix, short iy, MO_CarriedObject * carriedItem)
 {
     CObject * goal = nearestObjects.goal;
-    const int goalX = goal->x() + goal->w() / 2;
-    const int goalY = goal->y() + goal->h() / 2;
+    int goalX = goal->x() + goal->w() / 2;
+    int goalY = goal->y() + goal->h() / 2;
+    // An item: where it will be (a feather sways, a star slides)
+    int leftX = goal->x();
+    if (improved() && nearestObjects.goalValue >= 0) {
+        ItemAimPoint(goal, goalX, goalY);
+        leftX = goalX - goal->w() / 2;
+    }
+    // (the wrap as the scan found it, unless aiming ahead took us across the middle)
+    bool wrap = nearestObjects.goalwrap;
+    if (leftX != goal->x()) {
+        const int d = leftX - ix;
+        wrap = (d > App::screenWidth / 2 || d < -App::screenWidth / 2) && ainav::CanCrossEdge(iy, goalY);
+    }
 
     if (improvedFighting() && (NeedsPath(goalX, goalY) || (pPlayer->inair && navMove != 0)) && NavigateTo(playerKeys, goalX, goalY)) {
         //Following the path to it
-    } else if ((goal->x() > ix && nearestObjects.goalwrap) || (goal->x() < ix && !nearestObjects.goalwrap))
+    } else if ((leftX > ix && wrap) || (leftX < ix && !wrap))
         playerKeys->game_left.fDown = true;
     else
         playerKeys->game_right.fDown = true;
 
-    if (goal->y() <= iy && goal->x() - ix < 45 && goal->x() - ix > -45) {
-        playerKeys->game_jump.fDown = true;
-    } else if (goal->y() > iy && goal->x() - ix < 45 && goal->x() - ix > -45) {
+    // Under it: jump up to it (an item rising out of its block can't be taken yet, and a feather
+    // up high comes down to us: no point jumping at those); over it: drop down to it
+    const bool notYet = improved() && nearestObjects.goalValue >= 0 &&
+        (goal->GetState() == 0 || (dynamic_cast<PU_FeatherPowerup*>(goal) && goal->y() < iy - 100));
+    if (goal->y() <= iy && leftX - ix < 45 && leftX - ix > -45) {
+        if (!notYet)
+            playerKeys->game_jump.fDown = true;
+    } else if (goal->y() > iy && leftX - ix < 45 && leftX - ix > -45) {
         if (!pPlayer->inair) playerKeys->game_down.fDown = true;
     }
 

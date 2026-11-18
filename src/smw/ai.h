@@ -54,6 +54,7 @@ public:
         playerwrap = false;
         goalwrap = false;
         goalIsBlock = false;
+        goalValue = -1;
         stompwrap = false;
         teammatewrap = false;
         threatwrap = false;
@@ -76,6 +77,7 @@ public:
     bool teammatewrap;
     bool goalwrap;
     bool goalIsBlock;   // the goal is a ? block to hit from below (the spot under it: goalSpotRow)
+    short goalValue;    // the goal is an item worth this much to us now (CPlayerAI::ItemValue), -1 if not one
     int goalSpotRow;
     bool stompwrap;
     bool threatwrap;
@@ -119,7 +121,17 @@ public:
     void ScanFrontLayerObjects();
     void ScanPlayers();
     void ScanPowerupBlocks();
-    void DistanceToObject(CObject * object, CObject ** target, int * nearest, bool * wrap);
+    void DistanceToObject(CObject * object, CObject ** target, int * nearest, bool * wrap, int weightPct = 100);
+public:
+    /// What an item lying about is worth to this player now, 0..100 (-1: not an item): what it does
+    /// (a star, a weapon, the attack items kept for later, a mode's own items), what we have already
+    /// (the same weapon again only goes to the reserve) and the game mode (a heart only counts in
+    /// Health). Bad ones (the secret items: wind, spinning screen, reversed controls) are worth 0.
+    short ItemValue(const CObject* item) const;
+    /// Where an item will be by the time we get there: a feather or leaf sways about the middle of
+    /// its float, one sliding along keeps going
+    void ItemAimPoint(const CObject* item, int& x, int& y) const;
+private:
     void DistanceToObjectCenter(CObject * object, CObject ** target, int * nearest, bool * wrap);
     void DistanceToPlayer(CPlayer * player, CPlayer ** target, int * nearest, bool * wrap);
     void AimWeapon(COutputControl * playerKeys, Action actionType);

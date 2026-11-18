@@ -12,18 +12,25 @@ template <typename T> class MI_SelectField;
 class MI_WrappedText;
 class MI_PromptStrip;
 
+class MI_HeaderText;
+class MI_MenuPanel;
+
 /*
-    The entry of the online (rollback netplay) mode: your nickname and run-ahead, hosting a lobby
-    on a port and joining one by address (or the LAN games: the System Link menu, which hosts too).
-    Not on the Xbox: its main menu opens the System Link menu. Errors of hosting and joining are
-    shown at the bottom.
+    Two pages of the online (rollback netplay) mode, outside the lobby:
+    - Settings (Options > Online): your nickname, run-ahead, and the port you host on
+    - Join (the games list's "Join by address"): the address of a game that isn't on this network
+    Hosting and joining the games on the network are the games list's (SystemLinkMenu.h); a local
+    game's lobby is opened to the others by its Who can join. Errors of joining are shown here.
 */
 class UI_OnlineMenu : public UI_Menu {
 public:
+    enum class Mode { Settings, Join };
+
     UI_OnlineMenu();
 
-    /// Shows the remembered nickname, port and address again (when the menu is opened)
-    void Open();
+    /// Shows the page, with the remembered nickname, port and address
+    void Open(Mode mode);
+    Mode mode() const { return m_mode; }
 
     void ShowMessage(std::string text);
     void ClearMessage();
@@ -34,14 +41,22 @@ public:
     int port() const;
 
 private:
+    void ShowMode(Mode mode);
+
+    Mode m_mode = Mode::Join;
+    MI_HeaderText* miTitle;
+
+    MI_MenuPanel* miYouPanel;
+    MI_MenuPanel* miHostPanel;
     MI_TextField* miNameField;
     MI_SelectField<short>* miRunAheadField;
     MI_TextField* miPortField;
-    MI_Button* miHostButton;
+    MI_Button* miSettingsBack;
+
+    MI_MenuPanel* miJoinPanel;
     MI_TextField* miAddressField;
     MI_Button* miJoinButton;
-    MI_Button* miFindGamesButton = nullptr;    // the system link / LAN games menu (builds with the network)
-    MI_Button* miBackButton;
+    MI_Button* miJoinBack;
 
     MI_WrappedText* miMessage;
     MI_PromptStrip* miPrompts;

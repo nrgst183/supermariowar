@@ -77,7 +77,7 @@ private:
     MI_SelectField<short>* miKickWho = nullptr;
     MI_LobbyButton* miKickButton = nullptr;
     MI_LobbyButton* miOptionsDone = nullptr;
-    MI_LockTag* miHostTag[5] {};
+    MI_LockTag* miHostTag[4] {};
 
     MI_Image* miDialogImage = nullptr;
     MI_Text* miDialogLine1 = nullptr;

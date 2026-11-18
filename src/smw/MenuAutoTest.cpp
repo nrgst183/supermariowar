@@ -849,6 +849,63 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
+    //--at-role menuperf (with --at-perf 1): each menu screen in turn, its drawing measured over 240
+    //ticks ("perf:" lines, the map: menu:<screen>)
+    if (at.shotsRole == "menuperf" && step == 1) {
+        struct Screen { MenuCodeEnum code; const char* name; };
+        static const Screen SCREENS[] = {{MENU_CODE_NONE, "main"}, {MENU_CODE_TO_OPTIONS_MENU, "options"},
+            {MENU_CODE_TO_ONLINE_OPTIONS_MENU, "online_options"}, {MENU_CODE_TO_GRAPHICS_OPTIONS_MENU, "graphics_options"},
+            {MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU, "gameplay_options"}, {MENU_CODE_TO_POWERUP_SELECTION_MENU, "item_selection"},
+            {MENU_CODE_TO_MAIN_MENU, "main_again"}, {MENU_CODE_TO_SYSTEM_LINK_MENU, "games_list"},
+            {MENU_CODE_TO_ONLINE_MENU, "join_by_address"}, {MENU_CODE_TO_MAIN_MENU, "main_3"},
+            {MENU_CODE_TO_HISTORY_MENU, "history"}, {MENU_CODE_TO_MAIN_MENU, "main_4"},
+            {MENU_CODE_TO_CONTROLS_MENU, "controls"}, {MENU_CODE_TO_MAIN_MENU, "main_5"},
+            {MENU_CODE_TO_LOCAL_LOBBY, "lobby"}, {MENU_CODE_ONLINE_OPTIONS, "lobby_options"},
+            {MENU_CODE_ONLINE_OPTIONS_BACK, "lobby_cpus"}, {MENU_CODE_ONLINE_MATCH_SETTINGS, "match_type"},
+            {MENU_CODE_MATCH_SELECTION_START, "game_settings"}};
+        constexpr int HOLD = 260;
+        const int index = (t - 1) / HOLD;
+        const int at = (t - 1) % HOLD;
+        if (index >= static_cast<int>(sizeof(SCREENS) / sizeof(SCREENS[0]))) {
+            step = 1000;
+            t = 0;
+            return MENU_CODE_NONE;
+        }
+        if (at == 0)
+            return SCREENS[index].code;
+        if (at == 1 && SCREENS[index].code == MENU_CODE_ONLINE_OPTIONS && rollback::NetGame::instance().lobby())
+            rollback::NetGame::instance().lobby()->setCpuCount(2);
+        if (at == 20)
+            perfstats::reset();
+        if (at == HOLD - 1)
+            perfstats::report(std::string("menu:") + SCREENS[index].name, -1);
+#if defined(__linux__)
+        //(work/perf/blitwho counts while BLITWHO_ON is set: MENUPERF_SCREEN=<name> counts that screen alone)
+        if (const char* only = getenv("MENUPERF_SCREEN")) {
+            if (at == 20 && std::string(only) == SCREENS[index].name)
+                setenv("BLITWHO_ON", "1", 1);
+            if (at == HOLD - 1)
+                unsetenv("BLITWHO_ON");
+        }
+#endif
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role options: the options menu, and its Online page
+    if (at.shotsRole == "options" && step == 1) {
+        switch (t) {
+            case 1: return MENU_CODE_TO_OPTIONS_MENU;
+            case 20: shot("p1_options_menu"); break;
+            case 25: return MENU_CODE_TO_ONLINE_OPTIONS_MENU;
+            case 45:
+                shot("p2_online_options");
+                step = 1000;
+                t = 0;
+                break;
+        }
+        return MENU_CODE_NONE;
+    }
+
     //--at-role graphics: the graphics options menu
     if (at.shotsRole == "graphics" && step == 1) {
         if (t == 1)

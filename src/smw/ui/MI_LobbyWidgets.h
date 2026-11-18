@@ -156,6 +156,8 @@ public:
     void SetSettingsNote(std::string note) { m_note = std::move(note); }
     /// The buttons row (y 352): the controller's buttons or the keys of what can be done
     void SetPrompts(std::vector<prompts::Prompt> row) { m_prompts = std::move(row); }
+    /// The options page: a panel under its fields
+    void SetOptionsPage(bool options) { m_optionsPage = options; }
 
 private:
     LobbyRect m_statusRect;
@@ -167,6 +169,7 @@ private:
     Tone m_tone = Tone::Info;
     std::vector<prompts::Prompt> m_prompts;
     bool m_joining = false;
+    bool m_optionsPage = false;
     int m_tick = 0;
     int m_joinTicks = 0;    //(frames since the "connecting" screen came up)
 };

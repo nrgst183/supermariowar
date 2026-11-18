@@ -29,6 +29,7 @@ private:
     MI_Button* miEyeCandyOptionsMenuButton;
     MI_Button* miSoundOptionsMenuButton;
     MI_Button* miGenerateMapThumbsButton;
+    MI_Button* miOnlineOptionsMenuButton = nullptr;    // Options > Online (builds with the network, not the Xbox)
 
     MI_Button* miOptionsMenuBackButton;
 

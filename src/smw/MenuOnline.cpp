@@ -181,7 +181,7 @@ void MenuState::LeaveOnlineLobby(const std::string& message)
         mCurrentMenu = mSystemLinkMenu.get();
         return;
     }
-    mOnlineMenu->Open();
+    mOnlineMenu->Open(UI_OnlineMenu::Mode::Join);
     mOnlineMenu->ShowMessage(message);
     mCurrentMenu = mOnlineMenu.get();
 }

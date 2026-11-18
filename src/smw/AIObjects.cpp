@@ -8,6 +8,30 @@
 #include "gamemodes/Star.h"
 #include "objects/IO_FlameCannon.h"
 #include "objects/blocks/PowerupBlock.h"
+#include "objects/powerup/PU_BobombPowerup.h"
+#include "objects/powerup/PU_BombPowerup.h"
+#include "objects/powerup/PU_BoomerangPowerup.h"
+#include "objects/powerup/PU_BulletBillPowerup.h"
+#include "objects/powerup/PU_ClockPowerup.h"
+#include "objects/powerup/PU_CoinPowerup.h"
+#include "objects/powerup/PU_ExtraGuyPowerup.h"
+#include "objects/powerup/PU_ExtraHeartPowerup.h"
+#include "objects/powerup/PU_ExtraTimePowerup.h"
+#include "objects/powerup/PU_FeatherPowerup.h"
+#include "objects/powerup/PU_FirePowerup.h"
+#include "objects/powerup/PU_HammerPowerup.h"
+#include "objects/powerup/PU_IceWandPowerup.h"
+#include "objects/powerup/PU_JailKeyPowerup.h"
+#include "objects/powerup/PU_LeafPowerup.h"
+#include "objects/powerup/PU_ModPowerup.h"
+#include "objects/powerup/PU_MysteryMushroomPowerup.h"
+#include "objects/powerup/PU_PodoboPowerup.h"
+#include "objects/powerup/PU_PowPowerup.h"
+#include "objects/powerup/PU_PWingsPowerup.h"
+#include "objects/powerup/PU_SecretPowerup.h"
+#include "objects/powerup/PU_StarPowerup.h"
+#include "objects/powerup/PU_Tanooki.h"
+#include "objects/powerup/PU_TreasureChestBonus.h"
 
 #include "objects/moving/MO_Boomerang.h"
 #include "objects/moving/MO_CollectionCard.h"
@@ -45,6 +69,103 @@ void CPlayerAI::GetNearestObjects()
     ScanFrontLayerObjects();
     ScanPlayers();
     ScanPowerupBlocks();
+
+    if (nearestObjects.goal && !nearestObjects.goalIsBlock)
+        nearestObjects.goalValue = ItemValue(nearestObjects.goal);
+}
+
+short CPlayerAI::ItemValue(const CObject* item) const
+{
+    const auto* moving = dynamic_cast<const IO_MovingObject*>(item);
+    if (!moving || moving->getMovingObjectType() != movingobject_powerup)
+        return -1;
+
+    const short have = pPlayer->powerup;
+    const bool reserveFree = game_values.gamepowerups[pPlayer->globalID] < 0;
+    const GameModeType mode = game_values.gamemode ? static_cast<GameModeType>(game_values.gamemode->gamemode) : game_mode_classic;
+    // What a suit or weapon (powerup 1..8) is worth: full if we have none, little if it's ours
+    // already (it only fills the reserve), some if it replaces another (that goes to the reserve)
+    auto held = [&](short which, short worth) -> short {
+        if (have == which)
+            return reserveFree ? 20 : 5;
+        if (have > 0)
+            return static_cast<short>(worth * 2 / 3);
+        return worth;
+    };
+    // The items kept in the reserve until used (clock, POW, MOd, bullet bill, podoboo, shells)
+    auto kept = [&](short worth) -> short {
+        return reserveFree ? worth : static_cast<short>(worth / 4);
+    };
+
+    if (dynamic_cast<const PU_StarPowerup*>(item))
+        return pPlayer->isInvincible() ? 15 : 100;
+    if (dynamic_cast<const PU_HammerPowerup*>(item))
+        return held(2, 75);
+    if (dynamic_cast<const PU_FirePowerup*>(item))
+        return held(1, 65);
+    if (dynamic_cast<const PU_BoomerangPowerup*>(item))
+        return held(4, 65);
+    if (dynamic_cast<const PU_IceWandPowerup*>(item))
+        return held(5, 60);
+    if (dynamic_cast<const PU_BombPowerup*>(item))
+        return held(6, 60);
+    if (dynamic_cast<const PU_LeafPowerup*>(item))      //(a feather too: first)
+        return held(7, 55);
+    if (dynamic_cast<const PU_FeatherPowerup*>(item))
+        return held(3, 55);
+    if (dynamic_cast<const PU_PWingsPowerup*>(item))
+        return held(8, 60);
+    if (dynamic_cast<const PU_Tanooki*>(item))
+        return pPlayer->tanookisuit.isOn() ? kept(20) : 65;
+    if (dynamic_cast<const PU_BobombPowerup*>(item))
+        return pPlayer->bobomb ? kept(20) : 55;
+    if (dynamic_cast<const PU_ClockPowerup*>(item) || dynamic_cast<const PU_PowPowerup*>(item))
+        return kept(70);
+    if (dynamic_cast<const PU_ModPowerup*>(item) || dynamic_cast<const PU_BulletBillPowerup*>(item))
+        return kept(65);
+    if (dynamic_cast<const PU_PodoboPowerup*>(item))
+        return kept(55);
+    if (dynamic_cast<const PU_ExtraGuyPowerup*>(item))
+        return 50;
+    if (dynamic_cast<const PU_ExtraHeartPowerup*>(item))
+        return mode == game_mode_health ? 80 : 5;
+    if (dynamic_cast<const PU_ExtraTimePowerup*>(item))
+        return mode == game_mode_timelimit || mode == game_mode_star ? 40 : 5;
+    if (dynamic_cast<const PU_CoinPowerup*>(item))
+        return mode == game_mode_coins || mode == game_mode_greed ? 85 : 5;
+    if (dynamic_cast<const PU_JailKeyPowerup*>(item))
+        return pPlayer->jail.isActive() ? 95 : (reserveFree && mode == game_mode_jail ? 40 : 10);
+    if (dynamic_cast<const PU_MysteryMushroomPowerup*>(item))
+        return 25;
+    if (dynamic_cast<const PU_SecretPowerup*>(item))
+        return 0;
+    if (dynamic_cast<const PU_TreasureChestBonus*>(item))
+        return 60;
+    return 40;
+}
+
+void CPlayerAI::ItemAimPoint(const CObject* item, int& x, int& y) const
+{
+    x = item->x() + item->w() / 2;
+    y = item->y() + item->h() / 2;
+    if (const auto* feather = dynamic_cast<const PU_FeatherPowerup*>(item)) {
+        // It rises out of its block, then sways 45 pixels either side of a middle while sinking:
+        // under the middle we're where it comes back to
+        x = static_cast<int>(feather->swayCenterX()) + item->w() / 2;
+        return;
+    }
+    const auto* moving = dynamic_cast<const IO_MovingObject*>(item);
+    if (!moving || moving->velX() == 0.0f)
+        return;
+    // Sliding along (a star, a 1-up, a mystery mushroom): where it'll be when we get there, at
+    // our running speed (not further ahead than a second: it bounces off walls)
+    int dx = ainav::HorizontalDistance(x - (pPlayer->ix + PW / 2), pPlayer->iy, y);
+    const float closing = VELMOVING + ((dx > 0) == (moving->velX() < 0.0f) ? std::abs(moving->velX()) : -std::abs(moving->velX()) * 0.5f);
+    int ticks = static_cast<int>(std::abs(dx) / std::max(closing, 1.0f));
+    if (ticks > 60)
+        ticks = 60;
+    x += static_cast<int>(moving->velX() * static_cast<float>(ticks));
+    x = ((x % App::screenWidth) + App::screenWidth) % App::screenWidth;
 }
 
 // GetNearestObjects(): the middle layer's objects (most items and enemies)
@@ -274,7 +395,18 @@ void CPlayerAI::ScanBackLayerObjects()
                 continue;
 
             if (movingobject_powerup == movingtype) {
-                DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
+                if (!improved()) {
+                    DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap);
+                } else {
+                    // As far away as it is, but further the less it's worth to us now (a weapon we
+                    // have already twice as far as a star): never nearer than it is, which would put
+                    // it ahead of the game's goals (flags, coins, zones). None we're better off without.
+                    const short value = ItemValue(movingobject);
+                    if (value <= 0)
+                        continue;
+                    const int weight = std::clamp(10000 / value, 100, 400);
+                    DistanceToObject(movingobject, &nearestObjects.goal, &nearestObjects.goaldistance, &nearestObjects.goalwrap, weight);
+                }
             } else if ((movingobject_fireball == movingtype && (static_cast<MO_Fireball*>(movingobject))->iTeamID != iTeamID)
                       || movingobject_poisonpowerup == movingtype) {
                 if (fInvincible)
@@ -485,7 +617,7 @@ void CPlayerAI::ScanPowerupBlocks()
     }
 }
 
-void CPlayerAI::DistanceToObject(CObject * object, CObject ** target, int * nearest, bool * wrap)
+void CPlayerAI::DistanceToObject(CObject * object, CObject ** target, int * nearest, bool * wrap, int weightPct)
 {
     //Calculate normal screen
     short tx = object->x() - pPlayer->ix;
@@ -501,6 +633,8 @@ void CPlayerAI::DistanceToObject(CObject * object, CObject ** target, int * near
     }
 
     int distance_player_pow2 = tx*tx + ty*ty;    // a^2 = b^2 + c^2 :)
+    if (weightPct != 100)
+        distance_player_pow2 = static_cast<int>(static_cast<long long>(distance_player_pow2) * weightPct / 100);
 
     if (distance_player_pow2 < *nearest) {
         *target = object;

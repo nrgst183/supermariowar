@@ -1,5 +1,17 @@
 #include "movingplatform.h"
 
+#include <algorithm>
+
+namespace {
+//The Xbox copies a platform's opaque tiles (see drawOpaque); a PC's SDL draws them keyed as fast
+//(build with SMW_COPY_OPAQUE_PLATFORMS to try the Xbox's way on a PC)
+#if defined(SMW_XBOX) || defined(SMW_COPY_OPAQUE_PLATFORMS)
+constexpr bool kCopyOpaqueParts = true;
+#else
+constexpr bool kCopyOpaqueParts = false;
+#endif
+}
+
 #include "gfx.h"
 #include "IO_Block.h"
 #include "Game.h"
@@ -99,39 +111,73 @@ MovingPlatform::MovingPlatform(const std::vector<TilesetTile>& tiledata, const s
         }
     }
 
-    rSrcRect.x = 0;
-    rSrcRect.y = 0;
-    rSrcRect.w = w * iTileSize;
-    rSrcRect.h = h * iTileSize;
-
-    //The tiles drawn: runs of tiles in each row, rows with the same runs merged
-    std::vector<SDL_Rect> rowRuns;
-    for (short iRow = 0; iRow < iTileHeight; iRow++) {
-        rowRuns.clear();
-        for (short iCol = 0; iCol < iTileWidth; iCol++) {
-            if (iTileData[iCol * iTileHeight + iRow].iID == TILESETNONE)
-                continue;
-            if (!rowRuns.empty() && rowRuns.back().x + rowRuns.back().w == iCol * iTileSize)
-                rowRuns.back().w += iTileSize;
-            else
-                rowRuns.push_back({iCol * iTileSize, iRow * iTileSize, iTileSize, iTileSize});
+    //Which tiles are opaque all over (the Xbox's: see drawOpaque): static ones (an animated tile's
+    //frames change it) without a pixel of the color key on either surface
+    std::vector<bool> opaque(iTileData.size(), false);
+    if (kCopyOpaqueParts) {
+        SDL_Surface* surfaces[2] = {sprites[0].getSurface(), sprites[1].getSurface()};
+        const Uint32 key = surfaces[0] ? SDL_MapSurfaceRGB(surfaces[0], 255, 0, 255) & 0x00FFFFFFu : 0;
+        const bool locked = surfaces[0] && surfaces[1] && SDL_LockSurface(surfaces[0]) && SDL_LockSurface(surfaces[1]);
+        for (short iCol = 0; locked && iCol < iTileWidth; iCol++) {
+            for (short iRow = 0; iRow < iTileHeight; iRow++) {
+                const TilesetTile& tile = iTileData[iCol * iTileHeight + iRow];
+                if (tile.iID == TILESETNONE || tile.iID == TILESETANIMATED)
+                    continue;
+                bool all = true;
+                for (SDL_Surface* surface : surfaces) {
+                    for (int y = iRow * iTileSize; all && y < (iRow + 1) * iTileSize && y < surface->h; y++) {
+                        const Uint32* row = reinterpret_cast<const Uint32*>(static_cast<const Uint8*>(surface->pixels) + y * surface->pitch);
+                        for (int x = iCol * iTileSize; x < (iCol + 1) * iTileSize && x < surface->w; x++) {
+                            if ((row[x] & 0x00FFFFFFu) == key) {
+                                all = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                opaque[iCol * iTileHeight + iRow] = all;
+            }
         }
-        //(the same columns as the rows just above: those get taller)
-        size_t above = 0;
-        while (above < drawParts.size() && drawParts[drawParts.size() - 1 - above].y + drawParts[drawParts.size() - 1 - above].h == iRow * iTileSize)
-            above++;
-        bool same = above == rowRuns.size() && above > 0;
-        for (size_t i = 0; same && i < above; i++) {
-            const SDL_Rect& a = drawParts[drawParts.size() - above + i];
-            same = a.x == rowRuns[i].x && a.w == rowRuns[i].w;
-        }
-        if (same) {
-            for (size_t i = 0; i < above; i++)
-                drawParts[drawParts.size() - above + i].h += iTileSize;
-        } else {
-            drawParts.insert(drawParts.end(), rowRuns.begin(), rowRuns.end());
+        if (locked) {
+            SDL_UnlockSurface(surfaces[0]);
+            SDL_UnlockSurface(surfaces[1]);
         }
     }
+
+    //The tiles drawn: runs of tiles in each row, rows with the same runs merged (the opaque ones and
+    //the rest apart)
+    const auto buildParts = [&](std::vector<SDL_Rect>& parts, bool wantOpaque) {
+        std::vector<SDL_Rect> rowRuns;
+        for (short iRow = 0; iRow < iTileHeight; iRow++) {
+            rowRuns.clear();
+            for (short iCol = 0; iCol < iTileWidth; iCol++) {
+                const size_t at = iCol * iTileHeight + iRow;
+                if (iTileData[at].iID == TILESETNONE || opaque[at] != wantOpaque)
+                    continue;
+                if (!rowRuns.empty() && rowRuns.back().x + rowRuns.back().w == iCol * iTileSize)
+                    rowRuns.back().w += iTileSize;
+                else
+                    rowRuns.push_back({iCol * iTileSize, iRow * iTileSize, iTileSize, iTileSize});
+            }
+            //(the same columns as the rows just above: those get taller)
+            size_t above = 0;
+            while (above < parts.size() && parts[parts.size() - 1 - above].y + parts[parts.size() - 1 - above].h == iRow * iTileSize)
+                above++;
+            bool same = above == rowRuns.size() && above > 0;
+            for (size_t i = 0; same && i < above; i++) {
+                const SDL_Rect& r = parts[parts.size() - above + i];
+                same = r.x == rowRuns[i].x && r.w == rowRuns[i].w;
+            }
+            if (same) {
+                for (size_t i = 0; i < above; i++)
+                    parts[parts.size() - above + i].h += iTileSize;
+            } else {
+                parts.insert(parts.end(), rowRuns.begin(), rowRuns.end());
+            }
+        }
+    };
+    buildParts(drawParts, false);
+    buildParts(drawOpaque, true);
 
     fVelX = pPath->velocity0().x;
     fVelY = pPath->velocity0().y;
@@ -215,17 +261,28 @@ void MovingPlatform::draw()
         //where they show (a platform as wide as the screen can show on both sides)
         SDL_Surface* surface = sprites[1 - g_iCurrentDrawIndex].getSurface();
         const int w = App::screenWidth;
-        for (const SDL_Rect& part : drawParts) {
-            const int x = rDstRect.x + part.x;
-            const int y = rDstRect.y + part.y;
-            for (const int at : {x, x - w, x + w}) {
-                if (at >= w || at + part.w <= 0)
-                    continue;
-                SDL_Rect src = part;
-                SDL_Rect dst = {at, y, part.w, part.h};
-                SDL_BlitSurface(surface, &src, blitdest, &dst);
+        const auto drawAll = [&](const std::vector<SDL_Rect>& parts) {
+            for (const SDL_Rect& part : parts) {
+                const int x = rDstRect.x + part.x;
+                const int y = rDstRect.y + part.y;
+                for (const int at : {x, x - w, x + w}) {
+                    if (at >= w || at + part.w <= 0)
+                        continue;
+                    SDL_Rect src = part;
+                    SDL_Rect dst = {at, y, part.w, part.h};
+                    SDL_BlitSurface(surface, &src, blitdest, &dst);
+                }
             }
+        };
+        //(the opaque parts copied: without the color key, a memcpy)
+        if (!drawOpaque.empty()) {
+            Uint32 key = 0;
+            SDL_GetSurfaceColorKey(surface, &key);
+            SDL_SetSurfaceColorKey(surface, false, 0);
+            drawAll(drawOpaque);
+            SDL_SetSurfaceColorKey(surface, true, key);
         }
+        drawAll(drawParts);
     }
 }
 

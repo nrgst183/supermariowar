@@ -44,56 +44,57 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     miScene = new MI_LobbyScene();
 
     // The team and character selection, with the buttons where the original has "Continue"
-    miTeam = new MI_OnlineTeamSelect(112, 96);
+    miTeam = new MI_OnlineTeamSelect(112, 78);
     miTeam->SetAutoModify(true);
-    miOptionsButton = new MI_LobbyButton(&rm->spr_selectfield, 108, 318, "Options", 200, false);
-    miOptionsButton->SetCode(MENU_CODE_ONLINE_OPTIONS);
-    miContinueButton = new MI_LobbyButton(&rm->spr_selectfield, 332, 318, "Continue", 200, true);
-    miContinueButton->SetCode(MENU_CODE_ONLINE_MATCH_SETTINGS);
-
-    // The options page: who can join, the players, and the settings that are rarely touched
-    miWhoCanJoin = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 92, "Who can join", FIELD_W, FIELD_INDENT);
-    miWhoCanJoin->add("Nobody (local game)", static_cast<short>(rollback::LobbyAccess::Nobody));
+    // Under it: who can join (the lobby is local until it's opened to the others), the options
+    // and Continue
+    miWhoCanJoin = new MI_SelectField<short>(&rm->spr_selectfield, 40, 298, "Lobby", 238, 98);
+    miWhoCanJoin->add("Local only", static_cast<short>(rollback::LobbyAccess::Nobody));
 #ifndef NETWORK_DISABLED
 #ifdef SMW_XBOX
     miWhoCanJoin->add("System link", static_cast<short>(rollback::LobbyAccess::Lan));
 #else
-    miWhoCanJoin->add("Your network (LAN)", static_cast<short>(rollback::LobbyAccess::Lan));
-    miWhoCanJoin->add("Anyone (internet)", static_cast<short>(rollback::LobbyAccess::Internet));
+    miWhoCanJoin->add("LAN", static_cast<short>(rollback::LobbyAccess::Lan));
+    miWhoCanJoin->add("Internet", static_cast<short>(rollback::LobbyAccess::Internet));
 #endif
 #endif
     miWhoCanJoin->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
+    miOptionsButton = new MI_LobbyButton(&rm->spr_selectfield, 290, 298, "Options", 140, false);
+    miOptionsButton->SetCode(MENU_CODE_ONLINE_OPTIONS);
+    miContinueButton = new MI_LobbyButton(&rm->spr_selectfield, 442, 298, "Continue", 158, true);
+    miContinueButton->SetCode(MENU_CODE_ONLINE_MATCH_SETTINGS);
 
-    miLocalPlayers = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 128, "My players", FIELD_W, FIELD_INDENT);
+    // The options page: the players, and the settings that are rarely touched
+    miLocalPlayers = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 110, "My players", FIELD_W, FIELD_INDENT);
     for (short n = 1; n <= rollback::MAX_LOCAL_PLAYERS; n++)
         miLocalPlayers->add(std::to_string(n), n);
     miLocalPlayers->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
 
-    miCpuPlayers = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 164, "CPU players", FIELD_W, FIELD_INDENT);
+    miCpuPlayers = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 146, "CPU players", FIELD_W, FIELD_INDENT);
     for (short n = 0; n <= 3; n++)
         miCpuPlayers->add(std::to_string(n), n);
     miCpuPlayers->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
 
-    miInputDelay = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 200, "Input delay", FIELD_W, FIELD_INDENT);
+    miInputDelay = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 182, "Input delay", FIELD_W, FIELD_INDENT);
     miInputDelay->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
     RebuildDelayItems(2);
 
-    miEveryone = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 236, "Match settings", FIELD_W, FIELD_INDENT);
+    miEveryone = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 218, "Match settings", FIELD_W, FIELD_INDENT);
     miEveryone->add("Host only", 0);
     miEveryone->add("Everyone can change", 1);
     miEveryone->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
 
-    miKickWho = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 272, "Kick player", FIELD_W, FIELD_INDENT);
+    miKickWho = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 254, "Kick player", FIELD_W, FIELD_INDENT);
     miKickWho->add("-", -1);
 
-    miKickButton = new MI_LobbyButton(&rm->spr_selectfield, FIELD_X, 310, "Kick", 200, false);
+    miKickButton = new MI_LobbyButton(&rm->spr_selectfield, FIELD_X, 292, "Kick", 200, false);
     miKickButton->SetCode(MENU_CODE_ONLINE_KICK);
-    miOptionsDone = new MI_LobbyButton(&rm->spr_selectfield, static_cast<short>(FIELD_X + FIELD_W - 200), 310, "Back", 200, true);
+    miOptionsDone = new MI_LobbyButton(&rm->spr_selectfield, static_cast<short>(FIELD_X + FIELD_W - 200), 292, "Back", 200, true);
     miOptionsDone->SetCode(MENU_CODE_ONLINE_OPTIONS_BACK);
 
     // What only the host can change says so
-    const short tagY[5] = {100, 172, 208, 244, 280};
-    for (int i = 0; i < 5; i++)
+    const short tagY[4] = {154, 190, 226, 262};
+    for (int i = 0; i < 4; i++)
         miHostTag[i] = new MI_LockTag(FIELD_X + FIELD_W - 16, tagY[i], "Host");
 
     // Confirmation dialog (leave the lobby, kick a player)
@@ -109,13 +110,13 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
 
     // Team page: the selection, and below it the buttons (down from the selection once ready)
     AddControl(miTeam, nullptr, miContinueButton, nullptr, nullptr);
-    AddControl(miOptionsButton, miTeam, nullptr, nullptr, miContinueButton);
+    AddControl(miWhoCanJoin, miTeam, nullptr, nullptr, miOptionsButton);
+    AddControl(miOptionsButton, miTeam, nullptr, miWhoCanJoin, miContinueButton);
     AddControl(miContinueButton, miTeam, nullptr, miOptionsButton, nullptr);
     miTeam->SetLeaveDown([this]() { Focus(miContinueButton); });
 
     // Options page
-    AddControl(miWhoCanJoin, nullptr, miLocalPlayers, nullptr, nullptr);
-    AddControl(miLocalPlayers, miWhoCanJoin, miCpuPlayers, nullptr, nullptr);
+    AddControl(miLocalPlayers, nullptr, miCpuPlayers, nullptr, nullptr);
     AddControl(miCpuPlayers, miLocalPlayers, miInputDelay, nullptr, nullptr);
     AddControl(miInputDelay, miCpuPlayers, miEveryone, nullptr, nullptr);
     AddControl(miEveryone, miInputDelay, miKickWho, nullptr, nullptr);
@@ -194,13 +195,15 @@ void UI_OnlineLobbyMenu::ShowPage(Page page)
     const bool joining = !lobby || lobby->phase() == rollback::NetLobby::Phase::Joining;
 
     miTeam->setVisible(team && !joining);
+    miWhoCanJoin->setVisible(team && !joining);
     miOptionsButton->setVisible(team && !joining);
     miContinueButton->setVisible(team && !joining);
     for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton, miOptionsDone})
         control->setVisible(!team && !joining);
     for (MI_LockTag* tag : miHostTag)
         tag->setVisible(!team && !joining);
-    miScene->SetTitle(joining ? "Online" : team ? "Team and Character Selection" : LocalGame() ? "Options" : "Online Options");
+    miScene->SetTitle(joining ? "Online" : team ? "Team and Character Selection" : "Lobby Options");
+    miScene->SetOptionsPage(!team && !joining);
 
     SetCancelCode(team ? MENU_CODE_ONLINE_LEAVE : MENU_CODE_ONLINE_OPTIONS_BACK);
     if (m_dialog == Dialog::None)
@@ -241,11 +244,13 @@ void UI_OnlineLobbyMenu::ApplyLayout(bool host, bool joining)
 
     miScene->SetJoining(joining);
     const bool team = m_page == Page::Team;
-    miScene->SetTitle(joining ? "Online" : team ? "Team and Character Selection" : LocalGame() ? "Options" : "Online Options");
+    miScene->SetTitle(joining ? "Online" : team ? "Team and Character Selection" : "Lobby Options");
+    miScene->SetOptionsPage(!team && !joining);
     miTeam->setVisible(team && !joining);
+    miWhoCanJoin->setVisible(team && !joining);
     miOptionsButton->setVisible(team && !joining);
     miContinueButton->setVisible(team && !joining);
-    for (UI_Control* control : std::initializer_list<UI_Control*> {miWhoCanJoin, miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton, miOptionsDone})
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton, miOptionsDone})
         control->setVisible(!team && !joining);
     for (MI_LockTag* tag : miHostTag)
         tag->setVisible(!team && !joining && !host);
@@ -329,10 +334,17 @@ void UI_OnlineLobbyMenu::Sync()
     // local game: how to let the others in)
     std::string settingsNote = lobby->settingsEveryone() ? "Match settings: everyone can change" : "Match settings: host only";
     if (localGame)
-        settingsNote = "Local game: Options, Who can join lets others in";
+#if defined(NETWORK_DISABLED)
+        settingsNote = "Local game";
+#elif defined(SMW_XBOX)
+        settingsNote = "Local game: set Lobby to System link to let others in";
+#else
+        settingsNote = "Local game: set Lobby to LAN or Internet to let others in";
+#endif
     miScene->SetSettingsNote(m_page == Page::Team && !joining ? settingsNote : std::string());
     //(the title follows who can join: a local game's options aren't online ones)
-    miScene->SetTitle(joining ? "Online" : m_page == Page::Team ? "Team and Character Selection" : localGame ? "Options" : "Online Options");
+    miScene->SetTitle(joining ? "Online" : m_page == Page::Team ? "Team and Character Selection" : "Lobby Options");
+    miScene->SetOptionsPage(m_page != Page::Team && !joining);
 
     // The status line: what the lobby says, else what is going on with the players. The hint under
     // the buttons says what the player can do.
@@ -391,11 +403,13 @@ void UI_OnlineLobbyMenu::Sync()
             hint = host ? "Choose the match type, game mode and map" : "See what the host has chosen";
         else if (m_currentFocus == miOptionsButton)
             hint = host ? "Players, CPUs, input delay, who changes the settings" : "Your players on this computer";
+        else if (m_currentFocus == miWhoCanJoin && !host)
+            hint = "The host chooses who can join";
+        else if (m_currentFocus == miWhoCanJoin)
+            hint = net.access() == rollback::LobbyAccess::Nobody ? "Local only: a game on this computer" : "Others can join this lobby now";
     } else if (m_dialog == Dialog::None && !joining) {
         if (!host && (m_currentFocus == miCpuPlayers || m_currentFocus == miInputDelay || m_currentFocus == miEveryone || m_currentFocus == miKickWho))
             hint = "Only the host can change this";
-        else if (m_currentFocus == miWhoCanJoin)
-            hint = net.access() == rollback::LobbyAccess::Nobody ? "Nobody: a game on this computer only" : "Others can join this lobby now";
         else if (m_currentFocus == miLocalPlayers)
             hint = "Players on this computer (each with their own controls)";
         else if (m_currentFocus == miInputDelay)
@@ -436,8 +450,7 @@ bool UI_OnlineLobbyMenu::LocalGame() const
 
 UI_Control* UI_OnlineLobbyMenu::FirstOption()
 {
-    const rollback::NetLobby* lobby = lobbyOrNull();
-    return lobby && lobby->isHost() ? static_cast<UI_Control*>(miWhoCanJoin) : miLocalPlayers;
+    return miLocalPlayers;
 }
 
 void UI_OnlineLobbyMenu::ApplyChanges()

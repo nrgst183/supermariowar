@@ -370,31 +370,33 @@ void MI_OnlineTeamSelect::Draw()
     }
 
     // The players' cards: the number, the name (a crown: the host), the Ready mushroom (not ready yet:
-    // dots going), who it is and the connection; this computer's players in a gold frame
+    // dots going), who it is and the connection; this computer's players in a gold frame (over the
+    // footer: 24 higher than they were)
+    constexpr int CARD_Y = 344;
     for (int s = 0; s < 4; s++) {
         if (!have[s])
             continue;
         const Info& i = info[s];
         const int cardX = s * 160 + 16;
         if (i.mine) {
-            prompts::fill(cardX - 4, 364, 136, 104, BLACK);
-            prompts::fill(cardX - 2, 366, 132, 100, {248, 200, 40, 255});
+            prompts::fill(cardX - 4, CARD_Y - 4, 136, 104, BLACK);
+            prompts::fill(cardX - 2, CARD_Y - 2, 132, 100, {248, 200, 40, 255});
         }
-        rm->spr_player_select_ready.draw(cardX, 368, {0, 0, 128, 96});
-        rm->spr_menu_boxed_numbers.draw(cardX + 16, 388, {s * 16, i.color * 16, 16, 16});
+        rm->spr_player_select_ready.draw(cardX, CARD_Y, {0, 0, 128, 96});
+        rm->spr_menu_boxed_numbers.draw(cardX + 16, CARD_Y + 20, {s * 16, i.color * 16, 16, 16});
         const bool host = i.human && lobby->slot(s).peer == 0 && lobby->slot(s).localIndex == 0;
         const int nameW = host ? 62 : 80;
-        rm->menu_font_small.drawChopRight(cardX + 36, 404 - rm->menu_font_small.getHeight(), nameW, i.name);
+        rm->menu_font_small.drawChopRight(cardX + 36, CARD_Y + 36 - rm->menu_font_small.getHeight(), nameW, i.name);
         if (host)
-            theme::crown(cardX + 36 + std::min(nameW, rm->menu_font_small.getWidth(i.name)) + 2, 389);
+            theme::crown(cardX + 36 + std::min(nameW, rm->menu_font_small.getWidth(i.name)) + 2, CARD_Y + 21);
         // (the empty circle of the sprite is not drawn: a player who is not ready shows dots)
         if (i.ready) {
-            rm->spr_player_select_ready.draw(cardX + 48, 408, {128, i.human ? 32 : 64, 34, 32});
+            rm->spr_player_select_ready.draw(cardX + 48, CARD_Y + 40, {128, i.human ? 32 : 64, 34, 32});
         } else if (i.human) {
             const int lit = (m_tick / 12) % 4;
             for (int d = 0; d < 3; d++) {
-                prompts::fill(cardX + 50 + d * 10, 420, 8, 8, BLACK);
-                prompts::fill(cardX + 52 + d * 10, 422, 4, 4, d < lit ? SDL_Color {248, 200, 40, 255} : SDL_Color {150, 150, 160, 255});
+                prompts::fill(cardX + 50 + d * 10, CARD_Y + 52, 8, 8, BLACK);
+                prompts::fill(cardX + 52 + d * 10, CARD_Y + 54, 4, 4, d < lit ? SDL_Color {248, 200, 40, 255} : SDL_Color {150, 150, 160, 255});
             }
         }
 
@@ -403,10 +405,10 @@ void MI_OnlineTeamSelect::Draw()
         if (i.downloadingSkin)
             line = "skin...";
         if (showPing) {
-            rm->menu_font_small.drawChopCentered(cardX + 54, 441, 88, line);
-            theme::signal(cardX + 98, 438, i.pingMs);
+            rm->menu_font_small.drawChopCentered(cardX + 54, CARD_Y + 73, 88, line);
+            theme::signal(cardX + 98, CARD_Y + 70, i.pingMs);
         } else {
-            rm->menu_font_small.drawChopCentered(cardX + 64, 441, 112, line);
+            rm->menu_font_small.drawChopCentered(cardX + 64, CARD_Y + 73, 112, line);
         }
     }
 }
@@ -492,7 +494,7 @@ void MI_LobbyMap::Draw()
 
 MI_LobbyScene::MI_LobbyScene()
     : UI_Control(0, 0)
-    , m_statusRect {10, 44, 620, 32}
+    , m_statusRect {20, 40, 600, 32}
     , m_hintRect {10, 354, 620, 16}
     , m_title("Team and Character Selection")
 {}
@@ -516,7 +518,7 @@ void MI_LobbyScene::Draw()
 
     using prompts::Pad;
     if (m_joining) {
-        creamFrame(144, 110);
+        menupanel::box(144, 110, 352, 220);
         theme::spinningCoin(304, 150, m_tick++);
         rm->menu_font_large.drawCentered(320, 196, "Connecting...");
         rm->menu_font_small.drawCentered(320, 232, ellipsize(rm->menu_font_small, m_status, 320));
@@ -529,20 +531,24 @@ void MI_LobbyScene::Draw()
     }
     ++m_tick;
 
-    // The status bar: what is going on, always (its icon: fine, a warning, a problem)
+    // The status bar: what the selected thing does, else what is going on (its icon: fine, a
+    // warning, a problem)
     const LobbyRect& r = m_statusRect;
+    const std::string& line = m_hint.empty() ? m_status : m_hint;
     blueBar(r.x, r.y, r.w);
-    theme::statusIcon(r.x + 12, r.y + 8, static_cast<theme::Status>(m_tone));
-    rm->menu_font_large.drawCentered(r.x + r.w / 2 + 10, r.y + 5, ellipsize(rm->menu_font_large, m_status, r.w - 64));
+    //(the large font when the line fits, else the small one)
+    const bool large = rm->menu_font_large.getWidth(line) <= r.w - 80;
+    const gfxFont& font = large ? rm->menu_font_large : rm->menu_font_small;
+    const int lineW = std::min(font.getWidth(line), r.w - 80);
+    theme::statusIcon(r.x + r.w / 2 - lineW / 2 - 14, r.y + 8, m_hint.empty() ? static_cast<theme::Status>(m_tone) : theme::Status::Info);
+    font.drawCentered(r.x + r.w / 2 + 12, r.y + (large ? 5 : 9), ellipsize(font, line, r.w - 80));
 
-    // Under it, in the small font: what the selected thing does, else who may change the match settings
-    const std::string& tip = m_hint.empty() ? m_note : m_hint;
-    if (!tip.empty())
-        rm->menu_font_small.drawCentered(320, r.y + r.h + 3, ellipsize(rm->menu_font_small, tip, 600));
+    // The options page: its fields in a panel
+    if (m_optionsPage)
+        menupanel::box(46, 98, 548, 236);
 
-    // And over the cards: the buttons of what can be done
-    if (!m_prompts.empty())
-        prompts::drawPrompts(320, 351, m_prompts);
+    // Along the bottom: the buttons of what can be done
+    menupanel::footer(m_prompts);
 }
 
 

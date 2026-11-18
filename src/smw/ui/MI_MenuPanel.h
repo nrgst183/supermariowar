@@ -14,6 +14,9 @@ void box(int x, int y, int w, int h);
 /// A row of a list in a panel: darker than the panel, or (selected) bright with a white rim;
 /// `dim`: a row that can't be chosen (greyer)
 void row(int x, int y, int w, int h, bool selected, bool dim = false);
+/// The button prompts on a dark strip along the bottom of the screen (y 450 to 480), after a label
+/// if there is one; every menu's prompts are drawn here
+void footer(const std::vector<prompts::Prompt>& row, const std::string& label = "");
 }
 
 /// A panel, with a title at its top left (and a line of small text at its top right)
@@ -34,8 +37,8 @@ private:
     std::function<std::string()> m_noteSource;
 };
 
-/// A strip of button prompts in a panel, with a label first: the controller's buttons or the
-/// keys, whichever was used last (asked every frame)
+/// A menu's button prompts, with a label first: the controller's buttons or the keys, whichever
+/// was used last (asked every frame); drawn as the footer along the bottom of the screen
 class MI_PromptStrip : public UI_Control {
 public:
     MI_PromptStrip(short x, short y, short w, std::string label, std::function<std::vector<prompts::Prompt>()> row);

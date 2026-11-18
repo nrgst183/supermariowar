@@ -17,24 +17,19 @@ UI_MainMenu::UI_MainMenu()
     miSMWVersion = new MI_Image(&rm->menu_version, 628 - rm->menu_version.getWidth(), 10,
         0, 0, rm->menu_version.getWidth(), rm->menu_version.getHeight(), 1, 1, 0);
 
-    miMainStartButton = new MI_Button(&rm->spr_selectfield, 120, 210, "Start", 310);
+    miMainStartButton = new MI_Button(&rm->spr_selectfield, 120, 210, "Play", 310);
     miMainStartButton->SetCode(MENU_CODE_TO_LOCAL_LOBBY);
 
-    miQuickGameButton = new MI_Button(&rm->spr_selectfield, 440, 210, "Go!", 80);
+    miQuickGameButton = new MI_Button(&rm->spr_selectfield, 440, 210, "Quick", 80);
     miQuickGameButton->SetCode(MENU_CODE_QUICK_GAME_START);
 
     miPlayerSelect = new MI_PlayerSelect(&rm->menu_player_select, 120, 250, "Players", 400, 140);
 
 #ifndef SMW_NO_ONLINE
-    // Online (rollback netplay); web builds have no network code
-#ifdef SMW_XBOX
-    //(the Xbox: straight to the games on the network, where it hosts too)
-    miOnlineButton = new MI_Button(&rm->spr_selectfield, 120, 322, "System Link", 200);
+    // Joining someone's game: the games on the network (and, on PCs, an address). Hosting is the
+    // lobby's: Play, then who can join.
+    miOnlineButton = new MI_Button(&rm->spr_selectfield, 120, 322, "Join a game", 200);
     miOnlineButton->SetCode(MENU_CODE_TO_SYSTEM_LINK_MENU);
-#else
-    miOnlineButton = new MI_Button(&rm->spr_selectfield, 120, 322, "Online", 200);
-    miOnlineButton->SetCode(MENU_CODE_TO_ONLINE_MENU);
-#endif
     miHistoryButton = new MI_Button(&rm->spr_selectfield, 320, 322, "History", 200);
 #else
     miHistoryButton = new MI_Button(&rm->spr_selectfield, 120, 322, "History", 400);

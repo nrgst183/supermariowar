@@ -129,6 +129,7 @@ enum MenuCodeEnum {
     MENU_CODE_HOST_WORLD_EDITOR,
     MENU_CODE_JOIN_EDITOR,
     MENU_CODE_EDITORS_ACTION,          // the editors menu's own buttons (UI_EditorsMenu::Act)
+    MENU_CODE_TO_ONLINE_OPTIONS_MENU,  // Options > Online: nickname, run-ahead, port
 };
 
 enum class MenuNavDirection : unsigned char {

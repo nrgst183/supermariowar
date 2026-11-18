@@ -17,6 +17,11 @@ public:
 
     void nospawn(short y);
 
+    /// The middle it sways about (where it is, until it starts floating)
+    float swayCenterX() const {
+        return state >= 2 ? dFloatCenterX : fx;
+    }
+
 private:
     bool fFloatDirectionRight = true;
     float dFloatAngle = HALF_PI;

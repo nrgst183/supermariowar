@@ -108,6 +108,13 @@ SDL_Texture* createScreenTexture(SDL_Renderer* renderer)
     if (!SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST))
         throw_error("Couldn't set up texture scaling mode: %s\n", SDL_GetError());
 
+    //The finished frame: copied to the window, not blended over it (its alpha channel was blending
+    //every pixel, a whole screen's worth a frame: with a software renderer the most costly thing
+    //the game did; the frame is opaque, so it looks the same)
+#ifndef SMW_XBOX    //(the Xbox draws in the memory it displays: no texture to present)
+    SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_NONE);
+#endif
+
     return texture;
 }
 } // namespace

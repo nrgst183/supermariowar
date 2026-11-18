@@ -902,9 +902,14 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
             mEditorsMenu->SetStatus("Can't join: " + error);
 #endif
     } else if (MENU_CODE_TO_ONLINE_MENU == code) {
+        //"Join by address", from the games list
         mSystemLinkMenu->Close();
         mOnlineMenu->ClearMessage();
-        mOnlineMenu->Open();
+        mOnlineMenu->Open(UI_OnlineMenu::Mode::Join);
+        mCurrentMenu = mOnlineMenu.get();
+    } else if (MENU_CODE_TO_ONLINE_OPTIONS_MENU == code) {
+        mOnlineMenu->ClearMessage();
+        mOnlineMenu->Open(UI_OnlineMenu::Mode::Settings);
         mCurrentMenu = mOnlineMenu.get();
     } else if (MENU_CODE_ONLINE_HOST == code) {
         HostOnlineGame();

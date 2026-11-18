@@ -28,6 +28,7 @@ class MovingPlatform : public sim::ArenaAllocated
         void draw(short iOffsetX, short iOffsetY);
         void update();
 
+
         void ResetPath();
 
         void collide(CPlayer * player);
@@ -104,6 +105,10 @@ class MovingPlatform : public sim::ArenaAllocated
         //(an airship's outline: a good share of its rectangle). Rows of tiles with the same
         //columns merged into one rectangle.
         std::vector<SDL_Rect> drawParts;
+        //On the Xbox, of those the parts opaque all over (static tiles without a pixel of the color
+        //key: most of a platform's): copied, without the key (the same pixels, far faster there: a
+        //memcpy, not a test of each pixel). drawParts has the rest (on a PC, all).
+        std::vector<SDL_Rect> drawOpaque;
 
         short iDrawLayer;
 
