@@ -7,6 +7,9 @@
 namespace {
 const char * szPathNames[3] = {"Line Segment", "Continuous", "Ellipse"};
 
+// A platform's tiles being chosen: the tileset screen runs inside the platforms' (the game's overlay asks)
+bool g_platformTilePicker = false;
+
 enum {PLATFORM_EDIT_STATE_SELECT, PLATFORM_EDIT_STATE_PATH_TYPE, PLATFORM_EDIT_STATE_CHANGE_PATH_TYPE, PLATFORM_EDIT_STATE_EDIT, PLATFORM_EDIT_STATE_PATH, PLATFORM_EDIT_STATE_TEST, PLATFORM_EDIT_STATE_TILETYPE, PLATFORM_EDIT_STATE_ANIMATED, PLATFORM_EDIT_STATE_MOVE};
 
 short iPlatformEditState = PLATFORM_EDIT_STATE_SELECT;
@@ -194,12 +197,14 @@ int editor_platforms()
                 } else if (event.key.key == SDLK_T) {
                     if (PLATFORM_EDIT_STATE_EDIT == iPlatformEditState || PLATFORM_EDIT_STATE_ANIMATED == iPlatformEditState || PLATFORM_EDIT_STATE_TILETYPE == iPlatformEditState) {
                             FPSLimiter::instance().frameStart();
+                            g_platformTilePicker = true;
                             while (editor_tiles() == EDITOR_TILES) {
                                 FPSLimiter::instance().beforeFlip();
                                 gfx_flipscreen();
                                 FPSLimiter::instance().afterFlip();
                                 FPSLimiter::instance().frameStart();
                             }
+                            g_platformTilePicker = false;
                             iPlatformEditState = PLATFORM_EDIT_STATE_EDIT;
                     } else if (PLATFORM_EDIT_STATE_PATH == iPlatformEditState) {
                             iPlatformEditState = PLATFORM_EDIT_STATE_CHANGE_PATH_TYPE;

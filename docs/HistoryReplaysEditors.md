@@ -71,10 +71,11 @@ snapshot every 4 seconds: jumping anywhere is instant.
 The theater and the editors draw controller buttons in two styles
 (`src/smw/ui/InputPrompts.h`): the Xbox one (A B X Y, LB RB, LT RT, View and Menu) and the
 original Xbox's (the Duke and the Controller S: the colored gem buttons, White and Black,
-the L and R triggers, START and BACK). Controls > Button Prompts picks one; Auto (the
-default) uses the style of the controller pressed last. An original Xbox controller is
-recognised by its USB ids (Microsoft's and the licensed ones) or its name; through an
-adapter that reports itself as an Xbox 360 pad, pick Original Xbox by hand.
+the L and R triggers, START and BACK). Controls > Button Prompts picks one: Original Xbox
+(the default), Xbox, or Auto, which uses the style of the controller pressed last. Auto
+recognises an original Xbox controller by its USB ids (Microsoft's and the licensed ones)
+or its name; through an adapter that reports itself as an Xbox 360 pad, it shows the Xbox
+style.
 
 ## The editors (main menu > Editors)
 
@@ -89,17 +90,18 @@ map:
 
 | Controller | |
 |---|---|
-| Left stick | the cursor (faster the further it's pushed) |
+| Left stick | the cursor: a small push moves a pixel or so, a full one crosses the screen in about a second |
 | D-pad | the cursor, one tile per press |
 | A / B | place / remove; held while the cursor moves, the whole rectangle (map editor; world editor: hold to paint) |
+| LT + A / B | map editor: paint / erase freely as the cursor moves (no rectangle) |
 | X | map editor: take the block, item or tiles under the cursor (world editor: Shift) |
 | Y | map editor: the next layer (world editor: Ctrl) |
 | LB / RB | map editor: back and forth through the last 8 things picked (before that: the blocks, items and tile types) |
-| LT / RT (held) | Shift / Ctrl |
-| Right stick | arrow keys (scrolls the world) |
-| Right stick pressed | the tools: undo, redo; on a map, copy an area, paste, fill |
+| LT / RT (held) | Shift / Ctrl (in move mode: Shift adds to the selection, Ctrl selects freehand) |
+| Right stick | map editor: the cursor, slowly (a pixel or two); world editor: scrolls the world |
+| Right stick pressed | the tools: undo, redo; on a map, copy an area, paste, fill (in move mode also: copy or delete the selection, replace or merge) |
 | Left stick held | the whole map (the world: all of it, small), with everyone's cursor |
-| Back | Escape (in the main mode: asks to quit; A on Yes) |
+| Back | Escape: on the map, asks to leave (A chooses, B stays, left / right pick Yes or No) |
 | Start | the editor window |
 
 **The tools** (the right stick pressed, or the mouse's middle button): **Undo** and
@@ -112,7 +114,14 @@ pressed that are the same as it (the same block, or tile on the active layer, or
 
 The **tileset screen** works tile by tile: the d-pad moves a gold frame one tile at a time and
 scrolls the tileset at the screen's edge, the stick's cursor settles on a tile when let go,
-A held with the d-pad takes several tiles, LB / RB change the tileset.
+A held with the d-pad takes several tiles, LB / RB change the tileset, B goes back to the
+map. Choosing a platform's tiles uses the same screen.
+
+**? blocks:** the Modes page's "? block contents" (or K at the cursor) then A on a ? block
+(or a click) opens what it gives. **Zones:** the Zones page picks whose zone (everyone's or
+a team's) and marks, clears or inverts every cell. Clearing all the tile types, clearing the
+map, a new map, and another map with changes unsaved ask to be chosen twice. F1 (or Help on
+the File page) shows the controls for the controller, or the mouse and the keys.
 
 In the editor's other screens (the tilesets, warps, platforms...) and the world editor,
 RB is Enter and LB hides or shows the buttons' bar.
@@ -134,7 +143,10 @@ commands (New, Delete, its path...) to choose with the d-pad. Back leaves the sc
 Every cursor, the mouse's too, is a white glove with a cuff in its player's color.
 
 On a keyboard, every command keeps its key; the window lists them. Every cursor marks the
-tile it edits with a frame in its player's color.
+tile it edits with a frame in its player's color. With the mouse on the map editor's map:
+Shift and a drag fills a rectangle (the right button clears it), Alt and a click takes the
+cell, the wheel goes through the last things picked (with Ctrl: the layers), Ctrl+C and
+Ctrl+V copy an area and paste it, and the middle button opens the tools.
 
 When an editor asks for a name, an on-screen keyboard opens (A types, B deletes,
 X shift, Y space, Start done, Back cancel; with the mouse: click the keys).
@@ -174,3 +186,7 @@ The others may Save As a copy of their own.
   world editor): two or more games edit together with scripted controllers, at the same
   time and on the same cells; each prints a hash of its document (`cotest:`), which must
   be the same everywhere. `--at-role colocal`: two controllers in one editor
+- `--at-role edux`: the map editor's screens with a controller (a ? block, the zones page,
+  F1, the tileset screen's B, move mode's tools, the exit prompt); `--at-role edmouse`: the
+  map editor with the mouse; `--at-role mouse`: the menus with the mouse; `--at-role
+  menutour`: a screenshot of every menu

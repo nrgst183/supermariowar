@@ -683,7 +683,7 @@ bool mapShown()
 
 int toolsCount()
 {
-    return levelMap() ? T_ITEM_COUNT : 2;
+    return levelMap() ? (leveleditor::shell::mode() == 3 ? T_ITEM_COUNT : T_BASIC_COUNT) : 2;
 }
 
 SDL_Rect toolsRect()
@@ -789,6 +789,10 @@ void chooseTool(int item)
             toast(padUsed() ? "Paste: press A to place it, B to stop" : "Paste: click to place it, right-click to stop");
             break;
         case T_FILL: s.armed = Armed::Fill; toast(padUsed() ? "Fill: press A to fill the connected area" : "Fill: click to fill the connected area"); break;
+        //(move mode: its keys)
+        case T_MOVE_COPY: closeTools(); tapKey(SDLK_C); return;
+        case T_MOVE_DELETE: closeTools(); tapKey(SDLK_DELETE); return;
+        case T_MOVE_REPLACE: tapKey(SDLK_M); s.overlayDirty = true; return;    //(the menu stays: the label changes)
         default: break;
     }
     closeTools();
@@ -883,6 +887,11 @@ void updatePointer(int index)
         const float speed = (0.8f + 12.0f * push * push) / push;
         dx += p.pad.lx * speed;
         dy += p.pad.ly * speed;
+    }
+    //(on the level editor's map, the right stick moves it slowly: a pixel or two at a time)
+    if (levelMap() && s.overlay == Overlay::None && (p.pad.rx != 0 || p.pad.ry != 0)) {
+        dx += p.pad.rx * 1.5f;
+        dy += p.pad.ry * 1.5f;
     }
     //The d-pad: one tile, from the tile's middle
     const bool up = p.up.fire(p.pad.buttons[UP]);
@@ -983,7 +992,8 @@ void updatePointer(int index)
         const int col = std::clamp(static_cast<int>(p.x) / TILE, 0, sh::MAP_COLS - 1);
         const int row = std::clamp(static_cast<int>(p.y) / TILE, 0, sh::MAP_ROWS - 1);
         //(a rectangle: held and moved, then let go; the area to copy, or what the mode paints cell by cell)
-        const bool rectangles = onMap && (s.armed == Armed::Copy || (s.armed == Armed::None && sh::paintsCells() && tool != TOOL_PICK));
+        //(LT held: no rectangle, A and B paint and erase freely as the pointer moves)
+        const bool rectangles = onMap && (s.armed == Armed::Copy || (s.armed == Armed::None && sh::paintsCells() && tool != TOOL_PICK && !p.pad.buttons[LT]));
         if (p.pressed(A) || p.pressed(B))
             p.shown = true;
         if (onMap && s.armed != Armed::None && (p.pressed(B) || p.pressed(BACK))) {
@@ -1094,6 +1104,14 @@ void updatePointer(int index)
             closeWindow();
         else
             openWindow(index);
+    }
+    //RT on the level editor's map: Ctrl pressed and let go too (move mode's freehand selection wants
+    //the key itself, not only its being held)
+    if (levelMap() && s.overlay == Overlay::None) {
+        if (p.pressed(RT))
+            pushKey(SDLK_LCTRL, true);
+        else if (p.released(RT))
+            pushKey(SDLK_LCTRL, false);
     }
     //The right stick pressed: the tools (undo, copy, paste, fill)
     if (p.pressed(RS) && s.overlay == Overlay::None && mapShown())

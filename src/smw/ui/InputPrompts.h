@@ -45,6 +45,9 @@ int drawMouse(int x, int y, bool left, bool right);
 // The pad glyph on a controller, else the key cap ("" key: the mouse);
 // then the label. Returns the total width.
 int drawPrompt(int x, int y, Pad pad, const std::string& key, const std::string& label);
+// The shoulders' and the triggers' names in text, as the style draws them: LB RB LT RT, or (the
+// original Xbox) White Black L R
+std::string padName(Pad pad);
 int promptWidth(Pad pad, const std::string& key, const std::string& label);
 
 // Player 1's keyboard keys of the menus (the game's Controls), as short names

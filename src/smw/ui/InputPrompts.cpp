@@ -702,6 +702,18 @@ int drawMouse(int x, int y, bool left, bool right)
     return 19;
 }
 
+std::string padName(Pad pad)
+{
+    const bool original = style() == Style::OriginalXbox;
+    switch (pad) {
+        case Pad::LB: return original ? "White" : "LB";
+        case Pad::RB: return original ? "Black" : "RB";
+        case Pad::LT: return original ? "L" : "LT";
+        case Pad::RT: return original ? "R" : "RT";
+        default: return {};
+    }
+}
+
 int drawPrompt(int x, int y, Pad pad, const std::string& key, const std::string& label)
 {
     int w = 0;

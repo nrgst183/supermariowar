@@ -6,6 +6,7 @@
 #define SMW_EMBEDDED_EDITOR
 #include "CoEdit.h"
 #include "LevelShell.h"
+#include "ui/InputPrompts.h"
 #include "../../leveleditor/LevelEditorState.h"
 
 namespace leveleditor {
@@ -320,6 +321,16 @@ namespace shell {
 bool inMapView()
 {
     return state == EDITOR_EDIT && !fExiting && !g_inBlockProperties;
+}
+
+bool helpShown()
+{
+    return state == DISPLAY_HELP;
+}
+
+bool moveReplace()
+{
+    return move_replace;
 }
 
 int zoneTeam()
@@ -762,7 +773,9 @@ void setBrush(const Brush& b)
 
 bool tilePicker(TilePicker* picker)
 {
-    if (state != EDITOR_TILES || set_tile_tileset < 0 || static_cast<size_t>(set_tile_tileset) >= g_tilesetmanager->count())
+    //(also a platform's tiles: the same screen, inside the platforms')
+    const bool showing = state == EDITOR_TILES || (state == EDITOR_PLATFORM && g_platformTilePicker);
+    if (!showing || set_tile_tileset < 0 || static_cast<size_t>(set_tile_tileset) >= g_tilesetmanager->count())
         return false;
     CTileset* ts = g_tilesetmanager->tileset(set_tile_tileset);
     picker->viewCol = view_tileset_x;
@@ -795,11 +808,12 @@ Screen currentScreen()
         sc.title = "What this block gives";
         sc.a = "more";
         sc.b = "less";
-        sc.holds = "LT: every item";
+        sc.holds = prompts::padName(prompts::Pad::LT) + ": every item";
         sc.commands = {{"Default", SDLK_D}, {"All items to default", SDLK_D, true}, {"Random", SDLK_GRAVE}, {"Nothing", SDLK_0}, done};
         return sc;
     }
-    switch (state) {
+    //(a platform's tiles: the tileset screen)
+    switch (state == EDITOR_PLATFORM && g_platformTilePicker ? EDITOR_TILES : state) {
         case EDITOR_TILES:
             sc.title = "Tileset " + std::to_string(set_tile_tileset + 1) + " of " + std::to_string(g_tilesetmanager->count()) + ": " +
                        g_tilesetmanager->tileset(set_tile_tileset)->name();
@@ -817,7 +831,10 @@ Screen currentScreen()
         case EDITOR_ANIMATION:
             sc.title = "Animated tiles";
             sc.a = "take (drag for more)";
-            sc.commands = {done};
+            sc.shoulders = "page";
+            sc.lb = SDLK_LEFT;
+            sc.rb = SDLK_RIGHT;
+            sc.commands = {{"Previous page", SDLK_LEFT}, {"Next page", SDLK_RIGHT}, done};
             break;
         case EDITOR_WARP:
             sc.title = "Warps: pick a color and a direction";
@@ -852,7 +869,7 @@ Screen currentScreen()
             sc.title = "What the ? blocks give";
             sc.a = "more";
             sc.b = "less";
-            sc.holds = "LT: every block";
+            sc.holds = prompts::padName(prompts::Pad::LT) + ": every block";
             sc.commands = {{"Default", SDLK_D}, {"All blocks to default", SDLK_D, true}, {"Random", SDLK_GRAVE}, {"Nothing", SDLK_0}, done};
             break;
         case EDITOR_MODEITEMS:
@@ -868,7 +885,13 @@ Screen currentScreen()
                 case PLATFORM_EDIT_STATE_SELECT:
                     sc.title = "Platforms";
                     sc.a = "edit one";
-                    sc.commands = {{"New platform", SDLK_N}, {"Try the paths", SDLK_C}, {"Save the map", SDLK_S}, done};
+                    sc.commands = {{"New platform", SDLK_N}, {"Reorder", SDLK_M}, {"Try the paths", SDLK_C}, {"Save the map", SDLK_S}, done};
+                    break;
+                case PLATFORM_EDIT_STATE_MOVE:
+                    sc.title = iPlatformSwitchState == 1 ? "Reorder: choose where platform " + std::to_string(iPlatformSwitchIndex + 1) + " goes"
+                                                         : "Reorder: choose a platform to move";
+                    sc.a = "choose";
+                    sc.commands = {done};
                     break;
                 case PLATFORM_EDIT_STATE_PATH_TYPE:
                 case PLATFORM_EDIT_STATE_CHANGE_PATH_TYPE:
@@ -885,11 +908,11 @@ Screen currentScreen()
                         sc.xHold = SDLK_X;
                         sc.yHold = SDLK_Z;
                         sc.rbHold = SDLK_C;
-                        sc.holds = "hold X / Y / RB with A: width, height, circle";
+                        sc.holds = "hold X / Y / " + prompts::padName(prompts::Pad::RB) + " with A: width, height, circle";
                     } else {
                         sc.a = "start point";
                         sc.b = g_Platforms[iEditPlatform].iPathType == PlatformPathType::Straight ? "end point" : "angle";
-                        sc.holds = "LT: snap";
+                        sc.holds = prompts::padName(prompts::Pad::LT) + ": snap";
                     }
                     sc.commands = {{"Path shape", SDLK_T}, done};
                     break;
@@ -937,7 +960,7 @@ Screen currentScreen()
                         sc.shoulders = "slower / faster";
                         sc.lb = SDLK_MINUS;
                         sc.rb = SDLK_EQUALS;
-                        sc.holds = "LT: snap the angle";
+                        sc.holds = prompts::padName(prompts::Pad::LT) + ": snap the angle";
                         sc.commands.push_back({"Slower", SDLK_MINUS});
                         sc.commands.push_back({"Faster", SDLK_EQUALS});
                         if (hazard.itype == MapHazardType::RotoDisc) {

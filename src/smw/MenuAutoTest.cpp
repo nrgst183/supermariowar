@@ -644,7 +644,10 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             if (f == 25) t.shot = "u1_block_contents";
             t.back = tap(f, 30);
             if (f == 40) t.shot = "u2_back_on_map";
-            if (f == 45) t.key = SDLK_X;
+            if (f == 41) t.key = SDLK_F1;
+            if (f == 43) t.shot = "u2b_help";
+            t.a = tap(f, 44);
+            if (f == 47) t.key = SDLK_X;
             t.start = tap(f, 50);
             t.rb = tap(f, 54) || tap(f, 57) || tap(f, 60);    //(blocks, items, types, zones)
             if (f == 64) t.shot = "u3_zones_page";
@@ -653,16 +656,21 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             if (f == 85) t.shot = "u4_tile_picker";
             t.b = t.b || tap(f, 90);
             if (f == 100) t.shot = "u5_after_picker_b";
-            t.back = t.back || tap(f, 110);
-            if (f == 120) t.shot = "u6_exit_prompt";
-            t.b = t.b || tap(f, 125);
-            if (f == 135) t.shot = "u7_stayed";
-            t.back = t.back || tap(f, 140);
-            t.left = tap(f, 150);
-            if (f == 156) t.shot = "u8_yes_chosen";
-            t.a = tap(f, 160);
-            if (f > 190 && f % 40 == 0) t.back = true;
-            if (f > 190 && f % 40 == 20) t.a = true;
+            //Move mode: its commands in the tools
+            if (f == 102) t.key = SDLK_M;
+            t.rs = tap(f, 106);
+            if (f == 112) t.shot = "u5b_move_tools";
+            t.b = t.b || tap(f, 116);
+            t.back = t.back || tap(f, 150);
+            if (f == 160) t.shot = "u6_exit_prompt";
+            t.b = t.b || tap(f, 165);
+            if (f == 175) t.shot = "u7_stayed";
+            t.back = t.back || tap(f, 180);
+            t.left = tap(f, 190);
+            if (f == 196) t.shot = "u8_yes_chosen";
+            t.a = t.a || tap(f, 200);
+            if (f > 230 && f % 40 == 0) t.back = true;
+            if (f > 230 && f % 40 == 20) t.a = true;
             return t;
         };
         if (step == 1) {

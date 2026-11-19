@@ -1223,8 +1223,9 @@ void drawTools()
     const SDL_Rect r = toolsRect();
     theme::panel(r.x, r.y, r.w, r.h);
     theme::font().draw(r.x + 14, r.y + 14, "Tools");
-    static const char* LABELS[] = {"Undo", "Redo", "Copy an area", "Paste", "Fill"};
-    static const Art* ARTS[] = {nullptr, nullptr, &ART_MOVE, &ART_BRUSH, &ART_SPRING};
+    const char* LABELS[] = {"Undo", "Redo", "Copy an area", "Paste", "Fill", "Copy selection", "Delete selection",
+        leveleditor::shell::moveReplace() ? "Moving: replaces" : "Moving: merges"};
+    static const Art* ARTS[] = {nullptr, nullptr, &ART_MOVE, &ART_BRUSH, &ART_SPRING, &ART_MOVE, &ART_CLOSE, &ART_MOVE};
     static const Art ART_UNDO = {"..#.....", ".##.....", "#######.", ".##....#", "..#....#", ".......#", "..#####.", "........"};
     static const Art ART_REDO = {".....#..", ".....##.", ".#######", "#....##.", "#....#..", "#.......", ".#####..", "........"};
     static const Art ART_FILL = {"...#....", "..#w#...", ".#www#..", "#wwwww#.", ".#www#c.", "..#w#.cc", "...#..cc", "......c."};
@@ -1625,6 +1626,9 @@ void drawHints()
     int y = 0;
     if (!hintsShown(&y))
         return;
+    //(the help has its own table, and any button closes it)
+    if (s.editor == Editor::Level && leveleditor::shell::helpShown())
+        return;
     std::vector<std::tuple<prompts::Pad, std::string, std::string>> items;
     if (controller)
         items = {{prompts::Pad::A, "", "place"}, {prompts::Pad::B, "", "remove"}, {prompts::Pad::X, "", "shift"},
@@ -1641,6 +1645,57 @@ void drawHints()
     int ix = x + 4;
     for (const auto& [pad, key, label] : items)
         ix += prompts::drawPrompt(ix, y, pad, key, label) + gap;
+}
+
+// The level editor's help (F1): a table of what the controller's buttons do, or the mouse's and the
+// keys' (whichever was used last; the prompts draw that device's)
+void drawLevelHelp()
+{
+    const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+    struct Line {
+        prompts::Pad pad;
+        const char* key;
+        std::string text;
+    };
+    using prompts::Pad;
+    //(the shoulders' names as the style draws them: RB, or the original's Black)
+    const Line PAD[] = {
+        {Pad::A, "", "place (hold and move: a rectangle)"},
+        {Pad::B, "", "erase (hold and move: a rectangle)"},
+        {Pad::LT, "", "held: A and B paint and erase freely"},
+        {Pad::X, "", "pick up what's under the cursor"},
+        {Pad::Y, "", "the next layer"},
+        {Pad::LB, "", "and " + prompts::padName(Pad::RB) + ": what you used lately"},
+        {Pad::LStick, "", "move (pressed: the whole map)"},
+        {Pad::RStick, "", "move slowly (pressed: the tools)"},
+        {Pad::Start, "", "the editor window: everything else"},
+        {Pad::Back, "", "leave the editor"},
+    };
+    const Line KEYS[] = {
+        {Pad::A, "", "place (drag: paint)"},
+        {Pad::B, "RMB", "erase"},
+        {Pad::A, "Shift", "and drag: fill a rectangle"},
+        {Pad::A, "Alt", "and click: pick up a cell"},
+        {Pad::A, "Wheel", "what you used lately (Ctrl: the layer)"},
+        {Pad::A, "Middle", "button: the tools"},
+        {Pad::A, "Ctrl+Z", "undo (Ctrl+Y: redo)"},
+        {Pad::A, "Ctrl+C", "copy an area (Ctrl+V: paste it)"},
+        {Pad::A, "Tab", "the editor window: every command, with its key"},
+        {Pad::A, "Esc", "leave the editor"},
+    };
+    const Line* lines = controller ? PAD : KEYS;
+    const int count = 10;
+    const int lineH = 24;
+    const int w = 500;
+    const int h = 70 + count * lineH + 30;
+    const int x = (SCREEN_W - w) / 2;
+    const int y = (SCREEN_H - h) / 2;
+    theme::panel(x, y, w, h);
+    theme::font().drawCentered(SCREEN_W / 2, y + 14, controller ? "Map editor: the controller" : "Map editor: the mouse and keys");
+    for (int k = 0; k < count; k++)
+        prompts::drawPrompt(x + 30, y + 50 + k * lineH, lines[k].pad, lines[k].key, lines[k].text);
+    rm->menu_font_small.drawCentered(SCREEN_W / 2, y + h - 26,
+        controller ? "Elsewhere, the bar at the bottom shows the buttons" : "Elsewhere, Tab lists a screen's commands");
 }
 
 // Who is editing (online), and the latest notice
@@ -1810,3 +1865,12 @@ void present()
 }
 
 } // namespace editors::input::detail
+
+namespace leveleditor::shell {
+
+void drawHelp()
+{
+    editors::input::detail::drawLevelHelp();
+}
+
+} // namespace leveleditor::shell

@@ -7,6 +7,10 @@ int display_help()
     drawmap(false, TILESIZE);
     rm->menu_shade.draw(0, 0);
     //rm->menu_font_large.drawCentered(320, 15, "Help");
+#ifdef SMW_EMBEDDED_EDITOR
+    //(in the game: the controller's buttons or the mouse's and the keys', the overlay's table)
+    shell::drawHelp();
+#else
 
     int offsety = 10;
     int offsetx = 20;
@@ -118,6 +122,7 @@ int display_help()
     rm->menu_font_small.draw(offsetx, offsety, "[delete] - Delete");
     offsety += rm->menu_font_small.getHeight() + 2;
     rm->menu_font_small.draw(offsetx, offsety, "[alt] + [enter] - Full Screen/Window");
+#endif
 
         //handle messages
         while (SDL_PollEvent(&event)) {
@@ -129,6 +134,11 @@ int display_help()
                 case SDL_EVENT_KEY_DOWN:
                     return 0;
                 break;
+#ifdef SMW_EMBEDDED_EDITOR
+                //(a click, or the controller's A or B: closed too)
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    return 0;
+#endif
 
                 default:
                     break;

@@ -46,7 +46,7 @@ inline const std::vector<Action> LEVEL_ACTIONS = {
     {"Move", SDLK_M}, {"Tile types", SDLK_L}, {"Platforms", SDLK_P}, {"Hazards", SDLK_H},
     {"Animated tiles", SDLK_A}, {"Race goals", SDLK_J}, {"? block contents", SDLK_K}, {"No player starts", SDLK_X},
     {"No items", SDLK_Z},
-    {"Active layer", SDLK_Y, false, false, "Layers"}, {"Hide other layers", SDLK_U}, {"Hide blocks", SDLK_V}, {"Optimize layers", SDLK_END},
+    {"Active layer", SDLK_Y, false, false, "Layers"}, {"Hide other layers", SDLK_U}, {"Hide blocks", SDLK_V},
     {"Backgrounds", SDLK_B, false, false, "Look"}, {"Next background", SDLK_G}, {"Music category", SDLK_R}, {"Eyecandy", SDLK_E},
     {"New map", SDLK_N, false, false, "File"}, {"Save", SDLK_S}, {"Save as...", SDLK_S, true}, {"Find map...", SDLK_F},
     {"New search...", SDLK_F, true}, {"Previous map", SDLK_PAGEUP}, {"Next map", SDLK_PAGEDOWN},
@@ -376,7 +376,8 @@ struct Quick {
 
 // ---- the tools menu (the right stick pressed): undo, redo, and on the level editor's map copy, paste, fill
 
-enum ToolItem { T_UNDO, T_REDO, T_COPY, T_PASTE, T_FILL, T_ITEM_COUNT };
+// (the last three only in move mode: its selection copied, deleted, and moving it replacing or merging)
+enum ToolItem { T_UNDO, T_REDO, T_COPY, T_PASTE, T_FILL, T_BASIC_COUNT, T_MOVE_COPY = T_BASIC_COUNT, T_MOVE_DELETE, T_MOVE_REPLACE, T_ITEM_COUNT };
 
 constexpr int TOOLS_W = 210;
 constexpr int TOOLS_ROW = 30;

@@ -39,6 +39,14 @@ bool switchBlockOn();
 int item();
 void setItem(int item);
 
+// Move mode: moving a selection replaces what is under it (else merges with it)
+bool moveReplace();
+
+// The help screen (F1): what the controller's buttons, or the mouse and the keys, do (the overlay
+// draws it, EditorInputDraw.cpp)
+void drawHelp();
+bool helpShown();
+
 // The no-spawn zone being painted: 0 everyone's, 1-4 a team's
 int zoneTeam();
 

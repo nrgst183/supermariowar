@@ -31,9 +31,9 @@ UI_PlayerControlsSelectMenu::UI_PlayerControlsSelectMenu()
 
     //The controller buttons the theater and the editors show
     miButtonPromptsField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Button Prompts", SettingsPage::ROW_W, SettingsPage::LABEL_W);
-    miButtonPromptsField->add("Auto", 0);
-    miButtonPromptsField->add("Xbox", 1);
     miButtonPromptsField->add("Original Xbox", 2);
+    miButtonPromptsField->add("Xbox", 1);
+    miButtonPromptsField->add("Auto", 0);
     miButtonPromptsField->setOutputPtr(&game_values.buttonprompts);
     miButtonPromptsField->setCurrentValue(game_values.buttonprompts);
     page.add(miButtonPromptsField, "Button icons to show (Auto matches your controller)");
