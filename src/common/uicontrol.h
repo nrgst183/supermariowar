@@ -48,6 +48,27 @@ public:
         return MENU_CODE_NONE;
     }
 
+    /// Where the control is on the screen: the menus frame it when it's the focused one, and the mouse
+    /// points at it there. Empty (w 0): no single box (a control that shows its own selection)
+    struct Box {
+        short x = 0;
+        short y = 0;
+        short w = 0;
+        short h = 0;
+    };
+    virtual Box FocusBox() const {
+        return {};
+    }
+    /// A click at x, y on the control when it does something of its own there (true, and the code
+    /// to handle); false: the menu's usual click (as A)
+    virtual bool PointerPress(short /*x*/, short /*y*/, MenuCodeEnum& /*code*/) {
+        return false;
+    }
+    bool Contains(short x, short y) const {
+        const Box b = FocusBox();
+        return b.w > 0 && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
+    }
+
     /// Left/right on the control while it's only focused, when the menu has nothing that way: a value
     /// field takes the next/previous value at once (no select, change, select). Whether it does that,
     /// and doing it (dir -1/1): the code its change returns

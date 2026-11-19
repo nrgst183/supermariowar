@@ -3,6 +3,7 @@
 // the namespace worldeditor:: so that its names don't clash with the game's or the
 // other editor's. SMW_EMBEDDED_EDITOR leaves out what the game has itself (the
 // window, the screen surfaces, the stand-ins for gameplay code).
+#include <algorithm>
 #include <new>    // (placement new: a session starts with new menus)
 
 #define SMW_EMBEDDED_EDITOR

@@ -6,11 +6,14 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
+#include "ui/SettingsPage.h"
 
 UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     : UI_Menu()
 {
-    miFireballLimitField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 60, "Fireball Limit", 500, 220);
+    SettingsPage page(9);
+
+    miFireballLimitField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Fireball Limit", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miFireballLimitField->add("Unlimited", 0);
     miFireballLimitField->add("2", 2);
     miFireballLimitField->add("5", 5);
@@ -25,8 +28,9 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miFireballLimitField->add("50", 50);
     miFireballLimitField->setOutputPtr(&game_values.fireballlimit);
     miFireballLimitField->setCurrentValue(game_values.fireballlimit);
+    page.add(miFireballLimitField, "Fireballs per Fire Flower");
 
-    miHammerLimitField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 100, "Hammer Limit", 500, 220);
+    miHammerLimitField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Hammer Limit", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miHammerLimitField->add("Unlimited", 0);
     miHammerLimitField->add("2", 2);
     miHammerLimitField->add("5", 5);
@@ -41,8 +45,9 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miHammerLimitField->add("50", 50);
     miHammerLimitField->setOutputPtr(&game_values.hammerlimit);
     miHammerLimitField->setCurrentValue(game_values.hammerlimit);
+    page.add(miHammerLimitField, "Hammers per Hammer Suit");
 
-    miBoomerangLimitField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 140, "Boomerang Limit", 500, 220);
+    miBoomerangLimitField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Boomerang Limit", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miBoomerangLimitField->add("Unlimited", 0);
     miBoomerangLimitField->add("2", 2);
     miBoomerangLimitField->add("5", 5);
@@ -57,8 +62,9 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miBoomerangLimitField->add("50", 50);
     miBoomerangLimitField->setOutputPtr(&game_values.boomeranglimit);
     miBoomerangLimitField->setCurrentValue(game_values.boomeranglimit);
+    page.add(miBoomerangLimitField, "Throws per Boomerang Flower");
 
-    miFeatherLimitField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 180, "Feather Limit", 500, 220);
+    miFeatherLimitField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Feather Limit", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miFeatherLimitField->add("Unlimited", 0);
     miFeatherLimitField->add("2", 2);
     miFeatherLimitField->add("5", 5);
@@ -73,8 +79,9 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miFeatherLimitField->add("50", 50);
     miFeatherLimitField->setOutputPtr(&game_values.featherlimit);
     miFeatherLimitField->setCurrentValue(game_values.featherlimit);
+    page.add(miFeatherLimitField, "Uses per Feather");
 
-    miLeafLimitField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 220, "Leaf Limit", 500, 220);
+    miLeafLimitField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Leaf Limit", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miLeafLimitField->add("Unlimited", 0);
     miLeafLimitField->add("2", 2);
     miLeafLimitField->add("5", 5);
@@ -89,8 +96,9 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miLeafLimitField->add("50", 50);
     miLeafLimitField->setOutputPtr(&game_values.leaflimit);
     miLeafLimitField->setCurrentValue(game_values.leaflimit);
+    page.add(miLeafLimitField, "Tail spins per Super Leaf");
 
-    miPwingsLimitField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 260, "P-Wings Limit", 500, 220);
+    miPwingsLimitField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "P-Wings Limit", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miPwingsLimitField->add("Unlimited", 0);
     miPwingsLimitField->add("2", 2);
     miPwingsLimitField->add("5", 5);
@@ -105,8 +113,9 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miPwingsLimitField->add("50", 50);
     miPwingsLimitField->setOutputPtr(&game_values.pwingslimit);
     miPwingsLimitField->setCurrentValue(game_values.pwingslimit);
+    page.add(miPwingsLimitField, "Uses per P-Wing");
 
-    miTanookiLimitField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 300, "Tanooki Limit", 500, 220);
+    miTanookiLimitField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Tanooki Limit", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miTanookiLimitField->add("Unlimited", 0);
     miTanookiLimitField->add("2", 2);
     miTanookiLimitField->add("5", 5);
@@ -121,8 +130,9 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miTanookiLimitField->add("50", 50);
     miTanookiLimitField->setOutputPtr(&game_values.tanookilimit);
     miTanookiLimitField->setCurrentValue(game_values.tanookilimit);
+    page.add(miTanookiLimitField, "Statue turns per Tanooki Suit");
 
-    miBombLimitField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 340, "Bomb Limit", 500, 220);
+    miBombLimitField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Bomb Limit", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miBombLimitField->add("Unlimited", 0);
     miBombLimitField->add("2", 2);
     miBombLimitField->add("5", 5);
@@ -137,8 +147,9 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miBombLimitField->add("50", 50);
     miBombLimitField->setOutputPtr(&game_values.bombslimit);
     miBombLimitField->setCurrentValue(game_values.bombslimit);
+    page.add(miBombLimitField, "Bombs per Bob-omb item");
 
-    miWandLimitField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 380, "Wand Limit", 500, 220);
+    miWandLimitField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Wand Limit", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miWandLimitField->add("Unlimited", 0);
     miWandLimitField->add("2", 2);
     miWandLimitField->add("5", 5);
@@ -153,24 +164,7 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miWandLimitField->add("50", 50);
     miWandLimitField->setOutputPtr(&game_values.wandlimit);
     miWandLimitField->setCurrentValue(game_values.wandlimit);
+    page.add(miWandLimitField, "Shots per Wand");
 
-    miProjectilesLimitsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
-    miProjectilesLimitsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
-
-    AddControl(miFireballLimitField, miProjectilesLimitsMenuBackButton, miHammerLimitField, nullptr, miProjectilesLimitsMenuBackButton);
-    AddControl(miHammerLimitField, miFireballLimitField, miBoomerangLimitField, nullptr, miProjectilesLimitsMenuBackButton);
-    AddControl(miBoomerangLimitField, miHammerLimitField, miFeatherLimitField, nullptr, miProjectilesLimitsMenuBackButton);
-    AddControl(miFeatherLimitField, miBoomerangLimitField, miLeafLimitField, nullptr, miProjectilesLimitsMenuBackButton);
-    AddControl(miLeafLimitField, miFeatherLimitField, miPwingsLimitField, nullptr, miProjectilesLimitsMenuBackButton);
-    AddControl(miPwingsLimitField, miLeafLimitField, miTanookiLimitField, nullptr, miProjectilesLimitsMenuBackButton);
-    AddControl(miTanookiLimitField, miPwingsLimitField, miBombLimitField, nullptr, miProjectilesLimitsMenuBackButton);
-    AddControl(miBombLimitField, miTanookiLimitField, miWandLimitField, nullptr, miProjectilesLimitsMenuBackButton);
-    AddControl(miWandLimitField, miBombLimitField, miProjectilesLimitsMenuBackButton, nullptr, miProjectilesLimitsMenuBackButton);
-
-    AddControl(miProjectilesLimitsMenuBackButton, miWandLimitField, miFireballLimitField, miWandLimitField, nullptr);
-
-    AddTitleBar("Weapon Use Limits Menu");
-
-    setInitialFocus(miFireballLimitField);
-    SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
+    miProjectilesLimitsMenuBackButton = page.finish(*this, "Weapon Use Limits", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

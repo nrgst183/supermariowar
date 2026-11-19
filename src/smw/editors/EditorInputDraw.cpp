@@ -178,30 +178,30 @@ struct Entry {
 
 const Entry BLOCKS[] = {
     {0, "Brick block", "breaks when a big player hits it from below"},
-    {1, "? block", "gives a power-up when hit; point at one and press K to choose what comes out"},
+    {1, "? block", "gives a power-up when hit (set what's inside on the Modes page)"},
     {2, "Donut block", "falls a moment after a player stands on it"},
-    {3, "Flip block", "spins when hit: players fall through it while it spins"},
+    {3, "Flip block", "spins when hit, and players fall through it while it spins"},
     {4, "Bounce block", "bounces a player that hits it from below"},
     {5, "Note block", "bounces players that land on it"},
-    {6, "Throw block", "pick it up with run and throw it"},
-    {15, "View block", "a ? block that shows what is in it"},
-    {16, "Red throw block", "pick it up with run and throw it"},
-    {17, "Red note block", "a note block: a big bounce"},
-    {18, "Blue note block", "a note block: a small bounce"},
-    {19, "Gray throw block", "pick it up with run and throw it"},
+    {6, "Throw block", "hold run to pick it up, then throw it"},
+    {15, "View block", "a ? block that shows what's inside"},
+    {16, "Red throw block", "hold run to pick it up, then throw it"},
+    {17, "Red note block", "a note block with a big bounce"},
+    {18, "Blue note block", "a note block with a small bounce"},
+    {19, "Gray throw block", "hold run to pick it up, then throw it"},
 };
 const Entry BREAKABLE[] = {
-    {20, "Fireball block", "only a fireball breaks it"}, {21, "Feather block", "only a feather's spin breaks it"},
+    {20, "Fireball block", "only a fireball breaks it"}, {21, "Feather block", "only a cape spin breaks it"},
     {22, "Shell block", "only a thrown shell breaks it"}, {23, "Bob-omb block", "only a Bob-omb's blast breaks it"},
     {24, "Boomerang block", "only a boomerang breaks it"}, {25, "Hammer block", "only a hammer breaks it"},
     {26, "Kuribo's shoe block", "only a Kuribo's shoe breaks it"}, {27, "P-wings block", "only a player with P-wings breaks it"},
-    {28, "Star block", "only a player with a star breaks it"}, {29, "Leaf block", "only a leaf's tail breaks it"},
+    {28, "Star block", "only a player with a star breaks it"}, {29, "Leaf block", "only a tail swipe breaks it"},
 };
 const char* COLORS[] = {"Red", "Green", "Yellow", "Blue"};
 const Entry ITEMS[] = {
-    {0, "Spring", "bounces whoever stands on it; can be carried"}, {1, "Spike", "hurts whoever touches it"},
-    {2, "Kuribo's shoe", "jump in to stomp everything"}, {3, "Gold spring", "a spring with a much bigger bounce"},
-    {4, "Sticky Kuribo's shoe", "a Kuribo's shoe you can't get out of"}, {5, "Throw box", "pick it up and throw it: it breaks on impact"},
+    {0, "Spring", "bounces whoever lands on it, and can be carried"}, {1, "Spike", "hurts whoever touches it"},
+    {2, "Kuribo's shoe", "hop in to stomp on anything"}, {3, "Gold spring", "a spring with a much bigger bounce"},
+    {4, "Sticky Kuribo's shoe", "a Kuribo's shoe you can't get out of"}, {5, "Throw box", "pick it up and throw it; it breaks when it hits"},
 };
 const char* TILE_TYPES[] = {"Solid", "Solid on top", "Ice", "Death", "Death on top", "Death on bottom", "Death on left", "Death on right",
     "Ice on top", "Ice, death on bottom", "Ice, death on left", "Ice, death on right", "Super death", "Super death on top",
@@ -464,17 +464,17 @@ struct Page {
 };
 
 const Page LEVEL_PAGES[] = {
-    {"Terrain", &ART_GROUND, "The ground, walls and scenery: tiles from the tilesets, painted on one of 4 layers."},
+    {"Terrain", &ART_GROUND, "Ground, walls and scenery. Take tiles from a tileset and paint them on one of 4 layers."},
     {"Blocks", nullptr, "Things players can bump, break, bounce on and flip. Pick one, then click on the map."},
     {"Items", &ART_SPRING, "Springs, spikes, shoes and boxes that start on the map."},
-    {"Types", &ART_TYPES, "How the tiles behave: solid, solid on top, ice, or deadly. Painted over the tiles."},
-    {"Zones", &ART_ZONE, "Where nobody starts, or no item appears: paint the cells."},
+    {"Types", &ART_TYPES, "How tiles behave: solid, solid on top, icy or deadly. Paint them over the tiles."},
+    {"Zones", &ART_ZONE, "Mark the places where players can't spawn or items can't appear."},
     {"Warps", &ART_PIPE, "Pipes and doors that take players to another warp of the same color."},
-    {"Platforms", &ART_PLATFORM, "Moving platforms: their tiles, path and speed."},
+    {"Platforms", &ART_PLATFORM, "Moving platforms. Set their tiles, path and speed."},
     {"Hazards", &ART_FIRE, "Fireballs, rotodiscs, bullet bills and other things that move on their own."},
-    {"Modes", &ART_FLAG, "What some game modes need: race goals and flag bases."},
-    {"Look", &ART_LOOK, "The background, the eyecandy and the music of the map."},
-    {"File", &ART_DISK, "Maps: new, open, save, and leaving the editor."},
+    {"Modes", &ART_FLAG, "Race goals and flag bases, for the modes that use them."},
+    {"Look", &ART_LOOK, "The map's background, eyecandy and music."},
+    {"File", &ART_DISK, "Create, open and save maps, or leave the editor."},
 };
 constexpr int LEVEL_PAGE_COUNT = static_cast<int>(sizeof(LEVEL_PAGES) / sizeof(LEVEL_PAGES[0]));
 
@@ -523,12 +523,12 @@ void levelPage(Layout& l)
             theme::inset(box.x, box.y, box.w, box.h);
             if (!sh::drawTiles(box.x + 4, box.y + 4, 64))
                 theme::font().drawCentered(box.x + 36, box.y + 28, "none");
-            theme::font().draw(l.x + 82, l.y + 4, mode == 1 ? "In use," : "Not in use");
-            theme::font().draw(l.x + 82, l.y + 20, "layer " + std::to_string(sh::layer() + 1));
+            theme::font().draw(l.x + 82, l.y + 4, mode == 1 ? "Painting" : "Not painting");
+            theme::font().draw(l.x + 82, l.y + 20, "on layer " + std::to_string(sh::layer() + 1));
             l.y += 80;
-            pageButton(l, "Choose tiles", [] { runKey(SDLK_T); }, "Opens the tilesets: drag over tiles to take several", &ART_GROUND, "T",
+            pageButton(l, "Choose tiles", [] { runKey(SDLK_T); }, "Open the tilesets. Drag across tiles to take several", &ART_GROUND, "T",
                 mode == 1);
-            pageButton(l, "Animated tiles", [] { runKey(SDLK_A); }, "Tiles that move: water, lava, coins...", &ART_LOOK, "A", mode == 8);
+            pageButton(l, "Animated tiles", [] { runKey(SDLK_A); }, "Moving tiles like water, lava and coins", &ART_LOOK, "A", mode == 8);
             pageButton(l, "Use the tiles", [] { sh::setMode(1); }, "Back to painting the selected tiles", &ART_BRUSH, nullptr, false);
             break;
         }
@@ -546,7 +546,7 @@ void levelPage(Layout& l)
                 const int id = 7 + color;
                 cell(r, mode == 0 && sh::block() == id && sh::switchOn(color) == on, [&](int x, int y) { drawBlock(x, y, id, on); },
                     [id, on] { sh::setBlock(id, on); },
-                    std::string(COLORS[color]) + " switch, starts " + (on ? "ON" : "OFF") + ": hitting it flips every " + COLORS[color] + " switch block");
+                    std::string(COLORS[color]) + " switch, starts " + (on ? "ON" : "OFF") + ". Hit it to flip every " + COLORS[color] + " switch block");
             }, 4);
             section(l, "Switch blocks");
             grid(l, 8, [&](int k, const SDL_Rect& r) {
@@ -555,7 +555,7 @@ void levelPage(Layout& l)
                 const int id = 11 + color;
                 cell(r, mode == 0 && sh::block() == id && sh::switchBlockOn() == on, [&](int x, int y) { drawBlock(x, y, id, on); },
                     [id, on] { sh::setBlock(id, on); },
-                    std::string(COLORS[color]) + " switch block, " + (on ? "solid" : "an outline") + " at the start: the " + COLORS[color] + " switches flip it");
+                    std::string(COLORS[color]) + " switch block, starts " + (on ? "solid" : "as an outline") + ". " + COLORS[color] + " switches flip it");
             }, 4);
             section(l, "Breakable only by...");
             grid(l, 10, [&](int k, const SDL_Rect& r) {
@@ -587,16 +587,34 @@ void levelPage(Layout& l)
                     },
                     [k] { sh::setTileType(k + 1); }, TILE_TYPES[k]);
             });
-            l.y += drawWrapped(l.x, l.y, l.w, "Delete clears every tile type of the map.") + 6;
+            l.y += 4;
+            pageButton(l, "Clear all tile types", [] {
+                if (!confirmed("clear-types", "This removes every tile type from the map"))
+                    return;
+                sh::setMode(6);
+                runKey(SDLK_DELETE, false, false, true);
+            }, "Remove every tile type from the map", &ART_TYPES, "Del");
             break;
         case 4:    //Zones
-            pageButton(l, "No player starts", [] { runKey(SDLK_X, false, false, true); }, "Cells where no player appears at the start or after dying",
+            pageButton(l, "No player starts", [] { runKey(SDLK_X, false, false, true); }, "Cells where players can't appear at the start or after dying",
                 &ART_ZONE, "X", mode == 4);
-            pageButton(l, "No items", [] { runKey(SDLK_Z, false, false, true); }, "Cells where no item appears", &ART_ZONE, "Z", mode == 5);
+            pageButton(l, "No items", [] { runKey(SDLK_Z, false, false, true); }, "Cells where items can't appear", &ART_ZONE, "Z", mode == 5);
             l.y += 4;
-            l.y += drawWrapped(l.x, l.y, l.w, "Click or drag on the map to mark cells, the right button clears them.") + 6;
-            if (mode == 4)
-                l.y += drawWrapped(l.x, l.y, l.w, "Keys: X everyone, 1-4 a team's own zone; A all cells, N none, I invert.") + 6;
+            l.y += drawWrapped(l.x, l.y, l.w, padUsed() ? "Mark cells on the map with A, clear them with B." :
+                                                          "Click or drag on the map to mark cells. Right-click to clear them.") + 6;
+            if (mode == 4) {
+                //(whose start zone: everyone's, or a team's; then the whole map at once)
+                section(l, "Whose zone");
+                grid(l, 5, [&](int k, const SDL_Rect& r) {
+                    cell(r, sh::zoneTeam() == k,
+                        [k](int x, int y) { theme::font().drawCentered(x + 16, y + 8, k == 0 ? "All" : std::to_string(k).c_str()); },
+                        [k] { runKey(k == 0 ? SDLK_X : static_cast<SDL_Keycode>(SDLK_1 + k - 1), false, false, true); },
+                        k == 0 ? "Everyone's zone" : "Team " + std::to_string(k) + "'s own zone");
+                });
+                pageButton(l, "Mark every cell", [] { sh::setMode(4); runKey(SDLK_A, false, false, true); }, "Mark the whole map for this zone", &ART_ZONE, "A");
+                pageButton(l, "Clear every cell", [] { sh::setMode(4); runKey(SDLK_N, false, false, true); }, "Clear the whole map for this zone", &ART_ZONE, "N");
+                pageButton(l, "Invert", [] { sh::setMode(4); runKey(SDLK_I, false, false, true); }, "Swap marked and unmarked cells", &ART_ZONE, "I");
+            }
             break;
         case 5:    //Warps
             pageButton(l, "Warps", [] { runKey(SDLK_W); }, "Pick a warp's color and direction, then click its cells", &ART_PIPE, "W", mode == 2);
@@ -608,15 +626,15 @@ void levelPage(Layout& l)
             pageButton(l, "Hazards", [] { runKey(SDLK_H); }, "Add, move and set up the hazards", &ART_FIRE, "H");
             break;
         case 8:    //Modes
-            pageButton(l, "Race goals, flag bases", [] { runKey(SDLK_J); }, "Where the race goals and the flag bases are", &ART_FLAG, "J");
-            pageButton(l, "? block contents", [] { closeWindow(); }, "Point at a ? block on the map and press K to choose what comes out of it",
+            pageButton(l, "Race goals, flag bases", [] { runKey(SDLK_J); }, "Place the race goals and flag bases", &ART_FLAG, "J");
+            pageButton(l, "? block contents", [] { armBlockContents(); }, "Choose a ? block on the map to set what's inside it",
                 nullptr, "K");
             break;
         case 9:    //Look
-            pageButton(l, "Background", [] { runKey(SDLK_G); }, "Pick the map's background picture", &ART_LOOK, "G");
+            pageButton(l, "Backgrounds", [] { runKey(SDLK_B); }, "Choose the map's background from all of them", &ART_LOOK, "B");
+            pageButton(l, "Next background", [] { runKey(SDLK_G, false, false, true); }, "Switch to the next background (and its music)", &ART_LOOK, "G");
             pageButton(l, "Eyecandy", [] { runKey(SDLK_E); }, "Clouds, ghosts, leaves, snow, bubbles...", &ART_LOOK, "E");
-            pageButton(l, "Music", [] { runKey(SDLK_R, false, false, true); }, "Which music plays: changes the category", &ART_LOOK, "R");
-            pageButton(l, "Thumbnails", [] { runKey(SDLK_B); }, "The pictures of the map in the menus", &ART_LOOK, "B");
+            pageButton(l, "Music", [] { runKey(SDLK_R, false, false, true); }, "Change which kind of music plays", &ART_LOOK, "R");
             break;
         default: {    //File
             bool file = false;
@@ -626,10 +644,26 @@ void levelPage(Layout& l)
                 if (!file)
                     continue;
                 const std::string key = keyName(a);
-                pageButton(l, a.label, [&a] { runKey(a.key, a.shift, a.ctrl); }, a.label, nullptr, nullptr);
-                //(its key, drawn over the button's right end)
-                const int kw = std::max(16, theme::font().getWidth(key) + 8);
-                prompts::drawKey(l.x + l.w - kw - 4, l.y - 27 + 4, key);
+                pageButton(l, a.label, [&a] {
+                    //(the actions that throw the map's changes away: chosen twice)
+                    const std::string label = a.label;
+                    if (label == "Clear all" && !confirmed("clear", "This clears the whole map"))
+                        return;
+                    if (label == "New map" && !confirmed("new", "This starts a new, empty map"))
+                        return;
+                    //(N is "no zone here" in the zones mode: from the tiles' mode, it's a new map)
+                    if (label == "New map")
+                        sh::setMode(1);
+                    if ((label == "Previous map" || label == "Next map") && !s.undos.empty() &&
+                        !confirmed(label, "Changes you haven't saved will be lost"))
+                        return;
+                    runKey(a.key, a.shift, a.ctrl);
+                }, a.label, nullptr, nullptr);
+                //(its key, drawn over the button's right end: for the keyboard)
+                if (!padUsed()) {
+                    const int kw = std::max(16, theme::font().getWidth(key) + 8);
+                    prompts::drawKey(l.x + l.w - kw - 4, l.y - 27 + 4, key);
+                }
             }
             break;
         }
@@ -812,9 +846,9 @@ void drawWindow()
     int ty = win.y + 40;
     if (level && !screenMode) {
         static const Art* toolArt[] = {&ART_BRUSH, &ART_ERASER, &ART_MOVE, &ART_PICK};
-        static const char* toolTip[] = {"Paint: click or drag to place what is selected (the right button removes)",
-            "Erase: click or drag to remove", "Select and move: drag over cells, then drag them somewhere else (M)",
-            "Pick: click the map to take the block or tile there"};
+        static const char* toolTip[] = {"Paint: click or drag to place. Right-click removes",
+            "Erase: click or drag to remove", "Move: drag over cells, then drag them to a new spot (M)",
+            "Pick: click the map to copy the block or tile there"};
         int x = win.x + 8;
         for (int t = 0; t < TOOL_COUNT; t++) {
             const SDL_Rect r {x, ty, 26, 26};
@@ -844,7 +878,7 @@ void drawWindow()
         theme::icon(blocks.x + 5, blocks.y + 5, theme::Icon::QuestionBlock);
         if (!sh::blocksShown())
             fill(blocks.x + 4, blocks.y + 12, 18, 2, {216, 40, 32, 255});
-        addWidget(blocks, [] { sh::setBlocksShown(!sh::blocksShown()); }, "Hide the blocks, to see the tiles under them (V)", ZONE_TOOLS);
+        addWidget(blocks, [] { sh::setBlocksShown(!sh::blocksShown()); }, "Hide blocks to see the tiles under them (V)", ZONE_TOOLS);
         ty += 32;
         //The last things picked (LB / RB on the map)
         if (!s.recents.empty()) {
@@ -859,7 +893,7 @@ void drawWindow()
                 theme::block(r.x, r.y, r.w, r.h, hovered(r) ? theme::Tone::Green : sel ? theme::Tone::Gold : theme::Tone::Dark);
                 drawScaled(r.x + 2, r.y + 2, 24, [&b](int x, int y) { drawBrush(b, x, y); });
                 addWidget(r, [b] { s.stepped = b; sh::setBrush(b); if (currentTool() != TOOL_ERASE) setTool(TOOL_PAINT); },
-                    "Picked before: " + brushName(b), ZONE_TOOLS, sel, true);
+                    "Used recently: " + brushName(b), ZONE_TOOLS, sel, true);
                 rx += 30;
             }
             if (controller)
@@ -1156,16 +1190,30 @@ void drawCellTools()
         cellOf(s.cx, s.cy, &c, &r);
         cellFrame(s.mouseDragCol, s.mouseDragRow, c, r, {255, 255, 255, 255}, "Copy", s.cy);
     }
+    if (s.mouseRect) {
+        int c = 0, r = 0;
+        cellOf(s.cx, s.cy, &c, &r);
+        if (!s.mouseRectErase)
+            drawGhost(s.mouseDragCol, s.mouseDragRow, c, r, false);
+        const std::string size = std::to_string(std::abs(c - s.mouseDragCol) + 1) + " x " + std::to_string(std::abs(r - s.mouseDragRow) + 1);
+        cellFrame(s.mouseDragCol, s.mouseDragRow, c, r, s.mouseRectErase ? red : SDL_Color {255, 255, 255, 255},
+            s.mouseRectErase ? "Clear " + size : size, s.cy);
+    }
     if (s.armed == Armed::Paste) {
         int w = 1, h = 1;
         sh::clipboard(&w, &h);
         int c = 0, r = 0;
         cellOf(s.cx, s.cy, &c, &r);
-        cellFrame(c, r, std::min(c + w - 1, sh::MAP_COLS - 1), std::min(r + h - 1, sh::MAP_ROWS - 1), {255, 255, 255, 255}, "Paste here (A)", s.cy);
+        cellFrame(c, r, std::min(c + w - 1, sh::MAP_COLS - 1), std::min(r + h - 1, sh::MAP_ROWS - 1), {255, 255, 255, 255}, padUsed() ? "Paste here (A)" : "Paste here", s.cy);
     } else if (s.armed == Armed::Fill) {
         int c = 0, r = 0;
         cellOf(s.cx, s.cy, &c, &r);
-        cellFrame(c, r, c, r, {255, 255, 255, 255}, "Fill from here (A)", s.cy);
+        cellFrame(c, r, c, r, {255, 255, 255, 255}, padUsed() ? "Fill from here (A)" : "Fill from here", s.cy);
+    } else if (s.armed == Armed::Properties) {
+        int c = 0, r = 0;
+        cellOf(s.cx, s.cy, &c, &r);
+        const bool block = sh::hasProperties(c, r);
+        cellFrame(c, r, c, r, block ? SDL_Color {255, 255, 255, 255} : red, block ? "Open this block" : "Not a ? block", s.cy);
     }
 }
 
@@ -1291,7 +1339,7 @@ void drawChip()
     const int tool = currentTool();
     const sh::Brush brush = sh::brush();
     //(the name: the tool when it isn't painting, else the selection, with its size for tiles)
-    std::string name = tool == TOOL_ERASE ? "Eraser" : tool == TOOL_PICK ? "Take: A picks up a cell" : selectionName();
+    std::string name = tool == TOOL_ERASE ? "Eraser" : tool == TOOL_PICK ? "Pick: A copies a cell" : selectionName();
     if (tool == TOOL_PAINT && brush.mode == 1)
         name = brushName(brush);
     const int col = static_cast<int>(s.cx) / TILE;
@@ -1306,13 +1354,15 @@ void drawChip()
         dragging = dragging || p.drag >= 0;
     std::vector<prompts::Prompt> buttons;
     if (s.armed == Armed::Copy)
-        buttons = {{{prompts::Pad::A}, {}, "hold, move over the cells, let go"}, {{prompts::Pad::B}, {}, "stop"}};
+        buttons = {{{prompts::Pad::A}, {}, "hold and drag over the cells"}, {{prompts::Pad::B}, {}, "stop"}};
     else if (s.armed == Armed::Paste)
         buttons = {{{prompts::Pad::A}, {}, "paste here"}, {{prompts::Pad::B}, {}, "stop pasting"}};
     else if (s.armed == Armed::Fill)
         buttons = {{{prompts::Pad::A}, {}, "fill from this cell"}, {{prompts::Pad::B}, {}, "stop"}};
+    else if (s.armed == Armed::Properties)
+        buttons = {{{prompts::Pad::A}, {}, "open this ? block"}, {{prompts::Pad::B}, {}, "stop"}};
     else if (dragging)
-        buttons = {{{prompts::Pad::LStick}, {}, "size the rectangle"}, {{}, {}, "let go to fill it"}};
+        buttons = {{{prompts::Pad::LStick}, {}, "size the rectangle"}, {{}, {}, "release to fill it"}};
     else if (sh::paintsCells() && tool != TOOL_PICK)
         buttons = {{{prompts::Pad::A}, {}, tool == TOOL_ERASE ? "erase (hold: area)" : "place (hold: area)"},
             {{prompts::Pad::B}, {}, "erase"}, {{prompts::Pad::X}, {}, "take"}, {{prompts::Pad::Y}, {}, "layer"},
@@ -1382,14 +1432,14 @@ void drawChip()
 void drawWorldChip()
 {
     namespace sh = worldeditor::shell;
-    const std::string name = sh::modeName() + (sh::autoPaint() ? "  (auto paint)" : "");
+    const std::string name = sh::modeName() + (sh::autoPaint() ? "  (auto-paint)" : "");
     const std::string info = sh::worldName() + "   " + std::to_string(static_cast<int>(s.cx) / TILE) + "," +
                              std::to_string(static_cast<int>(s.cy) / TILE);
     const bool controller = prompts::lastDevice() == prompts::Device::Controller;
     const std::vector<prompts::Prompt> row1 = controller ? std::vector<prompts::Prompt> {{{prompts::Pad::Start}, {}, "editor"}}
                                                          : std::vector<prompts::Prompt> {{{}, {"Tab"}, "editor"}};
     const std::vector<prompts::Prompt> buttons = {{{prompts::Pad::A}, {}, "place"}, {{prompts::Pad::B}, {}, "remove"},
-        {{prompts::Pad::LT, prompts::Pad::RT}, {}, "shift/ctrl"}, {{prompts::Pad::RStick}, {}, "undo"}, {{prompts::Pad::LStick}, {}, "whole world"}};
+        {{prompts::Pad::LT, prompts::Pad::RT}, {}, "shift/ctrl"}, {{prompts::Pad::RStick}, {}, "undo"}, {{prompts::Pad::LStick}, {}, "see all"}};
     const int pw = prompts::promptsWidth(row1, 14);
     const int bw = controller && s.hints ? prompts::promptsWidth(buttons, 10) : 0;
     const int w = std::max(46 + std::max(theme::font().getWidth(name), theme::font().getWidth(info)) + 16 + pw + 10, bw + 20);
@@ -1515,6 +1565,7 @@ void drawScreenStrip()
     const leveleditor::shell::Screen& sc = s.screen;
     const bool controller = prompts::lastDevice() == prompts::Device::Controller;
     std::vector<prompts::Prompt> row;
+    const bool exitShown = s.editor == Editor::Level && leveleditor::shell::exitPrompt();
     if (controller) {
         if (!sc.a.empty())
             row.push_back({{prompts::Pad::A}, {}, sc.a});
@@ -1522,8 +1573,14 @@ void drawScreenStrip()
             row.push_back({{prompts::Pad::B}, {}, sc.b});
         if (!sc.shoulders.empty())
             row.push_back({{prompts::Pad::LB, prompts::Pad::RB}, {}, sc.shoulders});
-        row.push_back({{prompts::Pad::Start}, {}, "more"});
-        row.push_back({{prompts::Pad::Back}, {}, "done"});
+        //(the exit prompt: only its own answers)
+        if (!exitShown) {
+            row.push_back({{prompts::Pad::Start}, {}, "more"});
+            row.push_back({{prompts::Pad::Back}, {}, "done"});
+        }
+    } else if (exitShown) {
+        row.push_back({{}, {"Enter"}, "choose"});
+        row.push_back({{}, {"Esc"}, "stay"});
     } else {
         row.push_back({{}, {"Tab"}, "commands"});
         row.push_back({{}, {"Esc"}, "done"});
@@ -1572,7 +1629,7 @@ void drawHints()
     if (controller)
         items = {{prompts::Pad::A, "", "place"}, {prompts::Pad::B, "", "remove"}, {prompts::Pad::X, "", "shift"},
             {prompts::Pad::Y, "", "ctrl"}, {prompts::Pad::RB, "", "ok"}, {prompts::Pad::Start, "", "editor"},
-            {prompts::Pad::Back, "", "back"}, {prompts::Pad::LB, "", "hide"}};
+            {prompts::Pad::Back, "", "back"}, {prompts::Pad::LB, "", "hide bar"}};
     else
         items = {{prompts::Pad::Start, "Tab", "editor"}, {prompts::Pad::Back, "F1", "help"}, {prompts::Pad::B, "Esc", "back"}};
     const int gap = 7;

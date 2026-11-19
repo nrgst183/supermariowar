@@ -7,11 +7,14 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_StoredPowerupResetButton.h"
 #include "ui/MI_Text.h"
+#include "ui/SettingsPage.h"
 
 UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     : UI_Menu()
 {
-    miStoredPowerupDelayField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 100, "Item Use Speed", 500, 220);
+    SettingsPage page(7);
+
+    miStoredPowerupDelayField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Item Use Speed", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miStoredPowerupDelayField->add("Very Slow", 2);
     miStoredPowerupDelayField->add("Slow", 3);
     miStoredPowerupDelayField->add("Moderate", 4);
@@ -19,8 +22,9 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miStoredPowerupDelayField->add("Very Fast", 6);
     miStoredPowerupDelayField->setOutputPtr(&game_values.storedpowerupdelay);
     miStoredPowerupDelayField->setCurrentValue(game_values.storedpowerupdelay);
+    page.add(miStoredPowerupDelayField, "How quickly a stored item comes out when used");
 
-    miItemRespawnField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 140, "Item Spawn", 500, 220);
+    miItemRespawnField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Item Spawn", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miItemRespawnField->add("Off", 0);
     miItemRespawnField->add("5 Seconds", 310);
     miItemRespawnField->add("10 Seconds", 620);
@@ -36,8 +40,9 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miItemRespawnField->add("60 Seconds", 3720);
     miItemRespawnField->setOutputPtr(&game_values.itemrespawntime);
     miItemRespawnField->setCurrentValue(game_values.itemrespawntime);
+    page.add(miItemRespawnField, "How often items appear at a map's item spots");
 
-    miHiddenBlockRespawnField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 180, "Hidden Block Hide", 500, 220);
+    miHiddenBlockRespawnField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Hidden Block Hide", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miHiddenBlockRespawnField->add("Off", 0);
     miHiddenBlockRespawnField->add("5 Seconds", 310);
     miHiddenBlockRespawnField->add("10 Seconds", 620);
@@ -53,46 +58,35 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miHiddenBlockRespawnField->add("60 Seconds", 3720);
     miHiddenBlockRespawnField->setOutputPtr(&game_values.hiddenblockrespawn);
     miHiddenBlockRespawnField->setCurrentValue(game_values.hiddenblockrespawn);
+    page.add(miHiddenBlockRespawnField, "How long until a hit hidden block hides again");
 
-    miSwapStyleField = new MI_SelectField<MysteryMushroomSwapStyle>(&rm->spr_selectfield, 70, 220, "Swap Style", 500, 220);
+    miSwapStyleField = new MI_SelectField<MysteryMushroomSwapStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Swap Style", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miSwapStyleField->add("Walk", MysteryMushroomSwapStyle::Walk);
     miSwapStyleField->add("Blink", MysteryMushroomSwapStyle::Blink);
     miSwapStyleField->add("Instant", MysteryMushroomSwapStyle::Instant);
     miSwapStyleField->setOutputPtr(&game_values.swapstyle);
     miSwapStyleField->setCurrentValue(game_values.swapstyle);
+    page.add(miSwapStyleField, "How players trade places with the Mystery Mushroom");
 
-    miBonusWheelField = new MI_SelectField<BonusWheelStyle>(&rm->spr_selectfield, 70, 260, "Bonus Wheel", 500, 220);
+    miBonusWheelField = new MI_SelectField<BonusWheelStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Bonus Wheel", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miBonusWheelField->add("Off", BonusWheelStyle::Off);
     miBonusWheelField->add("Tournament Win", BonusWheelStyle::TournamentWin);
     miBonusWheelField->add("Every Game", BonusWheelStyle::EveryGame);
     miBonusWheelField->setOutputPtr(&game_values.bonuswheel);
     miBonusWheelField->setCurrentValue(game_values.bonuswheel);
+    page.add(miBonusWheelField, "When the bonus wheel spins");
 
-    miKeepPowerupField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 300, "Bonus Item", 500, 220);
+    miKeepPowerupField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Bonus Item", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miKeepPowerupField->add("Until Next Spin", false);
     miKeepPowerupField->add("Keep Always", true);
     miKeepPowerupField->setOutputPtr(&game_values.keeppowerup);
     miKeepPowerupField->setCurrentValue(game_values.keeppowerup ? 1 : 0);
     miKeepPowerupField->setAutoAdvance(true);
+    page.add(miKeepPowerupField, "Keep the wheel's item until the next spin, or for good");
 
-    miStoredPowerupResetButton = new MI_StoredPowerupResetButton(&rm->spr_selectfield, 70, 340, "Reset Stored Items", 500);
+    miStoredPowerupResetButton = new MI_StoredPowerupResetButton(&rm->spr_selectfield, page.x(), page.rowY(), "Reset Stored Items", SettingsPage::ROW_W);
     miStoredPowerupResetButton->SetCode(MENU_CODE_RESET_STORED_POWERUPS);
+    page.add(miStoredPowerupResetButton, "Clear every player's stored item");
 
-    miPowerupSettingsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
-    miPowerupSettingsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
-
-    AddControl(miStoredPowerupDelayField, miPowerupSettingsMenuBackButton, miItemRespawnField, nullptr, miPowerupSettingsMenuBackButton);
-    AddControl(miItemRespawnField, miStoredPowerupDelayField, miHiddenBlockRespawnField, nullptr, miPowerupSettingsMenuBackButton);
-    AddControl(miHiddenBlockRespawnField, miItemRespawnField, miSwapStyleField, nullptr, miPowerupSettingsMenuBackButton);
-    AddControl(miSwapStyleField, miHiddenBlockRespawnField, miBonusWheelField, nullptr, miPowerupSettingsMenuBackButton);
-    AddControl(miBonusWheelField, miSwapStyleField, miKeepPowerupField, nullptr, miPowerupSettingsMenuBackButton);
-    AddControl(miKeepPowerupField, miBonusWheelField, miStoredPowerupResetButton, nullptr, miPowerupSettingsMenuBackButton);
-    AddControl(miStoredPowerupResetButton, miKeepPowerupField, miPowerupSettingsMenuBackButton, nullptr, miPowerupSettingsMenuBackButton);
-
-    AddControl(miPowerupSettingsMenuBackButton, miStoredPowerupResetButton, miStoredPowerupDelayField, miStoredPowerupResetButton, nullptr);
-
-    AddTitleBar("Item Settings Menu");
-
-    setInitialFocus(miStoredPowerupDelayField);
-    SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
+    miPowerupSettingsMenuBackButton = page.finish(*this, "Item Settings", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

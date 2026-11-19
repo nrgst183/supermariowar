@@ -211,7 +211,7 @@ int editor_warp()
 
         spr_warps[0].draw(0, 0, {0, 0, 320, 32});
 
-                rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
+                if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
 
         DrawMessage();
         gfx_flipscreen();
@@ -330,7 +330,7 @@ int editor_vehicles()
         mCurrentMenu->Update();
         mCurrentMenu->Draw();
 
-        rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
+        if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
 
         DrawMessage();
         gfx_flipscreen();

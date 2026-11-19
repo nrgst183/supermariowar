@@ -469,7 +469,7 @@ int editor_stage()
                 rm->menu_font_small.draw(0, 480 - rm->menu_font_small.getHeight(), "[LMB] Select Items, [LMB] Remove Items");
         }
 
-        rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
+        if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
 
         DrawMessage();
         gfx_flipscreen();

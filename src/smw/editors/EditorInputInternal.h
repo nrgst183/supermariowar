@@ -44,10 +44,10 @@ struct Action {
 inline const std::vector<Action> LEVEL_ACTIONS = {
     {"Tiles", SDLK_T, false, false, "Modes"}, {"Blocks", SDLK_I}, {"Map items", SDLK_O}, {"Warps", SDLK_W},
     {"Move", SDLK_M}, {"Tile types", SDLK_L}, {"Platforms", SDLK_P}, {"Hazards", SDLK_H},
-    {"Animated tiles", SDLK_A}, {"Race goals", SDLK_J}, {"Block properties", SDLK_K}, {"No player spawn", SDLK_X},
-    {"No item spawn", SDLK_Z},
+    {"Animated tiles", SDLK_A}, {"Race goals", SDLK_J}, {"? block contents", SDLK_K}, {"No player starts", SDLK_X},
+    {"No items", SDLK_Z},
     {"Active layer", SDLK_Y, false, false, "Layers"}, {"Hide other layers", SDLK_U}, {"Hide blocks", SDLK_V}, {"Optimize layers", SDLK_END},
-    {"Backgrounds", SDLK_G, false, false, "Look"}, {"Thumbnails", SDLK_B}, {"Music category", SDLK_R}, {"Eyecandy", SDLK_E},
+    {"Backgrounds", SDLK_B, false, false, "Look"}, {"Next background", SDLK_G}, {"Music category", SDLK_R}, {"Eyecandy", SDLK_E},
     {"New map", SDLK_N, false, false, "File"}, {"Save", SDLK_S}, {"Save as...", SDLK_S, true}, {"Find map...", SDLK_F},
     {"New search...", SDLK_F, true}, {"Previous map", SDLK_PAGEUP}, {"Next map", SDLK_PAGEDOWN},
     {"Clear all", SDLK_DELETE, false, true, "Other"}, {"Screenshot", SDLK_INSERT}, {"Help", SDLK_F1}, {"Leave", SDLK_ESCAPE},
@@ -73,10 +73,20 @@ struct Pad {
     float lx = 0, ly = 0, rx = 0, ry = 0;
 };
 
-inline float axis(Sint16 value)
+// A stick's two axes: a round dead zone (a diagonal push doesn't stick to an axis), and from its edge
+// the push grows from 0 smoothly (no jump)
+inline void stick(Sint16 x, Sint16 y, float& ox, float& oy)
 {
-    const float v = std::clamp(value / 32767.0f, -1.0f, 1.0f);
-    return std::fabs(v) < DEADZONE ? 0.0f : v;
+    const float vx = std::clamp(x / 32767.0f, -1.0f, 1.0f);
+    const float vy = std::clamp(y / 32767.0f, -1.0f, 1.0f);
+    const float m = std::hypot(vx, vy);
+    if (m < DEADZONE) {
+        ox = oy = 0.0f;
+        return;
+    }
+    const float scale = (std::min(1.0f, m) - DEADZONE) / (1.0f - DEADZONE) / m;
+    ox = vx * scale;
+    oy = vy * scale;
 }
 
 struct Controllers {
@@ -126,10 +136,8 @@ struct Controllers {
             p.buttons[RT] = SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > 16000;
             p.buttons[LS] = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_LEFT_STICK);
             p.buttons[RS] = SDL_GetGamepadButton(pad, SDL_GAMEPAD_BUTTON_RIGHT_STICK);
-            p.lx = axis(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX));
-            p.ly = axis(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY));
-            p.rx = axis(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTX));
-            p.ry = axis(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTY));
+            stick(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX), SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY), p.lx, p.ly);
+            stick(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTX), SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTY), p.rx, p.ry);
             pads.push_back(p);
         }
         //Without a mapping: the usual layout (buttons 0-7, the first hat, axes 0-3)
@@ -152,12 +160,10 @@ struct Controllers {
             }
             const int axes = SDL_GetNumJoystickAxes(joy);
             if (axes >= 2) {
-                p.lx = axis(SDL_GetJoystickAxis(joy, 0));
-                p.ly = axis(SDL_GetJoystickAxis(joy, 1));
+                stick(SDL_GetJoystickAxis(joy, 0), SDL_GetJoystickAxis(joy, 1), p.lx, p.ly);
             }
             if (axes >= 4) {
-                p.rx = axis(SDL_GetJoystickAxis(joy, 2));
-                p.ry = axis(SDL_GetJoystickAxis(joy, 3));
+                stick(SDL_GetJoystickAxis(joy, 2), SDL_GetJoystickAxis(joy, 3), p.rx, p.ry);
             }
             pads.push_back(p);
         }
@@ -199,7 +205,7 @@ struct Pointer {
 enum class Overlay { None, Window, Keyboard, Tools };
 
 // A tool waiting for the next click on the map (chosen in the tools menu)
-enum class Armed { None, Copy, Paste, Fill };
+enum class Armed { None, Copy, Paste, Fill, Properties };    // (Properties: the next ? block chosen opens)
 
 // One undo: each value of the document that changed, before and after
 struct UndoStep {
@@ -276,6 +282,10 @@ struct State {
     Armed armed = Armed::None;
     bool mouseDrag = false;            // (the mouse drawing the area to copy)
     int mouseDragCol = 0, mouseDragRow = 0;
+    std::string confirmId;             // (an action that throws work away, chosen once: chosen again soon, it happens)
+    Uint64 confirmMs = 0;
+    bool mouseRect = false;            // (the mouse drawing a rectangle to fill: Shift and drag; from mouseDragCol, Row)
+    bool mouseRectErase = false;       // (with the right button: to clear)
 
     //The last things picked (LB / RB on the level editor's map)
     std::vector<leveleditor::shell::Brush> recents;
@@ -388,6 +398,9 @@ void setTool(int tool);
 int currentTool();
 void closeWindow();
 void runKey(SDL_Keycode key, bool shift = false, bool ctrl = false, bool keepOpen = false);
+bool padUsed();
+void armBlockContents();
+bool confirmed(const std::string& id, const std::string& warning);
 const std::vector<OskKey>& oskKeys();
 int toolsCount();
 SDL_Rect toolsRect();

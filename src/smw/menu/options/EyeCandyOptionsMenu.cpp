@@ -6,18 +6,22 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
+#include "ui/SettingsPage.h"
 
 UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     : UI_Menu()
 {
-    miSpawnStyleField = new MI_SelectField<SpawnStyle>(&rm->spr_selectfield, 70, 80, "Spawn Style", 500, 220);
+    SettingsPage page(8);
+
+    miSpawnStyleField = new MI_SelectField<SpawnStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Spawn Style", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miSpawnStyleField->add("Instant", SpawnStyle::Instant);
     miSpawnStyleField->add("Door", SpawnStyle::Door);
     miSpawnStyleField->add("Swirl", SpawnStyle::Swirl);
     miSpawnStyleField->setOutputPtr(&game_values.spawnstyle);
     miSpawnStyleField->setCurrentValue(game_values.spawnstyle);
+    page.add(miSpawnStyleField, "How players appear at the start and after dying");
 
-    miAwardStyleField = new MI_SelectField<AwardStyle>(&rm->spr_selectfield, 70, 120, "Award Style", 500, 220);
+    miAwardStyleField = new MI_SelectField<AwardStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Award Style", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miAwardStyleField->add("None", AwardStyle::None);
     miAwardStyleField->add("Fireworks", AwardStyle::Fireworks);
     miAwardStyleField->add("Spiral", AwardStyle::Swirl);
@@ -26,65 +30,55 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miAwardStyleField->add("Text", AwardStyle::Text);
     miAwardStyleField->setOutputPtr(&game_values.awardstyle);
     miAwardStyleField->setCurrentValue(game_values.awardstyle);
+    page.add(miAwardStyleField, "Effect for a player on a kill streak");
 
-    miScoreStyleField = new MI_SelectField<ScoreboardStyle>(&rm->spr_selectfield, 70, 160, "Score Location", 500, 220);
-    miScoreStyleField->add("Top", ScoreboardStyle::Top);
-    miScoreStyleField->add("Bottom", ScoreboardStyle::Bottom);
-    miScoreStyleField->add("Corners", ScoreboardStyle::Corners);
-    miScoreStyleField->setOutputPtr(&game_values.scoreboardstyle);
-    miScoreStyleField->setCurrentValue(game_values.scoreboardstyle);
-
-    miCrunchField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 200, "Screen Crunch", 500, 220);
-    miCrunchField->add("Off", false);
-    miCrunchField->add("On", true);
-    miCrunchField->setOutputPtr(&game_values.screencrunch);
-    miCrunchField->setCurrentValue(game_values.screencrunch ? 1 : 0);
-    miCrunchField->setAutoAdvance(true);
-
-    miWinningCrownField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 240, "Leader Crown", 500, 220);
+    miWinningCrownField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Leader Crown", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miWinningCrownField->add("Off", false);
     miWinningCrownField->add("On", true);
     miWinningCrownField->setOutputPtr(&game_values.showwinningcrown);
     miWinningCrownField->setCurrentValue(game_values.showwinningcrown ? 1 : 0);
     miWinningCrownField->setAutoAdvance(true);
+    page.add(miWinningCrownField, "Crowns the player in the lead");
 
-    miStartCountDownField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 280, "Start Countdown", 500, 220);
-    miStartCountDownField->add("Off", false);
-    miStartCountDownField->add("On", true);
-    miStartCountDownField->setOutputPtr(&game_values.startgamecountdown);
-    miStartCountDownField->setCurrentValue(game_values.startgamecountdown ? 1 : 0);
-    miStartCountDownField->setAutoAdvance(true);
-
-    miStartModeDisplayField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 320, "Show Mode", 500, 220);
-    miStartModeDisplayField->add("Off", false);
-    miStartModeDisplayField->add("On", true);
-    miStartModeDisplayField->setOutputPtr(&game_values.startmodedisplay);
-    miStartModeDisplayField->setCurrentValue(game_values.startmodedisplay ? 1 : 0);
-    miStartModeDisplayField->setAutoAdvance(true);
-
-    miDeadTeamNoticeField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 360, "Dead Team Notice", 500, 220);
+    miDeadTeamNoticeField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Dead Team Notice", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miDeadTeamNoticeField->add("Off", false);
     miDeadTeamNoticeField->add("On", true);
     miDeadTeamNoticeField->setOutputPtr(&game_values.deadteamnotice);
     miDeadTeamNoticeField->setCurrentValue(game_values.deadteamnotice ? 1 : 0);
     miDeadTeamNoticeField->setAutoAdvance(true);
+    page.add(miDeadTeamNoticeField, "Tell everyone when a team is out");
 
-    miEyeCandyOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
-    miEyeCandyOptionsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
+    miStartCountDownField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Start Countdown", SettingsPage::ROW_W, SettingsPage::LABEL_W);
+    miStartCountDownField->add("Off", false);
+    miStartCountDownField->add("On", true);
+    miStartCountDownField->setOutputPtr(&game_values.startgamecountdown);
+    miStartCountDownField->setCurrentValue(game_values.startgamecountdown ? 1 : 0);
+    miStartCountDownField->setAutoAdvance(true);
+    page.add(miStartCountDownField, "Count down 3, 2, 1 before a match starts");
 
-    AddControl(miSpawnStyleField, miEyeCandyOptionsMenuBackButton, miAwardStyleField, nullptr, miEyeCandyOptionsMenuBackButton);
-    AddControl(miAwardStyleField, miSpawnStyleField, miScoreStyleField, nullptr, miEyeCandyOptionsMenuBackButton);
-    AddControl(miScoreStyleField, miAwardStyleField, miCrunchField, nullptr, miEyeCandyOptionsMenuBackButton);
-    AddControl(miCrunchField, miScoreStyleField, miWinningCrownField, nullptr, miEyeCandyOptionsMenuBackButton);
-    AddControl(miWinningCrownField, miCrunchField, miStartCountDownField, nullptr, miEyeCandyOptionsMenuBackButton);
-    AddControl(miStartCountDownField, miWinningCrownField, miStartModeDisplayField, nullptr, miEyeCandyOptionsMenuBackButton);
-    AddControl(miStartModeDisplayField, miStartCountDownField, miDeadTeamNoticeField, nullptr, miEyeCandyOptionsMenuBackButton);
-    AddControl(miDeadTeamNoticeField, miStartModeDisplayField, miEyeCandyOptionsMenuBackButton, nullptr, miEyeCandyOptionsMenuBackButton);
+    miStartModeDisplayField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Show Mode", SettingsPage::ROW_W, SettingsPage::LABEL_W);
+    miStartModeDisplayField->add("Off", false);
+    miStartModeDisplayField->add("On", true);
+    miStartModeDisplayField->setOutputPtr(&game_values.startmodedisplay);
+    miStartModeDisplayField->setCurrentValue(game_values.startmodedisplay ? 1 : 0);
+    miStartModeDisplayField->setAutoAdvance(true);
+    page.add(miStartModeDisplayField, "Show the game mode's name as a match starts");
 
-    AddControl(miEyeCandyOptionsMenuBackButton, miDeadTeamNoticeField, miSpawnStyleField, miDeadTeamNoticeField, nullptr);
+    miScoreStyleField = new MI_SelectField<ScoreboardStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Score Location", SettingsPage::ROW_W, SettingsPage::LABEL_W);
+    miScoreStyleField->add("Top", ScoreboardStyle::Top);
+    miScoreStyleField->add("Bottom", ScoreboardStyle::Bottom);
+    miScoreStyleField->add("Corners", ScoreboardStyle::Corners);
+    miScoreStyleField->setOutputPtr(&game_values.scoreboardstyle);
+    miScoreStyleField->setCurrentValue(game_values.scoreboardstyle);
+    page.add(miScoreStyleField, "Where scores appear on screen");
 
-    AddTitleBar("Eye Candy Options Menu");
+    miCrunchField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Screen Crunch", SettingsPage::ROW_W, SettingsPage::LABEL_W);
+    miCrunchField->add("Off", false);
+    miCrunchField->add("On", true);
+    miCrunchField->setOutputPtr(&game_values.screencrunch);
+    miCrunchField->setCurrentValue(game_values.screencrunch ? 1 : 0);
+    miCrunchField->setAutoAdvance(true);
+    page.add(miCrunchField, "Shake the screen when a player dies");
 
-    setInitialFocus(miSpawnStyleField);
-    SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
+    miEyeCandyOptionsMenuBackButton = page.finish(*this, "Eye Candy Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

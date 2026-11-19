@@ -34,6 +34,7 @@ void UI_Menu::AddControl(UI_Control* control, UI_Control* up, UI_Control* down, 
 }
 
 void (*UI_Menu::drawHints)(const UI_Menu& menu) = nullptr;
+void (*UI_Menu::drawFocus)(const UI_Control& control, bool modifying) = nullptr;
 
 void UI_Menu::AddNonControl(UI_Control* control)
 {
@@ -87,6 +88,9 @@ void UI_Menu::Draw()
     for (const std::unique_ptr<UI_Control>& control : controls) {
         control->Draw();
     }
+
+    if (drawFocus && m_currentFocus && m_currentFocus->IsVisible())
+        drawFocus(*m_currentFocus, fModifyingItem);
 
     if (drawHints && m_title && m_hints)
         drawHints(*this);
@@ -276,4 +280,91 @@ void UI_Menu::Refresh()
     for (const std::unique_ptr<UI_Control>& control : controls) {
         control->Refresh();
     }
+}
+
+UI_Control* UI_Menu::ControlAt(short x, short y) const
+{
+    //(the last drawn is on top)
+    for (auto it = controls.rbegin(); it != controls.rend(); ++it) {
+        if ((*it)->IsVisible() && (*it)->Contains(x, y))
+            return it->get();
+    }
+    return nullptr;
+}
+
+void UI_Menu::Focus(UI_Control* control)
+{
+    if (control == m_currentFocus)
+        return;
+    if (m_currentFocus) {
+        if (fModifyingItem)
+            m_currentFocus->Modify(false);
+        m_currentFocus->Select(false);
+    }
+    m_currentFocus = control;
+    fModifyingItem = m_currentFocus->Select(true);
+}
+
+MenuCodeEnum UI_Menu::PointerMove(short x, short y)
+{
+    //(not while a value is being changed: the pointer may cross other controls on the way to its arrows)
+    if (fModifyingItem)
+        return MENU_CODE_NONE;
+    if (UI_Control* control = ControlAt(x, y))
+        Focus(control);
+    return MENU_CODE_NONE;
+}
+
+MenuCodeEnum UI_Menu::PointerClick(short x, short y, bool right)
+{
+    if (right) {
+        //(changing a value: done with it; else back, as B)
+        if (fModifyingItem && m_currentFocus) {
+            m_currentFocus->Modify(false);
+            fModifyingItem = false;
+            return MENU_CODE_NONE;
+        }
+        return cancelCode;
+    }
+
+    UI_Control* control = ControlAt(x, y);
+    if (fModifyingItem && m_currentFocus) {
+        //The control being changed: its own click (a value field's arrows); elsewhere: done changing
+        if (control == m_currentFocus) {
+            const MenuCodeEnum code = m_currentFocus->MouseClick(x, y);
+            if (code != MENU_CODE_CLICKED && code != MENU_CODE_NONE)
+                return code;
+        }
+        m_currentFocus->Modify(false);
+        fModifyingItem = false;
+        if (!control || control == m_currentFocus)
+            return MENU_CODE_NONE;
+    }
+    if (!control)
+        return MENU_CODE_NONE;
+
+    Focus(control);
+    if (fModifyingItem)
+        return MENU_CODE_NONE;
+    MenuCodeEnum own = MENU_CODE_NONE;
+    if (control->PointerPress(x, y, own))
+        return own;
+    //A value field: its next value; anything else: as A
+    if (control->CanNudge())
+        return control->Nudge(1);
+    const MenuCodeEnum code = control->Modify(true);
+    if (MENU_CODE_MODIFY_ACCEPTED == code) {
+        fModifyingItem = true;
+        return MENU_CODE_NONE;
+    }
+    if (MENU_CODE_UNSELECT_ITEM == code)
+        return MENU_CODE_NONE;
+    return code;
+}
+
+MenuCodeEnum UI_Menu::PointerWheel(int dir)
+{
+    if (!m_currentFocus || !m_currentFocus->CanNudge())
+        return MENU_CODE_NONE;
+    return m_currentFocus->Nudge(dir);
 }

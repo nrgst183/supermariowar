@@ -16,7 +16,7 @@ UI_OptionsMenu::UI_OptionsMenu()
     constexpr short RIGHT_X = 326;
     constexpr short BUTTON_W = 250;
     AddNonControl(new MI_MenuPanel(36, 42, 568, 76, "Game", "The rules of every match"));
-    AddNonControl(new MI_MenuPanel(36, 122, 568, 112, "Items and Weapons", "What turns up, and what it does"));
+    AddNonControl(new MI_MenuPanel(36, 122, 568, 112, "Items and Weapons", "What appears and how it works"));
     AddNonControl(new MI_MenuPanel(36, 238, 568, 112, "Look and Sound"));
 
     miGameplayOptionsMenuButton = new MI_Button(&rm->spr_selectfield, LEFT_X, 78, "Gameplay", BUTTON_W, TextAlign::CENTER);
@@ -52,8 +52,8 @@ UI_OptionsMenu::UI_OptionsMenu()
     miGenerateMapThumbsButton->SetCode(MENU_CODE_SAVE_ALL_MAP_THUMBNAILS);
 
 #if !defined(NETWORK_DISABLED) && !defined(SMW_XBOX) && !defined(__EMSCRIPTEN__)
-    AddNonControl(new MI_MenuPanel(36, 354, 568, 76, "Online", "Your nickname, run-ahead and port"));
-    miOnlineOptionsMenuButton = new MI_Button(&rm->spr_selectfield, 170, 390, "Online", 300, TextAlign::CENTER);
+    AddNonControl(new MI_MenuPanel(36, 354, 568, 76, "Online", "Your nickname, port and ping bars"));
+    miOnlineOptionsMenuButton = new MI_Button(&rm->spr_selectfield, 320 - BUTTON_W / 2, 390, "Online", BUTTON_W, TextAlign::CENTER);
     miOnlineOptionsMenuButton->SetCode(MENU_CODE_TO_ONLINE_OPTIONS_MENU);
 #endif
 

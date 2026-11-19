@@ -211,6 +211,7 @@ void setBlock(int block, bool on);
 bool switchOn(int color);
 void pick(int col, int row);
 int hazardType(int index);
+bool hasProperties(int col, int row);
 class Cells;    // (painting, filling, copying cells)
 }
 } // namespace leveleditor
@@ -488,6 +489,7 @@ class CMap
         friend void leveleditor::SetNoSpawn(short, short, short, bool);
         friend int leveleditor::editor_platforms();
         friend void leveleditor::shell::setBlock(int, bool);
+        friend bool leveleditor::shell::hasProperties(int, int);
         friend bool leveleditor::shell::switchOn(int);
         friend void leveleditor::shell::pick(int, int);
         friend int leveleditor::shell::hazardType(int);

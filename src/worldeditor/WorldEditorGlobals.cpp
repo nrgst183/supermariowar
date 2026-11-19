@@ -1,5 +1,7 @@
 #include "WorldEditorState.h"
 
+#include <algorithm>
+
 #ifndef SMW_EMBEDDED_EDITOR  // the game's own (EditorLauncher.h)
 SDL_Surface		*screen;
 SDL_Surface		*blitdest;

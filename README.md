@@ -33,7 +33,7 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 
 ### Online multiplayer
 
-![The LAN games list with two games found and a button to host your own; the lobby's options, where "Who can join" makes the same lobby a game on this computer only, on the LAN or on the internet; the lobby every game starts from (two players on one computer and two CPUs, open to the LAN: the address others join at shows at the top); and a match on Airshipz](docs/gfx/fork/online.png)
+![The LAN games list with two games found and a button to host your own; the lobby's options, where "Open to" makes the same lobby a game on this computer only, on the LAN or on the internet; the lobby every game starts from (two players on one computer and two CPUs, open to the LAN: the address others join at shows at the top); and a match on Airshipz](docs/gfx/fork/online.png)
 
 - **Rollback netcode** for up to four players: everybody connects directly to each other, no server. Inputs that arrive late are predicted and corrected, so the game stays responsive with lag.
 - **A full online lobby**: pick your character and team, see everyone's ping, add CPU players, and play tournaments, tours and worlds online. Missing maps and custom skins are sent to the players who don't have them.

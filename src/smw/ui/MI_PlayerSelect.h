@@ -21,6 +21,11 @@ public:
 
     MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
     MenuCodeEnum Modify(bool modify) override;
+    Box FocusBox() const override {
+        return {m_pos.x, m_pos.y, iWidth, 64};
+    }
+    /// A click on a player's mushroom: the next of off, player and CPU for it
+    bool PointerPress(short x, short y, MenuCodeEnum& code) override;
 
 private:
     gfxSprite* spr = nullptr;

@@ -1,5 +1,7 @@
 #include "LevelEditorState.h"
 
+#include <algorithm>
+
 TileType CalculateTileType(short x, short y)
 {
     TileType type = TileType::NonSolid;
@@ -114,6 +116,11 @@ int editor_edit()
                         else if (event.key.key == SDLK_ESCAPE) {
                             return EDITOR_QUIT;
                         }
+                #elif defined(SMW_EMBEDDED_EDITOR)
+                        //(in the game: Escape and the controller's B are No)
+                        else if (event.key.key == SDLK_ESCAPE) {
+                            fExiting = false;
+                        }
                 #endif
                     }
                 }
@@ -133,8 +140,11 @@ int editor_edit()
                     if (key == SDLK_ESCAPE) {
                             if (g_musiccategorydisplaytimer > 0)
                                 g_musiccategorydisplaytimer = 0;
+#ifndef SMW_EMBEDDED_EDITOR
+                            //(in the game, Escape is the exit prompt from any mode: no detour through tiles)
                             else if (edit_mode != 1)
                                 edit_mode = 1;
+#endif
                         else {
                                 fSelectedYes = false;
                                 fExiting = true;

@@ -71,18 +71,17 @@ void MenuState::HostOnlineGame()
     EnterOnlineLobby();
 }
 
-// "Host a game" in the System Link (LAN games) menu: found there by the others on the network
+// "Host a game" in the System Link (LAN games) menu: the same lobby as the main menu's Start, open
+// to the network already (found there by the others)
 void MenuState::HostSystemLinkGame()
 {
     mSystemLinkMenu->ClearMessage();
     std::string error;
-    if (!HostLobby(atoi(game_values.onlineport.c_str()), rollback::LobbyAccess::Lan, error)) {
+    if (!OpenLobby(rollback::LobbyAccess::Lan, LobbyOrigin::SystemLink, error)) {
         mSystemLinkMenu->ShowMessage(error);
         return;
     }
     mSystemLinkMenu->Close();
-    mLobbyOrigin = LobbyOrigin::SystemLink;
-    EnterOnlineLobby();
 }
 
 void MenuState::JoinOnlineGame()
@@ -92,7 +91,7 @@ void MenuState::JoinOnlineGame()
 
     game_values.onlineaddress = trimmed(game_values.onlineaddress);
     if (game_values.onlineaddress.empty()) {
-        mOnlineMenu->ShowMessage("Enter the address of the host, like 192.168.1.20:7300");
+        mOnlineMenu->ShowMessage("Enter the host's address, like 192.168.1.20:7300");
         return;
     }
 
@@ -186,24 +185,32 @@ void MenuState::LeaveOnlineLobby(const std::string& message)
     mCurrentMenu = mOnlineMenu.get();
 }
 
-// The main menu's Start: the lobby of a local game (who can join: nobody; no network). Its players
-// are the main menu's (players and CPUs), or as they were (backing out of a local game's menus).
+// The main menu's Start: the lobby of a local game (who can join: nobody; no network), which the
+// lobby's "who can join" opens to the others. Its players are the main menu's (players and CPUs), or
+// as they were (backing out of a local game's menus).
 void MenuState::OpenLocalLobby()
 {
-    rollback::NetGame& net = rollback::NetGame::instance();
     std::string error;
-    if (!net.host(0, error, rollback::LobbyAccess::Nobody)) {
+    if (!OpenLobby(rollback::LobbyAccess::Nobody, LobbyOrigin::MainMenu, error)) {
         //(can't be: there's no network to fail; the menus as they were, then)
         printf("lobby: %s\n", error.c_str());
         mMatchSelectionMenu->WorldMapChanged();
         mCurrentMenu = mMatchSelectionMenu.get();
         mCurrentMenu->ResetMenu();
-        return;
     }
-    rollback::NetLobby* lobby = net.lobby();
-    lobby->setName(systemLinkPlayerName());
+}
 
-    LocalSetup setup = mLocalSetup;
+// Every lobby this computer hosts (Start, or Host in the games list): on the port of the Online
+// options (the one it opens to the others on, then), with the main menu's players, open to
+// `access`; Back goes to `origin`. False and why if it can't.
+bool MenuState::OpenLobby(rollback::LobbyAccess access, LobbyOrigin origin, std::string& error)
+{
+    if (!HostLobby(atoi(game_values.onlineport.c_str()), access, error))
+        return false;
+    rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+
+    //(backing out of a local game's menus: the lobby as it was)
+    LocalSetup setup = origin == LobbyOrigin::MainMenu ? mLocalSetup : LocalSetup {};
     if (!setup.valid) {
         setup = {};
         setup.localPlayers = 0;
@@ -226,8 +233,9 @@ void MenuState::OpenLocalLobby()
     }
 
     mLocalFromLobby = false;
-    mLobbyOrigin = LobbyOrigin::MainMenu;
+    mLobbyOrigin = origin;
     EnterOnlineLobby();
+    return true;
 }
 
 // Continue in a local game's lobby: its players, teams and colors go to the local match menus

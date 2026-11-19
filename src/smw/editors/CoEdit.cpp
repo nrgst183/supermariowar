@@ -351,7 +351,7 @@ void handleMessage(int connection, const uint8_t* data, size_t size)
             break;
         case MSG_BYE:
             g.status = "The host closed the session" + std::string(r.ok ? "" : "");
-            setNotice("The host closed the session: you keep your copy");
+            setNotice("The host ended the session. You keep your copy");
             g.state = State::Ended;
             break;
         default:
@@ -497,7 +497,7 @@ void pump()
                     if (g.state == State::Connecting)
                         g.status = "No answer from the host";
                     else if (g.state == State::Joined)
-                        setNotice("Lost the connection to the host: you keep your copy");
+                        setNotice("Lost the connection to the host. You keep your copy");
                     g.state = State::Ended;
                     g.cursors.clear();
                 }
@@ -661,7 +661,7 @@ bool blockedKey(SDL_Keycode key, SDL_Keymod mod)
     const bool shift = (mod & SDL_KMOD_SHIFT) != 0;
     const bool blocked = (key == SDLK_S && !shift) || key == SDLK_N || key == SDLK_F || key == SDLK_PAGEUP || key == SDLK_PAGEDOWN;
     if (blocked)
-        setNotice(key == SDLK_S ? "Only the host saves the shared file (Save as makes your own copy)" : "Only the host opens other maps and worlds");
+        setNotice(key == SDLK_S ? "Only the host can save. Use Save as to keep your own copy" : "Only the host can open other maps and worlds");
     return blocked;
 }
 

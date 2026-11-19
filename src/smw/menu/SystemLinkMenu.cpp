@@ -49,11 +49,11 @@ private:
     std::function<void()> m_fn;
 };
 
+// (the main menu's button)
+constexpr const char* TITLE = "Join a Game";
 #ifdef SMW_XBOX
-constexpr const char* TITLE = "System Link Games";
 constexpr const char* WHERE = "consoles and PCs";
 #else
-constexpr const char* TITLE = "LAN Games";
 constexpr const char* WHERE = "PCs and consoles";
 #endif
 
@@ -113,11 +113,11 @@ std::string systemLinkNetworkStatus()
         case SDL_XBOX_NETWORK_READY:
             return std::string("System link: this console is ") + address;
         case SDL_XBOX_NETWORK_NO_CABLE:
-            return "No network cable: connect the consoles (or a hub, or a router) for system link";
+            return "No network cable. Connect the consoles, a hub or a router";
         case SDL_XBOX_NETWORK_PENDING:
             return "Getting a network address...";
         case SDL_XBOX_NETWORK_NO_ADDRESS:
-            return "The network gave no address: check the dashboard's network settings";
+            return "No network address. Check the dashboard's network settings";
         default:
             return "The network didn't start";
     }
@@ -265,8 +265,8 @@ void MI_LanGameList::drawEmpty() const
     }
     theme::spinner(320, 116, m_tick);
     rm->menu_font_large.drawCentered(320, 150, "Looking for games...");
-    rm->menu_font_small.drawCentered(320, 184, std::string("Games hosted on the ") + WHERE + " of this network");
-    rm->menu_font_small.drawCentered(320, 202, "show up here by themselves, within a second or two.");
+    rm->menu_font_small.drawCentered(320, 184, std::string("Games hosted on ") + WHERE + " on this network");
+    rm->menu_font_small.drawCentered(320, 202, "appear here on their own within a second or two.");
     rm->menu_font_small.drawCentered(320, 228, "None? Host one with the button below.");
 }
 
@@ -444,15 +444,15 @@ void UI_SystemLinkMenu::drawDetails() const
     std::string text;
     if (!game.sameBuild) {
         status = theme::Status::Error;
-        text = "Another version (" + shortBuild(game.build) + ", this is " + shortBuild(GIT_REVISION) + "): both need the same build";
+        text = "Another version (" + shortBuild(game.build) + ", yours is " + shortBuild(GIT_REVISION) + "). Builds must match";
     } else if (full) {
         status = theme::Status::Warn;
-        text = "Full: every place in the lobby is taken";
+        text = "Full. Every spot in the lobby is taken";
     } else if (game.inMatch) {
         status = theme::Status::Info;
-        text = "A match is on: you join the lobby and play from the next match";
+        text = "Match in progress. You'll play from the next match";
     } else {
-        text = "In the lobby, " + std::to_string(game.members) + " of " + std::to_string(game.maxMembers) + " in: press A to join";
+        text = "In the lobby (" + std::to_string(game.members) + " of " + std::to_string(game.maxMembers) + "). Press A to join";
     }
     theme::statusIcon(PANEL_X + 20, DETAILS_Y + 36, status);
     rm->menu_font_small.draw(PANEL_X + 44, DETAILS_Y + 40, fit(rm->menu_font_small, text, PANEL_W - 64));
@@ -462,11 +462,11 @@ std::string UI_SystemLinkMenu::SelectedAddress(std::string& why) const
 {
     const MI_LanGameList::Game* game = m_list->Selected();
     if (!game) {
-        why = "No game to join yet: wait for one to show up";
+        why = "No games yet. Wait for one to show up";
         return {};
     }
     if (!game->sameBuild) {
-        why = "That game is another version: both need the same build of the game";
+        why = "That game is a different version. Builds must match";
         return {};
     }
     if (game->maxMembers > 0 && game->members >= game->maxMembers) {

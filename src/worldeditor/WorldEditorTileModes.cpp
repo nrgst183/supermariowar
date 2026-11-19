@@ -104,7 +104,7 @@ int editor_start_items()
                 rm->spr_storedpoweruplarge.draw(rPickedItemDst[iPickedItem].x, rPickedItemDst[iPickedItem].y, {iPowerup << 5, 0, 32, 32});
         }
 
-        rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
+        if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
 
         DrawMessage();
         gfx_flipscreen();
@@ -175,7 +175,7 @@ int editor_boundary()
 
         rm->spr_worldforegroundspecial[0].draw(0, 0, {0, 0, 320, 320});
 
-                rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
+                if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
 
         DrawMessage();
         gfx_flipscreen();
@@ -248,7 +248,7 @@ int editor_type()
 
         rm->spr_worldforegroundspecial[0].draw(64, 0, {448, 64, 128, 32});
 
-        rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
+        if (OLD_HUD) rm->menu_font_small.drawRightJustified(640, 0, worldlist->currentPath().string().c_str());
 
         DrawMessage();
         gfx_flipscreen();

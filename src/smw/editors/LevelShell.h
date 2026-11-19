@@ -11,8 +11,15 @@
 // EmbeddedLevelEditor.cpp.
 namespace leveleditor::shell {
 
-// The editor shows the map (not one of its full-screen pickers or dialogs)
+// The editor shows the map (not one of its full-screen pickers or dialogs, nor the exit prompt
+// or the ? block screen over it)
 bool inMapView();
+// The "Exit? Yes / No" prompt is showing over the map (the arrow keys and Enter answer it)
+bool exitPrompt();
+// The ? block screen (what a ? block gives) is showing over the map
+bool blockProperties();
+// The block at the cell has contents to set (a ? block and the like: K opens them, at the mouse)
+bool hasProperties(int col, int row);
 
 // The editor's edit_mode: 0 blocks, 1 tiles, 2 warps, 3 move, 4 no player spawn,
 // 5 no item spawn, 6 tile types, 7 map items, 8 animated tiles
@@ -31,6 +38,9 @@ bool switchBlockOn();
 // Map items (0-5: green spring, spike, Kuribo's shoe, gold spring, sticky shoe, throw box)
 int item();
 void setItem(int item);
+
+// The no-spawn zone being painted: 0 everyone's, 1-4 a team's
+int zoneTeam();
 
 // Tile types (1-18)
 int tileType();

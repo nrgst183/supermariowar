@@ -122,6 +122,31 @@ void drawMenuHints(const UI_Menu& menu)
             prompts::drawPrompts(App::screenWidth - 8 - w / 2, Y, right, GAP);
     }
 }
+
+// The frame around the focused control: white (gold while its value is being changed), with a dark
+// edge so that it shows on the green and gray buttons and on any backdrop; its corners cut, like the
+// buttons' round ends
+void drawMenuFocus(const UI_Control& control, bool modifying)
+{
+    const UI_Control::Box b = control.FocusBox();
+    if (b.w <= 0)
+        return;
+    const SDL_Color dark {16, 24, 48, 255};
+    const SDL_Color light = modifying ? SDL_Color {248, 200, 40, 255} : SDL_Color {248, 248, 248, 255};
+    auto frame = [](int x, int y, int w, int h, int t, SDL_Color c) {
+        prompts::fill(x + 2, y, w - 4, t, c);
+        prompts::fill(x + 2, y + h - t, w - 4, t, c);
+        prompts::fill(x, y + 2, t, h - 4, c);
+        prompts::fill(x + w - t, y + 2, t, h - 4, c);
+    };
+    frame(b.x - 4, b.y - 4, b.w + 8, b.h + 8, 1, dark);
+    frame(b.x - 3, b.y - 3, b.w + 6, b.h + 6, 2, light);
+    //(the corners: a pixel in, so the frame bends round)
+    prompts::fill(b.x - 2, b.y - 2, 2, 2, light);
+    prompts::fill(b.x + b.w, b.y - 2, 2, 2, light);
+    prompts::fill(b.x - 2, b.y + b.h, 2, 2, light);
+    prompts::fill(b.x + b.w, b.y + b.h, 2, 2, light);
+}
 } // namespace
 
 MenuState::MenuState() = default;
@@ -136,6 +161,7 @@ MenuState& MenuState::instance()
 bool MenuState::init()
 {
     UI_Menu::drawHints = drawMenuHints;
+    UI_Menu::drawFocus = drawMenuFocus;
     mMainMenu = std::make_unique<UI_MainMenu>();
 
     // Options menu
@@ -503,8 +529,12 @@ void MenuState::update()
         if (cmd::g_autotest.enabled)
             code = AutoTestMenuUpdate();
         //Online tournaments, tours and worlds: the host leads the menus (MenuOnlineSeries.cpp)
-        if (MENU_CODE_NONE == code && !OnlineSeriesInput(code))
+        if (MENU_CODE_NONE == code && !OnlineSeriesInput(code)) {
             code = mCurrentMenu->SendInput(&game_values.playerInput);
+            //(nothing from the buttons: what the mouse did)
+            if (MENU_CODE_NONE == code)
+                code = ApplyPointer();
+        }
         //(the editors menu's own buttons: what they lead to)
         if (MENU_CODE_EDITORS_ACTION == code)
             code = mEditorsMenu->Act();
@@ -662,7 +692,34 @@ bool MenuState::PollMenuEvents()
             JoystickManager::instance().handleEvent(event);
             break;
 
+        //The mouse: the pointer shows while it's used (and hides with a key or a button)
+        case SDL_EVENT_MOUSE_MOTION:
+            SDL_ShowCursor();
+            mPointer.moved = true;
+            mPointer.x = static_cast<short>(event.motion.x);
+            mPointer.y = static_cast<short>(event.motion.y);
+            break;
+
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            SDL_ShowCursor();
+            if (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT) {
+                mPointer.click = event.button.button == SDL_BUTTON_LEFT ? 1 : 2;
+                mPointer.clickX = static_cast<short>(event.button.x);
+                mPointer.clickY = static_cast<short>(event.button.y);
+            }
+            break;
+
+        case SDL_EVENT_MOUSE_WHEEL:
+            mPointer.wheel += event.wheel.y > 0 ? 1 : event.wheel.y < 0 ? -1 : 0;
+            break;
+
+        case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+        case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
+            SDL_HideCursor();
+            break;
+
         case SDL_EVENT_KEY_DOWN: {
+            SDL_HideCursor();
             if (event.key.key == SDLK_F1) {
                 game_values.showfps = !game_values.showfps;
             }
@@ -730,9 +787,25 @@ bool MenuState::PollMenuEvents()
     return true;
 }
 
+// What the mouse did since the last frame, done to the current menu: the code to handle
+MenuCodeEnum MenuState::ApplyPointer()
+{
+    const PendingPointer pointer = mPointer;
+    mPointer = {};
+    MenuCodeEnum code = MENU_CODE_NONE;
+    if (pointer.moved)
+        code = mCurrentMenu->PointerMove(pointer.x, pointer.y);
+    if (pointer.click)
+        code = mCurrentMenu->PointerClick(pointer.clickX, pointer.clickY, pointer.click == 2);
+    else if (pointer.wheel)
+        code = mCurrentMenu->PointerWheel(pointer.wheel > 0 ? 1 : -1);
+    return code;
+}
+
 // The screen has faded out to start a match: its settings, its map and music, then the gameplay
 void MenuState::LaunchMatch()
 {
+    SDL_HideCursor();    //(the menus' pointer: not in the match)
     if (game_values.matchtype == MatchType::QuickGame)
         mModeOptionsMenu->SetRandomGameModeSettings(game_values.gamemode->gamemode);
     else
@@ -988,7 +1061,12 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
             SetControllingTeamForSettingsMenu(game_values.tournamentcontrolteam, false);
         }
 
-        if (mLocalFromLobby) {
+        if (MENU_CODE_QUICK_GAME_START == code) {
+            //The main menu's Go!: a random game right away, with the main menu's players on the
+            //teams and characters they last had (the team select's, not shown)
+            mTeamSelectMenu->ResetTeamSelect();
+            EnterGameSetup();
+        } else if (mLocalFromLobby) {
             //A local game from the lobby: its players and teams are set, straight to the game setup
             EnterGameSetup();
         } else {

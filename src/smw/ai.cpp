@@ -20,6 +20,7 @@
 #include "objects/carriable/CO_Star.h"
 #include "objects/powerup/PU_FeatherPowerup.h"
 
+#include <algorithm>
 #include <memory>
 #include <cstdio>
 #include <cstdlib> // abs()

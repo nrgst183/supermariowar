@@ -74,6 +74,17 @@ public:
 
     MenuCodeEnum MouseClick(short iMouseX, short iMouseY);
 
+    /// The mouse in the menus (the game's: GSMenu.cpp): pointing at a control focuses it; a click
+    /// presses it (a value field: its next value, or, while it's being changed, its arrows); the right
+    /// button backs out; the wheel steps the focused value field. Each returns the code to handle, as
+    /// SendInput does.
+    MenuCodeEnum PointerMove(short x, short y);
+    MenuCodeEnum PointerClick(short x, short y, bool right);
+    MenuCodeEnum PointerWheel(int dir);
+
+    /// Draws the frame around the focused control (the game sets it; with none, no frame)
+    static void (*drawFocus)(const UI_Control& control, bool modifying);
+
     bool IsModifying() const {
         return fModifyingItem;
     }
@@ -82,6 +93,8 @@ public:
 
 protected:
     MenuCodeEnum MoveNextControl(MenuNavDirection iDirection);
+    UI_Control* ControlAt(short x, short y) const;
+    void Focus(UI_Control* control);
 
     std::vector<std::unique_ptr<UI_Control>> controls;
 

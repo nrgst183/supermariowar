@@ -744,6 +744,35 @@ void closeTools()
     s.overlayDirty = true;
 }
 
+// The controller was used last (else the mouse and the keyboard): what the tips say
+bool padUsed()
+{
+    return prompts::lastDevice() == prompts::Device::Controller;
+}
+
+// An action that throws work away: true when it was chosen a moment ago too (else the warning, and
+// choosing it again within 3 seconds does it)
+bool confirmed(const std::string& id, const std::string& warning)
+{
+    const Uint64 now = SDL_GetTicks();
+    if (s.confirmId == id && now - s.confirmMs < 3000) {
+        s.confirmId.clear();
+        return true;
+    }
+    s.confirmId = id;
+    s.confirmMs = now;
+    toast(warning + (padUsed() ? ". Press A again to confirm" : ". Click again to confirm"));
+    return false;
+}
+
+// "? block contents": the next ? block chosen on the map opens its screen
+void armBlockContents()
+{
+    closeWindow();
+    s.armed = Armed::Properties;
+    toast(padUsed() ? "Point at a ? block and press A (B to stop)" : "Click a ? block (right-click to stop)");
+}
+
 void chooseTool(int item)
 {
     std::string why;
@@ -754,9 +783,12 @@ void chooseTool(int item)
     switch (item) {
         case T_UNDO: undoApply(false); return;    //(the menu stays: undo again)
         case T_REDO: undoApply(true); return;
-        case T_COPY: s.armed = Armed::Copy; toast("Copy: hold A and drag over the cells"); break;
-        case T_PASTE: s.armed = Armed::Paste; toast("Paste: A puts it down, B stops"); break;
-        case T_FILL: s.armed = Armed::Fill; toast("Fill: A fills the cells joined to that one"); break;
+        case T_COPY: s.armed = Armed::Copy; toast(padUsed() ? "Copy: hold A and drag over an area" : "Copy: drag over an area"); break;
+        case T_PASTE:
+            s.armed = Armed::Paste;
+            toast(padUsed() ? "Paste: press A to place it, B to stop" : "Paste: click to place it, right-click to stop");
+            break;
+        case T_FILL: s.armed = Armed::Fill; toast(padUsed() ? "Fill: press A to fill the connected area" : "Fill: click to fill the connected area"); break;
         default: break;
     }
     closeTools();
@@ -844,9 +876,11 @@ void updatePointer(int index)
     }
     float dx = 0;
     float dy = 0;
-    //The stick: faster the further it's pushed
+    //The stick: a little push moves a pixel or so (to aim at a cell), a full one crosses the screen in
+    //about a second (the speed grows with the square of the push)
     if (p.pad.lx != 0 || p.pad.ly != 0) {
-        const float speed = 1.5f + 9.0f * std::min(1.0f, std::hypot(p.pad.lx, p.pad.ly));
+        const float push = std::min(1.0f, std::hypot(p.pad.lx, p.pad.ly));
+        const float speed = (0.8f + 12.0f * push * push) / push;
         dx += p.pad.lx * speed;
         dy += p.pad.ly * speed;
     }
@@ -906,6 +940,31 @@ void updatePointer(int index)
             moveMouseTo(index);
     }
 
+    //The exit prompt: A answers (Yes or No under the pointer, else the one chosen), B and Back stay,
+    //left and right choose
+    if (s.editor == Editor::Level && leveleditor::shell::exitPrompt()) {
+        if (left)
+            tapKey(SDLK_LEFT);
+        if (right)
+            tapKey(SDLK_RIGHT);
+        if (p.pressed(A)) {
+            //(the boxes, EditorMapEdit.cpp)
+            const bool onYes = p.y >= 250 && p.y < 282 && p.x >= 250 && p.x < 314;
+            const bool onNo = p.y >= 250 && p.y < 282 && p.x >= 326 && p.x < 390;
+            if (onYes || onNo)
+                tapKey(onYes ? SDLK_LEFT : SDLK_RIGHT);
+            tapKey(SDLK_RETURN);
+        }
+        if (p.pressed(B) || p.pressed(BACK))
+            tapKey(SDLK_ESCAPE);
+        return;
+    }
+    //The tileset screen: B goes back to the map (its right button would change the tiles' types)
+    if (picking && p.pressed(B)) {
+        tapKey(SDLK_ESCAPE);
+        p.last.buttons[B] = p.pad.buttons[B];
+    }
+
     //Over the window: its widgets get the buttons, not the editor
     if (inWindow(p.x, p.y)) {
         if (p.shown)
@@ -940,6 +999,15 @@ void updatePointer(int index)
         } else if (onMap && s.armed == Armed::Fill && p.pressed(A)) {
             sh::floodFill(col, row);
             s.armed = Armed::None;
+        } else if (onMap && s.armed == Armed::Properties && p.pressed(A)) {
+            //(the ? block under the reticle: its screen, with K at the mouse)
+            if (sh::hasProperties(col, row)) {
+                moveMouseTo(index);
+                tapKey(SDLK_K);
+                s.armed = Armed::None;
+            } else {
+                toast("That isn't a ? block. Choose one, or press B to stop");
+            }
         } else if (rectangles && p.drag < 0 && (p.pressed(A) || p.pressed(B))) {
             p.drag = p.pressed(A) ? A : B;
             p.dragCol = col;
@@ -953,7 +1021,7 @@ void updatePointer(int index)
                     s.armed = Armed::None;
                     int w = 0, h = 0;
                     sh::clipboard(&w, &h);
-                    toast("Copied " + std::to_string(w) + " x " + std::to_string(h) + ": Paste is in the tools");
+                    toast("Copied " + std::to_string(w) + " x " + std::to_string(h) + ". Paste it from the tools");
                 } else if (col == p.dragCol && row == p.dragRow) {
                     //(one cell: a click, as the editor does it)
                     pushButton(index, erase ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT, true);
@@ -972,7 +1040,7 @@ void updatePointer(int index)
         } else if (p.released(A) && (p.buttons & (SDL_BUTTON_LMASK | SDL_BUTTON_RMASK)) && !p.pad.buttons[B]) {
             pushButton(index, (p.buttons & SDL_BUTTON_LMASK) ? SDL_BUTTON_LEFT : SDL_BUTTON_RIGHT, false);
         }
-        if (p.drag < 0 && !rectangles && s.armed == Armed::None) {
+        if (p.drag < 0 && !rectangles && s.armed == Armed::None && !picking) {
             if (p.pressed(B))
                 pushButton(index, SDL_BUTTON_RIGHT, true);
             else if (p.released(B) && (p.buttons & SDL_BUTTON_RMASK))
@@ -1361,6 +1429,12 @@ bool pollEvent(SDL_Event* event)
             undoApply(event->key.key == SDLK_Y || (event->key.mod & SDL_KMOD_SHIFT));
             continue;
         }
+        //Ctrl+C, Ctrl+V: copy an area, paste it (the tools)
+        if (event->type == SDL_EVENT_KEY_DOWN && s.textEntries == 0 && (event->key.mod & SDL_KMOD_CTRL) && levelMap() &&
+            s.overlay == Overlay::None && (event->key.key == SDLK_C || event->key.key == SDLK_V)) {
+            chooseTool(event->key.key == SDLK_C ? T_COPY : T_PASTE);
+            continue;
+        }
         //The tools: the middle button opens them; with them open, the mouse picks one
         if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && event->button.button == SDL_BUTTON_MIDDLE && mapShown() &&
             (s.overlay == Overlay::None || s.overlay == Overlay::Tools)) {
@@ -1401,6 +1475,57 @@ bool pollEvent(SDL_Event* event)
         }
         if (s.overlay == Overlay::Tools && event->type == SDL_EVENT_MOUSE_BUTTON_UP)
             continue;
+        //The map with the mouse: the wheel steps through what was used lately (with Ctrl: the layers),
+        //Alt and a click picks up the cell, Shift and a drag fills a rectangle (the right button: clears it)
+        if (levelMap() && s.overlay == Overlay::None && s.armed == Armed::None) {
+            namespace sh = leveleditor::shell;
+            if (event->type == SDL_EVENT_MOUSE_WHEEL && event->wheel.y != 0 && !inWindow(s.cx, s.cy)) {
+                const int dir = event->wheel.y > 0 ? -1 : 1;
+                if (SDL_GetModState() & SDL_KMOD_CTRL)
+                    sh::setLayer((sh::layer() + 4 + dir) % 4);    //(down: the next layer)
+                else
+                    recentStep(dir);
+                s.overlayDirty = true;
+                continue;
+            }
+            if (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN && (event->button.button == SDL_BUTTON_LEFT || event->button.button == SDL_BUTTON_RIGHT) &&
+                !inWindow(event->button.x, event->button.y)) {
+                const SDL_Keymod mod = SDL_GetModState();
+                const int col = std::clamp(static_cast<int>(event->button.x) / TILE, 0, sh::MAP_COLS - 1);
+                const int row = std::clamp(static_cast<int>(event->button.y) / TILE, 0, sh::MAP_ROWS - 1);
+                if ((mod & SDL_KMOD_ALT) && event->button.button == SDL_BUTTON_LEFT) {
+                    sh::pick(col, row);
+                    setTool(TOOL_PAINT);
+                    s.pickRelease = true;
+                    s.overlayDirty = true;
+                    continue;
+                }
+                if ((mod & SDL_KMOD_SHIFT) && sh::paintsCells() && currentTool() != TOOL_PICK) {
+                    s.mouseRect = true;
+                    s.mouseRectErase = event->button.button == SDL_BUTTON_RIGHT || currentTool() == TOOL_ERASE;
+                    s.mouseDragCol = col;
+                    s.mouseDragRow = row;
+                    s.overlayDirty = true;
+                    continue;
+                }
+            }
+        }
+        if (s.mouseRect) {
+            if (event->type == SDL_EVENT_MOUSE_BUTTON_UP) {
+                namespace sh = leveleditor::shell;
+                const int col = std::clamp(static_cast<int>(event->button.x) / TILE, 0, sh::MAP_COLS - 1);
+                const int row = std::clamp(static_cast<int>(event->button.y) / TILE, 0, sh::MAP_ROWS - 1);
+                sh::fillRect(s.mouseDragCol, s.mouseDragRow, col, row, s.mouseRectErase);
+                s.mouseRect = false;
+                s.overlayDirty = true;
+                continue;
+            }
+            //(the button held while it's drawn isn't painting)
+            if (event->type == SDL_EVENT_MOUSE_MOTION) {
+                event->motion.state = 0;
+                s.overlayDirty = true;
+            }
+        }
         //An armed tool: the mouse uses it on the map (the right button puts it away)
         if (levelMap() && s.armed != Armed::None && s.overlay != Overlay::Keyboard &&
             (event->type == SDL_EVENT_MOUSE_BUTTON_DOWN || event->type == SDL_EVENT_MOUSE_BUTTON_UP) && !inWindow(event->button.x, event->button.y)) {
@@ -1413,7 +1538,15 @@ bool pollEvent(SDL_Event* event)
                 s.mouseDrag = false;
                 toast("Stopped");
             } else if (event->button.button == SDL_BUTTON_LEFT) {
-                if (s.armed == Armed::Paste && down) {
+                if (s.armed == Armed::Properties && down) {
+                    if (sh::hasProperties(col, row)) {
+                        //(the editor's mouse is there: K opens the block's screen)
+                        s.armed = Armed::None;
+                        tapKey(SDLK_K);
+                    } else {
+                        toast("That isn't a ? block. Click one, or right-click to stop");
+                    }
+                } else if (s.armed == Armed::Paste && down) {
                     sh::paste(col, row);
                 } else if (s.armed == Armed::Fill && down) {
                     sh::floodFill(col, row);
@@ -1428,7 +1561,7 @@ bool pollEvent(SDL_Event* event)
                     s.armed = Armed::None;
                     int w = 0, h = 0;
                     sh::clipboard(&w, &h);
-                    toast("Copied " + std::to_string(w) + " x " + std::to_string(h) + ": Paste is in the tools");
+                    toast("Copied " + std::to_string(w) + " x " + std::to_string(h) + ". Paste it from the tools");
                 }
             }
             s.overlayDirty = true;

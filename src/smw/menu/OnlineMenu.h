@@ -51,6 +51,9 @@ private:
     MI_TextField* miNameField;
     MI_SelectField<short>* miRunAheadField;
     MI_TextField* miPortField;
+    MI_MenuPanel* miMatchPanel;
+    MI_SelectField<bool>* miPingBarsField;
+    MI_SelectField<bool>* miNetStatsField;
     MI_Button* miSettingsBack;
 
     MI_MenuPanel* miJoinPanel;

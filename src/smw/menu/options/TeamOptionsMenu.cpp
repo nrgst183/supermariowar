@@ -6,25 +6,30 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
+#include "ui/SettingsPage.h"
 
 UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     : UI_Menu()
 {
-    miTeamKillsField = new MI_SelectField<TeamCollisionStyle>(&rm->spr_selectfield, 70, 180, "Player Collision", 500, 220);
+    SettingsPage page(3);
+
+    miTeamKillsField = new MI_SelectField<TeamCollisionStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Player Collision", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miTeamKillsField->add("Off", TeamCollisionStyle::Off);
     miTeamKillsField->add("Assist", TeamCollisionStyle::Assist);
     miTeamKillsField->add("On", TeamCollisionStyle::On);
     miTeamKillsField->setOutputPtr(&game_values.teamcollision);
     miTeamKillsField->setCurrentValue(game_values.teamcollision);
+    page.add(miTeamKillsField, "Teammates pass through, bounce off or can hurt each other");
 
-    miTeamColorsField = new MI_SelectField<bool>(&rm->spr_selectfield, 70, 220, "Colors", 500, 220);
+    miTeamColorsField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Colors", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miTeamColorsField->add("Individual", false);
     miTeamColorsField->add("Team", true);
     miTeamColorsField->setOutputPtr(&game_values.teamcolors);
     miTeamColorsField->setCurrentValue(game_values.teamcolors ? 1 : 0);
     miTeamColorsField->setAutoAdvance(true);
+    page.add(miTeamColorsField, "Players wear their team's color, or their own");
 
-    miTournamentControlField = new MI_SelectField<TournamentControlStyle>(&rm->spr_selectfield, 70, 260, "Tournament Control", 500, 220);
+    miTournamentControlField = new MI_SelectField<TournamentControlStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Tournament Control", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miTournamentControlField->add("All", TournamentControlStyle::All);
     miTournamentControlField->add("Game Winner", TournamentControlStyle::GameWinner);
     miTournamentControlField->add("Game Loser", TournamentControlStyle::GameLoser);
@@ -35,17 +40,7 @@ UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     miTournamentControlField->add("Round Robin", TournamentControlStyle::RoundRobin);
     miTournamentControlField->setOutputPtr(&game_values.tournamentcontrolstyle);
     miTournamentControlField->setCurrentValue(game_values.tournamentcontrolstyle);
+    page.add(miTournamentControlField, "Who picks the next game of a tournament");
 
-    miTeamOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
-    miTeamOptionsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
-
-    AddControl(miTeamKillsField, miTeamOptionsMenuBackButton, miTeamColorsField, nullptr, miTeamOptionsMenuBackButton);
-    AddControl(miTeamColorsField, miTeamKillsField, miTournamentControlField, nullptr, miTeamOptionsMenuBackButton);
-    AddControl(miTournamentControlField, miTeamColorsField, miTeamOptionsMenuBackButton, nullptr, miTeamOptionsMenuBackButton);
-    AddControl(miTeamOptionsMenuBackButton, miTournamentControlField, miTeamKillsField, miTournamentControlField, nullptr);
-
-    AddTitleBar("Team Options Menu");
-
-    setInitialFocus(miTeamKillsField);
-    SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
+    miTeamOptionsMenuBackButton = page.finish(*this, "Team Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

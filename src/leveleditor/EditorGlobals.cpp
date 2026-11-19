@@ -1,5 +1,7 @@
 #include "LevelEditorState.h"
 
+#include <algorithm>
+
 #ifndef SMW_EMBEDDED_EDITOR  // stand-ins for the game's code (the game has the real ones)
 void CPlayer::flipsidesifneeded() {}
 bool CPlayer::isInvincible() const { return false; }

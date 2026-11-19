@@ -2,6 +2,7 @@
 
 #include "ConfigNames.h"
 
+#include <algorithm>
 #include <toml.hpp>
 
 

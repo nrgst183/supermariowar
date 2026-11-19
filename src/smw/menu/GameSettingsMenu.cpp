@@ -38,6 +38,8 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     miSettingsStartButton = new MI_Button(&rm->spr_selectfield, 70, 45, "Start", 500);
     miSettingsStartButton->SetCode(MENU_CODE_START_GAME);
 
+    //A row each for the mode, its goal (lives, frags, ...) and the map: left and right change them; the
+    //map preview's side has the other buttons, in a column (the mode's rules, then the map list's)
     miModeField = new MI_ImageSelectField(&rm->spr_selectfield, &rm->menu_mode_small, 70, 85, "Mode", 500, 120, 16, 16);
 
     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
@@ -48,7 +50,7 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     miModeField->setItemChangedCode(MENU_CODE_MODE_CHANGED);
 
     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
-        miGoalField[iGameMode] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 125, gamemodes[iGameMode]->GetGoalName().c_str(), 352, 120);
+        miGoalField[iGameMode] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 125, gamemodes[iGameMode]->GetGoalName().c_str(), 500, 120);
         miGoalField[iGameMode]->setVisible(iGameMode == 0);
 
         for (short iGameModeOption = 0; iGameModeOption < GAMEMODE_NUM_OPTIONS; iGameModeOption++) {
@@ -60,18 +62,18 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
         miGoalField[iGameMode]->setCurrentValue(gamemodes[iGameMode]->goal);
     }
 
-    miModeSettingsButton = new MI_Button(&rm->spr_selectfield, 430, 125, "Settings", 140);
+    miModeSettingsButton = new MI_Button(&rm->spr_selectfield, 430, 205, "Rules", 140);
     miModeSettingsButton->SetCode(MENU_CODE_TO_MODE_SETTINGS_MENU);
 
     miMapField = new MI_MapField(&rm->spr_selectfield, 70, 165, "Map", 500, 120, true);
 
-    miMapFiltersButton = new MI_Button(&rm->spr_selectfield, 430, 205, "Filters", 140);
+    miMapFiltersButton = new MI_Button(&rm->spr_selectfield, 430, 245, "Filters", 140);
     miMapFiltersButton->SetCode(MENU_CODE_TO_MAP_FILTERS);
 
-    miMapFiltersOnImage = new MI_Image(&rm->menu_map_filter, 530, 213, 0, 48, 16, 16, 1, 1, 0);
+    miMapFiltersOnImage = new MI_Image(&rm->menu_map_filter, 530, 253, 0, 48, 16, 16, 1, 1, 0);
     miMapFiltersOnImage->setVisible(false);
 
-    miMapThumbnailsButton = new MI_Button(&rm->spr_selectfield, 430, 245, "Thumbs", 140);
+    miMapThumbnailsButton = new MI_Button(&rm->spr_selectfield, 430, 285, "Thumbs", 140);
     miMapThumbnailsButton->SetCode(MENU_CODE_TO_MAP_BROWSER_THUMBNAILS);
 
     miMapFilterScroll = new MI_MapFilterScroll(&rm->menu_plain_field, 120, 72, 400, 9);
@@ -112,16 +114,16 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     AddControl(miSettingsStartButton, miMapThumbnailsButton, miModeField, nullptr, nullptr);
     AddControl(miModeField, miSettingsStartButton, miGoalField[0], nullptr, nullptr);
 
-    AddControl(miGoalField[0], miModeField, miGoalField[1], nullptr, miModeSettingsButton);
+    //(one goal field shows, the mode's: up and down go along them to the one shown)
+    AddControl(miGoalField[0], miModeField, miGoalField[1], nullptr, nullptr);
 
     for (short iGoalField = 1; iGoalField < GAMEMODE_LAST - 1; iGoalField++)
-        AddControl(miGoalField[iGoalField], miGoalField[iGoalField - 1], miGoalField[iGoalField + 1], miGoalField[iGoalField - 1], miModeSettingsButton);
+        AddControl(miGoalField[iGoalField], miGoalField[iGoalField - 1], miGoalField[iGoalField + 1], nullptr, nullptr);
 
-    AddControl(miGoalField[GAMEMODE_LAST - 1], miGoalField[GAMEMODE_LAST - 2], miMapField, miGoalField[GAMEMODE_LAST - 2], miModeSettingsButton);
-
-    AddControl(miModeSettingsButton, miModeField, miMapField, miGoalField[GAMEMODE_LAST - 1], nullptr);
-    AddControl(miMapField, miGoalField[GAMEMODE_LAST - 1], miMapFiltersButton, nullptr, nullptr);
-    AddControl(miMapFiltersButton, miMapField, miMapThumbnailsButton, nullptr, nullptr);
+    AddControl(miGoalField[GAMEMODE_LAST - 1], miGoalField[GAMEMODE_LAST - 2], miMapField, nullptr, nullptr);
+    AddControl(miMapField, miGoalField[GAMEMODE_LAST - 1], miModeSettingsButton, nullptr, nullptr);
+    AddControl(miModeSettingsButton, miMapField, miMapFiltersButton, nullptr, nullptr);
+    AddControl(miMapFiltersButton, miModeSettingsButton, miMapThumbnailsButton, nullptr, nullptr);
     AddControl(miMapThumbnailsButton, miMapFiltersButton, miSettingsStartButton, nullptr, nullptr);
 
     AddControl(miMapFilterScroll, nullptr, nullptr, nullptr, nullptr);
@@ -142,7 +144,7 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     // What only the host can change, in the online lobby (hidden until SetOnlineView())
     miHostNote = new MI_LockTag(622, 10, "");
     miHostTag[0] = new MI_LockTag(562, 93, "Host");
-    miHostTag[1] = new MI_LockTag(414, 133, "Host");
+    miHostTag[1] = new MI_LockTag(562, 133, "Host");
     miHostTag[2] = new MI_LockTag(562, 173, "Host");
     miMapOverlay = new MI_LobbyMap({70, 195, 352, 270}, {86, 211, 320, 240});
     miMapOverlay->setVisible(false);

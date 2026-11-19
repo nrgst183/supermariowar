@@ -50,6 +50,9 @@ public:
     void SetData(std::string& data, short maxchars);
 
     MenuCodeEnum MouseClick(short iMouseX, short iMouseY) override;
+    Box FocusBox() const override {
+        return {m_pos.x, m_pos.y, iWidth, 32};
+    }
 
     void Refresh() override;
 

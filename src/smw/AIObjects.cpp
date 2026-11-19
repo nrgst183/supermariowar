@@ -57,6 +57,7 @@
 #include "objects/overmap/WO_PipeCoin.h"
 #include "objects/overmap/WO_RaceGoal.h"
 
+#include <algorithm>
 #include <memory>
 #include <cstdlib> // abs()
 

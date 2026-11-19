@@ -21,6 +21,9 @@ namespace {
 short iBlockType;
 bool editor_properties_initialized = false;
 } // namespace
+
+// The ? block screen is showing (its loop runs inside the map's: the game's overlay asks, see LevelShell.h)
+bool g_inBlockProperties = false;
 void init_editor_properties(short iBlockCol, short iBlockRow)
 {
     if (editor_properties_initialized)
@@ -34,6 +37,10 @@ void init_editor_properties(short iBlockCol, short iBlockRow)
 int editor_properties(short iBlockCol, short iBlockRow)
 {
     init_editor_properties(iBlockCol, iBlockRow);
+    struct Showing {
+        Showing() { g_inBlockProperties = true; }
+        ~Showing() { g_inBlockProperties = false; }
+    } showing;
     while (true)
     {
         FPSLimiter::instance().frameStart();
@@ -74,8 +81,8 @@ int editor_properties(short iBlockCol, short iBlockRow)
                         }
                     }
                 }
+                break;
 
-            [[fallthrough]];
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
                     short iHiddenCheckboxY = 0;
                 if (iBlockType == 1 || iBlockType == 15) {

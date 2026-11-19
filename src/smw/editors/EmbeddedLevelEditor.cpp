@@ -24,6 +24,8 @@ namespace leveleditor {
 #include "../../leveleditor/EditorWarpEyecandy.cpp"
 #include "../../leveleditor/main.cpp"
 
+#include <algorithm>
+
 // ---- editing together (CoEdit.h): the map as keyed values
 
 using editors::coedit::Bytes;
@@ -317,7 +319,31 @@ namespace shell {
 
 bool inMapView()
 {
-    return state == EDITOR_EDIT;
+    return state == EDITOR_EDIT && !fExiting && !g_inBlockProperties;
+}
+
+int zoneTeam()
+{
+    return nospawn_mode;
+}
+
+bool exitPrompt()
+{
+    return state == EDITOR_EDIT && fExiting;
+}
+
+bool blockProperties()
+{
+    return state == EDITOR_EDIT && g_inBlockProperties;
+}
+
+bool hasProperties(int col, int row)
+{
+    if (col < 0 || col >= MAPWIDTH || row < 0 || row >= MAPHEIGHT)
+        return false;
+    //(the blocks K opens, EditorMapEdit.cpp)
+    const short type = g_map->objectdata[col][row].iType;
+    return type == 1 || type == 15 || type == 4 || type == 5 || type == 17 || type == 18 || type == 3;
 }
 
 int mode()
@@ -758,11 +784,26 @@ Screen currentScreen()
 {
     Screen sc;
     const Command done {"Done", SDLK_ESCAPE};
+    //(over the map: the exit prompt, the ? block screen)
+    if (exitPrompt()) {
+        sc.title = "Leave the editor?";
+        sc.a = "choose";
+        sc.b = "stay";
+        return sc;
+    }
+    if (blockProperties()) {
+        sc.title = "What this block gives";
+        sc.a = "more";
+        sc.b = "less";
+        sc.holds = "LT: every item";
+        sc.commands = {{"Default", SDLK_D}, {"All items to default", SDLK_D, true}, {"Random", SDLK_GRAVE}, {"Nothing", SDLK_0}, done};
+        return sc;
+    }
     switch (state) {
         case EDITOR_TILES:
             sc.title = "Tileset " + std::to_string(set_tile_tileset + 1) + " of " + std::to_string(g_tilesetmanager->count()) + ": " +
                        g_tilesetmanager->tileset(set_tile_tileset)->name();
-            sc.a = "take (held, with the d-pad: several)";
+            sc.a = "take (hold and move for more)";
             sc.shoulders = "tileset";
             sc.lb = SDLK_PAGEUP;
             sc.rb = SDLK_PAGEDOWN;
@@ -775,7 +816,7 @@ Screen currentScreen()
             break;
         case EDITOR_ANIMATION:
             sc.title = "Animated tiles";
-            sc.a = "take (drag: several)";
+            sc.a = "take (drag for more)";
             sc.commands = {done};
             break;
         case EDITOR_WARP:
@@ -790,8 +831,8 @@ Screen currentScreen()
             break;
         case EDITOR_BACKGROUNDS:
             sc.title = "Backgrounds";
-            sc.a = "take, with its music";
-            sc.b = "the picture only";
+            sc.a = "use it, with its music";
+            sc.b = "picture only";
             sc.shoulders = "page";
             sc.lb = SDLK_PAGEUP;
             sc.rb = SDLK_PAGEDOWN;
@@ -812,7 +853,7 @@ Screen currentScreen()
             sc.a = "more";
             sc.b = "less";
             sc.holds = "LT: every block";
-            sc.commands = {{"Default", SDLK_D}, {"Every block: default", SDLK_D, true}, {"Random", SDLK_GRAVE}, {"Nothing", SDLK_0}, done};
+            sc.commands = {{"Default", SDLK_D}, {"All blocks to default", SDLK_D, true}, {"Random", SDLK_GRAVE}, {"Nothing", SDLK_0}, done};
             break;
         case EDITOR_MODEITEMS:
             sc.title = modeitemmode == 0 ? "Race goals" : "Flag bases";
@@ -831,12 +872,12 @@ Screen currentScreen()
                     break;
                 case PLATFORM_EDIT_STATE_PATH_TYPE:
                 case PLATFORM_EDIT_STATE_CHANGE_PATH_TYPE:
-                    sc.title = "Platform: its path's shape";
+                    sc.title = "Platform path shape";
                     sc.a = "choose";
                     sc.commands = {done};
                     break;
                 case PLATFORM_EDIT_STATE_PATH:
-                    sc.title = "Platform " + std::to_string(iEditPlatform + 1) + ": its path (" +
+                    sc.title = "Platform " + std::to_string(iEditPlatform + 1) + " path (" +
                                szPathNames[static_cast<int>(g_Platforms[iEditPlatform].iPathType)] + ")";
                     if (g_Platforms[iEditPlatform].iPathType == PlatformPathType::Ellipse) {
                         sc.a = "center";
@@ -853,7 +894,7 @@ Screen currentScreen()
                     sc.commands = {{"Path shape", SDLK_T}, done};
                     break;
                 case PLATFORM_EDIT_STATE_TEST:
-                    sc.title = "Platforms: trying the paths";
+                    sc.title = "Platforms: testing the paths";
                     sc.commands = {done};
                     break;
                 default:
@@ -876,12 +917,12 @@ Screen currentScreen()
                     sc.commands = {{"New hazard", SDLK_N}, done};
                     break;
                 case MAPHAZARD_EDIT_STATE_TYPE:
-                    sc.title = "Hazard: what kind";
+                    sc.title = "Choose a hazard";
                     sc.a = "choose";
                     sc.commands = {done};
                     break;
                 case MAPHAZARD_EDIT_STATE_LOCATION:
-                    sc.title = "Hazard: where it is";
+                    sc.title = "Place the hazard";
                     sc.a = "place";
                     sc.commands = {{"Its settings", SDLK_P}, {"Delete it", SDLK_DELETE}, done};
                     break;
@@ -890,7 +931,7 @@ Screen currentScreen()
                         MapHazardType itype;
                     } hazard {static_cast<MapHazardType>(hazardType(iEditMapHazard))};
                     sc.title = std::string("Hazard: ") + szHazardNames[static_cast<int>(hazard.itype)];
-                    sc.commands = {{"Where it is", SDLK_L}};
+                    sc.commands = {{"Move it", SDLK_L}};
                     if (hazard.itype == MapHazardType::FireBar || hazard.itype == MapHazardType::RotoDisc) {
                         sc.a = "angle and size";
                         sc.shoulders = "slower / faster";

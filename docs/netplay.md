@@ -8,14 +8,18 @@ The old lobby server mode (`smw-server`) has been removed.
 
 ### Hosting
 
-1. In the main menu, choose **Online** and then host a lobby. The default port is **UDP 7300**.
-2. Set up the match as usual (game mode, map, settings). The host's selections are what everybody plays.
-3. Give the other players your address. Wait until they appear in the lobby, then start the match once everyone is ready.
+Every game starts in the same lobby, online or not:
+
+1. In the main menu, choose **Start**. The lobby opens as a game on this computer (**Open to: No one**), with the main menu's players and CPUs.
+2. Set **Open to** to **LAN** (players on your network see the game in their **Join a Game** list) or **Internet** (the game also asks your router to open the port, see below). The status line shows the address the others join at. The port is **UDP 7300**, or the one in **Options, Online**.
+3. Wait until the others appear in the lobby, then **Continue** to set up the match as usual (match type, game mode, map, settings). The host's selections are what everybody plays.
+
+**Join a Game** has a **Host a game** button too: the same lobby, already open to the LAN.
 
 ### Joining
 
-1. Main menu, **Online**, join a lobby.
-2. Type the host's address: `192.168.1.20` or `192.168.1.20:7300` (the port can be left out when it is 7300), and wait in the lobby for the host to start.
+1. Main menu, **Join a Game**. Games hosted on your network show up in the list by themselves: pick one.
+2. A game on the internet: **Join by address**, then type the host's address: `192.168.1.20` or `192.168.1.20:7300` (the port can be left out when it is 7300), and wait in the lobby for the host to start.
 
 All players must run the **same version of the game**: the connection is refused if the builds (or the game data that matters for the simulation) differ.
 
@@ -32,7 +36,7 @@ All players must run the **same version of the game**: the connection is refused
 
 ### Tournaments, tours and worlds
 
-Every match type can be played online: single games, minigames, and the multi-match modes **tournament**, **tour** and **world**. The host picks the match type (and the number of wins, the tour or the world) under **Settings** in the lobby, and starts it from the lobby like a single game. Then:
+Every match type can be played online: single games, minigames, and the multi-match modes **tournament**, **tour** and **world**. The host picks the match type (and the number of wins, the tour or the world) with **Continue** in the lobby, and starts it like a single game. Then:
 
 - The **host leads the menus** between the matches: it continues from the scoreboard and the tour stop screen, and in a tournament it chooses every game (mode, goal, map). The other players see the same screens ("Waiting for the host...").
 - The **bonus wheel** is the same for everybody, and only the winning team can stop it (the host stops it after a while if they don't, or at once for CPU players).
@@ -49,11 +53,11 @@ Every match type can be played online: single games, minigames, and the multi-ma
 
 **Skins.** Every player is shown (in the lobby and in the match) with the skin their own machine has chosen. A skin that you don't have, or have under the same name but with other contents, is sent by its owner when you join (skins are small images, at most 128 KB, sent in 1 KB chunks), checked against its hash and saved in `skins/net/` in the data directory, under a safe name that never replaces an existing file. Skins are cosmetic and never delay or change a match: until a skin has arrived (or if it can't be used) the player is drawn with the default skin in the color of the slot.
 
-**Ping bars.** Every other player's score panel shows small signal bars for their connection: four green bars under 60 ms, three under 120 ms, two (yellow) under 200 ms, one (red) above. The lobby's player cards show the same bars. Online replays keep each player's ping, averaged per second, and the theater shows the bars as they were. **Options, Graphics, Ping Bars** turns them off.
+**Ping bars.** Every other player's score panel shows small signal bars for their connection: four green bars under 60 ms, three under 120 ms, two (yellow) under 200 ms, one (red) above. The lobby's player cards show the same bars. Online replays keep each player's ping, averaged per second, and the theater shows the bars as they were. **Options, Online, Ping Bars** turns them off.
 
-**Run-ahead.** **Online, Run-Ahead** (under your nickname; on the Xbox, in the System Link menu), or during a match the **pause button**: online the match can't pause, so it opens a panel instead (the match goes on, your players stand still while it's up) with the ping, how many frames late the others' moves come, the input delay, and the run-ahead to change with left and right. **Auto** (the default) runs as far ahead as the input delay, which cancels it (with no input delay, nothing: rollback already shows your buttons at once); off, 1, 2 or 3 frames are the other settings. Run-ahead shows the match that many frames ahead of where it really is, as emulators do: a button's effect appears that much sooner. Each frame the game runs its real tick, then a few more with the buttons held as they are, draws that, and goes back to the real state before the next frame. When you change your buttons, what was shown ahead is replaced a frame later, by a step of a pixel or two. It is only used online, to win back some of the input delay the network costs (the other players' last inputs are repeated, as rollback does anyway); offline matches are drawn as they are. It costs a few microseconds a frame, and never changes the match itself: the checksums and replays are the same with it on or off.
+**Run-ahead.** **Options, Online, Run-Ahead** (under your nickname; on the Xbox, in the Join a Game menu), or during a match the **pause button**: online the match can't pause, so it opens a panel instead (the match goes on, your players stand still while it's up) with the ping, how many frames late the others' moves come, the input delay, and the run-ahead to change with left and right. **Auto** (the default) runs as far ahead as the input delay, which cancels it (with no input delay, nothing: rollback already shows your buttons at once); off, 1, 2 or 3 frames are the other settings. Run-ahead shows the match that many frames ahead of where it really is, as emulators do: a button's effect appears that much sooner. Each frame the game runs its real tick, then a few more with the buttons held as they are, draws that, and goes back to the real state before the next frame. When you change your buttons, what was shown ahead is replaced a frame later, by a step of a pixel or two. It is only used online, to win back some of the input delay the network costs (the other players' last inputs are repeated, as rollback does anyway); offline matches are drawn as they are. It costs a few microseconds a frame, and never changes the match itself: the checksums and replays are the same with it on or off.
 
-**Network stats.** The bar at the top of the screen, under the scores, shows every other player's connection (signal bars and round trip time), the input delay in frames, and how many rollbacks happen per second. It is off by default and only drawn in online matches. Toggle it with **F3** during a match, or with **Options, Graphics, Network Stats**.
+**Network stats.** The bar at the top of the screen, under the scores, shows every other player's connection (signal bars and round trip time), the input delay in frames, and how many rollbacks happen per second. It is off by default and only drawn in online matches. Toggle it with **F3** during a match, or with **Options, Online, Net Stats**.
 
 **Waiting.** When another player's inputs are late by more than the game can predict (about eight frames), the match freezes for a moment. After a split second, a box shows **Waiting for <name>**, for how long, and a line that runs down to the moment the CPU takes over. If a player is silent for **5 seconds** the connection is considered lost, and the CPU takes over that player (see below). After 3 seconds of waiting, the box also counts down the seconds. A player that is only lagging is never dropped before that.
 

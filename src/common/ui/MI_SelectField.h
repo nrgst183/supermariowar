@@ -102,6 +102,9 @@ public:
     bool CanNudge() const override;
     MenuCodeEnum Nudge(int dir) override;
     MenuCodeEnum MouseClick(short iMouseX, short iMouseY) override;
+    Box FocusBox() const override {
+        return {m_pos.x, m_pos.y, m_width, 32};
+    }
 
 protected:
     gfxSprite* m_spr = nullptr;

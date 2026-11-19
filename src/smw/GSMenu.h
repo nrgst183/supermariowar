@@ -112,6 +112,19 @@ class MenuState : public GameState
 #endif
         void Exit();
         bool PollMenuEvents();
+        // The mouse in the menus (UI_Menu::Pointer...): what it did since the last frame, done to the
+        // current menu with the frame's input
+        struct PendingPointer {
+            bool moved = false;
+            short x = 0;
+            short y = 0;
+            int click = 0;      // 1 left, 2 right
+            short clickX = 0;
+            short clickY = 0;
+            int wheel = 0;
+        };
+        PendingPointer mPointer;
+        MenuCodeEnum ApplyPointer();
         bool HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs);
         void EnterGameSetup();
         void LaunchMatch();
@@ -146,6 +159,7 @@ class MenuState : public GameState
         bool mLocalFromLobby = false;   // the match menus (and matches) of a local game from the lobby
         short mLocalTeams = 0;
         void OpenLocalLobby();
+        bool OpenLobby(rollback::LobbyAccess access, LobbyOrigin origin, std::string& error);
         void StartLocalFromLobby();
         void ResetOnlineMenus();
         void LeaveLobbyQuietly();

@@ -632,6 +632,130 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         }
     }
 
+    //--at-role edux: the level editor's screens with a controller: a ? block's contents, the zones page,
+    //B on the tileset screen, and the exit prompt (B stays; left and A leave)
+    if (at.shotsRole == "edux") {
+        using editors::input::TestInput;
+        auto tap = [](int f, int from) { return f >= from && f < from + 2; };
+        auto levelScript = [tap](editors::Editor, int f, int) {
+            TestInput t;
+            if (f >= 5 && f < 10) { t.px = 496; t.py = 80; }    //(the map's ? block)
+            if (f == 12) t.key = SDLK_K;
+            if (f == 25) t.shot = "u1_block_contents";
+            t.back = tap(f, 30);
+            if (f == 40) t.shot = "u2_back_on_map";
+            if (f == 45) t.key = SDLK_X;
+            t.start = tap(f, 50);
+            t.rb = tap(f, 54) || tap(f, 57) || tap(f, 60);    //(blocks, items, types, zones)
+            if (f == 64) t.shot = "u3_zones_page";
+            t.b = tap(f, 68);
+            if (f == 75) t.key = SDLK_T;
+            if (f == 85) t.shot = "u4_tile_picker";
+            t.b = t.b || tap(f, 90);
+            if (f == 100) t.shot = "u5_after_picker_b";
+            t.back = t.back || tap(f, 110);
+            if (f == 120) t.shot = "u6_exit_prompt";
+            t.b = t.b || tap(f, 125);
+            if (f == 135) t.shot = "u7_stayed";
+            t.back = t.back || tap(f, 140);
+            t.left = tap(f, 150);
+            if (f == 156) t.shot = "u8_yes_chosen";
+            t.a = tap(f, 160);
+            if (f > 190 && f % 40 == 0) t.back = true;
+            if (f > 190 && f % 40 == 20) t.a = true;
+            return t;
+        };
+        if (step == 1) {
+            if (t == 1) {
+                editors::input::setTestDriver(levelScript, at.shotsDir);
+                return MENU_CODE_RUN_LEVEL_EDITOR;
+            }
+            if (t == 8) {
+                editors::input::setTestDriver(nullptr, {});
+                step = 1000;
+                t = 0;
+            }
+            return MENU_CODE_NONE;
+        }
+    }
+
+    //--at-role edmouse: the level editor with the mouse (SDL's events, as a real one sends): Alt and a
+    //click picks up a cell, Shift and a drag fills a rectangle, Ctrl and the wheel change the layer,
+    //Ctrl+C copies
+    if (at.shotsRole == "edmouse") {
+        using editors::input::TestInput;
+        auto levelScript = [](editors::Editor, int f, int) {
+            auto button = [](float x, float y, Uint8 b, bool down) {
+                SDL_Event e {};
+                e.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+                e.button.button = b;
+                e.button.down = down;
+                e.button.x = x;
+                e.button.y = y;
+                SDL_PushEvent(&e);
+            };
+            auto move = [](float x, float y, Uint32 state) {
+                SDL_Event e {};
+                e.type = SDL_EVENT_MOUSE_MOTION;
+                e.motion.x = x;
+                e.motion.y = y;
+                e.motion.state = state;
+                SDL_PushEvent(&e);
+            };
+            TestInput t;
+            switch (f) {
+                case 5: move(16, 464, 0); break;
+                case 8: SDL_SetModState(SDL_KMOD_LALT); button(16, 464, SDL_BUTTON_LEFT, true); break;    //(the ground's tile)
+                case 10: button(16, 464, SDL_BUTTON_LEFT, false); SDL_SetModState(SDL_KMOD_NONE); break;
+                case 14: move(80, 240, 0); break;
+                case 16: SDL_SetModState(SDL_KMOD_LSHIFT); button(80, 240, SDL_BUTTON_LEFT, true); break;
+                case 20: move(160, 272, SDL_BUTTON_LMASK); break;
+                case 24: move(240, 304, SDL_BUTTON_LMASK); break;
+                case 28: t.shot = "m1_shift_drag"; break;
+                case 32: button(240, 304, SDL_BUTTON_LEFT, false); SDL_SetModState(SDL_KMOD_NONE); break;
+                case 40: t.shot = "m2_rect_filled"; break;
+                case 44: {
+                    SDL_SetModState(SDL_KMOD_LCTRL);
+                    SDL_Event e {};
+                    e.type = SDL_EVENT_MOUSE_WHEEL;
+                    e.wheel.y = -1;
+                    SDL_PushEvent(&e);
+                    break;
+                }
+                case 46: SDL_SetModState(SDL_KMOD_NONE); break;
+                case 52: t.shot = "m3_ctrl_wheel_layer"; break;
+                case 56: {
+                    SDL_Event e {};
+                    e.type = SDL_EVENT_KEY_DOWN;
+                    e.key.key = SDLK_C;
+                    e.key.mod = SDL_KMOD_LCTRL;
+                    e.key.down = true;
+                    SDL_PushEvent(&e);
+                    break;
+                }
+                case 62: t.shot = "m4_ctrl_c"; break;
+                case 64: button(300, 300, SDL_BUTTON_RIGHT, true); break;    //(the copy put away)
+                case 65: button(300, 300, SDL_BUTTON_RIGHT, false); break;
+                default: break;
+            }
+            if (f > 90 && f % 40 == 0) t.back = true;
+            if (f > 90 && f % 40 == 20) { t.px = 282; t.py = 266; t.a = true; }
+            return t;
+        };
+        if (step == 1) {
+            if (t == 1) {
+                editors::input::setTestDriver(levelScript, at.shotsDir);
+                return MENU_CODE_RUN_LEVEL_EDITOR;
+            }
+            if (t == 8) {
+                editors::input::setTestDriver(nullptr, {});
+                step = 1000;
+                t = 0;
+            }
+            return MENU_CODE_NONE;
+        }
+    }
+
     //--at-role colocal: two controllers in one level editor, painting at the same time
     if (at.shotsRole == "colocal") {
         auto script = [](editors::Editor, int f, int pointer) {
@@ -846,6 +970,100 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             step = 1000;
             t = 0;
         }
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role mouse: the menus with the mouse (SDL's events, as a real one sends): pointing, clicking,
+    //the wheel and the right button
+    if (at.shotsRole == "mouse" && step == 1) {
+        auto move = [](float x, float y) {
+            SDL_Event e {};
+            e.type = SDL_EVENT_MOUSE_MOTION;
+            e.motion.x = x;
+            e.motion.y = y;
+            SDL_PushEvent(&e);
+        };
+        auto click = [](float x, float y, Uint8 button) {
+            SDL_Event e {};
+            e.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+            e.button.button = button;
+            e.button.down = true;
+            e.button.x = x;
+            e.button.y = y;
+            SDL_PushEvent(&e);
+        };
+        auto wheel = [](float dy) {
+            SDL_Event e {};
+            e.type = SDL_EVENT_MOUSE_WHEEL;
+            e.wheel.y = dy;
+            SDL_PushEvent(&e);
+        };
+        switch (t) {
+            case 5: move(220, 350); break;                          //(main menu: Options)
+            case 15: shot("p1_hover_options"); break;
+            case 20: click(220, 350, SDL_BUTTON_LEFT); break;
+            case 35: move(450, 211); break;                         //(Weapon Use Limits)
+            case 45: shot("p2_options_hover_grid"); break;
+            case 50: click(200, 95, SDL_BUTTON_LEFT); break;        //(Gameplay)
+            case 65: move(300, 120); break;                         //(a value row)
+            case 70: wheel(1); break;
+            case 75: wheel(1); break;
+            case 85: shot("p3_gameplay_wheel"); break;
+            case 90: click(300, 120, SDL_BUTTON_LEFT); break;
+            case 100: shot("p4_gameplay_clicked"); break;
+            case 105: click(300, 120, SDL_BUTTON_RIGHT); break;
+            case 120: shot("p5_back_to_options"); break;
+            case 125: click(300, 120, SDL_BUTTON_RIGHT); break;
+            case 140: move(400, 270); break;                        //(the main menu's players)
+            case 145: click(416, 270, SDL_BUTTON_LEFT); break;      //(player 3: the next kind)
+            case 160: shot("p6_main_players_clicked"); step = 1000; t = 0; break;
+        }
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role go: the main menu's Go! (a random game right away; --at-shot-every for its screens)
+    if (at.shotsRole == "go" && step == 1) {
+        step = 1000;
+        t = 0;
+        return MENU_CODE_QUICK_GAME_START;
+    }
+
+    //--at-role menutour: a screenshot of each menu screen in turn (for looking over the menus)
+    if (at.shotsRole == "menutour" && step == 1) {
+        struct Screen { MenuCodeEnum code; const char* name; };
+        static const Screen SCREENS[] = {{MENU_CODE_TO_OPTIONS_MENU, "t01_options"},
+            {MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU, "t02_gameplay"}, {MENU_CODE_NONE, "t02b_gameplay_down"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_TEAM_OPTIONS_MENU, "t03_team"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_POWERUP_SELECTION_MENU, "t04_item_selection"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_POWERUP_SETTINGS_MENU, "t05_item_settings"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_PROJECTILES_OPTIONS_MENU, "t06_weapons"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_PROJECTILES_LIMITS_MENU, "t07_weapon_limits"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_GRAPHICS_OPTIONS_MENU, "t08_graphics"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_EYECANDY_OPTIONS_MENU, "t09_eyecandy"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_SOUND_OPTIONS_MENU, "t10_sound"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_ONLINE_OPTIONS_MENU, "t11_online_options"}, {MENU_CODE_TO_MAIN_MENU, ""},
+            {MENU_CODE_TO_CONTROLS_MENU, "t12_controls"}, {MENU_CODE_TO_MAIN_MENU, ""},
+            {MENU_CODE_TO_HISTORY_MENU, "t13_history"}, {MENU_CODE_TO_MAIN_MENU, ""},
+            {MENU_CODE_TO_EDITORS_MENU, "t14_editors"}, {MENU_CODE_TO_MAIN_MENU, ""},
+            {MENU_CODE_TO_SYSTEM_LINK_MENU, "t15_join"}, {MENU_CODE_TO_MAIN_MENU, ""},
+            {MENU_CODE_TO_LOCAL_LOBBY, "t16_lobby"}, {MENU_CODE_ONLINE_OPTIONS, "t17_lobby_options"},
+            {MENU_CODE_ONLINE_OPTIONS_BACK, ""}, {MENU_CODE_ONLINE_MATCH_SETTINGS, "t18_match_type"},
+            {MENU_CODE_MATCH_SELECTION_START, "t19_game_settings"}, {MENU_CODE_TO_MODE_SETTINGS_MENU, "t20_mode_settings"}};
+        constexpr int HOLD = 20;
+        const int index = (t - 1) / HOLD;
+        const int frame = (t - 1) % HOLD;
+        if (index >= static_cast<int>(sizeof(SCREENS) / sizeof(SCREENS[0]))) {
+            step = 1000;
+            t = 0;
+            return MENU_CODE_NONE;
+        }
+        if (frame == 0 && SCREENS[index].code != MENU_CODE_NONE)
+            return SCREENS[index].code;
+        //(no menu code: down three rows on the same screen)
+        if (SCREENS[index].code == MENU_CODE_NONE && frame < 6 && frame % 2 == 0)
+            game_values.playerInput.outputControls[0].menu_down.fPressed = true;
+        if (frame == HOLD - 2 && SCREENS[index].name[0])
+            shot(SCREENS[index].name);
         return MENU_CODE_NONE;
     }
 

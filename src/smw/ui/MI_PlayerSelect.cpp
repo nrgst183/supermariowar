@@ -116,3 +116,29 @@ void MI_PlayerSelect::Draw()
         spr->draw(m_pos.x + iPlayerPosition[iPlayer], m_pos.y + 16, {game_values.playercontrol[iPlayer] * 34 + 32, 206, 34, 32});
     }
 }
+
+bool MI_PlayerSelect::PointerPress(short x, short y, MenuCodeEnum& code)
+{
+    code = MENU_CODE_NONE;
+    if (y < m_pos.y + 12 || y >= m_pos.y + 52)
+        return false;
+    for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
+        const int left = m_pos.x + iPlayerPosition[iPlayer] - 4;
+        if (x < left || x >= left + 42)
+            continue;
+        iSelectedPlayer = static_cast<short>(iPlayer);
+        SetImagePosition();
+        //(as down on it: off, player, CPU in turn, with two players at least)
+        if (++game_values.playercontrol[iPlayer] > 2)
+            game_values.playercontrol[iPlayer] = 0;
+        if (game_values.playercontrol[iPlayer] == 0) {
+            int iCountPlayers = 0;
+            for (int k = 0; k < 4; k++)
+                iCountPlayers += game_values.playercontrol[k] > 0;
+            if (iCountPlayers < 2)
+                game_values.playercontrol[iPlayer] = 1;
+        }
+        return true;
+    }
+    return false;
+}

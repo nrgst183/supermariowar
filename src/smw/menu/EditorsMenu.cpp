@@ -10,6 +10,7 @@
 #include "ui/MI_TextField.h"
 #include "ui/SmwTheme.h"
 
+#include <algorithm>
 #include <functional>
 #include <string>
 #include <utility>
@@ -36,7 +37,7 @@ void editorIcon(int x, int y, bool level)
     theme::icon(x, y, level ? theme::Icon::QuestionBlock : theme::Icon::Star);
 }
 
-// ---- a button drawn as a card: an icon, its title and a line under it; or (no line) a choice, gold
+// ---- a button drawn as a card: an icon, its title and a line under it; or (no line) a choice, green
 // with a tick when it is the one chosen
 class MI_Card : public MI_Button {
 public:
@@ -55,9 +56,11 @@ public:
     {
         if (!m_visible)
             return;
-        //A pipe like the menus' buttons: light green when selected, lighter gray (and ticked) when chosen
+        //A pipe like the menus' buttons: a choice is green (and ticked) when it is the one chosen, gray
+        //when not; the selected button is the lighter one
         const bool chosen = m_chosen && m_chosen();
-        pipe(m_pos.x, m_pos.y, m_w, fSelected ? PipeLook::LightGreen : chosen ? PipeLook::LightGray : PipeLook::Gray);
+        const bool green = m_chosen ? chosen : fSelected;
+        pipe(m_pos.x, m_pos.y, m_w, green ? (fSelected ? PipeLook::LightGreen : PipeLook::Green) : fSelected ? PipeLook::LightGray : PipeLook::Gray);
         const gfxFont& font = rm->menu_font_large;
         if (m_icon) {
             m_icon(m_pos.x + 18, m_pos.y + 8);
@@ -113,7 +116,7 @@ public:
         //The editor: its icon and name, a line under them
         editorIcon(x + 24, y + 17, *m_level);
         rm->menu_font_large.draw(x + 48, y + 15, *m_level ? "Map Editor" : "World Editor");
-        rm->menu_font_small.drawRightJustified(x + m_w - 24, y + 19, *m_level ? "The arenas you play on" : "Tours across a map of levels");
+        rm->menu_font_small.drawRightJustified(x + m_w - 24, y + 19, *m_level ? "The levels you battle in" : "Overworlds of levels to play through");
         prompts::fill(x + 18, y + 44, m_w - 36, 2, {248, 248, 248, 255});
         prompts::fill(x + 18, y + 46, m_w - 36, 1, {0, 40, 104, 255});
         //(the rows' names, level with their buttons)
@@ -152,10 +155,10 @@ UI_EditorsMenu::UI_EditorsMenu()
     miPickText = new MI_Text("What do you want to make?", 320, 128, 0, true, TextAlign::CENTER);
     AddNonControl(miPickText);
     miMaps = new MI_Card(120, 166, 400, 32, "Maps", "", [](int x, int y) { editorIcon(x, y, true); });
-    miMapsText = new MI_Text("The arenas you play on", 320, 202, 0, false, TextAlign::CENTER);
+    miMapsText = new MI_Text("The levels you battle in", 320, 202, 0, false, TextAlign::CENTER);
     AddNonControl(miMapsText);
     miWorlds = new MI_Card(120, 238, 400, 32, "Worlds", "", [](int x, int y) { editorIcon(x, y, false); });
-    miWorldsText = new MI_Text("Tours across a map of levels", 320, 274, 0, false, TextAlign::CENTER);
+    miWorldsText = new MI_Text("Overworlds of levels to play through", 320, 274, 0, false, TextAlign::CENTER);
     AddNonControl(miWorldsText);
 
     //The second page: where (here or online), how (host or join), then start
@@ -233,9 +236,9 @@ void UI_EditorsMenu::Relink()
     miAddressField->setVisible(setup && m_online && m_joining);
     miStatusText->setVisible(setup);
     miWhereText->setVisible(setup);
-    miWhereText->SetText(m_online ? "Edit the same map together, live" : "Every controller plugged in gets a cursor");
+    miWhereText->SetText(m_online ? "Edit together with friends over the network" : "Everyone with a controller gets a cursor");
     miHowText->setVisible(setup && m_online);
-    miHowText->SetText(m_joining ? "Type the address the host sees" : "The others join this computer's address");
+    miHowText->SetText(m_joining ? "Enter the address the host gives you" : "Friends join using this computer's address");
     miStart->setVisible(setup);
     miStart->SetName(m_online && m_joining ? "Join" : m_online ? "Host" : "Start");
     //(Start under the last row; the status under it, and the panel around them)

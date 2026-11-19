@@ -32,12 +32,12 @@ UI_OnlineMenu::UI_OnlineMenu()
     AddNonControl(miTitle);
 
     // Settings: you, and hosting
-    miYouPanel = new MI_MenuPanel(36, 42, 568, 112, "You", "Your name, and how far ahead you see");
-    miHostPanel = new MI_MenuPanel(36, 158, 568, 76, "Hosting", "The port the others join");
+    miYouPanel = new MI_MenuPanel(36, 42, 568, 112, "You", "Your nickname and run-ahead");
+    miHostPanel = new MI_MenuPanel(36, 158, 568, 76, "Hosting", "The port friends join on");
     miHostPanel->SetNoteSource([]() -> std::string {
         const std::string address = rollback::NetGame::lanAddress();
         if (address.empty())
-            return "The port the others join";
+            return "The port friends join on";
         const int port = atoi(game_values.onlineport.c_str());
         return "Others join " + address + ":" + std::to_string(port > 0 ? port : 7300);
     });
@@ -62,11 +62,30 @@ UI_OnlineMenu::UI_OnlineMenu()
     miPortField->SetData(game_values.onlineport, MAX_PORT_CHARS);
     miPortField->SetDisallowedChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ !@#$%^&*()-_=+`~[]{}\\|;:'\",<>./?");
 
+    // In the matches (and online replays): the others' connection on their score panels, and the
+    // connection's numbers (F3 in a match toggles them too)
+    miMatchPanel = new MI_MenuPanel(36, 238, 568, 112, "In online matches", "What the screen shows");
+    AddNonControl(miMatchPanel);
+
+    miPingBarsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 274, "Ping Bars", 512, 150);
+    miPingBarsField->add("Off", false);
+    miPingBarsField->add("On", true);
+    miPingBarsField->setOutputPtr(&game_values.showpingbars);
+    miPingBarsField->setCurrentValue(game_values.showpingbars ? 1 : 0);
+    miPingBarsField->setAutoAdvance(true);
+
+    miNetStatsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 310, "Net Stats", 512, 150);
+    miNetStatsField->add("Off", false);
+    miNetStatsField->add("On", true);
+    miNetStatsField->setOutputPtr(&game_values.shownetstats);
+    miNetStatsField->setCurrentValue(game_values.shownetstats ? 1 : 0);
+    miNetStatsField->setAutoAdvance(true);
+
     miSettingsBack = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
     miSettingsBack->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
     // Join by address (from the games list: a game that isn't on this network)
-    miJoinPanel = new MI_MenuPanel(36, 42, 568, 112, "Join a game", "At the address the host gives you");
+    miJoinPanel = new MI_MenuPanel(36, 42, 568, 112, "Join a game", "Type in the host's address");
     AddNonControl(miJoinPanel);
 
     miAddressField = new MI_TextField(&rm->spr_selectfield, 64, 78, "Address", 512, 150);
@@ -92,8 +111,10 @@ UI_OnlineMenu::UI_OnlineMenu()
 
     AddControl(miNameField, miSettingsBack, miRunAheadField, nullptr, miSettingsBack);
     AddControl(miRunAheadField, miNameField, miPortField, nullptr, miSettingsBack);
-    AddControl(miPortField, miRunAheadField, miSettingsBack, nullptr, miSettingsBack);
-    AddControl(miSettingsBack, miPortField, miNameField, miPortField, nullptr);
+    AddControl(miPortField, miRunAheadField, miPingBarsField, nullptr, miSettingsBack);
+    AddControl(miPingBarsField, miPortField, miNetStatsField, nullptr, miSettingsBack);
+    AddControl(miNetStatsField, miPingBarsField, miSettingsBack, nullptr, miSettingsBack);
+    AddControl(miSettingsBack, miNetStatsField, miNameField, miNetStatsField, nullptr);
 
     AddControl(miAddressField, miJoinBack, miJoinButton, nullptr, miJoinBack);
     AddControl(miJoinButton, miAddressField, miJoinBack, nullptr, miJoinBack);
@@ -110,7 +131,8 @@ void UI_OnlineMenu::ShowMode(Mode mode)
     m_mode = mode;
     const bool settings = mode == Mode::Settings;
     miTitle->SetText(settings ? "Online Options" : "Join by Address");
-    for (UI_Control* control : std::initializer_list<UI_Control*> {miYouPanel, miHostPanel, miNameField, miRunAheadField, miPortField, miSettingsBack})
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miYouPanel, miHostPanel, miNameField, miRunAheadField, miPortField, miMatchPanel,
+             miPingBarsField, miNetStatsField, miSettingsBack})
         control->setVisible(settings);
     for (UI_Control* control : std::initializer_list<UI_Control*> {miJoinPanel, miAddressField, miJoinButton, miJoinBack})
         control->setVisible(!settings);
@@ -124,6 +146,8 @@ void UI_OnlineMenu::Open(Mode mode)
     miPortField->Refresh();
     miAddressField->Refresh();
     miRunAheadField->setCurrentValue(game_values.runahead);
+    miPingBarsField->setCurrentValue(game_values.showpingbars ? 1 : 0);
+    miNetStatsField->setCurrentValue(game_values.shownetstats ? 1 : 0);
     ShowMode(mode);
     ResetMenu();
 }

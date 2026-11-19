@@ -1,5 +1,7 @@
 #include "LevelEditorState.h"
 
+#include <algorithm>
+
 //SDL_Rect r;
 
 namespace {

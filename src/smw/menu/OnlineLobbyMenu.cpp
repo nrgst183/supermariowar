@@ -48,8 +48,8 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     miTeam->SetAutoModify(true);
     // Under it: who can join (the lobby is local until it's opened to the others), the options
     // and Continue
-    miWhoCanJoin = new MI_SelectField<short>(&rm->spr_selectfield, 40, 298, "Lobby", 238, 98);
-    miWhoCanJoin->add("Local only", static_cast<short>(rollback::LobbyAccess::Nobody));
+    miWhoCanJoin = new MI_SelectField<short>(&rm->spr_selectfield, 40, 298, "Open to", 238, 98);
+    miWhoCanJoin->add("No one", static_cast<short>(rollback::LobbyAccess::Nobody));
 #ifndef NETWORK_DISABLED
 #ifdef SMW_XBOX
     miWhoCanJoin->add("System link", static_cast<short>(rollback::LobbyAccess::Lan));
@@ -332,14 +332,14 @@ void UI_OnlineLobbyMenu::Sync()
 
     // That the match settings are the host's, or everyone's, in the header of the team page (a
     // local game: how to let the others in)
-    std::string settingsNote = lobby->settingsEveryone() ? "Match settings: everyone can change" : "Match settings: host only";
+    std::string settingsNote = lobby->settingsEveryone() ? "Everyone can change match settings" : "Host-only match settings";
     if (localGame)
 #if defined(NETWORK_DISABLED)
         settingsNote = "Local game";
 #elif defined(SMW_XBOX)
-        settingsNote = "Local game: set Lobby to System link to let others in";
+        settingsNote = "Set Open to System link so friends can join";
 #else
-        settingsNote = "Local game: set Lobby to LAN or Internet to let others in";
+        settingsNote = "Set Open to LAN or Internet so friends can join";
 #endif
     miScene->SetSettingsNote(m_page == Page::Team && !joining ? settingsNote : std::string());
     //(the title follows who can join: a local game's options aren't online ones)
@@ -366,7 +366,7 @@ void UI_OnlineLobbyMenu::Sync()
         status = "Starting the match...";
     if (status.empty() && inLobby && local >= 0) {
         if (host) {
-            status = canStart ? "Everyone is ready: select Continue" : capitalized(why);
+            status = canStart ? "Everyone is ready. Select Continue" : capitalized(why);
             tone = canStart ? Tone::Good : Tone::Warn;
         } else {
             const bool ready = lobby->peer(local).ready;
@@ -386,7 +386,7 @@ void UI_OnlineLobbyMenu::Sync()
             status = router;
             tone = good ? Tone::Good : Tone::Warn;
         } else if (!anyone && !lan.empty()) {
-            status = "Waiting for players: they join " + lan + ":" + std::to_string(rollback::NetGame::instance().lobbyPort());
+            status = "Waiting for players at " + lan + ":" + std::to_string(rollback::NetGame::instance().lobbyPort());
             tone = Tone::Info;
         }
     }
@@ -406,16 +406,16 @@ void UI_OnlineLobbyMenu::Sync()
         else if (m_currentFocus == miWhoCanJoin && !host)
             hint = "The host chooses who can join";
         else if (m_currentFocus == miWhoCanJoin)
-            hint = net.access() == rollback::LobbyAccess::Nobody ? "Local only: a game on this computer" : "Others can join this lobby now";
+            hint = net.access() == rollback::LobbyAccess::Nobody ? "Only players on this computer can play" : "Others can join this lobby now";
     } else if (m_dialog == Dialog::None && !joining) {
         if (!host && (m_currentFocus == miCpuPlayers || m_currentFocus == miInputDelay || m_currentFocus == miEveryone || m_currentFocus == miKickWho))
             hint = "Only the host can change this";
         else if (m_currentFocus == miLocalPlayers)
-            hint = "Players on this computer (each with their own controls)";
+            hint = "Players on this computer, each with their own controls";
         else if (m_currentFocus == miInputDelay)
-            hint = "How many frames inputs are held back, to hide the lag";
+            hint = "Delays inputs by a few frames to hide lag";
         else if (m_currentFocus == miEveryone)
-            hint = "Whether the others can also change the mode, goal and map";
+            hint = "Whether other players can change the mode, goal and map";
     }
     miScene->SetStatus(status, tone, hint);
 
@@ -474,7 +474,7 @@ void UI_OnlineLobbyMenu::ApplyChanges()
         if (access != net.access()) {
             std::string error;
             if (!net.setAccess(access, error)) {
-                SetNotice(error.empty() ? "Can't open the lobby to the others" : error);
+                SetNotice(error.empty() ? "Can't open the lobby to others" : error);
                 miWhoCanJoin->setCurrentValue(static_cast<short>(net.access()));
             } else {
                 SetNotice({});

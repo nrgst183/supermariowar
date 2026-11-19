@@ -36,6 +36,7 @@
 #include "menu/TourStopMenu.h"
 #include "menu/WorldMenu.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <random>
 #include <string>

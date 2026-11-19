@@ -127,7 +127,7 @@ std::string MI_OnlineTeamSelect::hint() const
     if (!lobby || lobby->phase() != rollback::NetLobby::Phase::Lobby)
         return {};
     if (locked())
-        return lobby->isHost() ? "Select Continue to choose the match (Cancel: not ready)" : "Waiting for the host (Cancel: not ready)";
+        return lobby->isHost() ? "Select Continue to choose the match, Cancel to unready" : "Waiting for the host. Cancel to unready";
     return "Up/Down: skin  Left/Right: team  Select: ready";
 }
 

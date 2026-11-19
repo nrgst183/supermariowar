@@ -127,7 +127,7 @@ MenuCodeEnum MI_MatchHistory::SendInput(CPlayerInput* playerInput)
                 return MENU_CODE_NONE;
             const std::string file = selectedReplay();
             if (file.empty() || !replay::replayExists(file)) {
-                m_message = file.empty() ? "This match has no replay" : "Its replay was deleted (the newest 200 are kept)";
+                m_message = file.empty() ? "This match has no replay" : "Replay deleted (only the newest 200 are kept)";
                 return MENU_CODE_NONE;
             }
             return MENU_CODE_HISTORY_PLAY_REPLAY;
@@ -163,7 +163,7 @@ void MI_MatchHistory::Draw()
     if (m_entries.empty()) {
         theme::statusIcon(m_pos.x + m_width / 2 - 8, top + LINE_H * 2, theme::Status::Info);
         rm->menu_font_large.drawCentered(m_pos.x + m_width / 2, top + LINE_H * 3, "No matches yet");
-        rm->menu_font_small.drawCentered(m_pos.x + m_width / 2, top + LINE_H * 4, "Every match you play is listed here, with its replay");
+        rm->menu_font_small.drawCentered(m_pos.x + m_width / 2, top + LINE_H * 4, "Every match you play shows up here with its replay");
     }
 
     const short lineW = m_width - 24;
