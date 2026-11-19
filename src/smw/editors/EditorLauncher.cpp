@@ -9,6 +9,7 @@
 #include "ResourceManager.h"
 #include "WorldTourStop.h"
 #include "world.h"
+#include "world/WorldMapIO.h"
 
 #include <SDL3/SDL.h>
 
@@ -42,9 +43,20 @@ GameObjects take()
     return g;
 }
 
-// Deletes what the editor created (where it replaced the game's) and puts the game's back
-void giveBack(const GameObjects& g)
+// (the last session's graphics: see takeKeptGraphics)
+Editor g_keptEditor = Editor::Level;
+CResourceManager* g_keptGraphics = nullptr;
+
+// Deletes what the editor created (where it replaced the game's) and puts the game's back; the
+// editor's graphics are kept (takeKeptGraphics)
+void giveBack(const GameObjects& g, Editor editor)
 {
+    if (rm != g.rm) {
+        freeKeptGraphics();
+        g_keptEditor = editor;
+        g_keptGraphics = rm;
+        rm = g.rm;
+    }
     auto restore = [](auto*& global, auto* game) {
         if (global != game)
             delete global;
@@ -91,12 +103,31 @@ void rescanLists()
 
 } // namespace
 
+CResourceManager* takeKeptGraphics(Editor editor)
+{
+    if (g_keptGraphics && g_keptEditor == editor) {
+        CResourceManager* kept = g_keptGraphics;
+        g_keptGraphics = nullptr;
+        return kept;
+    }
+    freeKeptGraphics();
+    return nullptr;
+}
+
+void freeKeptGraphics()
+{
+    delete g_keptGraphics;
+    g_keptGraphics = nullptr;
+}
+
 bool run(Editor editor)
 {
     const char* name = editor == Editor::Level ? "level" : "world";
     printf("editors: starting the %s editor\n", name);
 
     const GameObjects game = take();
+    g_savedMapFiles.clear();
+    g_savedWorldFiles.clear();
     const CGameValues savedValues = game_values;
     WorldMap savedWorld = std::move(g_worldmap);
     const bool fullscreen = game_values.fullscreen;
@@ -123,7 +154,7 @@ bool run(Editor editor)
 
     //The world editor's tour stops (a loaded world's stages) aren't the game's
     std::vector<TourStop*> editorStops = game_values.tourstops;
-    giveBack(game);
+    giveBack(game, editor);
     game_values = savedValues;
     for (TourStop* stop : editorStops) {
         if (std::find(game_values.tourstops.begin(), game_values.tourstops.end(), stop) == game_values.tourstops.end())
@@ -132,7 +163,19 @@ bool run(Editor editor)
     g_worldmap = std::move(savedWorld);
     game_values.playerInput.ResetKeys();
 
-    rescanLists();
+    //(the lists made again only for a map or world the game's lists don't have: scanning the folders
+    //is slow from a disc, and every session saves its scratch file, which is listed after the first)
+    bool newFile = false;
+    for (const std::string& file : g_savedMapFiles)
+        newFile = newFile || !maplist->hasFile(file);
+    for (const std::string& file : g_savedWorldFiles) {
+        bool listed = false;
+        for (size_t k = 0; k < worldlist->count(); k++)
+            listed = listed || worldlist->at(k).string() == file;
+        newFile = newFile || !listed;
+    }
+    if (newFile)
+        rescanLists();
 
     //The editors keep their own fullscreen setting
     if (gfx_isfullscreen() != fullscreen)

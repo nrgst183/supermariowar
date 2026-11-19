@@ -130,7 +130,15 @@ void inner_main()
 #endif
     blitdest = screen;
 
+#ifdef SMW_EMBEDDED_EDITOR
+        //(the graphics of the last session, kept while the game was in its menus: none to load)
+        CResourceManager* const keptGraphics = editors::takeKeptGraphics(editors::Editor::Level);
+        const bool graphicsLoaded = keptGraphics != nullptr;
+        rm = graphicsLoaded ? keptGraphics : new CResourceManager();
+#else
+        const bool graphicsLoaded = false;
         rm = new CResourceManager();
+#endif
 #ifndef SMW_EMBEDDED_EDITOR  //(in the game: the game's tilesets, edited live)
         g_tilesetmanager = new CTilesetManager(convertPath("gfx/Classic/tilesets"));
 #endif
@@ -145,6 +153,7 @@ void inner_main()
     snprintf(title, sizeof(title), "%s %s", TITLESTRING, MAPTITLESTRING);
     gfx_settitle(title);
 
+    if (!graphicsLoaded) {
     printf("\n---------------- loading graphics ----------------\n");
 
     rm->spr_tiletypes = ImageLoader(convertPath("gfx/leveleditor/leveleditor_tile_types.png")).withoutColorKey().create();
@@ -228,6 +237,7 @@ void inner_main()
 
     rm->menu_font_small = gfxFont(convertPath("gfx/packs/Classic/fonts/font_small.png"));
     rm->menu_font_large = gfxFont(convertPath("gfx/packs/Classic/fonts/font_large.png"));
+    }    //(graphicsLoaded)
 
     printf("\n---------------- load map ----------------\n");
 
@@ -377,7 +387,7 @@ void gameloop_frame()
 
     printf("\n---------------- save map ----------------\n");
 
-    save_map(convertPath("maps/ZZleveleditor.map"));
+    save_map(writablePath(convertPath("maps/ZZleveleditor.map")));
 
     const std::string options_path(GetHomeDirectory() + "leveleditor.bin");
     BinaryFile editor_settings(options_path, "wb");

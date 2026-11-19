@@ -22,6 +22,14 @@ constexpr char dirSeparator() { return '/'; }
 std::string GetHomeDirectory();
 std::string GetRootDirectory();
 
+// Where a file of the data folder (a path from convertPath, or one relative to the data folder) is
+// written: itself while the data folder can be written to; else (the Xbox's disc, read-only) the
+// same place in the home folder (on the Xbox: T:), its folder made
+std::string writablePath(const std::string& path);
+// The home folder's copy of a data folder ("maps/", "worlds/"), where writablePath puts the files
+// that can't go in the data folder: "" while they can (nothing to look in)
+std::string homeCopyDir(const std::string& relDir);
+
 #ifdef __APPLE__
     void Initialize_Paths();
 #else

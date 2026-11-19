@@ -39,8 +39,20 @@ public:
     bool startswith(char letter);
     bool startswith(const std::string& match);
 
+    /// A map of the list is in this file
+    bool hasFile(const std::string& filename) const {
+        for (const auto& [name, node] : maps) {
+            if (node.filename == filename)
+                return true;
+        }
+        return false;
+    }
     const std::string& currentFilename() const {
         return (*outercurrent).second.filename;
+    }
+    /// The current map is now in this file (saved elsewhere: see writablePath)
+    void setCurrentFilename(const std::string& filename) {
+        (*outercurrent).second.filename = filename;
     }
     const std::string& currentShortmapname() const {
         return (*outercurrent).first;

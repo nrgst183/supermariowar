@@ -1,6 +1,7 @@
 #include "MI_TextField.h"
 
 #include "GameValues.h"
+#include "gfx.h"
 #include "ResourceManager.h"
 #include "ui/MI_Image.h"
 
@@ -9,7 +10,37 @@
 
 namespace {
 constexpr std::array<short, 10> NUMBER_KEY_MAP {41, 33, 64, 35, 36, 37, 94, 38, 42, 40};
+
+// The on-screen keyboard: four rows of ten characters, then Shift, Space, Del and Done (each over
+// some of the ten columns)
+constexpr const char* OSK_ROWS[] = {"1234567890", "qwertyuiop", "asdfghjkl-", "zxcvbnm._:"};
+constexpr short OSK_CHAR_ROWS = 4;
+constexpr short OSK_ROWS_ALL = 5;
+enum OskAction { OSK_SHIFT, OSK_SPACE, OSK_DEL, OSK_DONE };
+constexpr short OSK_ACTION_FROM[] = {0, 2, 6, 8};    //(their first column; each to the next's)
+constexpr const char* OSK_ACTION_NAME[] = {"Shift", "Space", "Del", "Done"};
+
+OskAction actionAt(short col)
+{
+    return col < 2 ? OSK_SHIFT : col < 6 ? OSK_SPACE : col < 8 ? OSK_DEL : OSK_DONE;
+}
+
+constexpr short KEY_W = 40;
+constexpr short KEY_H = 28;
+constexpr short KEY_GAP = 4;
+constexpr short PANEL_W = 10 * KEY_W + 9 * KEY_GAP + 24;
+constexpr short PANEL_H = 44 + OSK_ROWS_ALL * (KEY_H + KEY_GAP) + 26;
+constexpr short PANEL_X = (640 - PANEL_W) / 2;
+constexpr short PANEL_Y = 480 - PANEL_H - 8;
+
+void fillRect(short x, short y, short w, short h, Uint8 r, Uint8 g, Uint8 b)
+{
+    const SDL_Rect rect {x, y, w, h};
+    SDL_FillSurfaceRect(blitdest, &rect, SDL_MapSurfaceRGB(blitdest, r, g, b));
+}
 } // namespace
+
+bool (*MI_TextField::useOnScreenKeyboard)() = nullptr;
 
 
 MI_TextField::MI_TextField(gfxSprite * nspr, short x, short y, const char * name, short width, short indent)
@@ -41,11 +72,158 @@ MenuCodeEnum MI_TextField::Modify(bool modify)
 
     miModifyCursor->setVisible(modify);
     fModifying = modify;
+    //(with a controller: the on-screen keyboard, on the first letter)
+    m_osk = modify && useOnScreenKeyboard && useOnScreenKeyboard();
+    if (m_osk) {
+        m_oskRow = 1;
+        m_oskCol = 0;
+        m_oskShift = false;
+    }
     return MENU_CODE_MODIFY_ACCEPTED;
+}
+
+bool MI_TextField::OskAllowed(char c) const
+{
+    return szDisallowedChars.find(c) == std::string::npos;
+}
+
+MenuCodeEnum MI_TextField::TypeChar(char c)
+{
+    if (!szOutValue || iNumChars >= iMaxChars - 1 || !OskAllowed(c))
+        return MENU_CODE_NONE;
+    szOutValue->insert(iCursorIndex++, 1, c);
+    iNumChars++;
+    UpdateCursor();
+    return mcItemChangedCode;
+}
+
+MenuCodeEnum MI_TextField::Backspace()
+{
+    if (!szOutValue || iCursorIndex <= 0)
+        return MENU_CODE_NONE;
+    iCursorIndex--;
+    iNumChars--;
+    szOutValue->erase(iCursorIndex, 1);
+    UpdateCursor();
+    return mcItemChangedCode;
+}
+
+MenuCodeEnum MI_TextField::OskPress()
+{
+    if (m_oskRow < OSK_CHAR_ROWS) {
+        char c = OSK_ROWS[m_oskRow][m_oskCol];
+        if (m_oskShift && c >= 'a' && c <= 'z')
+            c = static_cast<char>(c - 'a' + 'A');
+        return TypeChar(c);
+    }
+    switch (actionAt(m_oskCol)) {
+        case OSK_SHIFT: m_oskShift = !m_oskShift; return MENU_CODE_NONE;
+        case OSK_SPACE: return TypeChar(' ');
+        case OSK_DEL: return Backspace();
+        case OSK_DONE:
+        default:
+            m_osk = false;
+            miModifyCursor->setVisible(false);
+            fModifying = false;
+            return MENU_CODE_UNSELECT_ITEM;
+    }
+}
+
+// The keyboard's buttons: the d-pad moves over the keys, A presses one, B is done (the text kept)
+MenuCodeEnum MI_TextField::OskInput(CPlayerInput* playerInput)
+{
+    for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
+        const COutputControl& keys = playerInput->outputControls[iPlayer];
+        if (keys.menu_cancel.fPressed) {
+            m_osk = false;
+            miModifyCursor->setVisible(false);
+            fModifying = false;
+            return MENU_CODE_UNSELECT_ITEM;
+        }
+        if (keys.menu_select.fPressed)
+            return OskPress();
+        if (keys.menu_up.fPressed)
+            m_oskRow = static_cast<short>((m_oskRow + OSK_ROWS_ALL - 1) % OSK_ROWS_ALL);
+        if (keys.menu_down.fPressed)
+            m_oskRow = static_cast<short>((m_oskRow + 1) % OSK_ROWS_ALL);
+        if (keys.menu_left.fPressed || keys.menu_right.fPressed) {
+            const int dir = keys.menu_right.fPressed ? 1 : -1;
+            if (m_oskRow < OSK_CHAR_ROWS) {
+                m_oskCol = static_cast<short>((m_oskCol + 10 + dir) % 10);
+            } else {
+                //(the action keys: from one to the next)
+                const int action = (static_cast<int>(actionAt(m_oskCol)) + 4 + dir) % 4;
+                m_oskCol = OSK_ACTION_FROM[action];
+            }
+        }
+    }
+    return MENU_CODE_NONE;
+}
+
+void MI_TextField::DrawOverlay()
+{
+    if (!m_visible || !m_osk || !szOutValue)
+        return;
+    //The panel: a white rim, the status bar's blue; the text at the top
+    fillRect(PANEL_X, PANEL_Y, PANEL_W, PANEL_H, 248, 248, 248);
+    fillRect(PANEL_X + 2, PANEL_Y + 2, PANEL_W - 4, PANEL_H - 4, 0, 40, 104);
+    fillRect(PANEL_X + 3, PANEL_Y + 3, PANEL_W - 6, PANEL_H - 6, 0, 95, 177);
+    fillRect(PANEL_X + 12, PANEL_Y + 10, PANEL_W - 24, 26, 16, 28, 84);
+    const std::string shown = *szOutValue + "_";
+    rm->menu_font_large.drawChopLeft(PANEL_X + PANEL_W - 18, PANEL_Y + 12, PANEL_W - 36, shown.c_str());
+
+    for (short row = 0; row < OSK_ROWS_ALL; row++) {
+        const short y = PANEL_Y + 44 + row * (KEY_H + KEY_GAP);
+        if (row < OSK_CHAR_ROWS) {
+            for (short col = 0; col < 10; col++) {
+                const short x = PANEL_X + 12 + col * (KEY_W + KEY_GAP);
+                char c = OSK_ROWS[row][col];
+                if (m_oskShift && c >= 'a' && c <= 'z')
+                    c = static_cast<char>(c - 'a' + 'A');
+                const bool chosen = row == m_oskRow && col == m_oskCol;
+                const bool allowed = OskAllowed(c);
+                if (chosen)
+                    fillRect(x - 2, y - 2, KEY_W + 4, KEY_H + 4, 248, 248, 248);
+                if (allowed)
+                    fillRect(x, y, KEY_W, KEY_H, chosen ? 248 : 0, chosen ? 200 : 64, chosen ? 40 : 136);
+                else
+                    fillRect(x, y, KEY_W, KEY_H, 56, 64, 88);
+                const char text[2] = {c, 0};
+                rm->menu_font_large.drawCentered(x + KEY_W / 2, y + 3, text);
+            }
+        } else {
+            for (int action = 0; action < 4; action++) {
+                const short from = OSK_ACTION_FROM[action];
+                const short to = action < 3 ? OSK_ACTION_FROM[action + 1] : 10;
+                const short x = PANEL_X + 12 + from * (KEY_W + KEY_GAP);
+                const short w = static_cast<short>((to - from) * (KEY_W + KEY_GAP) - KEY_GAP);
+                const bool chosen = row == m_oskRow && actionAt(m_oskCol) == action;
+                const bool on = action == OSK_SHIFT && m_oskShift;
+                if (chosen)
+                    fillRect(x - 2, y - 2, w + 4, KEY_H + 4, 248, 248, 248);
+                fillRect(x, y, w, KEY_H, chosen ? 248 : on ? 32 : 0, chosen ? 200 : on ? 144 : 64, chosen ? 40 : on ? 232 : 136);
+                rm->menu_font_large.drawCentered(x + w / 2, y + 3, OSK_ACTION_NAME[action]);
+            }
+        }
+    }
+    rm->menu_font_small.drawCentered(320, PANEL_Y + PANEL_H - 20, "A types, B is done");
 }
 
 MenuCodeEnum MI_TextField::SendInput(CPlayerInput * playerInput)
 {
+    //(the on-screen keyboard: its keys first; a keyboard's typing works as well)
+    if (m_osk) {
+        const MenuCodeEnum code = OskInput(playerInput);
+        if (code != MENU_CODE_NONE || !m_osk)
+            return code;
+        const SDL_Keycode key = playerInput->iPressedKey;
+        if (key == SDLK_BACKSPACE)
+            return Backspace();
+        if (key >= 32 && key < 127)
+            return TypeChar(static_cast<char>(key));
+        return MENU_CODE_NONE;
+    }
+
     const bool* keystate = SDL_GetKeyboardState(nullptr);
 
     for (int iPlayer = 0; iPlayer < 4; iPlayer++) {

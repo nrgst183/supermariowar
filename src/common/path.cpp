@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cassert>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <sys/stat.h>
@@ -35,6 +36,52 @@ std::string GetHomeDirectory()
     }
     return result;
 #endif
+}
+
+namespace {
+// (whether files can be written in the data folder: tried once)
+bool dataFolderWritable()
+{
+    static const bool writable = [] {
+        const std::string probe = convertPath(".smw_write_test");
+        FILE* file = fopen(probe.c_str(), "wb");
+        if (!file)
+            return false;
+        fclose(file);
+        std::remove(probe.c_str());
+        return true;
+    }();
+    return writable;
+}
+} // namespace
+
+std::string writablePath(const std::string& path)
+{
+    if (dataFolderWritable())
+        return path;
+    const std::string home = GetHomeDirectory();
+    if (!home.empty() && path.rfind(home, 0) == 0)
+        return path;    //(there already)
+    //(the part in the data folder; a path elsewhere stays as it is)
+    const std::string root = convertPath("");
+    std::string relative;
+    if (path.rfind(root, 0) == 0)
+        relative = path.substr(root.size());
+    else if (path.find(':') == std::string::npos && !path.starts_with('/'))
+        relative = path;
+    else
+        return path;
+    const std::string result = home + relative;
+    std::error_code err;
+    fs::create_directories(fs::path(result).parent_path(), err);
+    return result;
+}
+
+std::string homeCopyDir(const std::string& relDir)
+{
+    if (dataFolderWritable())
+        return {};
+    return GetHomeDirectory() + relDir;
 }
 
 std::string mapThumbnailPath(const std::string& mapFile)

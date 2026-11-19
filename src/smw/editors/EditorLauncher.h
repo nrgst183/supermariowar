@@ -15,9 +15,18 @@
 //   - the tilesets are the game's: tile type changes apply right away
 //   - game controllers work in them (EditorInput.h)
 // Maps and worlds saved in an editor show up in the game's lists afterwards.
+class CResourceManager;
+
 namespace editors {
 
 enum class Editor { Level, World };
+
+// The graphics an editor loaded (its resource manager), kept after its session while the game is in
+// its menus: opening that editor again needs no loading. The editor takes them back at its start
+// (nullptr: none kept, it loads them; another editor's kept ones are freed then: one set at a time,
+// the Xbox has 64 MB); the game frees them before a match.
+CResourceManager* takeKeptGraphics(Editor editor);
+void freeKeptGraphics();
 
 // Runs an editor until it is closed (its own quit, or Escape out of it).
 // False if the window was closed during the session: the game should quit.

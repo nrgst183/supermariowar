@@ -31,6 +31,8 @@ public:
 
     void add(std::filesystem::path path);
     bool find(const std::string& name);
+    /// The entry at `index` is now this file (saved elsewhere: see writablePath)
+    void setPathAt(size_t index, std::filesystem::path path);
 
 protected:
     std::vector<std::filesystem::path> m_filelist;

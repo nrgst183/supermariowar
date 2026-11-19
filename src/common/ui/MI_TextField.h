@@ -34,6 +34,12 @@ public:
 
     //Draws every frame
     void Draw() override;
+    //The on-screen keyboard, while it's up
+    void DrawOverlay() override;
+
+    /// Whether changing a field opens the on-screen keyboard (the game sets it: with a controller,
+    /// and always on the Xbox; none: never)
+    static bool (*useOnScreenKeyboard)();
 
     //Sends player input to control on every frame
     MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
@@ -60,6 +66,17 @@ public:
 
 protected:
     void UpdateCursor();
+    //The on-screen keyboard: the key at a row and column, and pressing it
+    MenuCodeEnum OskInput(CPlayerInput* playerInput);
+    MenuCodeEnum OskPress();
+    bool OskAllowed(char c) const;
+    MenuCodeEnum TypeChar(char c);
+    MenuCodeEnum Backspace();
+
+    bool m_osk = false;          // the keyboard is up
+    short m_oskRow = 1;
+    short m_oskCol = 0;
+    bool m_oskShift = false;
 
     short iCursorIndex = 0;
     short iNumChars = 0;

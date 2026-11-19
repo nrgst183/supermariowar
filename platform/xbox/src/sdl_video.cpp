@@ -682,3 +682,13 @@ bool SDL_SetTextureScaleMode(SDL_Texture* texture, SDL_ScaleMode scaleMode)
     (void)scaleMode;
     return true;
 }
+
+SDL_Window* SDL_GetKeyboardFocus(void)
+{
+    return g_window;
+}
+
+bool SDL_CaptureMouse(bool)
+{
+    return true;
+}

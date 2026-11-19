@@ -13,7 +13,7 @@
 
 // The builds with the Online Options menu (OptionsMenu.cpp) have the online matches' rows there;
 // the others have them here, at the bottom
-#if !defined(NETWORK_DISABLED) && !defined(SMW_XBOX) && !defined(__EMSCRIPTEN__)
+#if !defined(NETWORK_DISABLED) && !defined(__EMSCRIPTEN__)
 #define SMW_ONLINE_OPTIONS
 #endif
 

@@ -81,7 +81,7 @@ void takescreenshot()
             szSaveFile += "_thumb";
 
         szSaveFile += ".png";
-        IMG_SavePNG(sScreenshot.getSurface(), convertPath(szSaveFile).c_str());
+        IMG_SavePNG(sScreenshot.getSurface(), writablePath(convertPath(szSaveFile)).c_str());
     }
 
     g_worldmap = loadWorldMap(worldlist->at(game_values.worldindex).string(), iTileSizes[0]);

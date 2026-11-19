@@ -346,8 +346,11 @@ RETURN:
 }
 
 //Saves world to file
+std::vector<std::string> g_savedWorldFiles;
+
 bool saveWorldMap(const WorldMap& world, const std::string& szPath)
 {
+    g_savedWorldFiles.push_back(szPath);
     const std::vector<WorldWarp>& warps = world.getWarps();
     const std::vector<WorldVehicle>& vehicles = world.getVehicles();
 

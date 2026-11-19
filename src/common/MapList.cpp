@@ -28,6 +28,25 @@ void addMapsFrom(const std::string& dirpath, std::multimap<std::string, MapListN
         container.emplace(stripCreatorAndExt(path->filename().string()), std::move(node));
     }
 }
+
+// The maps saved in the home folder (where the data folder can't be written: the Xbox's disc): one
+// replaces the data folder's map of the same file name
+void addSavedMapsFrom(const std::string& dirpath, std::multimap<std::string, MapListNode>& container)
+{
+    if (dirpath.empty())
+        return;
+    FilesIterator dir(dirpath, {".map"});
+    while (auto path = dir.next()) {
+        const std::string file = path->filename().string();
+        for (auto it = container.begin(); it != container.end();) {
+            if (std::filesystem::path(it->second.filename).filename().string() == file)
+                it = container.erase(it);
+            else
+                ++it;
+        }
+        container.emplace(stripCreatorAndExt(file), MapListNode(path->string()));
+    }
+}
 } // namespace
 
 
@@ -42,6 +61,7 @@ MapList::MapList(bool fWorldEditor)
 {
     addMapsFrom(convertPath("maps/"), maps);
     addMapsFrom(convertPath("maps/net/"), maps);    //downloaded in online lobbies
+    addSavedMapsFrom(homeCopyDir("maps/"), maps);
 
 #ifdef _DEBUG
     addMapsFrom(convertPath("maps/test/"), maps);
@@ -114,7 +134,8 @@ void MapList::addWorldMaps()
 
 void MapList::add(const char * name)
 {
-    std::string fullName = convertPath("maps/") + name;
+    //(where the editors save it: the data folder, or the home folder's copy of it)
+    std::string fullName = writablePath(convertPath("maps/") + name);
     MapListNode node(std::move(fullName));
     maps.emplace(stripCreatorAndExt(name), std::move(node));
 }

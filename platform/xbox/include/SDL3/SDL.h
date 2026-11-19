@@ -220,6 +220,8 @@ Uint32 SDL_MapSurfaceRGBA(SDL_Surface* surface, Uint8 r, Uint8 g, Uint8 b, Uint8
 bool SDL_SetSurfaceClipRect(SDL_Surface* surface, const SDL_Rect* rect);
 bool SDL_GetSurfaceClipRect(SDL_Surface* surface, SDL_Rect* rect);
 bool SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color);
+// The part of a and b in both (false: none)
+bool SDL_GetRectIntersection(const SDL_Rect* a, const SDL_Rect* b, SDL_Rect* result);
 bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst, const SDL_Rect* dstrect);
 bool SDL_BlitSurfaceScaled(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst, const SDL_Rect* dstrect, SDL_ScaleMode scaleMode);
 
@@ -410,6 +412,9 @@ typedef enum SDL_Scancode {
 #define SDLK_PAGEUP       0x4000004bu
 #define SDLK_END          0x4000004du
 #define SDLK_PAGEDOWN     0x4000004eu
+#define SDLK_KP_MINUS     0x40000056u
+#define SDLK_KP_PLUS      0x40000057u
+#define SDLK_KP_ENTER     0x40000058u
 #define SDLK_RIGHT        0x4000004fu
 #define SDLK_LEFT         0x40000050u
 #define SDLK_DOWN         0x40000051u
@@ -434,6 +439,10 @@ typedef enum SDL_Scancode {
 
 const bool* SDL_GetKeyboardState(int* numkeys);
 SDL_Keymod SDL_GetModState(void);
+// (one window, always in focus; the mouse, if any, always on it)
+SDL_Window* SDL_GetKeyboardFocus(void);
+bool SDL_CaptureMouse(bool enabled);
+void SDL_SetModState(SDL_Keymod modstate);
 const char* SDL_GetKeyName(SDL_Keycode key);
 SDL_Scancode SDL_GetScancodeFromKey(SDL_Keycode key, SDL_Keymod* modstate);
 

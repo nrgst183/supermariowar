@@ -154,7 +154,7 @@ int save_as()
 
     if (dialog("Save As", "Enter name:", fileName, 64)) {
         std::string mapName = fileName;
-        save_map(convertPath("maps/" + mapName + ".map"));
+        save_map(writablePath(convertPath("maps/" + mapName + ".map")));
         mapName += ".map";
         maplist->add(mapName.c_str());
         maplist->find(mapName);

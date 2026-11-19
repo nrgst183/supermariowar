@@ -342,9 +342,17 @@ const bool* SDL_GetKeyboardState(int* numkeys)
     return g_keyboard_state;
 }
 
+// (no keyboard: the modifiers are only what SDL_SetModState says, as SDL's own)
+static SDL_Keymod g_modState = SDL_KMOD_NONE;
+
 SDL_Keymod SDL_GetModState(void)
 {
-    return SDL_KMOD_NONE;
+    return g_modState;
+}
+
+void SDL_SetModState(SDL_Keymod modstate)
+{
+    g_modState = modstate;
 }
 
 const char* SDL_GetKeyName(SDL_Keycode key)

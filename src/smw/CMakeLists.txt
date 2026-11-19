@@ -78,9 +78,9 @@ if (WIN32)
 	target_sources(smw PRIVATE "${PROJECT_SOURCE_DIR}/resources/windows/smw.rc")
 endif()
 
-# The map and world editors, built in (editors/EditorLauncher.h); not on the web
-# or the Xbox (they need a mouse and a keyboard)
-if(NOT EMSCRIPTEN AND NOT XBOXOG)
+# The map and world editors, built in (editors/EditorLauncher.h); not on the web.
+# On the Xbox they're worked with the controllers (and a USB keyboard and mouse if any)
+if(NOT EMSCRIPTEN)
 	target_sources(smw PRIVATE
 		editors/CoEdit.cpp
 		editors/CoEdit.h

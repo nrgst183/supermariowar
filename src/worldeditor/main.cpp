@@ -162,7 +162,15 @@ void inner_main()
 #endif
     blitdest = screen;
 
+#ifdef SMW_EMBEDDED_EDITOR
+        //(the graphics of the last session, kept while the game was in its menus: none to load)
+        CResourceManager* const keptGraphics = editors::takeKeptGraphics(editors::Editor::World);
+        const bool graphicsLoaded = keptGraphics != nullptr;
+        rm = graphicsLoaded ? keptGraphics : new CResourceManager();
+#else
+        const bool graphicsLoaded = false;
         rm = new CResourceManager();
+#endif
 
         g_map = new CMap();
 #ifndef SMW_EMBEDDED_EDITOR  //(in the game: the game's tilesets, edited live)
@@ -183,6 +191,7 @@ void inner_main()
 
     game_values.toplayer = true;
 
+    if (!graphicsLoaded) {
     printf("\n---------------- loading graphics ----------------\n");
 
     spr_warps[0] = ImageLoader(convertPath("gfx/leveleditor/leveleditor_warp.png")).create();
@@ -278,6 +287,7 @@ void inner_main()
     rm->spr_hazard_pirhanaplant[2] = ImageLoader(convertPath("gfx/packs/Classic/hazards/pirhanaplant_thumbnail.png")).create();
 
     rm->loadMenuGraphics();
+    }    //(graphicsLoaded)
 
     sMapSurface = gfxSprite::blank(768, 608);
 
@@ -715,7 +725,7 @@ void inner_main()
 
     WriteVehiclesIntoWorld();
     WriteWarpsIntoWorld();
-    saveWorldMap(g_worldmap, convertPath("worlds/ZZworldeditor.txt"));
+    saveWorldMap(g_worldmap, writablePath(convertPath("worlds/ZZworldeditor.txt")));
 
     {
         const std::string options_path(GetHomeDirectory() + "worldeditor.bin");

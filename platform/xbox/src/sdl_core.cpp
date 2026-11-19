@@ -447,3 +447,46 @@ void SDL_XboxReturnToDashboard(void)
     for (;;)
         Sleep(1000);
 }
+
+
+/* ---- Files -------------------------------------------------------------- */
+
+namespace {
+// (the Xbox's file functions want backslashes)
+std::string xboxPath(const char* path)
+{
+    std::string p = path;
+    for (char& c : p) {
+        if (c == '/')
+            c = '\\';
+    }
+    return p;
+}
+} // namespace
+
+bool sdlx_make_dir(const char* path)
+{
+    std::string p = xboxPath(path);
+    while (!p.empty() && p.back() == '\\')
+        p.pop_back();
+    return CreateDirectoryA(p.c_str(), NULL) || GetLastError() == ERROR_ALREADY_EXISTS;
+}
+
+Uint64 sdlx_dir_bytes(const char* path)
+{
+    std::string pattern = xboxPath(path);
+    if (!pattern.empty() && pattern.back() != '\\')
+        pattern += '\\';
+    pattern += '*';
+    WIN32_FIND_DATAA data;
+    HANDLE find = FindFirstFileA(pattern.c_str(), &data);
+    if (find == INVALID_HANDLE_VALUE)
+        return 0;
+    Uint64 total = 0;
+    do {
+        if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+            total += (static_cast<Uint64>(data.nFileSizeHigh) << 32) | data.nFileSizeLow;
+    } while (FindNextFileA(find, &data));
+    FindClose(find);
+    return total;
+}

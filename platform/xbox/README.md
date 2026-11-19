@@ -43,15 +43,28 @@ to copy to the hard disk.
 - Cached map previews go on the utility drive `Z:` (one of the hard disk's cache partitions).
 - Player 1-4 use the controller in port 1-4. Default buttons: A jump/select, B turbo/back,
   X power-up, Start pause, Back cancel. The d-pad works like the left stick.
-- System link: the main menu's System Link hosts a game; its Find games opens the list of the
-  games hosted on the local network (other consoles, and PCs running the same build: on a PC, the
-  Online menu's LAN games), where A joins one. It is the
+- System link: the main menu's Start opens the lobby; set Open to System link and other consoles
+  and PCs on the network find the game. Join a Game lists the games hosted on the local network
+  (other consoles, and PCs running the same build), where A joins one; Join by address joins a game
+  at an address (an on-screen keyboard types it). It is the
   game's netplay (ENet, UDP port 7300; the search uses UDP port 7301), over the Xbox's Winsock
   started without XNet's security, so consoles and PCs talk plain UDP. Under xemu, use a
   bridged (pcap) network or a UDP tunnel between instances: the default NAT mode has no LAN.
-- No map editor or world editor on the Xbox.
+- The map and world editors are in the game (main menu, Editors), worked with the controllers: see
+  docs/HistoryReplaysEditors.md. Maps and worlds are saved in the data folder when it can be written
+  to (the game started from a folder on the hard disk); started from a disc, they're saved on `T:\`
+  (in `maps\` and `worlds\`) and the game's lists read them there too, a saved copy in place of
+  the disc's.
+- Text (a nickname, an address, a map's name) is typed on an on-screen keyboard: the d-pad moves,
+  A types, B is done. Options > Online has the nickname (else the console's), the run-ahead, the port,
+  ping bars and network stats, as on a PC.
 - To keep within 64 MB of RAM, tileset images load per size as they're drawn and stay loaded
   up to 20 MB (the current map's always stay).
+- Big images read from the disc (tilesets, backgrounds, the editors' graphics) are decoded once and
+  kept decoded on the cache drive (`img\` there, up to 400 MB): later loads skip the DVD read and the
+  PNG decoding (`src/sdl_image.cpp`). An editor's graphics also stay loaded after it's left, while the
+  game is in its menus, so opening it again is quick; they're freed when a match starts or the other
+  editor opens.
 - Press both sticks in (L3 + R3) to show or hide a profiler: frame time split into blitting,
   filling, the copy to the screen, the swap (vertical blank wait), the rest of the game, and the
   audio thread's share of the CPU.

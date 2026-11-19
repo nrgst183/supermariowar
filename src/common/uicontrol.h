@@ -29,6 +29,8 @@ public:
 
     /// Draws every frame
     virtual void Draw() {}
+    /// The focused control's drawing over the whole menu (after every control): a popup of its own
+    virtual void DrawOverlay() {}
 
     /// Sends player input to control on every frame
     virtual MenuCodeEnum SendInput(CPlayerInput*) {

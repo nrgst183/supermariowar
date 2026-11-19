@@ -215,7 +215,33 @@ TourList::TourList()
 
 WorldList::WorldList()
     : SimpleFileList(convertPath("worlds/"), ".txt", true)
-{}
+{
+    //The worlds saved in the home folder (where the data folder can't be written: the Xbox's disc):
+    //one replaces the data folder's world of the same file name
+    const std::string saved = homeCopyDir("worlds/");
+    if (saved.empty())
+        return;
+    FilesIterator dir(saved, {".txt"});
+    while (auto path = dir.next()) {
+        bool replaced = false;
+        for (fs::path& entry : m_filelist) {
+            if (entry.filename() == path->filename()) {
+                entry = *path;
+                replaced = true;
+            }
+        }
+        if (!replaced)
+            m_filelist.push_back(*path);
+    }
+    if (m_index == static_cast<size_t>(-1) && !m_filelist.empty())
+        m_index = 0;
+}
+
+void SimpleFileList::setPathAt(size_t index, fs::path path)
+{
+    if (index < m_filelist.size())
+        m_filelist[index] = std::move(path);
+}
 
 BackgroundList::BackgroundList()
     : SimpleFileList(convertPath("gfx/packs/Classic/backgrounds/"), ".png")

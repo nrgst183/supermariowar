@@ -328,7 +328,11 @@ int savecurrentworld()
 
     WriteVehiclesIntoWorld();
     WriteWarpsIntoWorld();
-    saveWorldMap(g_worldmap, worldlist->at(game_values.worldindex).string());
+    //(a world on a disc that can't be written: saved in the home folder, the list then reads it there)
+    const std::string file = writablePath(worldlist->at(game_values.worldindex).string());
+    saveWorldMap(g_worldmap, file);
+    if (file != worldlist->at(game_values.worldindex).string())
+        worldlist->setPathAt(game_values.worldindex, file);
     return 0;
 }
 

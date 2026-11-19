@@ -89,7 +89,10 @@ std::string trimmed(const std::string& text)
 std::string systemLinkPlayerName()
 {
 #ifdef SMW_XBOX
-    //The console's nickname (the games share them), else "Xbox" and its address's last number
+    //The nickname of Options > Online, else the console's (the games share them), else "Xbox" and
+    //its address's last number
+    if (!trimmed(game_values.onlinename).empty())
+        return trimmed(game_values.onlinename);
     char name[17];
     if (SDL_XboxGetNickname(name, sizeof(name)))
         return trimmed(name).empty() ? "Xbox" : trimmed(name);
@@ -286,26 +289,10 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
         focus(m_host);
     });
 
-    //Under the list: hosting, and beside it on a PC joining by address (on the Xbox the run-ahead:
-    //a PC's is in Options > Online)
-#ifdef SMW_XBOX
-    m_host = new MI_Button(&rm->spr_selectfield, 64, HOST_Y, "Host a game", 250, TextAlign::CENTER);
-    MI_SelectField<short>* runAhead = new MI_SelectField<short>(&rm->spr_selectfield, 326, HOST_Y, "Run-Ahead", 250, 130);
-    runAhead->add("Auto", -1);    //(as much as the input delay)
-    runAhead->add("Off", 0);
-    runAhead->add("1 Frame", 1);
-    runAhead->add("2 Frames", 2);
-    runAhead->add("3 Frames", 3);
-    game_values.runahead = std::clamp<short>(game_values.runahead, -1, 3);
-    runAhead->setOutputPtr(&game_values.runahead);
-    runAhead->setCurrentValue(game_values.runahead);
-    runAhead->setAutoAdvance(true);
-    m_runAhead = runAhead;
-#else
+    //Under the list: hosting, and beside it joining by address (a game that isn't on this network)
     m_host = new MI_Button(&rm->spr_selectfield, 64, HOST_Y, "Host a game", 250, TextAlign::CENTER);
     m_joinAddress = new MI_Button(&rm->spr_selectfield, 326, HOST_Y, "Join by address", 250, TextAlign::CENTER);
     m_joinAddress->SetCode(MENU_CODE_TO_ONLINE_MENU);
-#endif
     m_host->SetCode(MENU_CODE_SYSTEM_LINK_HOST);
 
     //What went wrong (or on the Xbox, the state of its network), at the bottom

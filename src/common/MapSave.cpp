@@ -138,9 +138,13 @@ void CMap::buildDrawAreas(const bool skip[MAPWIDTH][MAPHEIGHT])
     }
 }
 
+std::vector<std::string> g_savedMapFiles;
+
 void CMap::saveMap(const std::string& file)
 {
     int i, j, k;
+
+    g_savedMapFiles.push_back(file);
 
     cout << "saving map " << file << " ... ";
 

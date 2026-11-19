@@ -216,6 +216,9 @@ class Cells;    // (painting, filling, copying cells)
 }
 } // namespace leveleditor
 
+// The map files saved (CMap::saveMap), in order: the editors' launcher reads them (EditorLauncher.cpp)
+extern std::vector<std::string> g_savedMapFiles;
+
 class CMap
 {
     public:

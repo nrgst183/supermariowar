@@ -67,8 +67,12 @@ int SDLCALL runPreviewJob(void* data)
 {
     PreviewJob& job = *static_cast<PreviewJob*>(data);
     setMapPreviewWorker(true);
-    //(below the game: on the Xbox's single core the menu's frames come first)
+    //(below the game, where there are cores to spare. Not on the Xbox: on its single core a thread
+    //below the menu's waits until it sleeps, and its frames yield with Sleep(0), which only lets threads
+    //of its own priority or above run: the preview never came)
+#ifndef SMW_XBOX
     SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_LOW);
+#endif
 
     job.map->loadMap(job.path, read_type_preview);
     job.backgroundPath = mapBackgroundPath(*job.map);

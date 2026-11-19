@@ -91,6 +91,8 @@ void UI_Menu::Draw()
 
     if (drawFocus && m_currentFocus && m_currentFocus->IsVisible())
         drawFocus(*m_currentFocus, fModifyingItem);
+    if (m_currentFocus && m_currentFocus->IsVisible())
+        m_currentFocus->DrawOverlay();
 
     if (drawHints && m_title && m_hints)
         drawHints(*this);

@@ -16,7 +16,8 @@ project(smw
 # Original Xbox, built with RXDK (-DCMAKE_TOOLCHAIN_FILE=<RXDK tools>/cmake/RxdkToolchain.cmake).
 # SDL comes from the compatibility layer in platform/xbox (it has some C sources).
 # The netplay runs over system link (ENet on the Xbox's Winsock, platform/xbox).
-# No editors and no unit tests on the console.
+# The editors are built into the game (src/smw/editors); no unit tests and no
+# standalone editors on the console.
 if(XBOXOG)
 	enable_language(C)
 	set(BUILD_TESTS OFF CACHE BOOL "Build the unit tests" FORCE)

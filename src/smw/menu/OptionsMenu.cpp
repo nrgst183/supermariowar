@@ -51,7 +51,7 @@ UI_OptionsMenu::UI_OptionsMenu()
     miGenerateMapThumbsButton = new MI_Button(&rm->spr_selectfield, RIGHT_X, 310, "Refresh Maps", BUTTON_W, TextAlign::CENTER);
     miGenerateMapThumbsButton->SetCode(MENU_CODE_SAVE_ALL_MAP_THUMBNAILS);
 
-#if !defined(NETWORK_DISABLED) && !defined(SMW_XBOX) && !defined(__EMSCRIPTEN__)
+#if !defined(NETWORK_DISABLED) && !defined(__EMSCRIPTEN__)
     AddNonControl(new MI_MenuPanel(36, 354, 568, 76, "Online", "Your nickname, port and ping bars"));
     miOnlineOptionsMenuButton = new MI_Button(&rm->spr_selectfield, 320 - BUTTON_W / 2, 390, "Online", BUTTON_W, TextAlign::CENTER);
     miOnlineOptionsMenuButton->SetCode(MENU_CODE_TO_ONLINE_OPTIONS_MENU);

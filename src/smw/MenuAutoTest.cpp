@@ -632,6 +632,74 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         }
     }
 
+    //--at-role edopen: the editor opened as a player does, with the menus' buttons (main menu: down to
+    //Editors, A; Maps, A; Start, A); a screenshot from inside it, then out
+    if (at.shotsRole == "edopen" && step == 1) {
+        COutputControl& keys = game_values.playerInput.outputControls[0];
+        if (t == 2) {
+            using editors::input::TestInput;
+            editors::input::setTestDriver([](editors::Editor, int f, int) {
+                TestInput in;
+                if (f == 20) in.shot = "o4_in_the_editor";
+                if (f > 30 && f % 40 == 0) in.back = true;
+                if (f > 30 && f % 40 == 20) { in.px = 282; in.py = 266; in.a = true; }
+                return in;
+            }, at.shotsDir);
+        }
+        //(down four rows: Players, Join a Game, Options, History; right: Editors)
+        if (t == 10 || t == 14 || t == 18 || t == 22)
+            keys.menu_down.fPressed = true;
+        if (t == 26)
+            keys.menu_right.fPressed = true;
+        if (t == 30)
+            shot("o1_main_on_editors");
+        if (t == 34)
+            keys.menu_select.fPressed = true;
+        if (t == 50)
+            shot("o2_editors_menu");
+        if (t == 54)
+            keys.menu_select.fPressed = true;
+        if (t == 70)
+            shot("o3_editors_setup");
+        if (t == 74)
+            keys.menu_select.fPressed = true;
+        if (t == 200) {
+            printf("shots: still in the menus 125 frames after Start (the editor didn't open)\n");
+            shot("o9_still_in_menus");
+            editors::input::setTestDriver(nullptr, {});
+            step = 1000;
+            t = 0;
+        }
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role edtwice: the level editor opened twice in a row (its graphics kept between: the log
+    //has one "loading graphics")
+    if (at.shotsRole == "edtwice" && (step == 1 || step == 2)) {
+        using editors::input::TestInput;
+        auto leave = [](editors::Editor, int f, int) {
+            TestInput in;
+            if (f == 10) in.shot = step == 1 ? "w1_first" : "w2_second";
+            if (f > 20 && f % 40 == 0) in.back = true;
+            if (f > 20 && f % 40 == 20) { in.px = 282; in.py = 266; in.a = true; }
+            return in;
+        };
+        if (t == 1) {
+            editors::input::setTestDriver(leave, at.shotsDir);
+            return MENU_CODE_RUN_LEVEL_EDITOR;
+        }
+        if (t == 8) {
+            if (step == 2) {
+                editors::input::setTestDriver(nullptr, {});
+                step = 1000;
+                t = 0;
+            } else {
+                next();
+            }
+        }
+        return MENU_CODE_NONE;
+    }
+
     //--at-role edux: the level editor's screens with a controller: a ? block's contents, the zones page,
     //B on the tileset screen, and the exit prompt (B stays; left and A leave)
     if (at.shotsRole == "edux") {
@@ -981,6 +1049,25 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
+    //--at-role osk (with --at-pad 1): a text field's on-screen keyboard (Join by address's): opened
+    //with A, two letters typed, B for done
+    if (at.shotsRole == "osk" && step == 1) {
+        COutputControl& keys = game_values.playerInput.outputControls[0];
+        switch (t) {
+            case 1: return MENU_CODE_TO_ONLINE_MENU;
+            case 10: keys.menu_select.fPressed = true; break;
+            case 20: shot("k1_keyboard"); break;
+            case 24: keys.menu_select.fPressed = true; break;    //(q)
+            case 28: keys.menu_down.fPressed = true; break;
+            case 32: keys.menu_right.fPressed = true; break;
+            case 36: keys.menu_select.fPressed = true; break;    //(s)
+            case 46: shot("k2_typed"); break;
+            case 50: keys.menu_cancel.fPressed = true; break;
+            case 60: shot("k3_done"); step = 1000; t = 0; break;
+        }
+        return MENU_CODE_NONE;
+    }
+
     //--at-role mouse: the menus with the mouse (SDL's events, as a real one sends): pointing, clicking,
     //the wheel and the right button
     if (at.shotsRole == "mouse" && step == 1) {
@@ -1056,7 +1143,8 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             {MENU_CODE_TO_SYSTEM_LINK_MENU, "t15_join"}, {MENU_CODE_TO_MAIN_MENU, ""},
             {MENU_CODE_TO_LOCAL_LOBBY, "t16_lobby"}, {MENU_CODE_ONLINE_OPTIONS, "t17_lobby_options"},
             {MENU_CODE_ONLINE_OPTIONS_BACK, ""}, {MENU_CODE_ONLINE_MATCH_SETTINGS, "t18_match_type"},
-            {MENU_CODE_MATCH_SELECTION_START, "t19_game_settings"}, {MENU_CODE_TO_MODE_SETTINGS_MENU, "t20_mode_settings"}};
+            {MENU_CODE_MATCH_SELECTION_START, "t19_game_settings"}, {MENU_CODE_TO_MODE_SETTINGS_MENU, "t20_mode_settings"},
+            {MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS, ""}, {MENU_CODE_TO_MAP_BROWSER_THUMBNAILS, "t21_map_thumbnails"}};
         constexpr int HOLD = 20;
         const int index = (t - 1) / HOLD;
         const int frame = (t - 1) % HOLD;

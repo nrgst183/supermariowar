@@ -11,6 +11,7 @@
 #include "GameValues.h"
 #include "gfx.h"
 #include "ui/InputPrompts.h"
+#include "ui/MI_TextField.h"
 #include "GSGameplay.h"
 #include "GameplayStyles.h"
 #include "joystick.h"
@@ -162,6 +163,14 @@ bool MenuState::init()
 {
     UI_Menu::drawHints = drawMenuHints;
     UI_Menu::drawFocus = drawMenuFocus;
+    //(text fields: the on-screen keyboard with a controller; on the Xbox, always)
+    MI_TextField::useOnScreenKeyboard = [] {
+#ifdef SMW_XBOX
+        return true;
+#else
+        return prompts::lastDevice() == prompts::Device::Controller;
+#endif
+    };
     mMainMenu = std::make_unique<UI_MainMenu>();
 
     // Options menu
@@ -806,6 +815,9 @@ MenuCodeEnum MenuState::ApplyPointer()
 void MenuState::LaunchMatch()
 {
     SDL_HideCursor();    //(the menus' pointer: not in the match)
+#ifdef SMW_HAS_EDITORS
+    editors::freeKeptGraphics();    //(an editor's graphics, kept in the menus: the match's memory)
+#endif
     if (game_values.matchtype == MatchType::QuickGame)
         mModeOptionsMenu->SetRandomGameModeSettings(game_values.gamemode->gamemode);
     else

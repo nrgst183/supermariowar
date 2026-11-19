@@ -476,7 +476,7 @@ void takescreenshot()
             szSaveFile += "_thumb";
 
         szSaveFile += ".png";
-        IMG_SavePNG(screenshot.getSurface(), convertPath(szSaveFile).c_str());
+        IMG_SavePNG(screenshot.getSurface(), writablePath(convertPath(szSaveFile)).c_str());
 
         printf("Screenshot taken: %s\n", szSaveFile.c_str());
 

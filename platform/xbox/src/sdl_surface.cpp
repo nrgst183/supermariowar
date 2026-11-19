@@ -672,3 +672,19 @@ bool SDL_BlitSurfaceScaled(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surfac
     }
     return true;
 }
+
+bool SDL_GetRectIntersection(const SDL_Rect* a, const SDL_Rect* b, SDL_Rect* result)
+{
+    if (!a || !b || !result)
+        return false;
+    const int x0 = a->x > b->x ? a->x : b->x;
+    const int y0 = a->y > b->y ? a->y : b->y;
+    const int x1 = (a->x + a->w) < (b->x + b->w) ? (a->x + a->w) : (b->x + b->w);
+    const int y1 = (a->y + a->h) < (b->y + b->h) ? (a->y + a->h) : (b->y + b->h);
+    if (x1 <= x0 || y1 <= y0) {
+        *result = {0, 0, 0, 0};
+        return false;
+    }
+    *result = {x0, y0, x1 - x0, y1 - y0};
+    return true;
+}

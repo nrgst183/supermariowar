@@ -113,7 +113,11 @@ int savecurrentmap()
     g_szMessageLine[1] = "been saved.";
     g_szMessageLine[2] = "";
 
-    save_map(maplist->currentFilename());
+    //(a map on a disc that can't be written: saved in the home folder, the list then reads it there)
+    const std::string file = writablePath(maplist->currentFilename());
+    save_map(file);
+    if (file != maplist->currentFilename())
+        maplist->setCurrentFilename(file);
     return 0;
 }
 
@@ -232,7 +236,7 @@ int newmap()
         std::string mapName = fileName;
         g_map->clearMap();
         g_map->clearPlatforms();
-        g_map->saveMap(convertPath("maps/" + mapName + ".map"));
+        g_map->saveMap(writablePath(convertPath("maps/" + mapName + ".map")));
         mapName += ".map";
         maplist->add(mapName.c_str());
         maplist->find(mapName);

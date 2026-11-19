@@ -19,6 +19,10 @@ void sdlx_video_quit();
 // Time (sdl_core.cpp)
 Uint64 sdlx_ticks_ns();
 
+// Files (sdl_core.cpp): a folder made (true if it's there), and the total size of the files in one
+bool sdlx_make_dir(const char* path);
+Uint64 sdlx_dir_bytes(const char* path);
+
 // Sets the x87 FPU to 53-bit (double) precision, so double maths gives the same
 // results every time (game replays and rollback need that); floats use SSE.
 // Called at startup and every frame, in case a library changed it.
