@@ -841,7 +841,7 @@ std::vector<PadState> Gamepads::read() const
     std::vector<PadState> pads;
     for (SDL_Gamepad* pad : m_gamepads) {
         PadState p;
-        p.id = SDL_GetGamepadID(pad);
+        p.id = SDL_GetJoystickID(SDL_GetGamepadJoystick(pad));    //(as the Xbox's SDL has it)
         const std::array<SDL_GamepadButton, BUTTON_COUNT> map = {SDL_GAMEPAD_BUTTON_SOUTH, SDL_GAMEPAD_BUTTON_EAST, SDL_GAMEPAD_BUTTON_WEST,
             SDL_GAMEPAD_BUTTON_NORTH, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, SDL_GAMEPAD_BUTTON_BACK,
             SDL_GAMEPAD_BUTTON_START, SDL_GAMEPAD_BUTTON_DPAD_UP, SDL_GAMEPAD_BUTTON_DPAD_DOWN, SDL_GAMEPAD_BUTTON_DPAD_LEFT,
