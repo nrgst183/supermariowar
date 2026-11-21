@@ -43,6 +43,9 @@ void finishModeMenu(UI_Menu& menu, const char* title, std::initializer_list<UI_C
     for (size_t i = 0; i < n; i++)
         menu.AddControl(column[i], i == 0 ? back : column[i - 1], i + 1 == n ? back : column[i + 1], nullptr, back);
     menu.AddControl(back, column[n - 1], column[0], column[n - 1], nullptr);
+    //(the rules on a panel, as the options screens)
+    if (UI_ModeOptionsMenu::addPanel)
+        UI_ModeOptionsMenu::addPanel(menu, std::vector<const UI_Control*>(column.begin(), column.end()));
 
     addTitleBar(menu, title);
 
@@ -50,6 +53,8 @@ void finishModeMenu(UI_Menu& menu, const char* title, std::initializer_list<UI_C
     menu.SetCancelCode(MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS);
 }
 } // namespace
+
+void (*UI_ModeOptionsMenu::addPanel)(UI_Menu& menu, const std::vector<const UI_Control*>& rules) = nullptr;
 
 UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     : UI_Menu()
@@ -70,7 +75,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miClassicModeScoringField->setOutputPtr(&game_values.gamemodemenusettings.classic.scoring);
     miClassicModeScoringField->setCurrentValue(game_values.gamemodemenusettings.classic.scoring);
 
-    finishModeMenu(mModeSettingsMenu[0], "Classic Mode Menu", {miClassicModeStyleField, miClassicModeScoringField});
+    finishModeMenu(mModeSettingsMenu[0], "Classic Rules", {miClassicModeStyleField, miClassicModeScoringField});
 
     //***********************
     // Frag Mode Settings
@@ -88,7 +93,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miFragModeScoringField->setOutputPtr(&game_values.gamemodemenusettings.frag.scoring);
     miFragModeScoringField->setCurrentValue(game_values.gamemodemenusettings.frag.scoring);
 
-    finishModeMenu(mModeSettingsMenu[1], "Frag Mode Menu", {miFragModeStyleField, miFragModeScoringField});
+    finishModeMenu(mModeSettingsMenu[1], "Frag Rules", {miFragModeStyleField, miFragModeScoringField});
 
     //***********************
     // Time Limit Mode Settings
@@ -112,7 +117,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miTimeLimitModePercentExtraTime->setCurrentValue(game_values.gamemodemenusettings.time.percentextratime);
     miTimeLimitModePercentExtraTime->allowWrap(false);
 
-    finishModeMenu(mModeSettingsMenu[2], "Time Mode Menu", {miTimeLimitModeStyleField, miTimeLimitModeScoringField, miTimeLimitModePercentExtraTime});
+    finishModeMenu(mModeSettingsMenu[2], "Time Rules", {miTimeLimitModeStyleField, miTimeLimitModeScoringField, miTimeLimitModePercentExtraTime});
 
     //***********************
     // Jail Mode Settings
@@ -155,7 +160,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miJailModeJailKeyField->setCurrentValue(game_values.gamemodemenusettings.jail.percentkey);
     miJailModeJailKeyField->allowWrap(false);
 
-    finishModeMenu(mModeSettingsMenu[3], "Jail Mode Menu", {miJailModeStyleField, miJailModeTimeFreeField, miJailModeTagFreeField, miJailModeJailKeyField});
+    finishModeMenu(mModeSettingsMenu[3], "Jail Rules", {miJailModeStyleField, miJailModeTimeFreeField, miJailModeTagFreeField, miJailModeJailKeyField});
 
     //***********************
     // Coins Mode Settings
@@ -179,7 +184,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miCoinModePercentExtraCoin->setCurrentValue(game_values.gamemodemenusettings.coins.percentextracoin);
     miCoinModePercentExtraCoin->allowWrap(false);
 
-    finishModeMenu(mModeSettingsMenu[4], "Coin Collection Mode Menu", {miCoinModePenaltyField, miCoinModeQuantityField, miCoinModePercentExtraCoin});
+    finishModeMenu(mModeSettingsMenu[4], "Coin Collection Rules", {miCoinModePenaltyField, miCoinModeQuantityField, miCoinModePercentExtraCoin});
 
     //***********************
     // Stomp Mode Settings
@@ -214,7 +219,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
         miStompModeEnemySlider[iEnemy]->setCurrentValue(game_values.gamemodemenusettings.stomp.enemyweight[iEnemy]);
     }
 
-    finishModeMenu(mModeSettingsMenu[5], "Stomp Mode Menu", {
+    finishModeMenu(mModeSettingsMenu[5], "Stomp Rules", {
         miStompModeRateField, miStompModeEnemySlider[0], miStompModeEnemySlider[1],
         miStompModeEnemySlider[2], miStompModeEnemySlider[3], miStompModeEnemySlider[4],
         miStompModeEnemySlider[5], miStompModeEnemySlider[6], miStompModeEnemySlider[7],
@@ -260,7 +265,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miEggModeExplosionTimeField->setOutputPtr(&game_values.gamemodemenusettings.egg.explode);
     miEggModeExplosionTimeField->setCurrentValue(game_values.gamemodemenusettings.egg.explode);
 
-    finishModeMenu(mModeSettingsMenu[6], "Yoshi's Eggs Mode Menu", {
+    finishModeMenu(mModeSettingsMenu[6], "Yoshi's Eggs Rules", {
         miEggModeEggQuantityField[0], miEggModeEggQuantityField[1], miEggModeEggQuantityField[2],
         miEggModeEggQuantityField[3], miEggModeYoshiQuantityField[0], miEggModeYoshiQuantityField[1],
         miEggModeYoshiQuantityField[2], miEggModeYoshiQuantityField[3], miEggModeExplosionTimeField
@@ -330,7 +335,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miFlagModeCenterFlagField->setCurrentValue(game_values.gamemodemenusettings.flag.centerflag ? 1 : 0);
     miFlagModeCenterFlagField->setAutoAdvance(true);
 
-    finishModeMenu(mModeSettingsMenu[7], "Capture The Flag Mode Menu", {
+    finishModeMenu(mModeSettingsMenu[7], "Capture The Flag Rules", {
         miFlagModeSpeedField, miFlagModeTouchReturnField, miFlagModePointMoveField,
         miFlagModeAutoReturnField, miFlagModeHomeScoreField, miFlagModeCenterFlagField
     });
@@ -353,7 +358,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miChickenModeGlideField->setCurrentValue(game_values.gamemodemenusettings.chicken.glide ? 1 : 0);
     miChickenModeGlideField->setAutoAdvance(true);
 
-    finishModeMenu(mModeSettingsMenu[8], "Chicken Mode Menu", {miChickenModeShowTargetField, miChickenModeGlideField});
+    finishModeMenu(mModeSettingsMenu[8], "Chicken Rules", {miChickenModeShowTargetField, miChickenModeGlideField});
 
     //***********************
     // Tag Mode Settings
@@ -366,7 +371,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miTagModeTagOnTouchField->setCurrentValue(game_values.gamemodemenusettings.tag.tagontouch ? 1 : 0);
     miTagModeTagOnTouchField->setAutoAdvance(true);
 
-    finishModeMenu(mModeSettingsMenu[9], "Tag Mode Menu", {miTagModeTagOnTouchField});
+    finishModeMenu(mModeSettingsMenu[9], "Tag Rules", {miTagModeTagOnTouchField});
 
     //***********************
     // Star Mode Settings
@@ -402,7 +407,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miStarModePercentExtraTime->setCurrentValue(game_values.gamemodemenusettings.star.percentextratime);
     miStarModePercentExtraTime->allowWrap(false);
 
-    finishModeMenu(mModeSettingsMenu[10], "Star Mode Menu", {miStarModeTimeField, miStarModeShineField, miStarModePercentExtraTime});
+    finishModeMenu(mModeSettingsMenu[10], "Star Rules", {miStarModeTimeField, miStarModeShineField, miStarModePercentExtraTime});
 
     //***********************
     // Domination Mode Settings
@@ -475,7 +480,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miDominationModeStealOnDeathField->setCurrentValue(game_values.gamemodemenusettings.domination.stealondeath ? 1 : 0);
     miDominationModeStealOnDeathField->setAutoAdvance(true);
 
-    finishModeMenu(mModeSettingsMenu[11], "Domination Mode Menu", {miDominationModeQuantityField, miDominationModeRelocateFrequencyField,
+    finishModeMenu(mModeSettingsMenu[11], "Domination Rules", {miDominationModeQuantityField, miDominationModeRelocateFrequencyField,
         miDominationModeLoseOnDeathField, miDominationModeRelocateOnDeathField, miDominationModeStealOnDeathField});
     mModeSettingsMenu[11].AddNonControl(miDominationModeDeathText);
 
@@ -518,7 +523,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miKingOfTheHillModeMultiplierField->setOutputPtr(&game_values.gamemodemenusettings.kingofthehill.maxmultiplier);
     miKingOfTheHillModeMultiplierField->setCurrentValue(game_values.gamemodemenusettings.kingofthehill.maxmultiplier);
 
-    finishModeMenu(mModeSettingsMenu[12], "King of the Hill Mode Menu", {
+    finishModeMenu(mModeSettingsMenu[12], "King of the Hill Rules", {
         miKingOfTheHillModeSizeField, miKingOfTheHillModeRelocateFrequencyField,
         miKingOfTheHillModeMultiplierField
     });
@@ -557,7 +562,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miRaceModePenaltyField->setOutputPtr(&game_values.gamemodemenusettings.race.penalty);
     miRaceModePenaltyField->setCurrentValue(game_values.gamemodemenusettings.race.penalty);
 
-    finishModeMenu(mModeSettingsMenu[13], "Race Mode Menu", {miRaceModeQuantityField, miRaceModeSpeedField, miRaceModePenaltyField});
+    finishModeMenu(mModeSettingsMenu[13], "Race Rules", {miRaceModeQuantityField, miRaceModeSpeedField, miRaceModePenaltyField});
 
     //***********************
     // Frenzy Mode Settings
@@ -568,7 +573,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
 
     //(its own Back button: a single control)
     mModeSettingsMenu[15].AddControl(miFrenzyModeOptions, nullptr, nullptr, nullptr, nullptr);
-    addTitleBar(mModeSettingsMenu[15], "Frenzy Mode Menu");
+    addTitleBar(mModeSettingsMenu[15], "Frenzy Rules");
     mModeSettingsMenu[15].setInitialFocus(miFrenzyModeOptions);
     mModeSettingsMenu[15].SetCancelCode(MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS);
 
@@ -623,7 +628,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miSurvivalModeShieldField->setCurrentValue(game_values.gamemodemenusettings.survival.shield ? 1 : 0);
     miSurvivalModeShieldField->setAutoAdvance(true);
 
-    finishModeMenu(mModeSettingsMenu[16], "Survival Mode Menu", {miSurvivalModeEnemySlider[0], miSurvivalModeEnemySlider[1], miSurvivalModeEnemySlider[2], miSurvivalModeDensityField, miSurvivalModeSpeedField, miSurvivalModeShieldField});
+    finishModeMenu(mModeSettingsMenu[16], "Survival Rules", {miSurvivalModeEnemySlider[0], miSurvivalModeEnemySlider[1], miSurvivalModeEnemySlider[2], miSurvivalModeDensityField, miSurvivalModeSpeedField, miSurvivalModeShieldField});
 
     //***********************
     // Greed Mode Settings
@@ -671,7 +676,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miGreedModePercentExtraCoin->setCurrentValue(game_values.gamemodemenusettings.greed.percentextracoin);
     miGreedModePercentExtraCoin->allowWrap(false);
 
-    finishModeMenu(mModeSettingsMenu[17], "Greed Mode Menu", {
+    finishModeMenu(mModeSettingsMenu[17], "Greed Rules", {
         miGreedModeCoinLife, miGreedModeOwnCoins, miGreedModeMultiplier, miGreedModePercentExtraCoin
     });
 
@@ -698,7 +703,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miHealthModePercentExtraLife->setCurrentValue(game_values.gamemodemenusettings.health.percentextralife);
     miHealthModePercentExtraLife->allowWrap(false);
 
-    finishModeMenu(mModeSettingsMenu[18], "Health Mode Menu", {miHealthModeStartLife, miHealthModeMaxLife, miHealthModePercentExtraLife});
+    finishModeMenu(mModeSettingsMenu[18], "Health Rules", {miHealthModeStartLife, miHealthModeMaxLife, miHealthModePercentExtraLife});
 
     //***********************
     // Card Collection Mode Settings
@@ -767,7 +772,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miCollectionModeCardLifeField->setOutputPtr(&game_values.gamemodemenusettings.collection.cardlife);
     miCollectionModeCardLifeField->setCurrentValue(game_values.gamemodemenusettings.collection.cardlife);
 
-    finishModeMenu(mModeSettingsMenu[19], "Card Collection Mode Menu", {miCollectionModeQuantityField, miCollectionModeRateField, miCollectionModeBankTimeField, miCollectionModeCardLifeField});
+    finishModeMenu(mModeSettingsMenu[19], "Card Collection Rules", {miCollectionModeQuantityField, miCollectionModeRateField, miCollectionModeBankTimeField, miCollectionModeCardLifeField});
 
     //***********************
     // Chase Mode Settings
@@ -797,7 +802,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
         miChaseModeQuantitySlider[iPhanto]->setCurrentValue(game_values.gamemodemenusettings.chase.phantoquantity[iPhanto]);
     }
 
-    finishModeMenu(mModeSettingsMenu[20], "Phanto Mode Menu", {
+    finishModeMenu(mModeSettingsMenu[20], "Phanto Rules", {
         miChaseModeSpeedField, miChaseModeQuantitySlider[0], miChaseModeQuantitySlider[1],
         miChaseModeQuantitySlider[2]
     });
@@ -835,7 +840,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miShyGuyTagModeFreeTimeField->setOutputPtr(&game_values.gamemodemenusettings.shyguytag.freetime);
     miShyGuyTagModeFreeTimeField->setCurrentValue(game_values.gamemodemenusettings.shyguytag.freetime);
 
-    finishModeMenu(mModeSettingsMenu[21], "Shyguy Tag Mode Menu", {miShyGuyTagModeTagOnSuicideField, miShyGuyTagModeTagOnStompField, miShyGuyTagModeFreeTimeField});
+    finishModeMenu(mModeSettingsMenu[21], "Shyguy Tag Rules", {miShyGuyTagModeTagOnSuicideField, miShyGuyTagModeTagOnStompField, miShyGuyTagModeFreeTimeField});
 
     //***********************
     // Boss Mode Settings
@@ -862,7 +867,7 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miBossModeHitPointsField->setOutputPtr(&game_values.gamemodemenusettings.boss.hitpoints);
     miBossModeHitPointsField->setCurrentValue(game_values.gamemodemenusettings.boss.hitpoints);
 
-    finishModeMenu(mBossSettingsMenu, "Boss Minigame Menu", {miBossModeTypeField, miBossModeDifficultyField, miBossModeHitPointsField});
+    finishModeMenu(mBossSettingsMenu, "Boss Minigame Rules", {miBossModeTypeField, miBossModeDifficultyField, miBossModeHitPointsField});
 
 }
 

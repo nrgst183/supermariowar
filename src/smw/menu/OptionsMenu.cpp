@@ -93,7 +93,7 @@ UI_OptionsMenu::UI_OptionsMenu()
 
     AddControl(miOptionsMenuBackButton, last ? last : miGenerateMapThumbsButton, miGameplayOptionsMenuButton, last ? last : miGenerateMapThumbsButton, nullptr);
 
-    AddTitleBar("Options Menu");
+    AddTitleBar("Options");
 
     AddNonControl(miGenerateThumbsDialogImage);
     AddNonControl(miGenerateThumbsDialogAreYouText);

@@ -841,6 +841,7 @@ std::vector<PadState> Gamepads::read() const
     std::vector<PadState> pads;
     for (SDL_Gamepad* pad : m_gamepads) {
         PadState p;
+        p.id = SDL_GetGamepadID(pad);
         const std::array<SDL_GamepadButton, BUTTON_COUNT> map = {SDL_GAMEPAD_BUTTON_SOUTH, SDL_GAMEPAD_BUTTON_EAST, SDL_GAMEPAD_BUTTON_WEST,
             SDL_GAMEPAD_BUTTON_NORTH, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, SDL_GAMEPAD_BUTTON_BACK,
             SDL_GAMEPAD_BUTTON_START, SDL_GAMEPAD_BUTTON_DPAD_UP, SDL_GAMEPAD_BUTTON_DPAD_DOWN, SDL_GAMEPAD_BUTTON_DPAD_LEFT,
@@ -858,6 +859,7 @@ std::vector<PadState> Gamepads::read() const
     //Without a mapping: the usual layout (buttons 0-7, the first hat, axes 0-3)
     for (SDL_Joystick* joy : m_joysticks) {
         PadState p;
+        p.id = SDL_GetJoystickID(joy);
         const int buttons = SDL_GetNumJoystickButtons(joy);
         for (int b = 0; b < 8 && b < buttons; b++)
             p.buttons[static_cast<size_t>(b)] = SDL_GetJoystickButton(joy, b);

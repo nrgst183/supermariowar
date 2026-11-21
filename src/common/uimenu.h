@@ -18,6 +18,8 @@ public:
 
     void AddControl(UI_Control* control, UI_Control* up, UI_Control* down, UI_Control* left, UI_Control* right);
     void AddNonControl(UI_Control* control);
+    /// A non-control drawn under everything else in the menu (a panel behind its controls)
+    void AddBackdrop(UI_Control* control);
     /// The bar along the top of the screen, with the menu's title (a non-control)
     void AddTitleBar(const std::string& title);
 
@@ -46,6 +48,13 @@ public:
     }
     void SetHints(bool hints) {
         m_hints = hints;
+    }
+    /// One of a set of pages (the options screens): the shoulders turn to the one before and after
+    void SetPaged(bool paged) {
+        m_paged = paged;
+    }
+    bool Paged() const {
+        return m_paged;
     }
 
     void ResetMenu();
@@ -106,6 +115,7 @@ protected:
     bool fModifyingItem = false;
     const MI_HeaderText* m_title = nullptr;
     bool m_hints = true;
+    bool m_paged = false;
 
     CEyecandyContainer eyeCandy;
 

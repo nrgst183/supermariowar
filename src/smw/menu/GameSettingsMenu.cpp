@@ -93,7 +93,7 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
 
     miGameSettingsLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
     miGameSettingsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miGameSettingsMenuHeaderText = new MI_HeaderText("Single Game Menu", 320, 5);
+    miGameSettingsMenuHeaderText = new MI_HeaderText("Single Game", 320, 5);
 
     // Exit tournament dialog box
     miGameSettingsExitDialogImage = new MI_Image(&rm->spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);

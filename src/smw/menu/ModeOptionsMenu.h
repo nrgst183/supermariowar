@@ -16,6 +16,10 @@ class UI_ModeOptionsMenu : public UI_Menu {
 public:
     UI_ModeOptionsMenu();
 
+    /// Puts a panel behind each mode's rules (the game sets it, before making the menu; the world
+    /// editor has none)
+    static void (*addPanel)(UI_Menu& menu, const std::vector<const UI_Control*>& rules);
+
     void SetRandomGameModeSettings(short iMode);
     void SetControllingTeam(short iControlTeam);
 

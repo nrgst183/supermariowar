@@ -89,6 +89,7 @@ int tinyWidth(const std::string& s, int scale = 2);
 enum Button { A, B, X, Y, LB, RB, BACK, START, UP, DOWN, LEFT, RIGHT, BUTTON_COUNT };
 
 struct PadState {
+    SDL_JoystickID id = 0;    // the controller's (its joystick instance ID)
     std::array<bool, BUTTON_COUNT> buttons {};
     float lx = 0, ly = 0, rx = 0, ry = 0;    // -1..1, with a dead zone
     float lt = 0, rt = 0;                    // 0..1

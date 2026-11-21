@@ -16,6 +16,8 @@
 #include "MapList.h"
 #include "SimulationState.h"
 #include "gamemodes/MiniPipe.h"
+#include "ui/InputPrompts.h"
+#include "ui/MenuPad.h"
 #include "ui/MI_MapField.h"
 #include "ui/MI_SelectField.h"
 
@@ -295,6 +297,9 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
     static bool shotTaken = false;
     ++menuFrames;
     ++t;
+    //(--at-pad 1: the controller's prompts throughout, whatever the window's mouse does)
+    if (at.pad)
+        prompts::setLastDevice(prompts::Device::Controller);
 
     auto next = [&]() {
         ++step;
@@ -1160,6 +1165,30 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             game_values.playerInput.outputControls[0].menu_down.fPressed = true;
         if (frame == HOLD - 2 && SCREENS[index].name[0])
             shot(SCREENS[index].name);
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role pages: the options screens, from Gameplay on, turned with Page Down (as RB) all the
+    //way round, a screenshot of each
+    if (at.shotsRole == "pages" && step == 1) {
+        constexpr int HOLD = 20;
+        constexpr int PAGES = 10;
+        const int index = (t - 1) / HOLD;
+        const int frame = (t - 1) % HOLD;
+        if (index >= PAGES) {
+            step = 1000;
+            t = 0;
+            return MENU_CODE_NONE;
+        }
+        if (frame == 0 && index == 0)
+            return MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU;
+        if (frame == 0)
+            menupad::noteKey(SDLK_PAGEDOWN);
+        if (frame == HOLD - 2) {
+            char name[32];
+            snprintf(name, sizeof(name), "pg%02d", index);
+            g_pendingShot = name;
+        }
         return MENU_CODE_NONE;
     }
 

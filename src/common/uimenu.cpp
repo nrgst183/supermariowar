@@ -21,6 +21,28 @@ constexpr MenuCodeEnum navDir2menuCode(MenuNavDirection direction)
     assert(false);
     return MenuCodeEnum::MENU_CODE_NONE;
 }
+
+// A held direction (a key, the d-pad, the stick) goes on moving through a menu: after a moment, then
+// steadily. How long each player's directions have been down, in frames
+constexpr int REPEAT_DELAY = 24;
+constexpr int REPEAT_EVERY = 5;
+int g_held[4][4] = {};
+
+void countHeld(const CPlayerInput& input)
+{
+    for (int p = 0; p < 4; p++) {
+        const COutputControl& keys = input.outputControls[p];
+        const CKeyState* dirs[4] = {&keys.menu_up, &keys.menu_down, &keys.menu_left, &keys.menu_right};
+        for (int d = 0; d < 4; d++)
+            g_held[p][d] = dirs[d]->fDown ? g_held[p][d] + 1 : 0;
+    }
+}
+
+bool repeats(int player, int dir)
+{
+    const int held = g_held[player][dir];
+    return held > REPEAT_DELAY && (held - REPEAT_DELAY) % REPEAT_EVERY == 0;
+}
 } // namespace
 
 void UI_Menu::AddControl(UI_Control* control, UI_Control* up, UI_Control* down, UI_Control* left, UI_Control* right)
@@ -43,6 +65,12 @@ void UI_Menu::AddNonControl(UI_Control* control)
     //(the title bar's: header text at the top of the screen, not a dialog's)
     if (auto* title = dynamic_cast<MI_HeaderText*>(control); title && !m_title && title->top() < 16)
         m_title = title;
+}
+
+void UI_Menu::AddBackdrop(UI_Control* control)
+{
+    control->setParent(this);
+    controls.emplace(controls.begin(), control);
 }
 
 void UI_Menu::AddTitleBar(const std::string& title)
@@ -102,6 +130,7 @@ void UI_Menu::Draw()
 
 MenuCodeEnum UI_Menu::SendInput(CPlayerInput* playerInput)
 {
+    countHeld(*playerInput);
     if (fModifyingItem) {
         MenuCodeEnum ret = m_currentFocus->SendInput(playerInput);
 
@@ -129,19 +158,19 @@ MenuCodeEnum UI_Menu::SendInput(CPlayerInput* playerInput)
             continue;
         }
 
-        if (playerInput->outputControls[iPlayer].menu_up.fPressed) {
+        if (playerInput->outputControls[iPlayer].menu_up.fPressed || repeats(iPlayer, 0)) {
             return MoveNextControl(MenuNavDirection::Up);
         }
 
-        if (playerInput->outputControls[iPlayer].menu_down.fPressed) {
+        if (playerInput->outputControls[iPlayer].menu_down.fPressed || repeats(iPlayer, 1)) {
             return MoveNextControl(MenuNavDirection::Down);
         }
 
-        if (playerInput->outputControls[iPlayer].menu_left.fPressed) {
+        if (playerInput->outputControls[iPlayer].menu_left.fPressed || repeats(iPlayer, 2)) {
             return MoveNextControl(MenuNavDirection::Left);
         }
 
-        if (playerInput->outputControls[iPlayer].menu_right.fPressed) {
+        if (playerInput->outputControls[iPlayer].menu_right.fPressed || repeats(iPlayer, 3)) {
             return MoveNextControl(MenuNavDirection::Right);
         }
 

@@ -13,8 +13,9 @@ UI_PowerupDropRatesMenu::UI_PowerupDropRatesMenu()
 
     AddControl(miPowerupSelection, nullptr, nullptr, nullptr, nullptr);
 
-    AddTitleBar("Item Selection Menu");
+    AddTitleBar("Item Selection");
 
     setInitialFocus(miPowerupSelection);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
+    SetPaged(true);
 }

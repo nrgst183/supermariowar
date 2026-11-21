@@ -125,6 +125,9 @@ class MenuState : public GameState
         };
         PendingPointer mPointer;
         MenuCodeEnum ApplyPointer();
+        /// The options screen before (-1) or after (1) the current one (LB and RB turn the pages), or
+        /// MENU_CODE_NONE when the current menu isn't one of them
+        MenuCodeEnum OptionsPageCode(int dir) const;
         bool HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs);
         void EnterGameSetup();
         void LaunchMatch();

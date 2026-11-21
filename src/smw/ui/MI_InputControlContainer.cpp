@@ -9,6 +9,7 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 #include "ResourceManager.h"
+#include "ui/MenuPad.h"
 
 #include <cmath>
 #include <cstdlib>
@@ -263,6 +264,7 @@ MenuCodeEnum MI_InputControlField::SendInput(CPlayerInput *)
 
     //Need to clear down keys when coming into this (we'll ignore key up events in here)
     game_values.playerInput.ResetKeys();
+    menupad::resync();    //(the button just bound isn't a press in the menu)
 
     fModifying = false;
     return MENU_CODE_UNSELECT_ITEM;

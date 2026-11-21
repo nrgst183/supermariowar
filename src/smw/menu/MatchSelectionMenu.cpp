@@ -71,7 +71,7 @@ UI_MatchSelectionMenu::UI_MatchSelectionMenu()
 
     miMatchSelectionMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
     miMatchSelectionMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
-    miMatchSelectionMenuHeaderText = new MI_HeaderText("Match Type Menu", 320, 5);
+    miMatchSelectionMenuHeaderText = new MI_HeaderText("Match Type", 320, 5);
 
     miMatchSelectionDisplayImage = new MI_Image(&rm->menu_match_select, 160, 80, 0, 0, 320, 240, 1, 1, 0);
     miWorldPreviewDisplay = new MI_WorldPreviewDisplay(160, 80, 20, 15);
@@ -143,7 +143,7 @@ void UI_MatchSelectionMenu::SetOnlineMode(bool online, bool minigame)
         miMatchSelectionField->setCurrentValue(minigame ? MatchType::MiniGame : MatchType::SingleGame);
 
     //(every match type can be played online: tournaments, tours and worlds too, see rollback/NetSeries.h)
-    miMatchSelectionMenuHeaderText->SetText(online ? "Online Match Type Menu" : "Match Type Menu");
+    miMatchSelectionMenuHeaderText->SetText(online ? "Online Match Type" : "Match Type");
     miMatchSelectionStartButton->SetName(online ? "Next" : "Start");
 
     if (online)

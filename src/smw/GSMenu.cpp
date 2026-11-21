@@ -11,6 +11,8 @@
 #include "GameValues.h"
 #include "gfx.h"
 #include "ui/InputPrompts.h"
+#include "ui/MenuPad.h"
+#include "ui/MI_MenuPanel.h"
 #include "ui/MI_TextField.h"
 #include "GSGameplay.h"
 #include "GameplayStyles.h"
@@ -106,10 +108,14 @@ void drawMenuHints(const UI_Menu& menu)
         left = {change, {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "done"}};
     } else {
         left = {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"}};
+        //(a value field changes with left and right: A on it isn't needed)
         if (menu.NudgesFocus())
             left.push_back(change);
-        left.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"});
+        else
+            left.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"});
     }
+    if (menu.Paged())
+        left.push_back({{Pad::LB, Pad::RB}, {"PgUp", "PgDn"}, "page"});
     //(clear of the title: the least needed first out)
     while (!left.empty() && 8 + prompts::promptsWidth(left, GAP) > title->left() - 12)
         left.erase(left.begin());
@@ -190,6 +196,9 @@ bool MenuState::init()
     mPlayerControlsMenu = std::make_unique<UI_PlayerControlsMenu>();
 
     // Gameplay menu
+    UI_ModeOptionsMenu::addPanel = [](UI_Menu& menu, const std::vector<const UI_Control*>& rules) {
+        AddPanelBehind(menu, rules);
+    };
     mModeOptionsMenu = std::make_unique<UI_ModeOptionsMenu>();
     mMatchSelectionMenu = std::make_unique<UI_MatchSelectionMenu>();
     mGameSettingsMenu = std::make_unique<UI_GameSettingsMenu>();
@@ -226,6 +235,7 @@ void MenuState::onEnterState()
 
     //Reset the keys each time we switch from menu to game and back
     game_values.playerInput.ResetKeys();
+    menupad::resync();
 
     fNeedMenuMusicReset = false;
 
@@ -446,6 +456,8 @@ void MenuState::update()
 
     if (!PollMenuEvents())
         return;
+    //(every controller, whether or not it's a player's: see MenuPad.h)
+    menupad::update(game_values.playerInput);
 
     //If AI is controlling the tournament menu, select the options
     if (game_values.matchtype == MatchType::Tournament && iTournamentAITimer > 0 && mCurrentMenu == mGameSettingsMenu.get() && mGameSettingsMenu->IsOnStartBtn()) {
@@ -538,6 +550,9 @@ void MenuState::update()
         if (cmd::g_autotest.enabled)
             code = AutoTestMenuUpdate();
         //Online tournaments, tours and worlds: the host leads the menus (MenuOnlineSeries.cpp)
+        //(LB and RB: the options screens' pages)
+        if (MENU_CODE_NONE == code && menupad::shoulder() != 0)
+            code = OptionsPageCode(menupad::shoulder());
         if (MENU_CODE_NONE == code && !OnlineSeriesInput(code)) {
             code = mCurrentMenu->SendInput(&game_values.playerInput);
             //(nothing from the buttons: what the mouse did)
@@ -699,6 +714,7 @@ bool MenuState::PollMenuEvents()
         case SDL_EVENT_JOYSTICK_ADDED:
         case SDL_EVENT_JOYSTICK_REMOVED:
             JoystickManager::instance().handleEvent(event);
+            menupad::devicesChanged();
             break;
 
         //The mouse: the pointer shows while it's used (and hides with a key or a button)
@@ -729,6 +745,7 @@ bool MenuState::PollMenuEvents()
 
         case SDL_EVENT_KEY_DOWN: {
             SDL_HideCursor();
+            menupad::noteKey(event.key.key);
             if (event.key.key == SDLK_F1) {
                 game_values.showfps = !game_values.showfps;
             }
@@ -809,6 +826,30 @@ MenuCodeEnum MenuState::ApplyPointer()
     else if (pointer.wheel)
         code = mCurrentMenu->PointerWheel(pointer.wheel > 0 ? 1 : -1);
     return code;
+}
+
+MenuCodeEnum MenuState::OptionsPageCode(int dir) const
+{
+    struct Page {
+        const UI_Menu* menu;
+        MenuCodeEnum code;
+    };
+    //(in the order of the Options menu's buttons)
+    const Page pages[] = {{mGameplayOptionsMenu.get(), MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU},
+        {mTeamOptionsMenu.get(), MENU_CODE_TO_TEAM_OPTIONS_MENU},
+        {mPowerupDropRatesMenu.get(), MENU_CODE_TO_POWERUP_SELECTION_MENU},
+        {mPowerupSettingsMenu.get(), MENU_CODE_TO_POWERUP_SETTINGS_MENU},
+        {mProjectileOptionsMenu.get(), MENU_CODE_TO_PROJECTILES_OPTIONS_MENU},
+        {mProjectileLimitsMenu.get(), MENU_CODE_TO_PROJECTILES_LIMITS_MENU},
+        {mGraphicsOptionsMenu.get(), MENU_CODE_TO_GRAPHICS_OPTIONS_MENU},
+        {mEyeCandyOptionsMenu.get(), MENU_CODE_TO_EYECANDY_OPTIONS_MENU},
+        {mSoundOptionsMenu.get(), MENU_CODE_TO_SOUND_OPTIONS_MENU}};
+    constexpr int COUNT = static_cast<int>(sizeof(pages) / sizeof(pages[0]));
+    for (int k = 0; k < COUNT; k++) {
+        if (pages[k].menu == mCurrentMenu)
+            return pages[(k + dir + COUNT) % COUNT].code;
+    }
+    return MENU_CODE_NONE;
 }
 
 // The screen has faded out to start a match: its settings, its map and music, then the gameplay
@@ -1571,13 +1612,13 @@ void MenuState::EnterGameSetup()
             }
 
             if (game_values.matchtype == MatchType::World)
-                mGameSettingsMenu->SetHeaderText("World Game Menu");
+                mGameSettingsMenu->SetHeaderText("World Game");
             else if (game_values.matchtype == MatchType::Tour)
-                mGameSettingsMenu->SetHeaderText("Tour Game Menu");
+                mGameSettingsMenu->SetHeaderText("Tour Game");
             else if (game_values.matchtype == MatchType::Tournament)
-                mGameSettingsMenu->SetHeaderText("Tournament Game Menu");
+                mGameSettingsMenu->SetHeaderText("Tournament Game");
             else
-                mGameSettingsMenu->SetHeaderText("Single Game Menu");
+                mGameSettingsMenu->SetHeaderText("Single Game");
         }
     }
 }

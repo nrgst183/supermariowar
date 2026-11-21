@@ -4,13 +4,14 @@
 #include "ResourceManager.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
+#include "ui/MI_MenuPanel.h"
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 
 UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     : UI_Menu()
 {
-    miFireballLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 10, 80, "Life", 305, 120);
+    miFireballLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 20, 68, "Life", 284, 120);
     miFireballLifeField->add("1 Second", 62);
     miFireballLifeField->add("2 Seconds", 124);
     miFireballLifeField->add("3 Seconds", 186);
@@ -24,7 +25,7 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miFireballLifeField->setOutputPtr(&game_values.fireballttl);
     miFireballLifeField->setCurrentValue(game_values.fireballttl);
 
-    miFeatherJumpsField = new MI_SelectField<short>(&rm->spr_selectfield, 10, 150, "Jumps", 305, 120);
+    miFeatherJumpsField = new MI_SelectField<short>(&rm->spr_selectfield, 20, 144, "Jumps", 284, 120);
     miFeatherJumpsField->add("1", 1);
     miFeatherJumpsField->add("2", 2);
     miFeatherJumpsField->add("3", 3);
@@ -33,7 +34,7 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miFeatherJumpsField->setOutputPtr(&game_values.featherjumps);
     miFeatherJumpsField->setCurrentValue(game_values.featherjumps);
 
-    miBoomerangStyleField = new MI_SelectField<BoomerangStyle>(&rm->spr_selectfield, 10, 220, "Style", 305, 120);
+    miBoomerangStyleField = new MI_SelectField<BoomerangStyle>(&rm->spr_selectfield, 20, 220, "Style", 284, 120);
     miBoomerangStyleField->add("Flat", BoomerangStyle::Flat);
     miBoomerangStyleField->add("SMB3", BoomerangStyle::SMB3);
     miBoomerangStyleField->add("Zelda", BoomerangStyle::Zelda);
@@ -41,7 +42,7 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miBoomerangStyleField->setOutputPtr(&game_values.boomerangstyle);
     miBoomerangStyleField->setCurrentValue(game_values.boomerangstyle);
 
-    miBoomerangLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 10, 260, "Life", 305, 120);
+    miBoomerangLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 20, 254, "Life", 284, 120);
     miBoomerangLifeField->add("1 Second", 62);
     miBoomerangLifeField->add("2 Seconds", 124);
     miBoomerangLifeField->add("3 Seconds", 186);
@@ -55,7 +56,7 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miBoomerangLifeField->setOutputPtr(&game_values.boomeranglife);
     miBoomerangLifeField->setCurrentValue(game_values.boomeranglife);
 
-    miHammerLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 325, 80, "Life", 305, 120);
+    miHammerLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 336, 68, "Life", 284, 120);
     miHammerLifeField->add("No Limit", 310);
     miHammerLifeField->add("0.5 Seconds", 31);
     miHammerLifeField->add("0.6 Seconds", 37);
@@ -68,7 +69,7 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miHammerLifeField->setOutputPtr(&game_values.hammerttl);
     miHammerLifeField->setCurrentValue(game_values.hammerttl);
 
-    miHammerDelayField = new MI_SelectField<short>(&rm->spr_selectfield, 325, 120, "Delay", 305, 120);
+    miHammerDelayField = new MI_SelectField<short>(&rm->spr_selectfield, 336, 102, "Delay", 284, 120);
     miHammerDelayField->add("None", 0);
     miHammerDelayField->add("0.1 Seconds", 6);
     miHammerDelayField->add("0.2 Seconds", 12);
@@ -83,14 +84,14 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miHammerDelayField->setOutputPtr(&game_values.hammerdelay);
     miHammerDelayField->setCurrentValue(game_values.hammerdelay);
 
-    miHammerOneKillField = new MI_SelectField<bool>(&rm->spr_selectfield, 325, 160, "Power", 305, 120);
+    miHammerOneKillField = new MI_SelectField<bool>(&rm->spr_selectfield, 336, 136, "Power", 284, 120);
     miHammerOneKillField->add("One Kill", true);
     miHammerOneKillField->add("Multiple Kills", false);
     miHammerOneKillField->setOutputPtr(&game_values.hammerpower);
     miHammerOneKillField->setCurrentValue(game_values.hammerpower);
     miHammerOneKillField->setAutoAdvance(true);
 
-    miShellLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 10, 330, "Life", 305, 120);
+    miShellLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 20, 330, "Life", 284, 120);
     miShellLifeField->add("Unlimited", 0);
     miShellLifeField->add("1 Second", 62);
     miShellLifeField->add("2 Seconds", 124);
@@ -109,7 +110,7 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miShellLifeField->setOutputPtr(&game_values.shellttl);
     miShellLifeField->setCurrentValue(game_values.shellttl);
 
-    miWandFreezeTimeField = new MI_SelectField<short>(&rm->spr_selectfield, 10, 400, "Freeze", 305, 120);
+    miWandFreezeTimeField = new MI_SelectField<short>(&rm->spr_selectfield, 20, 406, "Freeze", 284, 120);
     miWandFreezeTimeField->add("1 Second", 62);
     miWandFreezeTimeField->add("2 Seconds", 124);
     miWandFreezeTimeField->add("3 Seconds", 186);
@@ -127,7 +128,7 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miWandFreezeTimeField->setOutputPtr(&game_values.wandfreezetime);
     miWandFreezeTimeField->setCurrentValue(game_values.wandfreezetime);
 
-    miBlueBlockLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 325, 230, "Blue Life", 305, 120);
+    miBlueBlockLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 336, 212, "Blue Life", 284, 120);
     miBlueBlockLifeField->add("Unlimited", 0);
     miBlueBlockLifeField->add("1 Second", 62);
     miBlueBlockLifeField->add("2 Seconds", 124);
@@ -146,7 +147,7 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miBlueBlockLifeField->setOutputPtr(&game_values.blueblockttl);
     miBlueBlockLifeField->setCurrentValue(game_values.blueblockttl);
 
-    miGrayBlockLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 325, 270, "Gray Life", 305, 120);
+    miGrayBlockLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 336, 246, "Gray Life", 284, 120);
     miGrayBlockLifeField->add("Unlimited", 0);
     miGrayBlockLifeField->add("1 Second", 62);
     miGrayBlockLifeField->add("2 Seconds", 124);
@@ -165,7 +166,7 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miGrayBlockLifeField->setOutputPtr(&game_values.grayblockttl);
     miGrayBlockLifeField->setCurrentValue(game_values.grayblockttl);
 
-    miRedBlockLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 325, 310, "Red Life", 305, 120);
+    miRedBlockLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 336, 280, "Red Life", 284, 120);
     miRedBlockLifeField->add("Unlimited", 0);
     miRedBlockLifeField->add("1 Second", 62);
     miRedBlockLifeField->add("2 Seconds", 124);
@@ -187,13 +188,17 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miProjectileOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
     miProjectileOptionsMenuBackButton->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
-    miFireballText = new MI_Text("Fireball", 10, 50, 0, true, TextAlign::LEFT);
-    miFeatherText = new MI_Text("Feather", 10, 120, 0, true, TextAlign::LEFT);
-    miBoomerangText = new MI_Text("Boomerang", 10, 190, 0, true, TextAlign::LEFT);
-    miHammerText = new MI_Text("Hammer", 325, 50, 0, true, TextAlign::LEFT);
-    miShellText = new MI_Text("Shell", 10, 300, 0, true, TextAlign::LEFT);
-    miWandText = new MI_Text("Wand", 10, 370, 0, true, TextAlign::LEFT);
-    miBlueBlockText = new MI_Text("Throwable Blocks", 325, 200, 0, true, TextAlign::LEFT);
+    //Each weapon on a panel of its own, as the Options menu's (two columns: up and down each, left and
+    //right across)
+    struct Section {
+        short x, y, rows;
+        const char* title;
+    };
+    constexpr short COLUMN_W = 308;
+    for (const Section& section : {Section {8, 36, 1, "Fireball"}, Section {8, 112, 1, "Feather"}, Section {8, 188, 2, "Boomerang"},
+             Section {8, 298, 1, "Shell"}, Section {8, 374, 1, "Wand"}, Section {324, 36, 3, "Hammer"},
+             Section {324, 180, 3, "Throwable Blocks"}})
+        AddNonControl(new MI_MenuPanel(section.x, section.y, COLUMN_W, static_cast<short>(40 + section.rows * 34 - 2), section.title));
 
     AddControl(miFireballLifeField, miProjectileOptionsMenuBackButton, miFeatherJumpsField, nullptr, miHammerLifeField);
 
@@ -216,16 +221,10 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
 
     AddControl(miProjectileOptionsMenuBackButton, miRedBlockLifeField, miFireballLifeField, miWandFreezeTimeField, nullptr);
 
-    AddNonControl(miFireballText);
-    AddNonControl(miFeatherText);
-    AddNonControl(miBoomerangText);
-    AddNonControl(miHammerText);
-    AddNonControl(miShellText);
-    AddNonControl(miWandText);
-    AddNonControl(miBlueBlockText);
 
-    AddTitleBar("Projectile & Weapon Options Menu");
+    AddTitleBar("Weapons & Projectiles");
 
     setInitialFocus(miFireballLifeField);
     SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
+    SetPaged(true);
 };

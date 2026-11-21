@@ -29,11 +29,4 @@ private:
 
     MI_Button* miProjectileOptionsMenuBackButton;
 
-    MI_Text* miFireballText;
-    MI_Text* miHammerText;
-    MI_Text* miBoomerangText;
-    MI_Text* miFeatherText;
-    MI_Text* miShellText;
-    MI_Text* miWandText;
-    MI_Text* miBlueBlockText;
 };

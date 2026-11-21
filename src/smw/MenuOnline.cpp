@@ -157,7 +157,7 @@ void MenuState::ResetOnlineMenus()
     mOnlineView = false;
     mMatchSelectionMenu->SetOnlineMode(false, false);
     mGameSettingsMenu->SetStartButtonText("Start");
-    mGameSettingsMenu->SetHeaderText("Single Game Menu");
+    mGameSettingsMenu->SetHeaderText("Single Game");
     mGameSettingsMenu->SetOnlineView(UI_GameSettingsMenu::OnlineView::Off);
     mOnlineLobbyMenu->CloseDialog();
 }
@@ -389,7 +389,7 @@ void MenuState::OpenOnlineGameSettings()
     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++)
         mGameSettingsMenu->miGoalField[iGameMode]->hideItem(-1, false);
 
-    mGameSettingsMenu->SetHeaderText("Online Match Menu");
+    mGameSettingsMenu->SetHeaderText("Online Match");
     mGameSettingsMenu->SetStartButtonText("Start");
     mOnlineAppliedKey.clear();
 
@@ -404,7 +404,7 @@ void MenuState::ReturnToOnlineLobby()
     mOnlineSetup = false;
     mMatchSelectionMenu->SetOnlineMode(false, false);
     mGameSettingsMenu->SetStartButtonText("Start");
-    mGameSettingsMenu->SetHeaderText("Single Game Menu");
+    mGameSettingsMenu->SetHeaderText("Single Game");
 
     mCurrentMenu = mOnlineLobbyMenu.get();
     mOnlineLobbyMenu->Open(false);
@@ -445,7 +445,7 @@ void MenuState::OpenOnlineSettingsView()
     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++)
         mGameSettingsMenu->miGoalField[iGameMode]->hideItem(-1, false);
 
-    mGameSettingsMenu->SetHeaderText("Online Match Menu");
+    mGameSettingsMenu->SetHeaderText("Online Match");
     mGameSettingsMenu->SetOnlineView(UI_GameSettingsMenu::OnlineView::Locked);
 
     mCurrentMenu = mGameSettingsMenu.get();
@@ -457,7 +457,7 @@ void MenuState::CloseOnlineSettingsView()
 {
     mOnlineView = false;
     mGameSettingsMenu->SetOnlineView(UI_GameSettingsMenu::OnlineView::Off);
-    mGameSettingsMenu->SetHeaderText("Single Game Menu");
+    mGameSettingsMenu->SetHeaderText("Single Game");
     mCurrentMenu = mOnlineLobbyMenu.get();
     mOnlineLobbyMenu->Open(false);
 }

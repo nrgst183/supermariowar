@@ -1,6 +1,7 @@
 #pragma once
 
 #include "uicontrol.h"
+#include "uimenu.h"
 #include "ui/InputPrompts.h"
 
 #include <functional>
@@ -36,6 +37,11 @@ private:
     std::string m_note;
     std::function<std::string()> m_noteSource;
 };
+
+/// A panel behind controls already made, around them (`padX`, `padY` out; kept between the title
+/// bar and the footer), added under everything in the menu
+MI_MenuPanel* AddPanelBehind(UI_Menu& menu, std::initializer_list<const UI_Control*> controls, short padX = 18, short padY = 16);
+MI_MenuPanel* AddPanelBehind(UI_Menu& menu, const std::vector<const UI_Control*>& controls, short padX = 18, short padY = 16);
 
 /// A menu's button prompts, with a label first: the controller's buttons or the keys, whichever
 /// was used last (asked every frame); drawn as the footer along the bottom of the screen

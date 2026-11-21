@@ -17,6 +17,8 @@ target_sources(smw PRIVATE
     MI_MatchHistory.cpp
     MI_MenuPanel.cpp
     MI_MenuPanel.h
+    MenuPad.cpp
+    MenuPad.h
     SettingsPage.cpp
     SettingsPage.h
     MI_MatchHistory.h

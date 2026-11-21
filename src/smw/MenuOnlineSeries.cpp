@@ -194,12 +194,12 @@ bool MenuState::SetupOnlineSeries(const rollback::SeriesBeginMsg& begin, std::st
             return false;
         }
         mTournamentScoreboardMenu->miTournamentScoreboard->CreateScoreboard(g_sim.score_cnt, game_values.tourstops.size(), &rm->spr_tour_markers);
-        mGameSettingsMenu->SetHeaderText("Tour Game Menu");
+        mGameSettingsMenu->SetHeaderText("Tour Game");
         mCurrentMenu = mTourStopMenu.get();
         mCurrentMenu->ResetMenu();
     } else if (type == MatchType::Tournament) {
         mTournamentScoreboardMenu->miTournamentScoreboard->CreateScoreboard(g_sim.score_cnt, game_values.tournamentgames, &rm->menu_mode_large);
-        mGameSettingsMenu->SetHeaderText("Tournament Game Menu");
+        mGameSettingsMenu->SetHeaderText("Tournament Game");
         if (net.isHost()) {
             //The host chooses every game, as the controlling team would
             maplist->findexact(szCurrentMapName, false);
@@ -225,7 +225,7 @@ bool MenuState::SetupOnlineSeries(const rollback::SeriesBeginMsg& begin, std::st
         g_worldmap.SetInitialPowerups();
         mWorldMenu->miWorld->Init();
         mWorldMenu->miWorld->SetControllingTeam(RANDOM_INT(g_sim.score_cnt));
-        mGameSettingsMenu->SetHeaderText("World Game Menu");
+        mGameSettingsMenu->SetHeaderText("World Game");
 
         mCurrentMenu = mWorldMenu.get();
         mCurrentMenu->ResetMenu();

@@ -146,6 +146,35 @@ void footer(const std::vector<prompts::Prompt>& row, const std::string& label)
 }
 } // namespace menupanel
 
+MI_MenuPanel* AddPanelBehind(UI_Menu& menu, const std::vector<const UI_Control*>& controls, short padX, short padY)
+{
+    int x0 = 640, y0 = 480, x1 = 0, y1 = 0;
+    for (const UI_Control* control : controls) {
+        const UI_Control::Box b = control->FocusBox();
+        if (b.w <= 0)
+            continue;
+        x0 = std::min<int>(x0, b.x);
+        y0 = std::min<int>(y0, b.y);
+        x1 = std::max<int>(x1, b.x + b.w);
+        y1 = std::max<int>(y1, b.y + b.h);
+    }
+    if (x1 <= x0)
+        return nullptr;
+    //(clear of the title bar and the footer)
+    x0 = std::max(4, x0 - padX);
+    x1 = std::min(636, x1 + padX);
+    y0 = std::max(36, y0 - padY);
+    y1 = std::min(446, y1 + padY + 2);    //(the rim is thicker at the bottom: as much blue below as above)
+    auto* panel = new MI_MenuPanel(static_cast<short>(x0), static_cast<short>(y0), static_cast<short>(x1 - x0), static_cast<short>(y1 - y0));
+    menu.AddBackdrop(panel);
+    return panel;
+}
+
+MI_MenuPanel* AddPanelBehind(UI_Menu& menu, std::initializer_list<const UI_Control*> controls, short padX, short padY)
+{
+    return AddPanelBehind(menu, std::vector<const UI_Control*>(controls), padX, padY);
+}
+
 
 MI_MenuPanel::MI_MenuPanel(short x, short y, short w, short h, std::string title, std::string note)
     : UI_Control(x, y)
