@@ -33,7 +33,7 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 
 ### Online multiplayer
 
-![The LAN games list with two games found and a button to host your own; the lobby's options, where "Open to" makes the same lobby a game on this computer only, on the LAN or on the internet; the lobby every game starts from (two players on one computer and two CPUs, open to the LAN: the address others join at shows at the top); and a match on Airshipz](docs/gfx/fork/online.png)
+![The games list with three games found on the network, one of them a map editor session being edited; the lobby's options (two players on this computer and two CPUs); the lobby every game starts from, open to the LAN; and a match on Airshipz](docs/gfx/fork/online.png)
 
 - **Rollback netcode** for up to four players: everybody connects directly to each other, no server. Inputs that arrive late are predicted and corrected, so the game stays responsive with lag.
 - **A full online lobby**: pick your character and team, see everyone's ping, add CPU players, and play tournaments, tours and worlds online. Missing maps and custom skins are sent to the players who don't have them.
@@ -48,7 +48,7 @@ See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 ![The map editor: three players editing a map together with the blocks palette open, the tools menu (undo, redo, copy an area, paste, fill), and pasting a copied area; and the world editor with its modes menu open](docs/gfx/fork/map_editor.png)
 
 - **Make and edit maps and worlds right in the game** (**Main menu, Editors**), with a mouse and keyboard or a controller: rectangles, fill, copy and paste, and undo.
-- **Edit together**: one player hosts a map or a world, the others join and edit it with them at the same time, online or on one computer.
+- **Edit together**: one player hosts a map or a world in a lobby, the others find it in Join a Game and edit it with them at the same time, online or on one computer; anyone can join in while it's going.
 
 ### Theater: replays of every match
 
@@ -61,7 +61,7 @@ See [docs/HistoryReplaysEditors.md](docs/HistoryReplaysEditors.md).
 
 ### Improvements
 
-![Four CPU players on Boo's Mansion, The Arctic, Airshipz and Mushroom Valley](docs/gfx/fork/gameplay.png)
+![Four CPU players with random skins on Boo's Mansion, The Arctic, Airshipz and Mushroom Valley](docs/gfx/fork/gameplay.png)
 
 - **Smarter CPU players** that find their way around a map: running jumps, warp pipes, ? blocks and power-ups, and better fighting.
 - **50 more classic community maps**.

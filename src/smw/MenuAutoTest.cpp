@@ -276,8 +276,8 @@ std::string g_pendingShot;
 
 // --at-role pad: a controller played live from a file (<shots dir>/pad.txt), a command a line, read
 // as lines are added to it: what a person with a controller would do, to try the menus and the
-// editors with nothing else (no pointer put anywhere, no keys). In the menus, player 1's controller:
-// the d-pad, A and B; in the editors, every button and both sticks (EditorInput.h's TestInput).
+// editors with nothing else (no pointer put anywhere, no keys). In the menus, players 1 and 2's:
+// the d-pad, A, B and X; in the editors, every button and both sticks (EditorInput.h's TestInput).
 //   a, down*5          a press (two frames, then two let go), five of them
 //   a:30               held for 30 frames
 //   +a, -a             held down from now / let go (held through what follows: A and the d-pad)
@@ -558,15 +558,20 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             return exitSoon();
         if (!f.shot.empty())
             shot(f.shot.c_str());
-        if (f.pressedNow) {
-            COutputControl& keys = game_values.playerInput.outputControls[0];
-            keys.menu_up.fPressed = f.down.count("up") > 0;
-            keys.menu_down.fPressed = f.down.count("down") > 0;
-            keys.menu_left.fPressed = f.down.count("left") > 0;
-            keys.menu_right.fPressed = f.down.count("right") > 0;
-            keys.menu_select.fPressed = f.down.count("a") > 0;
-            keys.menu_cancel.fPressed = f.down.count("b") > 0;
-        }
+        //(players 1 and 2: the second's commands start with "2:"; X is the menus' random)
+        auto press = [](const padscript::Frame& frame, COutputControl& keys) {
+            if (!frame.pressedNow)
+                return;
+            keys.menu_up.fPressed = frame.down.count("up") > 0;
+            keys.menu_down.fPressed = frame.down.count("down") > 0;
+            keys.menu_left.fPressed = frame.down.count("left") > 0;
+            keys.menu_right.fPressed = frame.down.count("right") > 0;
+            keys.menu_select.fPressed = frame.down.count("a") > 0;
+            keys.menu_cancel.fPressed = frame.down.count("b") > 0;
+            keys.menu_random.fPressed = frame.down.count("x") > 0;
+        };
+        press(f, game_values.playerInput.outputControls[0]);
+        press(padscript::step(1), game_values.playerInput.outputControls[1]);
         return MENU_CODE_NONE;
     }
 

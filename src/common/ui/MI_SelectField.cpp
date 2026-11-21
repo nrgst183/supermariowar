@@ -67,15 +67,17 @@ void MI_SelectField<T>::Draw()
         return;
 
     gfxSprite* body = fLocked ? &rm->spr_selectfielddisabled : m_spr;
+    //(focused, a gray field lights up green as the others do, as the buttons: MI_Button)
+    const short row = fSelected ? (fLocked ? m_adjustmentY + 32 : 32) : m_adjustmentY;
 
     if (m_indent == 0) {
         short iHalfWidth = m_width / 2;
-        body->draw(m_pos.x, m_pos.y, {0, (fSelected ? 32 : 0) + m_adjustmentY, iHalfWidth, 32});
-        body->draw(m_pos.x + iHalfWidth, m_pos.y, {512 - iHalfWidth, (fSelected ? 32 : 0) + m_adjustmentY, m_width - iHalfWidth, 32});
+        body->draw(m_pos.x, m_pos.y, {0, row, iHalfWidth, 32});
+        body->draw(m_pos.x + iHalfWidth, m_pos.y, {512 - iHalfWidth, row, m_width - iHalfWidth, 32});
     } else {
-        body->draw(m_pos.x, m_pos.y, {0, (fSelected ? 32 : 0) + m_adjustmentY, m_indent - 16, 32});
+        body->draw(m_pos.x, m_pos.y, {0, row, m_indent - 16, 32});
         body->draw(m_pos.x + m_indent - 16, m_pos.y, {0, (fSelected ? 96 : 64), 32, 32});
-        body->draw(m_pos.x + m_indent + 16, m_pos.y, {528 - m_width + m_indent, (fSelected ? 32 : 0) + m_adjustmentY, m_width - m_indent - 16, 32});
+        body->draw(m_pos.x + m_indent + 16, m_pos.y, {528 - m_width + m_indent, row, m_width - m_indent - 16, 32});
     }
 
     if (m_indent> 0)
