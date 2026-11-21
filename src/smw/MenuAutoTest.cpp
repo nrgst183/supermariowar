@@ -285,6 +285,7 @@ std::string g_pendingShot;
 //   wait N             N frames of nothing
 //   shot NAME          a screenshot (NAME.png in the shots dir)
 //   quit               the game quits (from the menus)
+//   2:COMMAND          the second controller's (in the editors: someone else on this computer)
 // Each command printed as it starts ("pad: <line>"), and "pad: idle" once there are none left.
 namespace padscript {
 struct Command {
@@ -294,15 +295,20 @@ struct Command {
     float x = 0, y = 0;
 };
 
-struct State {
-    std::string path;
-    long offset = 0;
-    std::string partial;
+// A controller's commands, played in turn
+struct Controller {
     std::deque<Command> queue;
     Command current;
     int left = 0;    // frames of `current` still to come (press, then gap)
     bool idle = true;
     std::set<std::string> held;
+};
+
+struct State {
+    std::string path;
+    long offset = 0;
+    std::string partial;
+    Controller controllers[2];
 };
 State g;
 
@@ -318,8 +324,12 @@ void start(const std::string& dir)
     }
 }
 
-void parse(const std::string& line)
+void parse(std::string line)
 {
+    //(the second controller's)
+    Controller& ctl = g.controllers[line.rfind("2:", 0) == 0 ? 1 : 0];
+    if (&ctl == &g.controllers[1])
+        line.erase(0, 2);
     std::istringstream in(line);
     std::string word;
     if (!(in >> word) || word[0] == '#')
@@ -358,10 +368,10 @@ void parse(const std::string& line)
         c.what = word;
         c.gap = 2;
         for (int k = 0; k < times; k++)
-            g.queue.push_back(c);
+            ctl.queue.push_back(c);
         return;
     }
-    g.queue.push_back(c);
+    ctl.queue.push_back(c);
 }
 
 void poll()
@@ -400,14 +410,17 @@ struct Frame {
     bool quit = false;
 };
 
-Frame step()
+Frame step(int which = 0)
 {
-    poll();
+    if (which == 0)
+        poll();
+    Controller& g = padscript::g.controllers[which];
+    const char* tag = which == 1 ? "2:" : "";
     Frame out;
     if (g.left <= 0) {
         if (g.queue.empty()) {
             if (!g.idle) {
-                printf("pad: idle\n");
+                printf("pad: %sidle\n", tag);
                 fflush(stdout);
             }
             g.idle = true;
@@ -418,7 +431,7 @@ Frame step()
         g.current = g.queue.front();
         g.queue.pop_front();
         g.left = g.current.frames + g.current.gap;
-        printf("pad: %s\n", g.current.what.c_str());
+        printf("pad: %s%s\n", tag, g.current.what.c_str());
         fflush(stdout);
         out.pressedNow = true;
     }
@@ -450,9 +463,9 @@ Frame step()
 editors::input::TestInput editorInput(editors::Editor, int, int pointer)
 {
     editors::input::TestInput t;
-    if (pointer != 0)
+    if (pointer > 1)
         return t;
-    const Frame f = step();
+    const Frame f = step(pointer);
     auto on = [&](const char* name) { return f.down.count(name) > 0; };
     t.a = on("a"), t.b = on("b"), t.x = on("x"), t.y = on("y");
     t.lb = on("lb"), t.rb = on("rb"), t.back = on("back"), t.start = on("start");
@@ -533,7 +546,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         if (step == 0) {
             padscript::start(at.shotsDir);
 #ifdef SMW_HAS_EDITORS
-            editors::input::setTestDriver(padscript::editorInput, at.shotsDir);
+            editors::input::setTestDriver(padscript::editorInput, at.shotsDir, 2);
 #endif
             printf("pad: reading %s/pad.txt\n", at.shotsDir.c_str());
             fflush(stdout);

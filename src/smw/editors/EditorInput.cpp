@@ -1727,8 +1727,15 @@ void flip()
     }
     //What changed this frame: an undo
     undoTrack();
-    //Editing together: this frame's changes go out
-    coedit::afterFrame(s.cx, s.cy, true);
+    //Editing together: this frame's changes go out, with everyone's pointer here (the first
+    //controller's is ours; each other one that was used is someone else here, "P2"...)
+    std::vector<coedit::LocalCursor> locals;
+    for (size_t k = 1; k < s.pointers.size() && k < 8; k++) {
+        if (s.pointers[k].shown)
+            locals.push_back({static_cast<uint8_t>(k), s.pointers[k].x, s.pointers[k].y});
+    }
+    const bool first = !s.pointers.empty() && s.pointers[0].shown && s.owner >= 0;
+    coedit::afterFrame(first ? s.pointers[0].x : s.cx, first ? s.pointers[0].y : s.cy, true, locals);
     present();
 }
 

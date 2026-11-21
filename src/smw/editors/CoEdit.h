@@ -150,7 +150,14 @@ void pump();
 bool attached();
 void attach(std::unique_ptr<Document> document);
 void detach();
-void afterFrame(float pointerX, float pointerY, bool pointerVisible);
+// The others on this computer, with their own controllers (the first is the pointer above): who
+// picks up a controller joins the session as it goes, and the others see them ("Name P2")
+struct LocalCursor {
+    uint8_t index = 0;    // the controller (1: the second, ...)
+    float x = 0;
+    float y = 0;
+};
+void afterFrame(float pointerX, float pointerY, bool pointerVisible, const std::vector<LocalCursor>& locals = {});
 
 // What the overlay shows
 struct Cursor {

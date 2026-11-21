@@ -166,6 +166,10 @@ world in their own game, and sees the others' cursors with their names (the lobb
 there (bottom left), and who joins or leaves. The session goes over the lobby's connection
 (port 7300), so it works wherever the lobby does.
 
+Both work together: in a session over the network, every controller on each computer is its
+own person. Picking one up during the session joins in ("Name P2 joined"), and the others see its
+cursor ("Name P2", in a lighter shade of that computer's color) and its name in the list.
+
 How it works (`src/smw/editors/CoEdit.h`): every game edits its own copy. Once per frame,
 each compares its copy with the last synced state; every changed map cell, world tile or
 section (items, hazards, platforms, backgrounds and music; stages, vehicles, warps, start

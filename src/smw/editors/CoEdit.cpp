@@ -18,7 +18,7 @@
 namespace editors::coedit {
 namespace {
 
-constexpr uint16_t PROTOCOL = 1;
+constexpr uint16_t PROTOCOL = 2;
 constexpr uint32_t NOTICE_MS = 4000;
 constexpr int CURSOR_EVERY = 3;    // frames between cursor updates
 
@@ -32,6 +32,7 @@ enum Message : uint8_t {
     MSG_CURSOR,         // (unreliable) u8 id, i16 x, i16 y, u8 visible
     MSG_BYE,            // str reason
     MSG_NOTICE,         // host -> all: str
+    MSG_LOCALS,         // (unreliable) u8 id, u8 n, n x (u8 controller, i16 x, i16 y): the others at that game
 };
 
 struct Peer {
@@ -162,6 +163,8 @@ struct Session {
     std::vector<Op> early;                  // joiner: ordered ops before the document is attached
 
     std::map<int, Cursor> cursors;
+    std::map<int, std::vector<LocalCursor>> locals;    // each peer's others on its computer (MSG_LOCALS)
+    std::vector<LocalCursor> lastLocals;               // ours, as last sent
     int cursorFrames = 0;
     int16_t lastCursorX = -1, lastCursorY = -1;
     bool lastCursorVisible = false;
@@ -177,6 +180,43 @@ SDL_Color colorOf(int id)
     static const SDL_Color colors[] = {{232, 56, 40, 255}, {40, 184, 56, 255}, {48, 112, 232, 255}, {248, 200, 24, 255},
         {176, 72, 216, 255}, {248, 136, 24, 255}, {40, 200, 216, 255}, {248, 120, 184, 255}, {240, 240, 240, 255}};
     return colors[static_cast<size_t>(std::clamp(id, 0, 8))];
+}
+
+// The name of one of the others at a peer's computer ("Name P2")
+std::string localName(const std::string& name, int index)
+{
+    return name + " P" + std::to_string(index + 1);
+}
+
+// Reads a MSG_LOCALS list (after its id)
+std::vector<LocalCursor> readLocals(Reader& r)
+{
+    std::vector<LocalCursor> list;
+    const uint8_t n = r.u8();
+    for (uint8_t k = 0; k < n && k < 8 && r.ok; k++) {
+        LocalCursor c;
+        c.index = r.u8();
+        c.x = r.i16();
+        c.y = r.i16();
+        if (r.ok)
+            list.push_back(c);
+    }
+    return list;
+}
+
+// A peer's others now: who is new is announced
+void setLocals(int id, std::vector<LocalCursor> list, const std::string& name)
+{
+    const std::vector<LocalCursor>& before = g.locals[id];
+    for (const LocalCursor& c : list) {
+        const bool known = std::any_of(before.begin(), before.end(), [&](const LocalCursor& b) { return b.index == c.index; });
+        if (!known)
+            setNotice(localName(name, c.index) + " joined");
+    }
+    if (list.empty())
+        g.locals.erase(id);
+    else
+        g.locals[id] = std::move(list);
 }
 
 std::string nameOf(int id)
@@ -378,12 +418,23 @@ void handleMessage(int connection, const uint8_t* data, size_t size)
                     broadcast(relay, rollback::Channel::Unreliable, connection);
                 }
                 break;
+            case MSG_LOCALS:
+                if (peer->welcomed) {
+                    r.u8();
+                    setLocals(peer->id, readLocals(r), peer->name);
+                    //(to the others, with the right id)
+                    Bytes relay(data, data + size);
+                    relay[1] = static_cast<uint8_t>(peer->id);
+                    broadcast(relay, rollback::Channel::Unreliable, connection);
+                }
+                break;
             case MSG_BYE:
                 //(it left the session: in a lobby, it may come back in, and is welcomed again then)
                 peer->hello = false;
                 if (peer->welcomed) {
                     peer->welcomed = false;
                     g.cursors.erase(peer->id);
+                    g.locals.erase(peer->id);
                     sendPeers();
                     sendNotice(peer->name + " left");
                 }
@@ -458,6 +509,13 @@ void handleMessage(int connection, const uint8_t* data, size_t size)
             c.name = nameOf(id);
             c.color = colorOf(id);
             g.cursors[id] = c;
+            break;
+        }
+        case MSG_LOCALS: {
+            const int id = r.u8();
+            std::vector<LocalCursor> list = readLocals(r);
+            if (id != g.myId && r.ok)
+                setLocals(id, std::move(list), nameOf(id));
             break;
         }
         case MSG_NOTICE:
@@ -713,6 +771,7 @@ void pump()
                         const std::string name = it->name;
                         const bool welcomed = it->welcomed;
                         g.cursors.erase(it->id);
+                        g.locals.erase(it->id);
                         g.peers.erase(it);
                         if (welcomed) {
                             sendPeers();
@@ -726,6 +785,7 @@ void pump()
                         setNotice("Lost the connection to the host. You keep your copy");
                     g.state = State::Ended;
                     g.cursors.clear();
+                    g.locals.clear();
                 }
                 break;
             case rollback::TransportEvent::Type::Received:
@@ -769,7 +829,7 @@ void detach()
     g.pending.clear();
 }
 
-void afterFrame(float pointerX, float pointerY, bool pointerVisible)
+void afterFrame(float pointerX, float pointerY, bool pointerVisible, const std::vector<LocalCursor>& locals)
 {
     if (!g.doc || !active())
         return;
@@ -829,6 +889,33 @@ void afterFrame(float pointerX, float pointerY, bool pointerVisible)
         else
             send(g.hostConnection, w.out, rollback::Channel::Unreliable);
     }
+
+    //The others here (their controllers), as they move; and once a second anyway (unreliable: one may
+    //be lost, and someone who arrives later learns of them)
+    auto same = [](const std::vector<LocalCursor>& a, const std::vector<LocalCursor>& b) {
+        return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](const LocalCursor& p, const LocalCursor& q) {
+            return p.index == q.index && static_cast<int16_t>(p.x) == static_cast<int16_t>(q.x) && static_cast<int16_t>(p.y) == static_cast<int16_t>(q.y);
+        });
+    };
+    static int localsFrames = 0;
+    ++localsFrames;
+    if ((localsFrames >= CURSOR_EVERY && !same(locals, g.lastLocals)) || (localsFrames >= 60 && !locals.empty())) {
+        localsFrames = 0;
+        g.lastLocals = locals;
+        Writer w;
+        w.u8(MSG_LOCALS);
+        w.u8(static_cast<uint8_t>(g.myId));
+        w.u8(static_cast<uint8_t>(std::min<size_t>(locals.size(), 8)));
+        for (size_t k = 0; k < locals.size() && k < 8; k++) {
+            w.u8(locals[k].index);
+            w.i16(static_cast<int16_t>(locals[k].x));
+            w.i16(static_cast<int16_t>(locals[k].y));
+        }
+        if (g.host)
+            broadcast(w.out, rollback::Channel::Unreliable);
+        else
+            send(g.hostConnection, w.out, rollback::Channel::Unreliable);
+    }
     if (g.transport)
         g.transport->flush();
 }
@@ -839,6 +926,15 @@ std::vector<Cursor> remoteCursors()
     if (g.state == State::Hosting || g.state == State::Joined) {
         for (const auto& [id, c] : g.cursors)
             list.push_back(c);
+        for (const auto& [id, others] : g.locals) {
+            //(their player's color, lighter)
+            SDL_Color color = colorOf(id);
+            color.r = static_cast<Uint8>((color.r * 2 + 255) / 3);
+            color.g = static_cast<Uint8>((color.g * 2 + 255) / 3);
+            color.b = static_cast<Uint8>((color.b * 2 + 255) / 3);
+            for (const LocalCursor& o : others)
+                list.push_back(Cursor {localName(nameOf(id), o.index), color, o.x, o.y});
+        }
     }
     return list;
 }
@@ -848,12 +944,22 @@ std::vector<Person> people()
     std::vector<Person> list;
     if (!active())
         return list;
-    list.push_back(Person {g.myName, colorOf(g.myId), g.host, true});
+    //Each player, then the others at their computer ("Name P2")
+    auto add = [&](int id, const std::string& name, bool host, bool you) {
+        list.push_back(Person {name, colorOf(id), host, you});
+        const auto it = g.locals.find(id);
+        const std::vector<LocalCursor>* others = you ? &g.lastLocals : it != g.locals.end() ? &it->second : nullptr;
+        if (others) {
+            for (const LocalCursor& o : *others)
+                list.push_back(Person {localName(name, o.index), colorOf(id), false, you});
+        }
+    };
+    add(g.myId, g.myName, g.host, true);
     if (!g.host)
-        list.push_back(Person {nameOf(0), colorOf(0), true, false});
+        add(0, nameOf(0), true, false);
     for (const Peer& p : g.peers) {
         if (p.id != 0 && (!g.host || p.welcomed))
-            list.push_back(Person {p.name, colorOf(p.id), false, false});
+            add(p.id, p.name, false, false);
     }
     return list;
 }
