@@ -75,6 +75,7 @@ void CMap::clearMap()
 
     mapitems.clear();
     maphazards.clear();
+    numwarpexits = 0;
 
     for (short iSwitch = 0; iSwitch < 4; iSwitch++)
         iSwitches[iSwitch] = 0;
@@ -527,20 +528,21 @@ WarpExit * CMap::getRandomWarpExit(int connection, int currentID)
 
     for (int k = 0; k < numwarpexits; k++) {
         //(an exit pointing nowhere, in a damaged map, isn't one)
-        if (warpexits[k].direction < WARP_EXIT_UP || warpexits[k].direction > WARP_EXIT_LEFT)
+        if (warpexits[k].direction > WarpExitDirection::Left)
             continue;
         if (warpexits[k].connection == connection) {
-            if (warpexits[k].id == currentID)
+            if (warpexits[k].id == currentID) {
                 currentWarp = &warpexits[k];
-            else
+            } else {
                 indices[numIndices++] = k;
+            }
         }
     }
 
     if (numIndices == 0)
         return currentWarp;
 
-    return &warpexits[indices[RANDOM_INT( numIndices)]];
+    return &warpexits[indices[RANDOM_INT(numIndices)]];
 }
 
 void CMap::clearWarpLocks()
@@ -717,7 +719,7 @@ bool CMap::checkforwarp(short iData1, short iData2, short iData3, short iDirecti
         return false;
     bool exit = false;
     for (int k = 0; k < numwarpexits && !exit; k++)
-        exit = warpexits[k].connection == warp1->connection && warpexits[k].direction >= WARP_EXIT_UP && warpexits[k].direction <= WARP_EXIT_LEFT;
+        exit = warpexits[k].connection == warp1->connection && warpexits[k].direction <= WarpExitDirection::Left;
     if (!exit)
         return false;
 

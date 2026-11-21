@@ -234,9 +234,9 @@ void addWarps()
     auto exitSpot = [](const WarpExit& e) {
         int c = -1, r = -1;
         int x = e.x;
-        if (e.direction == WARP_EXIT_RIGHT)
+        if (e.direction == WarpExitDirection::Right)
             x += TILESIZE;
-        else if (e.direction == WARP_EXIT_LEFT)
+        else if (e.direction == WarpExitDirection::Left)
             x -= TILESIZE;
         //(as PlayerSpot, without building the graph again)
         int cx = x + PW / 2;
