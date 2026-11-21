@@ -76,6 +76,7 @@
 #include "menu/options/SoundOptionsMenu.h"
 #include "menu/options/TeamOptionsMenu.h"
 
+#include <cmath>
 #include <format>
 #include <string>
 #include <cstdlib> // atoi()
@@ -89,6 +90,8 @@ namespace {
 // What the buttons do, in the title bar of the menus (with a controller: with the keyboard and mouse
 // the menus look as they always have): choose, change a value, select at the left (as much as fits
 // before the title), back at the right when it goes back
+void roundBox(int x, int y, int w, int h, SDL_Color c);
+
 void drawMenuHints(const UI_Menu& menu)
 {
     if (prompts::lastDevice() != prompts::Device::Controller)
@@ -117,42 +120,108 @@ void drawMenuHints(const UI_Menu& menu)
     if (menu.Paged())
         left.push_back({{Pad::LB, Pad::RB}, {"PgUp", "PgDn"}, "page"});
     //(clear of the title: the least needed first out)
-    while (!left.empty() && 8 + prompts::promptsWidth(left, GAP) > title->left() - 12)
+    while (!left.empty() && 8 + prompts::promptsWidth(left, GAP) > title->left() - 20)
         left.erase(left.begin());
-    if (!left.empty())
-        prompts::drawPrompts(8 + prompts::promptsWidth(left, GAP) / 2, Y, left, GAP);
+    //(each group on a dark pill, as the hint bar at the bottom: apart from the title bar's own)
+    auto pill = [](int x, int w) {
+        roundBox(x - 6, 1, w + 12, 22, {0, 0, 0, 255});
+        roundBox(x - 5, 2, w + 10, 20, {16, 28, 84, 255});
+    };
+    if (!left.empty()) {
+        const int w = prompts::promptsWidth(left, GAP);
+        pill(8, w);
+        prompts::drawPrompts(8 + w / 2, Y + 1, left, GAP);
+    }
 
     if (menu.CancelCode() != MENU_CODE_NONE) {
         const std::vector<Prompt> right {{{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}};
         const int w = prompts::promptsWidth(right, GAP);
-        if (App::screenWidth - 8 - w > title->right() + 12)
-            prompts::drawPrompts(App::screenWidth - 8 - w / 2, Y, right, GAP);
+        if (App::screenWidth - 8 - w > title->right() + 20) {
+            pill(App::screenWidth - 8 - w, w);
+            prompts::drawPrompts(App::screenWidth - 8 - w / 2, Y + 1, right, GAP);
+        }
     }
 }
 
-// The frame around the focused control: white (gold while its value is being changed), with a dark
-// edge so that it shows on the green and gray buttons and on any backdrop; its corners cut, like the
-// buttons' round ends
+// Rounded boxes in pixels (radius 3: a row's ends come in 3, 1, 1 pixels near the top and bottom)
+int roundInset(int row, int h)
+{
+    static constexpr int IN[3] = {3, 1, 1};
+    if (row < 3)
+        return IN[row];
+    if (row >= h - 3)
+        return IN[h - 1 - row];
+    return 0;
+}
+
+// A filled rounded box
+void roundBox(int x, int y, int w, int h, SDL_Color c)
+{
+    for (int row = 0; row < h; row++) {
+        const int in = roundInset(row, h);
+        prompts::fill(x + in, y + row, w - 2 * in, 1, c);
+    }
+}
+
+// A rounded ring `t` pixels thick (only the ring: what's inside shows through)
+void roundRing(int x, int y, int w, int h, int t, SDL_Color c)
+{
+    for (int row = 0; row < h; row++) {
+        const int outer = roundInset(row, h);
+        if (row < t || row >= h - t) {
+            prompts::fill(x + outer, y + row, w - 2 * outer, 1, c);
+            continue;
+        }
+        const int inner = t + roundInset(row - t, h - 2 * t);
+        prompts::fill(x + outer, y + row, inner - outer, 1, c);
+        prompts::fill(x + w - inner, y + row, inner - outer, 1, c);
+    }
+}
+
+SDL_Color mix(SDL_Color a, SDL_Color b, float t)
+{
+    auto m = [t](Uint8 p, Uint8 q) { return static_cast<Uint8>(static_cast<float>(p) + (static_cast<float>(q) - static_cast<float>(p)) * t); };
+    return {m(a.r, b.r), m(a.g, b.g), m(a.b, b.b), 255};
+}
+
+// The frame around the focused control: a light band between two dark edges (so that it shows on
+// the green and gray buttons and on any backdrop), its corners round like the buttons' ends. It
+// breathes slowly from white to a pale gold; while its value is being changed, it is gold. With a
+// controller, a gold pointer bobs at its left, at the item the buttons work on.
 void drawMenuFocus(const UI_Control& control, bool modifying)
 {
     const UI_Control::Box b = control.FocusBox();
     if (b.w <= 0)
         return;
+    const Uint64 ms = SDL_GetTicks();
+    const float wave = 0.5f + 0.5f * std::sin(static_cast<float>(ms % 1400) * (6.2831853f / 1400.0f));
     const SDL_Color dark {16, 24, 48, 255};
-    const SDL_Color light = modifying ? SDL_Color {248, 200, 40, 255} : SDL_Color {248, 248, 248, 255};
-    auto frame = [](int x, int y, int w, int h, int t, SDL_Color c) {
-        prompts::fill(x + 2, y, w - 4, t, c);
-        prompts::fill(x + 2, y + h - t, w - 4, t, c);
-        prompts::fill(x, y + 2, t, h - 4, c);
-        prompts::fill(x + w - t, y + 2, t, h - 4, c);
-    };
-    frame(b.x - 4, b.y - 4, b.w + 8, b.h + 8, 1, dark);
-    frame(b.x - 3, b.y - 3, b.w + 6, b.h + 6, 2, light);
-    //(the corners: a pixel in, so the frame bends round)
-    prompts::fill(b.x - 2, b.y - 2, 2, 2, light);
-    prompts::fill(b.x + b.w, b.y - 2, 2, 2, light);
-    prompts::fill(b.x - 2, b.y + b.h, 2, 2, light);
-    prompts::fill(b.x + b.w, b.y + b.h, 2, 2, light);
+    const SDL_Color gold {248, 192, 32, 255};
+    const SDL_Color light = modifying ? gold : mix({252, 252, 252, 255}, {255, 226, 120, 255}, wave * 0.7f);
+
+    roundRing(b.x - 5, b.y - 5, b.w + 10, b.h + 10, 4, dark);
+    roundRing(b.x - 4, b.y - 4, b.w + 8, b.h + 8, 2, light);
+
+    if (prompts::lastDevice() != prompts::Device::Controller || modifying)
+        return;
+    //(the pointer: a gold arrowhead, a few pixels to and fro)
+    const int bob = static_cast<int>(wave * 3.0f + 0.5f);
+    const int px = b.x - 5 - 3 - 12 - bob;
+    const int py = b.y + b.h / 2 - 9;
+    if (px < 2)
+        return;
+    //(lit from above, as the game's coins: a light edge on top, orange underneath)
+    prompts::art(px, py, {
+        "dd    ",
+        "dhd   ",
+        "dhgd  ",
+        "dhggd ",
+        "dhgggd",
+        "dggod ",
+        "dgod  ",
+        "dod   ",
+        "dd    ",
+    }, {{'d', dark}, {'g', gold}, {'h', {255, 240, 160, 255}}, {'o', {224, 120, 16, 255}}}, 2);
 }
 } // namespace
 

@@ -37,8 +37,11 @@ void MI_Button::Draw()
         return;
 
     gfxSprite* body = fLocked ? &rm->spr_selectfielddisabled : spr;
-    body->draw(m_pos.x, m_pos.y, {0, (fSelected ? 32 : 0) + iAdjustmentY, iHalfWidth, 32});
-    body->draw(m_pos.x + iHalfWidth, m_pos.y, {512 - iWidth + iHalfWidth, (fSelected ? 32 : 0) + iAdjustmentY, iWidth - iHalfWidth, 32});
+    //(focused, a short gray button lights up green as the long ones are: the one the buttons work on
+    //stands out the same everywhere)
+    const short row = fSelected ? (fLocked ? iAdjustmentY + 32 : 32) : iAdjustmentY;
+    body->draw(m_pos.x, m_pos.y, {0, row, iHalfWidth, 32});
+    body->draw(m_pos.x + iHalfWidth, m_pos.y, {512 - iWidth + iHalfWidth, row, iWidth - iHalfWidth, 32});
 
     const SDL_Rect srcRect {iImageSrcX, iImageSrcY, iImageW, iImageH};
 

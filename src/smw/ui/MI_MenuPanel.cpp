@@ -160,9 +160,13 @@ MI_MenuPanel* AddPanelBehind(UI_Menu& menu, const std::vector<const UI_Control*>
     }
     if (x1 <= x0)
         return nullptr;
-    //(clear of the title bar and the footer)
-    x0 = std::max(4, x0 - padX);
-    x1 = std::min(636, x1 + padX);
+    //(clear of the title bar and the footer; at the sides, room for the controller's pointer at the
+    //focused control's left, as far as the screen's border allows)
+    constexpr int POINTER_ROOM = 12;
+    x0 = std::max(std::min(36, x0 - padX), x0 - padX - POINTER_ROOM);
+    x1 = std::min(std::max(604, x1 + padX), x1 + padX + POINTER_ROOM);
+    x0 = std::max(4, x0);
+    x1 = std::min(636, x1);
     y0 = std::max(36, y0 - padY);
     y1 = std::min(446, y1 + padY + 2);    //(the rim is thicker at the bottom: as much blue below as above)
     auto* panel = new MI_MenuPanel(static_cast<short>(x0), static_cast<short>(y0), static_cast<short>(x1 - x0), static_cast<short>(y1 - y0));

@@ -14,7 +14,7 @@ namespace {
 constexpr short AREA_TOP = 36;
 constexpr short AREA_BOTTOM = 404;
 constexpr short PAD = 15;           // (the panel around the rows: clear of the focused row's frame)
-constexpr short PAD_X = 18;
+constexpr short PAD_X = 30;          // (and of the controller's pointer, at the focused row's left)
 constexpr short ROW_H = 32;
 constexpr short STEP = 40;          // the original's
 constexpr short MIN_STEP = 34;      // (a long list: the rows closer)
