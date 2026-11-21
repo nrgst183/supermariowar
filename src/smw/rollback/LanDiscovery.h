@@ -12,8 +12,14 @@
 // network every second and lists who answers: the host's name, its lobby
 // port, how many are in, whether a match runs, and its build (only the same
 // build can join); then (newer builds: an answer may end before) the mode, the
-// map and how many players the next match has. Games that stop answering drop
-// off the list.
+// map and how many players the next match has; then (newer still) what the
+// lobby plays: matches, or a map or world editor session, and whether the host
+// is in the editor now. Games that stop answering drop off the list.
+//
+// The query goes to the network's broadcast address, to each network
+// adapter's own (a PC with several, e.g. a VPN's, sends the plain broadcast out
+// of one of them only) and to this computer (games hosted on it: the broadcast
+// doesn't come back to the computer that sent it).
 //
 // Any build with the network does both (Xboxes and PCs find each other). The
 // sockets are ENet's; nothing here touches the game.
@@ -33,7 +39,13 @@ struct HostInfo {
     std::string mode;           // the game mode the host has chosen ("Classic")
     std::string map;            // and the map
     uint8_t players = 0;        // the players of the next match, CPUs included
+    // (0 / false in the answers of builds before them)
+    uint8_t activity = 0;       // what the lobby plays: ACTIVITY_MATCHES, _MAP_EDITOR or _WORLD_EDITOR
+    bool editing = false;       // an editor session: the host is in the editor (joining goes straight in)
 };
+constexpr uint8_t ACTIVITY_MATCHES = 0;
+constexpr uint8_t ACTIVITY_MAP_EDITOR = 1;
+constexpr uint8_t ACTIVITY_WORLD_EDITOR = 2;
 
 // A game found on the network
 struct FoundGame {
@@ -84,7 +96,10 @@ private:
     static constexpr uintptr_t INVALID = ~uintptr_t(0);
     uintptr_t m_socket = INVALID;
     uint32_t m_lastQueryMs = 0;
+    uint32_t m_lastAdaptersMs = 0;
     bool m_queried = false;
+    std::vector<uint32_t> m_broadcasts;    // the adapters' broadcast addresses (network byte order)
+    std::vector<uint32_t> m_ownAddresses;  // and this computer's addresses (its games are listed once)
     std::vector<FoundGame> m_games;
 };
 

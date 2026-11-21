@@ -409,10 +409,12 @@ void CResourceManager::loadAllGraphics()
     loadWorldGraphics();
     loadGameGraphics();
 
-    spr_backmap[0] = builder("gfx/packs/backgrounds/Land_Classic.png").withoutColorKey().create();
-    spr_backmap[1] = builder("gfx/packs/backgrounds/Land_Classic.png").withoutColorKey().create();
-    spr_frontmap[0] = builder("gfx/packs/backgrounds/Land_Classic.png").withoutColorKey().create();
-    spr_frontmap[1] = builder("gfx/packs/backgrounds/Land_Classic.png").withoutColorKey().create();
+    //The map's layers, drawn over in full before they're shown (predrawbackground, predrawforeground):
+    //blank screens, not an image read (and decoded) four times
+    for (int k = 0; k < 2; k++) {
+        spr_backmap[k] = gfxSprite::blank(App::screenWidth, App::screenHeight, std::nullopt);
+        spr_frontmap[k] = gfxSprite::blank(App::screenWidth, App::screenHeight, std::nullopt);
+    }
 
     spr_overlay = builder("gfx/packs/menu/menu_shade.png").create();
 }

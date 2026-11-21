@@ -2,6 +2,15 @@
 
 #include <enet/enet.h>
 
+#if defined(_WIN32) && !defined(SMW_XBOX)
+#include <ws2tcpip.h>
+#elif !defined(_WIN32) && !defined(SMW_XBOX) && !defined(__EMSCRIPTEN__)
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <netinet/in.h>
+#define SMW_HAS_GETIFADDRS
+#endif
+
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -17,6 +26,8 @@ constexpr size_t MAX_TEXT = 48;
 constexpr size_t MAX_MESSAGE = 256;
 constexpr uint32_t QUERY_EVERY_MS = 1000;
 constexpr uint32_t FORGET_AFTER_MS = 3500;
+constexpr uint32_t ADAPTERS_EVERY_MS = 5000;    // (the network may change: adapters looked up again)
+const uint32_t LOOPBACK = ENET_HOST_TO_NET_32(0x7f000001);    // 127.0.0.1
 
 ENetSocket toSocket(uintptr_t socket)
 {
@@ -149,6 +160,9 @@ std::vector<uint8_t> encodeAnswer(const HostInfo& info)
     putText(out, info.mode);
     putText(out, info.map);
     out.push_back(info.players);
+    //(after those: what the lobby plays)
+    out.push_back(info.activity);
+    out.push_back(info.editing ? 1 : 0);
     return out;
 }
 
@@ -169,12 +183,65 @@ bool decodeAnswer(const uint8_t* data, size_t size, HostInfo& info)
         if (!getText(data, size, at, decoded.mode) || !getText(data, size, at, decoded.map) || at >= size)
             return false;
         decoded.players = data[at++];
+        //(what the lobby plays: both, or neither: an older build's answer)
+        if (at < size) {
+            if (at + 2 > size)
+                return false;
+            decoded.activity = data[at++];
+            decoded.editing = data[at++] != 0;
+        }
     }
     if (decoded.port == 0)
         return false;
     info = std::move(decoded);
     return true;
 }
+
+// ---- this computer's network adapters
+
+namespace {
+// The IPv4 adapters that are up (not the loopback): their broadcast addresses and their own
+void adapters(std::vector<uint32_t>& broadcasts, std::vector<uint32_t>& own)
+{
+    broadcasts.clear();
+    own.clear();
+#if defined(_WIN32) && !defined(SMW_XBOX)
+    SOCKET s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (s == INVALID_SOCKET)
+        return;
+    INTERFACE_INFO list[32];
+    DWORD bytes = 0;
+    if (WSAIoctl(s, SIO_GET_INTERFACE_LIST, nullptr, 0, list, sizeof(list), &bytes, nullptr, nullptr) == 0) {
+        for (DWORD k = 0; k < bytes / sizeof(INTERFACE_INFO); k++) {
+            const INTERFACE_INFO& i = list[k];
+            if (!(i.iiFlags & IFF_UP) || (i.iiFlags & IFF_LOOPBACK) || i.iiAddress.Address.sa_family != AF_INET)
+                continue;
+            const uint32_t address = i.iiAddress.AddressIn.sin_addr.s_addr;
+            const uint32_t mask = i.iiNetmask.AddressIn.sin_addr.s_addr;
+            own.push_back(address);
+            if (i.iiFlags & IFF_BROADCAST)
+                broadcasts.push_back(address | ~mask);
+        }
+    }
+    closesocket(s);
+#elif defined(SMW_HAS_GETIFADDRS)
+    ifaddrs* list = nullptr;
+    if (getifaddrs(&list) != 0)
+        return;
+    for (ifaddrs* i = list; i; i = i->ifa_next) {
+        if (!i->ifa_addr || i->ifa_addr->sa_family != AF_INET || !(i->ifa_flags & IFF_UP) || (i->ifa_flags & IFF_LOOPBACK))
+            continue;
+        const uint32_t address = reinterpret_cast<const sockaddr_in*>(i->ifa_addr)->sin_addr.s_addr;
+        own.push_back(address);
+        if ((i->ifa_flags & IFF_BROADCAST) && i->ifa_netmask)
+            broadcasts.push_back(address | ~reinterpret_cast<const sockaddr_in*>(i->ifa_netmask)->sin_addr.s_addr);
+    }
+    freeifaddrs(list);
+#endif
+    //(the plain broadcast goes too: it's the one an adapter's address may not be)
+    broadcasts.erase(std::remove(broadcasts.begin(), broadcasts.end(), ENET_HOST_BROADCAST), broadcasts.end());
+}
+} // namespace
 
 // ---- Responder
 
@@ -246,10 +313,21 @@ void Browser::update(uint32_t nowMs)
     if (!isOpen())
         return;
 
+    if (!m_queried || nowMs - m_lastAdaptersMs >= ADAPTERS_EVERY_MS) {
+        m_lastAdaptersMs = nowMs;
+        adapters(m_broadcasts, m_ownAddresses);
+    }
     if (!m_queried || nowMs - m_lastQueryMs >= QUERY_EVERY_MS) {
         m_queried = true;
         m_lastQueryMs = nowMs;
-        sendTo(m_socket, ENET_HOST_BROADCAST, DISCOVERY_PORT, encodeQuery());
+        const std::vector<uint8_t> query = encodeQuery();
+        sendTo(m_socket, ENET_HOST_BROADCAST, DISCOVERY_PORT, query);
+        for (uint32_t broadcast : m_broadcasts)
+            sendTo(m_socket, broadcast, DISCOVERY_PORT, query);
+#ifndef SMW_XBOX
+        //(a game hosted on this computer: the broadcasts don't come back to it)
+        sendTo(m_socket, LOOPBACK, DISCOVERY_PORT, query);
+#endif
     }
 
     uint8_t data[MAX_MESSAGE];
@@ -259,6 +337,10 @@ void Browser::update(uint32_t nowMs)
         HostInfo info;
         if (!decodeAnswer(data, size, info))
             continue;
+        //(a game on this computer answers each query more than once: from its loopback and its
+        //adapters' addresses; it is listed once, at the loopback, which joining it from here can use)
+        if (std::find(m_ownAddresses.begin(), m_ownAddresses.end(), from.host) != m_ownAddresses.end())
+            from.host = LOOPBACK;
         auto it = std::find_if(m_games.begin(), m_games.end(), [&](const FoundGame& game) {
             return game.ipv4 == from.host && game.info.port == info.port;
         });

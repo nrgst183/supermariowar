@@ -145,8 +145,9 @@ class MenuState : public GameState
         void LeaveOnlineLobbyNow();
         void HandleOnlineEvents();
         // Where the lobby was entered from (leaving it goes back there): the main menu's Start (a local
-        // game), the Online menu, or the System Link (LAN games) menu
-        enum class LobbyOrigin { MainMenu, OnlineMenu, SystemLink };
+        // game), the Online menu, the System Link (LAN games) menu, or the Editors menu (a lobby that
+        // edits a map or a world together)
+        enum class LobbyOrigin { MainMenu, OnlineMenu, SystemLink, Editors };
         LobbyOrigin mLobbyOrigin = LobbyOrigin::OnlineMenu;
 
         // A local game set up in the lobby (who can join: nobody) is played offline: the lobby closes
@@ -164,6 +165,13 @@ class MenuState : public GameState
         void OpenLocalLobby();
         bool OpenLobby(rollback::LobbyAccess access, LobbyOrigin origin, std::string& error);
         void StartLocalFromLobby();
+        // A lobby that edits together (CoEdit.h): Editors > Online > Host opens it; its Start (the host)
+        // opens the editor for everyone, and a joiner's button goes (back) into it
+        void OpenEditorLobby(bool world);
+        bool InEditorLobby() const;
+        void StartLobbyEditing();
+        void JoinLobbyEditing();
+        void BackToLobbyFromEditor();
         void ResetOnlineMenus();
         void LeaveLobbyQuietly();
         void OpenOnlineMatchSettings();

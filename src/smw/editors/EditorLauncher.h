@@ -32,4 +32,7 @@ void freeKeptGraphics();
 // False if the window was closed during the session: the game should quit.
 bool run(Editor editor);
 
+// Closes the running editor (as its own quit; nothing if none runs): a lobby's session that ended
+void requestClose();
+
 } // namespace editors

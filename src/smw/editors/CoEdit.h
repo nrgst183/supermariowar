@@ -37,6 +37,13 @@
 // Joining: the host sends its whole document (as operations). Only the host
 // saves to its file and switches maps or worlds (that changes the document
 // for everyone); a joiner may "save as" a copy of its own.
+//
+// IN A GAME LOBBY (main menu > Editors > Online > Host: a lobby like a match's,
+// found in Join a Game). The session's messages go over the lobby's own
+// connection (NetGame's EditData messages), so it works wherever the lobby
+// does. The host's Start opens the editor and asks everyone in the lobby to
+// join (EditStart; who comes later is asked when they arrive); leaving the
+// editor is back to the lobby, and when the host leaves it, everyone does.
 namespace editors::coedit {
 
 using Bytes = std::vector<uint8_t>;
@@ -118,6 +125,15 @@ bool host(Editor editor, uint16_t port, const std::string& name, std::string& er
 // Connects; the editor starts when the host has answered (state() == Joined)
 bool join(const std::string& address, const std::string& name, std::string& error);
 void leave(const std::string& reason);
+
+// The lobby's session (NetGame's lobby, which must be open): host, or join the host's
+bool hostLobby(Editor editor, const std::string& name, std::string& error);
+bool joinLobby(const std::string& name, std::string& error);
+bool overLobby();    // the session is the lobby's
+// Joiner: the host asked us in (EditStart) since the last call, and to which editor
+bool takeLobbyInvite(Editor& editor);
+// Hooks the lobby's messages up (once, at startup)
+void installLobbyHandler();
 
 enum class State { Off, Connecting, Joined, Hosting, Ended };
 State state();

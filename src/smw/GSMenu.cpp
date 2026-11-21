@@ -178,6 +178,10 @@ bool MenuState::init()
 #endif
     };
     mMainMenu = std::make_unique<UI_MainMenu>();
+#ifdef SMW_HAS_EDITORS
+    //(a lobby's editing session talks over the lobby)
+    editors::coedit::installLobbyHandler();
+#endif
 
     // Options menu
     mOptionsMenu = std::make_unique<UI_OptionsMenu>();
@@ -528,13 +532,25 @@ void MenuState::update()
         }
 
 #ifdef SMW_HAS_EDITORS
+        //A lobby's host asked us into its editor (as it started, or as we arrived)
+        editors::Editor invited;
+        if (editors::coedit::takeLobbyInvite(invited) && InEditorLobby() && editors::coedit::state() == editors::coedit::State::Off)
+            JoinLobbyEditing();
+
         //Joining an editing session: the editor opens once the host answers
         if (editors::coedit::state() != editors::coedit::State::Off) {
             editors::coedit::pump();
             const editors::coedit::State coeditState = editors::coedit::state();
             if (coeditState == editors::coedit::State::Joined) {
+                const bool lobbySession = editors::coedit::overLobby();
                 if (!RunEditor(editors::coedit::editor()))
                     return;
+                if (lobbySession)
+                    BackToLobbyFromEditor();
+            } else if (coeditState == editors::coedit::State::Ended && editors::coedit::overLobby()) {
+                //(the host ended it before we were in)
+                mOnlineLobbyMenu->SetNotice(editors::coedit::statusText());
+                editors::coedit::leave("");
             } else if (coeditState == editors::coedit::State::Ended) {
                 mEditorsMenu->SetStatus(editors::coedit::statusText());
                 editors::coedit::leave("");
@@ -1009,24 +1025,18 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         const bool level = MENU_CODE_RUN_LEVEL_EDITOR == code || MENU_CODE_HOST_LEVEL_EDITOR == code;
         const editors::Editor editor = level ? editors::Editor::Level : editors::Editor::World;
         if (MENU_CODE_HOST_LEVEL_EDITOR == code || MENU_CODE_HOST_WORLD_EDITOR == code) {
-            //Editing together: the others join this computer's address
-            std::string error;
-            if (!editors::coedit::host(editor, editors::coedit::DEFAULT_PORT, game_values.onlinename, error)) {
-                mEditorsMenu->SetStatus("Can't host: " + error);
-                return false;
-            }
+            //Editing together: a lobby, as a match's (the others find it in Join a Game); its Start opens
+            //the editor for everyone
+            OpenEditorLobby(editor == editors::Editor::World);
+            return true;
         }
         if (!RunEditor(editor))
             return false;
 #endif
     } else if (MENU_CODE_JOIN_EDITOR == code) {
-#ifdef SMW_HAS_EDITORS
-        std::string error;
-        if (editors::coedit::join(mEditorsMenu->joinAddress(), game_values.onlinename, error))
-            mEditorsMenu->SetStatus(editors::coedit::statusText());
-        else
-            mEditorsMenu->SetStatus("Can't join: " + error);
-#endif
+        //(a lobby that edits together is joined as any: from the games list)
+        mSystemLinkMenu->Open();
+        mCurrentMenu = mSystemLinkMenu.get();
     } else if (MENU_CODE_TO_ONLINE_MENU == code) {
         //"Join by address", from the games list
         mSystemLinkMenu->Close();
@@ -1056,6 +1066,12 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         mOnlineLobbyMenu->ShowPage(UI_OnlineLobbyMenu::Page::Team);
     } else if (MENU_CODE_ONLINE_KICK == code) {
         mOnlineLobbyMenu->KickSelected();
+    } else if (MENU_CODE_ONLINE_VIEW_SETTINGS == code && InEditorLobby()) {
+        JoinLobbyEditing();
+    } else if (MENU_CODE_ONLINE_MATCH_SETTINGS == code && InEditorLobby()) {
+        StartLobbyEditing();
+        if (game_values.appstate == AppState::Quit)
+            return false;
     } else if (MENU_CODE_ONLINE_VIEW_SETTINGS == code) {
         OpenOnlineSettingsView();
     } else if (MENU_CODE_ONLINE_SETTINGS_BACK == code) {

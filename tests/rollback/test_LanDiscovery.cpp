@@ -16,6 +16,8 @@ TEST_CASE("System link: the answer survives the trip")
     in.mode = "Classic";
     in.map = "Block Piles";
     in.players = 3;
+    in.activity = ACTIVITY_MAP_EDITOR;
+    in.editing = true;
     const std::vector<uint8_t> message = encodeAnswer(in);
     HostInfo out;
     REQUIRE(decodeAnswer(message.data(), message.size(), out));
@@ -28,16 +30,24 @@ TEST_CASE("System link: the answer survives the trip")
     CHECK(out.mode == "Classic");
     CHECK(out.map == "Block Piles");
     CHECK(out.players == 3);
+    CHECK(out.activity == ACTIVITY_MAP_EDITOR);
+    CHECK(out.editing);
 
-    //Cut short: refused, but where the first version's answer ended (an older build's answer:
-    //without the details)
+    //Cut short: refused, but where an older version's answer ended (without the details, or
+    //without what the lobby plays)
     const size_t firstVersion = 6 + 5 + 1 + in.name.size() + 1 + in.build.size();
+    const size_t secondVersion = firstVersion + 1 + in.mode.size() + 1 + in.map.size() + 1;
     for (size_t n = 0; n < message.size(); n++) {
         if (n == firstVersion) {
             REQUIRE(decodeAnswer(message.data(), n, out));
             CHECK(out.name == "Andrew");
             CHECK(out.mode.empty());
             CHECK(out.players == 0);
+        } else if (n == secondVersion) {
+            REQUIRE(decodeAnswer(message.data(), n, out));
+            CHECK(out.players == 3);
+            CHECK(out.activity == ACTIVITY_MATCHES);
+            CHECK_FALSE(out.editing);
         } else {
             CHECK_FALSE(decodeAnswer(message.data(), n, out));
         }

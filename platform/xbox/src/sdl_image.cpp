@@ -46,13 +46,13 @@ void writeToFile(void* context, void* data, int size)
 // ---- Decoded images, kept on the cache drive
 //
 // An image read from the disc is slow to load on the Xbox: the DVD read, then the PNG's inflate on a
-// 733 MHz CPU. The big ones (tilesets, backgrounds, the editors' sprites) are written decoded to the
+// 733 MHz CPU. Every one (the small ones too: their DVD seeks, a few hundred at startup, were most of
+// the loading time) is written decoded to the
 // cache drive the first time, and read from there afterwards straight into the surface. An entry
 // is the image's path (hashed), and its file's size (a changed file: decoded again); the cache
 // stops growing at CACHE_BUDGET.
 constexpr Uint32 CACHE_MAGIC = 0x49574D53;    // "SMWI"
 constexpr Uint32 CACHE_VERSION = 1;
-constexpr size_t CACHE_MIN_BYTES = 256u << 10;    // (decoded: the smaller ones decode quickly)
 constexpr Uint64 CACHE_BUDGET = 400ull << 20;
 
 struct CacheHeader {
@@ -138,7 +138,7 @@ void saveCached(const char* file, long sourceSize, SDL_Surface* surface, bool op
 {
     const size_t row = static_cast<size_t>(surface->w) * 4;
     const Uint64 bytes = sizeof(CacheHeader) + row * surface->h;
-    if (row * surface->h < CACHE_MIN_BYTES || sourceSize <= 0)
+    if (sourceSize <= 0)
         return;
     if (s_cacheUsed < 0)
         s_cacheUsed = static_cast<Sint64>(sdlx_dir_bytes(cacheDir().c_str()));

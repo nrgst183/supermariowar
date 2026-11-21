@@ -376,6 +376,83 @@ bool readFile(const char* path, std::vector<unsigned char>& out)
     return true;
 }
 
+// ---- Sounds and music from the disc, copied to the cache drive
+//
+// The sound effects (50 WAVs, 6 MB) are read at startup and a match's music when it starts: each a
+// DVD seek and a slow read. The first time, a file from the disc is copied to the cache drive as it
+// is, and read from there afterwards (as the decoded images are, in sdl_image.cpp). An entry is the
+// file's path (hashed) and its size (a changed file: copied again).
+constexpr Uint32 SOUND_CACHE_MAGIC = 0x53574D53;    // "SMWS"
+constexpr Uint64 SOUND_CACHE_BUDGET = 200ull << 20;
+
+Sint64 g_sound_cache_used = -1;    // (bytes in the cache folder: counted at the first write)
+
+std::string soundCacheDir()
+{
+    return std::string(SDL_XboxGetCachePath()) + "snd/";
+}
+
+std::string soundCacheFile(const char* file)
+{
+    //(FNV-1a of the path, its case and slashes evened out)
+    Uint64 hash = 1469598103934665603ull;
+    for (const char* c = file; *c; c++) {
+        char ch = *c == '\\' ? '/' : *c;
+        if (ch >= 'A' && ch <= 'Z')
+            ch = static_cast<char>(ch - 'A' + 'a');
+        hash = (hash ^ static_cast<unsigned char>(ch)) * 1099511628211ull;
+    }
+    char name[32];
+    snprintf(name, sizeof(name), "%016llx.snd", static_cast<unsigned long long>(hash));
+    return soundCacheDir() + name;
+}
+
+bool readSoundFile(const char* path, std::vector<unsigned char>& out)
+{
+    if (!((path[0] == 'D' || path[0] == 'd') && path[1] == ':'))
+        return readFile(path, out);
+
+    long size = -1;
+    if (FILE* file = fopen(path, "rb")) {
+        fseek(file, 0, SEEK_END);
+        size = ftell(file);
+        fclose(file);
+    }
+    if (size <= 0)
+        return readFile(path, out);
+
+    const std::string cached = soundCacheFile(path);
+    if (FILE* in = fopen(cached.c_str(), "rb")) {
+        Uint32 header[2] = {};
+        bool ok = fread(header, sizeof(header), 1, in) == 1 && header[0] == SOUND_CACHE_MAGIC && header[1] == static_cast<Uint32>(size);
+        if (ok) {
+            out.resize(static_cast<size_t>(size));
+            ok = fread(out.data(), 1, out.size(), in) == out.size();
+        }
+        fclose(in);
+        if (ok)
+            return true;
+    }
+
+    if (!readFile(path, out))
+        return false;
+    const Uint64 bytes = sizeof(Uint32) * 2 + out.size();
+    if (g_sound_cache_used < 0)
+        g_sound_cache_used = static_cast<Sint64>(sdlx_dir_bytes(soundCacheDir().c_str()));
+    if (static_cast<Uint64>(g_sound_cache_used) + bytes > SOUND_CACHE_BUDGET || !sdlx_make_dir(soundCacheDir().c_str()))
+        return true;
+    if (FILE* copy = fopen(cached.c_str(), "wb")) {
+        const Uint32 header[2] = {SOUND_CACHE_MAGIC, static_cast<Uint32>(size)};
+        const bool ok = fwrite(header, sizeof(header), 1, copy) == 1 && fwrite(out.data(), 1, out.size(), copy) == out.size();
+        fclose(copy);
+        if (ok)
+            g_sound_cache_used += static_cast<Sint64>(bytes);
+        else
+            std::remove(cached.c_str());    //(the drive is full: not kept half written)
+    }
+    return true;
+}
+
 Uint32 le32(const unsigned char* p) { return p[0] | (p[1] << 8) | (p[2] << 16) | (static_cast<Uint32>(p[3]) << 24); }
 Uint16 le16(const unsigned char* p) { return static_cast<Uint16>(p[0] | (p[1] << 8)); }
 
@@ -543,7 +620,7 @@ MIX_Audio* MIX_LoadAudio(MIX_Mixer* mixer, const char* path, bool predecode)
     }
 
     std::vector<unsigned char> data;
-    if (!readFile(path, data))
+    if (!readSoundFile(path, data))
         return nullptr;
 
     auto* audio = new MIX_Audio();

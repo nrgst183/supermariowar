@@ -233,12 +233,12 @@ void UI_EditorsMenu::Relink()
     miOnline->setVisible(setup);
     miHost->setVisible(setup && m_online);
     miJoin->setVisible(setup && m_online);
-    miAddressField->setVisible(setup && m_online && m_joining);
+    miAddressField->setVisible(false);    //(joining is from the games list, which has Join by address)
     miStatusText->setVisible(setup);
     miWhereText->setVisible(setup);
     miWhereText->SetText(m_online ? "Edit together with friends over the network" : "Everyone with a controller gets a cursor");
     miHowText->setVisible(setup && m_online);
-    miHowText->SetText(m_joining ? "Enter the address the host gives you" : "Friends join using this computer's address");
+    miHowText->SetText(m_joining ? "Find the game in the games list" : "A lobby friends join from Join a Game");
     miStart->setVisible(setup);
     miStart->SetName(m_online && m_joining ? "Join" : m_online ? "Host" : "Start");
     //(Start under the last row; the status under it, and the panel around them)
@@ -254,10 +254,6 @@ void UI_EditorsMenu::Relink()
         y = how + 32 + 8;
         howText = y;
         y += 26;
-    }
-    if (m_online && m_joining) {
-        address = y + 2;
-        y = address + 32 + 12;
     }
     const int start = y + 6;
     const int status = start + 40;
@@ -285,8 +281,6 @@ void UI_EditorsMenu::Relink()
         rows.push_back({miLocal, miOnline});
         if (m_online)
             rows.push_back({miHost, miJoin});
-        if (m_online && m_joining)
-            rows.push_back({miAddressField});
         rows.push_back({miStart});
         rows.push_back({miBack});
     }

@@ -101,7 +101,13 @@ SdlSurfacePtr loadImage(
         }
     }
 
+#ifdef SMW_XBOX
+    //(loaded in the screen's format already, and no key to turn into transparency: the conversion
+    //would only copy it, a second big allocation for an ingame tileset)
+    auto img = !color_key && raw->format == screen->format ? std::move(raw) : SdlSurfacePtr(SDL_ConvertSurface(raw.get(), screen->format));
+#else
     auto img = SdlSurfacePtr(SDL_ConvertSurface(raw.get(), screen->format));
+#endif
     if (!img) {
         throw std::format("Couldn't convert {} to the display's pixel format: {}", path_str, SDL_GetError());
     }

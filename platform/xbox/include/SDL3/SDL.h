@@ -783,6 +783,7 @@ bool SDL_PollEvent(SDL_Event* event);
 bool SDL_WaitEvent(SDL_Event* event);
 bool SDL_WaitEventTimeout(SDL_Event* event, Sint32 timeoutMS);
 bool SDL_PushEvent(SDL_Event* event);
+void SDL_FlushEvent(Uint32 type);
 bool SDL_AddEventWatch(SDL_EventFilter filter, void* userdata);
 void SDL_RemoveEventWatch(SDL_EventFilter filter, void* userdata);
 bool SDL_ConvertEventToRenderCoordinates(SDL_Renderer* renderer, SDL_Event* event);

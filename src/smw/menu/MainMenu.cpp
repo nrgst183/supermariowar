@@ -3,7 +3,6 @@
 #include "ResourceManager.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
-#include "ui/MI_PlayerSelect.h"
 
 #include <algorithm>
 #include <tuple>
@@ -18,8 +17,9 @@
 UI_MainMenu::UI_MainMenu()
     : UI_Menu()
 {
-    // The original's layout (Start and Go!, the players, then a row each), with a row more for the
-    // fork's History and Editors
+    // The original's layout (Start and Go!, then a row each), with a row more for the fork's History
+    // and Editors. Who plays (players and CPUs) is the lobby's, which Start opens; Go! plays with the
+    // lobby's last ones
     miSMWTitle = new MI_Image(&rm->menu_smw, 320 - (static_cast<short>(rm->menu_smw.getWidth()) >> 1), 20, 0, 0, 372, 140, 1, 1, 0);
     miSMWVersion = new MI_Image(&rm->menu_version, 628 - rm->menu_version.getWidth(), 10,
         0, 0, rm->menu_version.getWidth(), rm->menu_version.getHeight(), 1, 1, 0);
@@ -31,20 +31,18 @@ UI_MainMenu::UI_MainMenu()
     miQuickGameButton = new MI_Button(&rm->spr_selectfield, 440, 186, "Go!", 80);
     miQuickGameButton->SetCode(MENU_CODE_QUICK_GAME_START);
 
-    miPlayerSelect = new MI_PlayerSelect(&rm->menu_player_select, 120, 224, "Players", 400, 140);
-
     // A row each from here: a button the full width, or two side by side
-    constexpr short ROWS_Y = 296;
+    constexpr short ROWS_Y = 224;
     constexpr short ROW_STEP = 38;
-    std::vector<std::vector<UI_Control*>> rows {{miMainStartButton, miQuickGameButton}, {miPlayerSelect}};
+    std::vector<std::vector<UI_Control*>> rows {{miMainStartButton, miQuickGameButton}};
     auto wide = [&](const char* name, MenuCodeEnum code) {
-        MI_Button* button = new MI_Button(&rm->spr_selectfield, 120, ROWS_Y + ROW_STEP * static_cast<short>(rows.size() - 2), name, 400);
+        MI_Button* button = new MI_Button(&rm->spr_selectfield, 120, ROWS_Y + ROW_STEP * static_cast<short>(rows.size() - 1), name, 400);
         button->SetCode(code);
         rows.push_back({button});
         return button;
     };
     auto pair = [&](const char* left, MenuCodeEnum leftCode, const char* right, MenuCodeEnum rightCode) {
-        const short y = ROWS_Y + ROW_STEP * static_cast<short>(rows.size() - 2);
+        const short y = ROWS_Y + ROW_STEP * static_cast<short>(rows.size() - 1);
         MI_Button* a = new MI_Button(&rm->spr_selectfield, 120, y, left, 200);
         MI_Button* b = new MI_Button(&rm->spr_selectfield, 320, y, right, 200);
         a->SetCode(leftCode);

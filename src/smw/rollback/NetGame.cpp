@@ -156,6 +156,7 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
         return false;
     }
     shutdown();
+    setEditActivity(0, false, {});    //(a new lobby plays matches, unless told otherwise)
 
     //A host's lobby nobody can join has no network at all (no socket: no firewall prompt, and the
     //builds without the network have it too); the network comes when the host opens it
@@ -427,6 +428,9 @@ void NetGame::pump()
         info.map = m_lobby->mapName();
         for (int s = 0; s < 4; s++)
             info.players += m_lobby->slot(s).kind != SlotKind::Empty;
+        //(a lobby that edits together: the list says so, and whether the host is in the editor now)
+        info.activity = m_editActivity == 2 ? lan::ACTIVITY_WORLD_EDITOR : m_editActivity == 1 ? lan::ACTIVITY_MAP_EDITOR : lan::ACTIVITY_MATCHES;
+        info.editing = m_editRunning;
         lanResponder().answer(info);
     }
 #endif
@@ -524,9 +528,27 @@ bool NetGame::popSettingRequest(SettingRequest& request)
     return true;
 }
 
+void NetGame::setEditActivity(int editor, bool running, const std::string& document)
+{
+    m_editActivity = editor;
+    m_editRunning = editor != 0 && running;
+    m_editDocument = document;
+    m_lastInfoMs = 0;    //(shown at the next pump)
+}
+
 void NetGame::updateMatchInfo(uint32_t nowMs)
 {
-    if (nowMs - m_lastInfoMs < 250 || !game_values.gamemode)
+    if (nowMs - m_lastInfoMs < 250)
+        return;
+    //A lobby that edits together: the editor and the document (the game's menus may not be there:
+    //the editor runs)
+    if (m_editActivity != 0) {
+        m_lastInfoMs = nowMs;
+        m_lobby->setMatchInfo(m_editActivity == 1 ? "Map editor" : "World editor", m_editDocument);
+        m_lobby->setMatchDetail(m_editActivity == 1 ? MODE_ID_MAP_EDITOR : MODE_ID_WORLD_EDITOR, m_editRunning ? 1 : 0, "");
+        return;
+    }
+    if (!game_values.gamemode)
         return;
     m_lastInfoMs = nowMs;
     if (isSeriesMatchType(game_values.matchtype) && !m_series.active) {
@@ -687,6 +709,12 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
         case net::MsgType::PeerDrop:
             if (m_session)
                 m_session->onMessage(peer, data, size, nowMs);
+            break;
+
+        case net::MsgType::EditStart:
+        case net::MsgType::EditData:
+            if (m_editHandler)
+                m_editHandler(peer, data, size);
             break;
 
         default:

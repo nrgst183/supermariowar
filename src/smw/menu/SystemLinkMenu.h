@@ -27,6 +27,11 @@ public:
         int pingMs = -1;
         bool inMatch = false;
         bool sameBuild = true;
+        int activity = 0;       // lan::ACTIVITY_*: matches, or a map or world editor session
+        bool editing = false;   // an editor session the host is in now
+        bool editor() const { return activity != 0; }
+        // "Map editor", "World editor"
+        const char* editorName() const { return activity == 2 ? "World editor" : "Map editor"; }
     };
 
     MI_LanGameList();

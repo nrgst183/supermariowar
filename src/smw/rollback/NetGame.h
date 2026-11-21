@@ -10,6 +10,7 @@
 #include <array>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -182,6 +183,15 @@ public:
     // Handles network events; call once per main loop iteration
     void pump();
 
+    // ---- editing together in the lobby (CoEdit.h)
+    // Host: what the lobby does instead of matches: 0 matches, 1 the map editor, 2 the world editor;
+    // `running` while the host is in it, and the document's name (the lobby and the games list show them)
+    void setEditActivity(int editor, bool running, const std::string& document);
+    int editActivity() const { return m_editActivity; }
+    // EditStart and EditData messages go to `handler` (their bytes are only valid during the call)
+    using EditHandler = std::function<void(int peer, const uint8_t* data, size_t size)>;
+    void setEditHandler(EditHandler handler) { m_editHandler = std::move(handler); }
+
     // ---- --autotest
     // Host: every peer the command line waits for is in the lobby and ready,
     // and the round trips are measured
@@ -275,6 +285,10 @@ private:
     uint32_t m_closeMs = 0;
     uint32_t m_matchEndMs = 0;
     uint32_t m_lastInfoMs = 0;
+    int m_editActivity = 0;
+    bool m_editRunning = false;
+    std::string m_editDocument;
+    EditHandler m_editHandler;
     std::deque<SettingRequest> m_settingRequests;
     bool m_skinsAnnounced = false;   // our skins were handed to the lobby
     uint64_t m_skinKey = 0;          // the skin ids they were made from (and how many)

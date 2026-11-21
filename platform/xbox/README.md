@@ -60,9 +60,9 @@ to copy to the hard disk.
   ping bars and network stats, as on a PC.
 - To keep within 64 MB of RAM, tileset images load per size as they're drawn and stay loaded
   up to 20 MB (the current map's always stay).
-- Big images read from the disc (tilesets, backgrounds, the editors' graphics) are decoded once and
-  kept decoded on the cache drive (`img\` there, up to 400 MB): later loads skip the DVD read and the
-  PNG decoding (`src/sdl_image.cpp`). An editor's graphics also stay loaded after it's left, while the
+- Images read from the disc are decoded once and kept decoded on the cache drive (`img\` there, up
+  to 400 MB): later loads skip the DVD read and the PNG decoding (`src/sdl_image.cpp`). Sounds and
+  music are copied there as they are (`snd\`, up to 200 MB, `src/sdl_mixer.cpp`). An editor's graphics also stay loaded after it's left, while the
   game is in its menus, so opening it again is quick; they're freed when a match starts or the other
   editor opens.
 - Press both sticks in (L3 + R3) to show or hide a profiler: frame time split into blitting,

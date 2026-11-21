@@ -19,6 +19,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
 #include <deque>
 
 struct SDL_Joystick {
@@ -317,6 +318,11 @@ bool SDL_PushEvent(SDL_Event* event)
         return SDL_SetError("Parameter 'event' is invalid");
     sdlx_push_event(*event);
     return true;
+}
+
+void SDL_FlushEvent(Uint32 type)
+{
+    g_queue.erase(std::remove_if(g_queue.begin(), g_queue.end(), [type](const SDL_Event& e) { return e.type == type; }), g_queue.end());
 }
 
 bool SDL_AddEventWatch(SDL_EventFilter filter, void* userdata)

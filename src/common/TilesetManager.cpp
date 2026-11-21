@@ -223,6 +223,7 @@ void CTileset::saveTileset() const
         return;
 
     const fs::path tileset_path = m_tileset_dir / "tileset.tls";
+    s_savedCount++;
     BinaryFile tsf(tileset_path, "wb");
     if (!tsf.is_open()) {
         printf("ERROR: couldn't open tileset file to save tile types: %s\n", tileset_path.generic_string().c_str());

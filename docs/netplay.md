@@ -10,7 +10,7 @@ The old lobby server mode (`smw-server`) has been removed.
 
 Every game starts in the same lobby, online or not:
 
-1. In the main menu, choose **Start**. The lobby opens as a game on this computer (**Open to: No one**), with the main menu's players and CPUs.
+1. In the main menu, choose **Start**. The lobby opens as a game on this computer (**Open to: No one**), with the players and CPUs of the last game. Who plays is set there (**My players**, **CPU players**), and the main menu's **Go!** plays with the same ones.
 2. Set **Open to** to **LAN** (players on your network see the game in their **Join a Game** list) or **Internet** (the game also asks your router to open the port, see below). The status line shows the address the others join at. The port is **UDP 7300**, or the one in **Options, Online**.
 3. Wait until the others appear in the lobby, then **Continue** to set up the match as usual (match type, game mode, map, settings). The host's selections are what everybody plays.
 

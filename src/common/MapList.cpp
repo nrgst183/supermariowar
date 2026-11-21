@@ -381,8 +381,11 @@ void MapList::ReadFilters()
             if (!pszMapName)
                 continue;
 
-            auto mapIt = maps.find(pszMapName);
-            if (mapIt != maps.end()) {
+            //(maps of the same name: their lines in turn, as the summary was written)
+            auto [mapIt, mapsEnd] = maps.equal_range(pszMapName);
+            while (mapIt != mapsEnd && mapIt->second.fReadFromCache)
+                ++mapIt;
+            if (mapIt != mapsEnd) {
                 MapListNode& node = mapIt->second;
                 bool fErrorReading = false;
                 for (size_t iFilter = 0; iFilter < NUM_AUTO_FILTERS; iFilter++) {

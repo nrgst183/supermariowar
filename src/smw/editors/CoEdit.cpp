@@ -5,10 +5,14 @@
 #include "rollback/EnetTransport.h"
 #endif
 #include "rollback/NetConditionSim.h"
+#include "rollback/NetGame.h"
+#include "rollback/NetProtocol.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstring>
+#include <deque>
 #include <map>
 
 namespace editors::coedit {
@@ -34,6 +38,7 @@ struct Peer {
     int id = -1;
     int connection = -1;
     std::string name;
+    bool hello = false;       // it said hello (a lobby's peers are there before they open the editor)
     bool welcomed = false;
 };
 
@@ -44,11 +49,105 @@ struct Op {
     Bytes value;
 };
 
+// The lobby's connection as the session's transport: a connection is a lobby peer (the host is 0),
+// a message is the lobby's EditData message around ours. Polling it pumps the lobby (the editor has
+// its own loop: the main loop's pump doesn't run while it's open), and the lobby's peers coming and
+// going are the connections'.
+class LobbyTransport : public rollback::IMeshTransport {
+public:
+    explicit LobbyTransport(bool host) : m_host(host) {}
+
+    void send(int connection, rollback::Channel channel, const uint8_t* data, size_t size) override
+    {
+        rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+        if (!lobby || connection < 0 || connection >= rollback::net::MAX_PEERS || !(m_known & (1u << connection)))
+            return;
+        m_buffer.assign(1, static_cast<uint8_t>(rollback::net::MsgType::EditData));
+        m_buffer.insert(m_buffer.end(), data, data + size);
+        lobby->mesh().send(connection, channel, m_buffer.data(), m_buffer.size());
+    }
+
+    bool poll(rollback::TransportEvent& event) override
+    {
+        if (m_events.empty() && !m_polled) {
+            m_polled = true;
+            refresh();
+        }
+        if (m_events.empty()) {
+            m_polled = false;
+            return false;
+        }
+        m_current = std::move(m_events.front());
+        m_events.pop_front();
+        event = rollback::TransportEvent();
+        event.type = m_current.type;
+        event.connection = m_current.connection;
+        event.channel = rollback::Channel::Reliable;
+        event.data = m_current.data.data();
+        event.size = m_current.data.size();
+        return true;
+    }
+
+    void flush() override
+    {
+        if (rollback::NetLobby* lobby = rollback::NetGame::instance().lobby())
+            lobby->mesh().transport().flush();
+    }
+    void disconnect(int) override {}    //(the lobby says who is in it)
+    int connect(const std::string&, uint16_t) override { return 0; }
+    int connect(uint32_t, uint16_t) override { return 0; }
+    bool address(int, uint32_t&, uint16_t&) const override { return false; }
+    uint16_t localPort() const override { return 0; }
+
+    // A co-edit message from a lobby peer (the lobby's message handler)
+    void received(int peer, const uint8_t* data, size_t size)
+    {
+        if (peer < 0 || peer >= rollback::net::MAX_PEERS || (!m_host && peer != 0))
+            return;
+        arrived(peer);
+        m_events.push_back({rollback::TransportEvent::Type::Received, peer, Bytes(data, data + size)});
+    }
+
+    // The session's editor (the host asks the lobby's peers into it)
+    Editor editor = Editor::Level;
+
+private:
+    struct Queued {
+        rollback::TransportEvent::Type type;
+        int connection;
+        Bytes data;
+    };
+
+    // The lobby's news: its peers (the host: everyone else; a joiner: the host), and its document's name
+    void refresh();
+    void arrived(int peer)
+    {
+        if (m_known & (1u << peer))
+            return;
+        m_known |= 1u << peer;
+        m_events.push_back({rollback::TransportEvent::Type::Connected, peer, {}});
+        if (m_host) {
+            //(asked in: the editor opens in its game, which then says hello)
+            const uint8_t invite[2] = {static_cast<uint8_t>(rollback::net::MsgType::EditStart), static_cast<uint8_t>(editor == Editor::World ? 1 : 0)};
+            if (rollback::NetLobby* lobby = rollback::NetGame::instance().lobby())
+                lobby->mesh().send(peer, rollback::Channel::Reliable, invite, sizeof(invite));
+        }
+    }
+
+    bool m_host;
+    uint32_t m_known = 0;
+    bool m_polled = false;
+    std::deque<Queued> m_events;
+    Queued m_current {};
+    Bytes m_buffer;
+};
+
 struct Session {
     State state = State::Off;
     bool host = false;
     Editor editor = Editor::Level;
-    std::unique_ptr<rollback::IMeshTransport> transport;    //(ENet's; none in the builds without the network)
+    std::unique_ptr<rollback::IMeshTransport> transport;    //(ENet's, or the lobby's; none in the builds without the network)
+    LobbyTransport* lobby = nullptr;                         //(the transport, when it's the lobby's)
     int hostConnection = -1;
     int myId = 0;
     std::string myName;
@@ -124,10 +223,14 @@ void sendPeers()
 {
     Writer w;
     w.u8(MSG_PEERS);
-    w.u8(static_cast<uint8_t>(g.peers.size() + 1));
+    //(those in the session: a lobby's peers who haven't opened the editor aren't)
+    const size_t welcomed = static_cast<size_t>(std::count_if(g.peers.begin(), g.peers.end(), [](const Peer& p) { return p.welcomed; }));
+    w.u8(static_cast<uint8_t>(welcomed + 1));
     w.u8(0);
     w.str(g.myName);
     for (const Peer& p : g.peers) {
+        if (!p.welcomed)
+            continue;
         w.u8(static_cast<uint8_t>(p.id));
         w.str(p.name);
     }
@@ -153,7 +256,7 @@ void recapture()
 // Host: a joiner that said hello gets the document once it is there
 void welcome(Peer& peer)
 {
-    if (peer.welcomed || !g.doc)
+    if (peer.welcomed || !peer.hello || !g.doc)
         return;
     Writer w;
     w.u8(MSG_WELCOME);
@@ -232,6 +335,7 @@ void handleMessage(int connection, const uint8_t* data, size_t size)
                 }
                 if (peer->name.empty())
                     peer->name = "Player " + std::to_string(peer->id + 1);
+                peer->hello = true;
                 welcome(*peer);
                 break;
             }
@@ -272,6 +376,16 @@ void handleMessage(int connection, const uint8_t* data, size_t size)
                     Bytes relay(data, data + size);
                     relay[1] = static_cast<uint8_t>(peer->id);
                     broadcast(relay, rollback::Channel::Unreliable, connection);
+                }
+                break;
+            case MSG_BYE:
+                //(it left the session: in a lobby, it may come back in, and is welcomed again then)
+                peer->hello = false;
+                if (peer->welcomed) {
+                    peer->welcomed = false;
+                    g.cursors.erase(peer->id);
+                    sendPeers();
+                    sendNotice(peer->name + " left");
                 }
                 break;
             default:
@@ -351,13 +465,53 @@ void handleMessage(int connection, const uint8_t* data, size_t size)
             break;
         case MSG_BYE:
             g.status = "The host closed the session" + std::string(r.ok ? "" : "");
-            setNotice("The host ended the session. You keep your copy");
+            //(a lobby's: everyone goes back to the lobby)
+            setNotice(g.lobby ? "The host ended the session" : "The host ended the session. You keep your copy");
             g.state = State::Ended;
             break;
         default:
             break;
     }
 }
+
+void LobbyTransport::refresh()
+{
+    rollback::NetGame& net = rollback::NetGame::instance();
+    net.pump();
+    rollback::NetLobby* lobby = net.lobby();
+    const bool open = lobby && lobby->phase() != rollback::NetLobby::Phase::Closed;
+    for (int p = 0; p < rollback::net::MAX_PEERS; p++) {
+        const bool wanted = m_host ? p != 0 : p == 0;
+        const bool present = open && wanted && p != lobby->localPeer() && lobby->peer(p).present;
+        if (present) {
+            arrived(p);
+        } else if (m_known & (1u << p)) {
+            m_known &= ~(1u << p);
+            m_events.push_back({rollback::TransportEvent::Type::Disconnected, p, {}});
+        }
+    }
+    //(the host: what the lobby and the games list show)
+    if (m_host && open && g.doc) {
+        std::string title = g.doc->title();
+        for (const char* kind : {"map ", "world "}) {
+            if (title.rfind(kind, 0) == 0)
+                title.erase(0, std::strlen(kind));
+        }
+        net.setEditActivity(editor == Editor::World ? 2 : 1, true, title);
+    }
+}
+
+bool g_lobbyInvite = false;
+
+// Our name in a lobby's session: the lobby's (what the others see there)
+std::string lobbyName(const std::string& fallback)
+{
+    const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+    if (lobby && lobby->localPeer() >= 0 && !lobby->peer(lobby->localPeer()).name.empty())
+        return lobby->peer(lobby->localPeer()).name;
+    return fallback.empty() ? "Player" : fallback;
+}
+Editor g_lobbyInviteEditor = Editor::Level;
 
 bool openTransport(uint16_t port, std::string& error)
 {
@@ -438,11 +592,83 @@ void leave(const std::string& reason)
     else
         send(g.hostConnection, w.out);
     g.transport->flush();
-    g.transport->close(300);
+    if (!g.lobby)
+        g.transport->close(300);    //(the lobby's connection goes on)
     g.transport.reset();
+    g.lobby = nullptr;
     g.doc.reset();
     g.state = State::Off;
     printf("coedit: left the session\n");
+}
+
+bool hostLobby(Editor editor, const std::string& name, std::string& error)
+{
+    leave("");
+    reset();
+    if (!rollback::NetGame::instance().lobby()) {
+        error = "there's no lobby";
+        return false;
+    }
+    auto transport = std::make_unique<LobbyTransport>(true);
+    transport->editor = editor;
+    g.lobby = transport.get();
+    g.transport = std::move(transport);
+    g.host = true;
+    g.state = State::Hosting;
+    g.editor = editor;
+    g.myId = 0;
+    g.myName = lobbyName(name);
+    g.status = "Editing with the lobby";
+    printf("coedit: hosting the %s editor in the lobby\n", editor == Editor::Level ? "level" : "world");
+    return true;
+}
+
+bool joinLobby(const std::string& name, std::string& error)
+{
+    leave("");
+    reset();
+    if (!rollback::NetGame::instance().lobby()) {
+        error = "there's no lobby";
+        return false;
+    }
+    auto transport = std::make_unique<LobbyTransport>(false);
+    g.lobby = transport.get();
+    g.transport = std::move(transport);
+    g.hostConnection = 0;
+    g.host = false;
+    g.state = State::Connecting;
+    g.myName = lobbyName(name);
+    g.status = "Joining the host's editor...";
+    return true;
+}
+
+bool overLobby() { return g.lobby != nullptr; }
+
+bool takeLobbyInvite(Editor& editor)
+{
+    if (!g_lobbyInvite)
+        return false;
+    g_lobbyInvite = false;
+    editor = g_lobbyInviteEditor;
+    return true;
+}
+
+void installLobbyHandler()
+{
+    rollback::NetGame::instance().setEditHandler([](int peer, const uint8_t* data, size_t size) {
+        if (size == 0)
+            return;
+        if (data[0] == static_cast<uint8_t>(rollback::net::MsgType::EditStart)) {
+            const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+            if (peer == 0 && size >= 2 && lobby && !lobby->isHost()) {
+                g_lobbyInvite = true;
+                g_lobbyInviteEditor = data[1] == 1 ? Editor::World : Editor::Level;
+            }
+            return;
+        }
+        if (g.lobby)
+            g.lobby->received(peer, data + 1, size - 1);
+    });
 }
 
 State state() { return g.state; }
@@ -511,6 +737,9 @@ void pump()
     }
     if (g.transport)
         g.transport->flush();
+    //A lobby's session the host ended (or the lobby closed): back to the lobby, as everyone is
+    if (g.lobby && !g.host && g.state == State::Ended)
+        requestClose();
 }
 
 bool attached()

@@ -18,6 +18,10 @@
 #include "menu/OnlineLobbyMenu.h"
 #include "menu/OnlineMenu.h"
 #include "menu/SystemLinkMenu.h"
+#include "menu/EditorsMenu.h"
+#ifdef SMW_HAS_EDITORS
+#include "editors/CoEdit.h"
+#endif
 
 #include <algorithm>
 #include <cctype>
@@ -173,6 +177,11 @@ void MenuState::LeaveOnlineLobby(const std::string& message)
         mCurrentMenu = mMainMenu.get();
         return;
     }
+    if (mLobbyOrigin == LobbyOrigin::Editors) {
+        mEditorsMenu->SetStatus(message);
+        mCurrentMenu = mEditorsMenu.get();
+        return;
+    }
     if (mLobbyOrigin == LobbyOrigin::SystemLink) {
         mSystemLinkMenu->Open();
         if (!message.empty())
@@ -183,6 +192,81 @@ void MenuState::LeaveOnlineLobby(const std::string& message)
     mOnlineMenu->Open(UI_OnlineMenu::Mode::Join);
     mOnlineMenu->ShowMessage(message);
     mCurrentMenu = mOnlineMenu.get();
+}
+
+// Editors > Online > Host: a lobby like a match's (found in Join a Game), that edits a map or a world
+// together instead: open to the network from the start (the lobby's "who can join" changes it)
+void MenuState::OpenEditorLobby(bool world)
+{
+#ifdef SMW_HAS_EDITORS
+    std::string error;
+    if (!OpenLobby(rollback::LobbyAccess::Lan, LobbyOrigin::Editors, error)) {
+        mEditorsMenu->SetStatus("Can't host: " + error);
+        return;
+    }
+    rollback::NetGame& net = rollback::NetGame::instance();
+    net.setEditActivity(world ? 2 : 1, false, {});
+    //(no CPU players to edit with)
+    if (rollback::NetLobby* lobby = net.lobby())
+        lobby->setCpuCount(0);
+#else
+    (void)world;
+#endif
+}
+
+// The lobby we're in edits together (the host's choice, which the joiners see in its mode)
+bool MenuState::InEditorLobby() const
+{
+    const rollback::NetGame& net = rollback::NetGame::instance();
+    const rollback::NetLobby* lobby = net.lobby();
+    if (!lobby || !net.active())
+        return false;
+    return lobby->isHost() ? net.editActivity() != 0 : rollback::isEditorModeId(lobby->modeId());
+}
+
+// The host's Start: the editor, and everyone in the lobby is asked in (who comes later too)
+void MenuState::StartLobbyEditing()
+{
+#ifdef SMW_HAS_EDITORS
+    rollback::NetGame& net = rollback::NetGame::instance();
+    const bool world = net.editActivity() == 2;
+    std::string error;
+    if (!editors::coedit::hostLobby(world ? editors::Editor::World : editors::Editor::Level, game_values.onlinename, error)) {
+        mOnlineLobbyMenu->SetNotice("Can't start: " + error);
+        return;
+    }
+    net.setEditActivity(world ? 2 : 1, true, {});
+    if (!RunEditor(world ? editors::Editor::World : editors::Editor::Level))
+        return;
+    //(everyone else goes back to the lobby too: the session is over)
+    net.setEditActivity(world ? 2 : 1, false, {});
+    BackToLobbyFromEditor();
+#endif
+}
+
+// A joiner: into the host's session (asked in, or its button), once the host has answered
+void MenuState::JoinLobbyEditing()
+{
+#ifdef SMW_HAS_EDITORS
+    const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+    if (!lobby || lobby->goal() != 1) {
+        mOnlineLobbyMenu->SetNotice("The host hasn't started editing yet");
+        return;
+    }
+    std::string error;
+    if (editors::coedit::joinLobby(game_values.onlinename, error))
+        mOnlineLobbyMenu->SetNotice("Joining the host's editor...");
+    else
+        mOnlineLobbyMenu->SetNotice("Can't join: " + error);
+#endif
+}
+
+// Out of a lobby's editor: the lobby again (if it's still there; else HandleOnlineEvents says why)
+void MenuState::BackToLobbyFromEditor()
+{
+    if (!rollback::NetGame::instance().active())
+        return;
+    ReturnToOnlineLobby();
 }
 
 // The main menu's Start: the lobby of a local game (who can join: nobody; no network), which the
@@ -300,6 +384,20 @@ void MenuState::StartLocalFromLobby()
 // The player leaves on purpose
 void MenuState::LeaveOnlineLobbyNow()
 {
+    //(the main menu's lobby: its players and CPUs are the ones Go! plays with, and the next Start's)
+    rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+    if (mLobbyOrigin == LobbyOrigin::MainMenu && lobby && lobby->localPeer() >= 0) {
+        const int players = std::clamp(lobby->peer(lobby->localPeer()).localPlayers, 1, rollback::MAX_LOCAL_PLAYERS);
+        int cpus = 0;
+        for (int k = 0; k < 4; k++)
+            cpus += lobby->slot(k).kind == rollback::SlotKind::Cpu;
+        cpus = std::min(cpus, 4 - players);
+        for (int k = 0; k < 4; k++)
+            game_values.playercontrol[k] = k < players ? 1 : k < players + cpus ? 2 : 0;
+        //(two at least, as the main menu always had)
+        if (players + cpus < 2)
+            game_values.playercontrol[1] = 2;
+    }
     LeaveLobbyQuietly();
     LeaveOnlineLobby({});
 }

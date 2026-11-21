@@ -71,10 +71,14 @@ void giveBack(const GameObjects& g, Editor editor)
     restore(worldlist, g.worlds);
 }
 
+bool g_running = false;
+bool g_closeRequested = false;    // the quit events sent from now on are requestClose()'s
+int g_closeFrames = 0;
+
 // The window's close button during a session: the game quits afterwards
 bool SDLCALL watchQuit(void* userdata, SDL_Event* event)
 {
-    if (event->type == SDL_EVENT_QUIT)
+    if (event->type == SDL_EVENT_QUIT && !g_closeRequested)
         *static_cast<bool*>(userdata) = true;
     return true;
 }
@@ -120,10 +124,26 @@ void freeKeptGraphics()
     g_keptGraphics = nullptr;
 }
 
+void requestClose()
+{
+    if (!g_running)
+        return;
+    //(a quit event closes the editor's screens; one in the middle of something else may take another)
+    if (g_closeRequested && ++g_closeFrames % 30 != 0)
+        return;
+    g_closeRequested = true;
+    SDL_Event event {};
+    event.type = SDL_EVENT_QUIT;
+    SDL_PushEvent(&event);
+}
+
 bool run(Editor editor)
 {
     const char* name = editor == Editor::Level ? "level" : "world";
     printf("editors: starting the %s editor\n", name);
+    g_running = true;
+    g_closeRequested = false;
+    g_closeFrames = 0;
 
     const GameObjects game = take();
     g_savedMapFiles.clear();
@@ -151,6 +171,10 @@ bool run(Editor editor)
 
     input::end();
     SDL_RemoveEventWatch(watchQuit, &quit);
+    g_running = false;
+    g_closeRequested = false;
+    //(a quit event of ours still queued isn't the game's)
+    SDL_FlushEvent(SDL_EVENT_QUIT);
 
     //The world editor's tour stops (a loaded world's stages) aren't the game's
     std::vector<TourStop*> editorStops = game_values.tourstops;

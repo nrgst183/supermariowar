@@ -302,6 +302,13 @@ uint64_t simulationDataHash()
     uint64_t hash = net::fnv1a64("tiletypes", 9);
     if (!g_tilesetmanager)
         return hash;
+    //(every match starts with it: the files are read again only when the tilesets or their tile types
+    //changed, a DVD seek each on the Xbox)
+    static size_t s_count = 0;
+    static unsigned s_saved = 0;
+    static uint64_t s_hash = 0;
+    if (s_hash != 0 && s_count == g_tilesetmanager->count() && s_saved == CTileset::savedCount())
+        return s_hash;
     for (size_t i = 0; i < g_tilesetmanager->count(); i++) {
         // Only the names and tile type files are hashed: no need to load the images
         const CTileset* tileset = g_tilesetmanager->tilesetInfo(i);
@@ -309,6 +316,9 @@ uint64_t simulationDataHash()
         const uint64_t contents = fileHash((tileset->directory() / "tileset.tls").string());
         hash = net::fnv1a64(&contents, sizeof(contents), hash);
     }
+    s_count = g_tilesetmanager->count();
+    s_saved = CTileset::savedCount();
+    s_hash = hash;
     return hash;
 }
 

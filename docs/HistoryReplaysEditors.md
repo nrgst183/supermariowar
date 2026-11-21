@@ -156,10 +156,15 @@ X shift, Y space, Start done, Back cancel; with the mouse: click the keys).
 **On one computer:** every connected controller gets its own cursor (P1, P2, ...); each
 paints and clicks where its cursor is. The editor's mode and selected tile are shared.
 
-**Over the network** (Editors > Host Map / Host World, or Join with the host's address;
-port 7301): everyone edits the same map or world in their own game, and sees the others'
-cursors with their names (the nickname from the Online menu), who is there (bottom left),
-and who joins or leaves.
+**Over the network** it's a game like a match: Editors > Maps (or Worlds) > Online > Host
+opens a lobby (**Edit Together**) that the others find in **Join a Game** (listed as "Map
+editor" or "World editor"), or join by address. The host's **Start editing** opens the
+editor for everyone in the lobby, and whoever joins the lobby later is taken straight in; a
+joiner who leaves the editor is back in the lobby, and **Join editing** goes back in. When
+the host leaves the editor, everyone is back in the lobby. Everyone edits the same map or
+world in their own game, and sees the others' cursors with their names (the lobby's), who is
+there (bottom left), and who joins or leaves. The session goes over the lobby's connection
+(port 7300), so it works wherever the lobby does.
 
 How it works (`src/smw/editors/CoEdit.h`): every game edits its own copy. Once per frame,
 each compares its copy with the last synced state; every changed map cell, world tile or

@@ -101,6 +101,10 @@ enum class MsgType : uint8_t {
     WheelStop = 84,
     WorldInput = 85,     // joiner -> host
     WorldTick = 86,
+    // Editing together in a lobby (a map or world editor session instead of a match: CoEdit.h).
+    // In this range so that the lobby hands them to NetGame, in any phase
+    EditStart = 88,    // host -> joiner: u8 editor (0 map, 1 world): the session is on, join it
+    EditData = 89,     // either way: a co-edit message (CoEdit.cpp), reliable or not
 
     SkinInfo = 100,
     SkinRequest = 101,

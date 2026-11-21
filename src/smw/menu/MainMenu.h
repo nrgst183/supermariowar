@@ -4,7 +4,6 @@
 
 class MI_Button;
 class MI_Image;
-class MI_PlayerSelect;
 
 /*
     This is the main menu you see at the start of the game.
@@ -19,8 +18,6 @@ private:
 
     MI_Button* miMainStartButton;
     MI_Button* miQuickGameButton;
-
-    MI_PlayerSelect* miPlayerSelect;
 
     MI_Button* miOnlineButton = nullptr;
     MI_Button* miHistoryButton = nullptr;

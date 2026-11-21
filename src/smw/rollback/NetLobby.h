@@ -156,6 +156,11 @@
 namespace rollback {
 
 constexpr int LOBBY_SLOTS = 4;
+// modeId() of a lobby that edits a map or a world together instead of playing matches (its goal():
+// 1 while the host is in the editor), and modeName() what it says
+constexpr int MODE_ID_MAP_EDITOR = -10;
+constexpr int MODE_ID_WORLD_EDITOR = -11;
+inline bool isEditorModeId(int modeId) { return modeId == MODE_ID_MAP_EDITOR || modeId == MODE_ID_WORLD_EDITOR; }
 constexpr int MAX_LOCAL_PLAYERS = 4;    // players on one machine (a local game: all four)
 constexpr uint16_t DEFAULT_LOBBY_PORT = 7300;
 constexpr size_t MAX_NAME_LENGTH = 16;

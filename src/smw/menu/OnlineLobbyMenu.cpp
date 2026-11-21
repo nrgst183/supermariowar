@@ -342,8 +342,18 @@ void UI_OnlineLobbyMenu::Sync()
         settingsNote = "Set Open to LAN or Internet so friends can join";
 #endif
     miScene->SetSettingsNote(m_page == Page::Team && !joining ? settingsNote : std::string());
+    //(a lobby that edits together: its button opens the editor, or goes into the host's)
+    const bool editing = lobby->isHost() ? rollback::NetGame::instance().editActivity() != 0 : rollback::isEditorModeId(lobby->modeId());
+    if (editing && !joining) {
+        const bool world = lobby->modeId() == rollback::MODE_ID_WORLD_EDITOR || rollback::NetGame::instance().editActivity() == 2;
+        settingsNote = std::string(world ? "World editor" : "Map editor") + (lobby->goal() == 1 && !lobby->isHost() ? ": the host is editing" : "");
+        miScene->SetSettingsNote(m_page == Page::Team ? settingsNote : std::string());
+        miContinueButton->SetName(lobby->isHost() ? "Start editing" : "Join editing");
+    } else if (!joining) {
+        miContinueButton->SetName(host ? "Continue" : "Settings");
+    }
     //(the title follows who can join: a local game's options aren't online ones)
-    miScene->SetTitle(joining ? "Online" : m_page == Page::Team ? "Team and Character Selection" : "Lobby Options");
+    miScene->SetTitle(joining ? "Online" : m_page == Page::Team ? (editing ? "Edit Together" : "Team and Character Selection") : "Lobby Options");
     miScene->SetOptionsPage(m_page != Page::Team && !joining);
 
     // The status line: what the lobby says, else what is going on with the players. The hint under
@@ -364,7 +374,12 @@ void UI_OnlineLobbyMenu::Sync()
         status = "Connecting to the host...";
     if (status.empty() && phase == Phase::Starting)
         status = "Starting the match...";
-    if (status.empty() && inLobby && local >= 0) {
+    if (status.empty() && inLobby && local >= 0 && editing) {
+        //(editing together: no teams or ready to wait for)
+        const bool on = lobby->goal() == 1;
+        status = host ? "Select Start editing when everyone is here" : on ? "The host is editing: select Join editing" : "Waiting for the host to start editing";
+        tone = host || on ? Tone::Good : Tone::Info;
+    } else if (status.empty() && inLobby && local >= 0) {
         if (host) {
             status = canStart ? "Everyone is ready. Select Continue" : capitalized(why);
             tone = canStart ? Tone::Good : Tone::Warn;
@@ -397,6 +412,8 @@ void UI_OnlineLobbyMenu::Sync()
         //(the team box: its keys are in the buttons row, the line says who may change the settings)
         if (m_currentFocus == miTeam)
             hint.clear();
+        else if (m_currentFocus == miContinueButton && editing)
+            hint = host ? "Opens the editor; everyone here is asked in" : "Into the host's editor";
         else if (m_currentFocus == miContinueButton && host && inLobby && !canStart)
             hint = "Not yet: " + why;
         else if (m_currentFocus == miContinueButton)

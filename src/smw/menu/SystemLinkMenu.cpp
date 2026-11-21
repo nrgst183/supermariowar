@@ -244,19 +244,35 @@ void MI_LanGameList::drawRow(int x, int y, const Game& game, bool selected) cons
     std::string what;
     if (!game.sameBuild)
         what = "Another version of the game";
+    else if (game.editor())
+        //(an editor session: what is being made, or that it hasn't started)
+        what = std::string(game.editorName()) + (game.editing ? " - editing " + (game.map.empty() ? std::string("now") : game.map) : " - in the lobby");
     else if (!game.mode.empty())
         what = game.mode + (game.map.empty() ? "" : " - " + game.map);
     else
         what = game.address;
     if (game.sameBuild && game.inMatch)
         what = "Match on - " + what;
+    //(an editor session: its tag before the host's name, in the menus' highlight color)
+    if (game.sameBuild && game.editor()) {
+        const std::string tag = game.activity == 2 ? "WORLD EDIT" : "MAP EDIT";
+        const int tagW = rm->menu_font_small.getWidth(tag) + 30;
+        const int nameW = rm->menu_font_large.getWidth(fit(rm->menu_font_large, game.name.empty() ? game.address : game.name, 300));
+        const int tagX = x + 14 + nameW + 10;
+        //(green: being edited now; gold: its lobby waits for the host's start)
+        theme::block(tagX, y + 4, tagW, 20, game.editing ? theme::Tone::Green : theme::Tone::Gold);
+        theme::icon(tagX + 3, y + 6, game.activity == 2 ? theme::Icon::Star : theme::Icon::QuestionBlock);
+        rm->menu_font_small.draw(tagX + 22, y + 8, tag.c_str());
+    }
     rm->menu_font_small.draw(x + 14, y + 26, fit(rm->menu_font_small, what, 360));
 
     //Right: the connection, and how many are in
     theme::signal(x + ROW_W - 34, y + 6, game.pingMs);
     const std::string in = std::to_string(game.members) + "/" + std::to_string(game.maxMembers);
     rm->menu_font_large.drawRightJustified(x + ROW_W - 44, y + 4, in);
-    const std::string under = full ? "full" : game.players > 0 ? std::to_string(game.players) + (game.players == 1 ? " player" : " players") : "in lobby";
+    std::string under = full ? "full" : game.players > 0 ? std::to_string(game.players) + (game.players == 1 ? " player" : " players") : "in lobby";
+    if (!full && game.editor())
+        under = std::to_string(game.members) + (game.members == 1 ? " person" : " people");
     rm->menu_font_small.drawRightJustified(x + ROW_W - 44, y + 26, under);
 }
 
@@ -438,6 +454,13 @@ void UI_SystemLinkMenu::drawDetails() const
     } else if (game.inMatch) {
         status = theme::Status::Info;
         text = "Match in progress. You'll play from the next match";
+    } else if (game.editor() && game.editing) {
+        text = std::string(game.activity == 2 ? "Editing a world" : "Editing a map") + " together (" + std::to_string(game.members) + " of "
+            + std::to_string(game.maxMembers) + "). Press A to join in";
+    } else if (game.editor()) {
+        status = theme::Status::Info;
+        text = std::string(game.editorName()) + " lobby (" + std::to_string(game.members) + " of " + std::to_string(game.maxMembers)
+            + "). Press A to join";
     } else {
         text = "In the lobby (" + std::to_string(game.members) + " of " + std::to_string(game.maxMembers) + "). Press A to join";
     }
@@ -483,6 +506,8 @@ void UI_SystemLinkMenu::RefreshGames()
             game.pingMs = found.pingMs;
             game.inMatch = found.info.inMatch;
             game.sameBuild = found.info.build == GIT_REVISION;
+            game.activity = found.info.activity;
+            game.editing = found.info.editing;
             games.push_back(std::move(game));
         }
         //Sorted (the answers come in any order): the games that can be joined first, by name

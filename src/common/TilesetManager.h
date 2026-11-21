@@ -33,6 +33,8 @@ public:
     bool isModified() const { return m_modified; }
 
     void saveTileset() const;
+    // How many times tile types were saved (this run): what's read from the files may have changed
+    static unsigned savedCount() { return s_savedCount; }
 
     TileType tileType(size_t iTileCol, size_t iTileRow) const;
     void setTileType(size_t iTileCol, size_t iTileRow, TileType type);
@@ -49,6 +51,7 @@ public:
     const gfxSprite& sprite(DrawSize size) const;
 
 private:
+    static inline unsigned s_savedCount = 0;
     std::string m_name;
     std::filesystem::path m_tileset_dir;
     std::vector<TileType> m_tiletypes;

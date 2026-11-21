@@ -39,6 +39,8 @@
 #include <random>
 #include <cassert>
 #include <sstream>
+#include <deque>
+#include <set>
 
 // main.cpp: --at-perf
 namespace perfstats {
@@ -272,6 +274,197 @@ namespace {
 std::string g_pendingShot;
 }
 
+// --at-role pad: a controller played live from a file (<shots dir>/pad.txt), a command a line, read
+// as lines are added to it: what a person with a controller would do, to try the menus and the
+// editors with nothing else (no pointer put anywhere, no keys). In the menus, player 1's controller:
+// the d-pad, A and B; in the editors, every button and both sticks (EditorInput.h's TestInput).
+//   a, down*5          a press (two frames, then two let go), five of them
+//   a:30               held for 30 frames
+//   +a, -a             held down from now / let go (held through what follows: A and the d-pad)
+//   stick l|r X Y N    a stick pushed to X, Y (-1..1) for N frames
+//   wait N             N frames of nothing
+//   shot NAME          a screenshot (NAME.png in the shots dir)
+//   quit               the game quits (from the menus)
+// Each command printed as it starts ("pad: <line>"), and "pad: idle" once there are none left.
+namespace padscript {
+struct Command {
+    std::string what;
+    int frames = 0;    // the press (or stick, or wait) lasts this long
+    int gap = 0;       // then this long let go
+    float x = 0, y = 0;
+};
+
+struct State {
+    std::string path;
+    long offset = 0;
+    std::string partial;
+    std::deque<Command> queue;
+    Command current;
+    int left = 0;    // frames of `current` still to come (press, then gap)
+    bool idle = true;
+    std::set<std::string> held;
+};
+State g;
+
+void start(const std::string& dir)
+{
+    g = State {};
+    g.path = dir + "/pad.txt";
+    if (FILE* f = fopen(g.path.c_str(), "rb")) {
+        //(what's in it already is from before: only what's added counts)
+        fseek(f, 0, SEEK_END);
+        g.offset = ftell(f);
+        fclose(f);
+    }
+}
+
+void parse(const std::string& line)
+{
+    std::istringstream in(line);
+    std::string word;
+    if (!(in >> word) || word[0] == '#')
+        return;
+    Command c;
+    if (word == "wait") {
+        in >> c.frames;
+        c.what = "wait";
+    } else if (word == "shot") {
+        std::string name;
+        in >> name;
+        c.what = "shot " + name;
+        c.frames = 1;
+    } else if (word == "quit") {
+        c.what = word;
+        c.frames = 1;
+    } else if (word == "stick") {
+        std::string which;
+        in >> which >> c.x >> c.y >> c.frames;
+        c.what = "stick " + which;
+        c.gap = 2;
+    } else if (word[0] == '+' || word[0] == '-') {
+        c.what = word;
+        c.frames = 1;
+    } else {
+        int times = 1;
+        c.frames = 2;
+        if (const size_t star = word.find('*'); star != std::string::npos) {
+            times = std::max(1, atoi(word.c_str() + star + 1));
+            word.resize(star);
+        }
+        if (const size_t colon = word.find(':'); colon != std::string::npos) {
+            c.frames = std::max(1, atoi(word.c_str() + colon + 1));
+            word.resize(colon);
+        }
+        c.what = word;
+        c.gap = 2;
+        for (int k = 0; k < times; k++)
+            g.queue.push_back(c);
+        return;
+    }
+    g.queue.push_back(c);
+}
+
+void poll()
+{
+    FILE* f = fopen(g.path.c_str(), "rb");
+    if (!f)
+        return;
+    fseek(f, 0, SEEK_END);
+    const long end = ftell(f);
+    if (end > g.offset) {
+        std::string text(static_cast<size_t>(end - g.offset), '\0');
+        fseek(f, g.offset, SEEK_SET);
+        text.resize(fread(text.data(), 1, text.size(), f));
+        g.offset += static_cast<long>(text.size());
+        g.partial += text;
+        size_t eol;
+        while ((eol = g.partial.find('\n')) != std::string::npos) {
+            std::string line = g.partial.substr(0, eol);
+            g.partial.erase(0, eol + 1);
+            if (!line.empty() && line.back() == '\r')
+                line.pop_back();
+            parse(line);
+        }
+    } else if (end < g.offset) {
+        g.offset = end;    //(the file started over)
+    }
+    fclose(f);
+}
+
+// One frame: what's pressed (the buttons' names, and the sticks), and a screenshot or quit
+struct Frame {
+    std::set<std::string> down;
+    bool pressedNow = false;    // the first frame of a command (the menus want presses)
+    float lx = 0, ly = 0, rx = 0, ry = 0;
+    std::string shot;
+    bool quit = false;
+};
+
+Frame step()
+{
+    poll();
+    Frame out;
+    if (g.left <= 0) {
+        if (g.queue.empty()) {
+            if (!g.idle) {
+                printf("pad: idle\n");
+                fflush(stdout);
+            }
+            g.idle = true;
+            out.down = g.held;
+            return out;
+        }
+        g.idle = false;
+        g.current = g.queue.front();
+        g.queue.pop_front();
+        g.left = g.current.frames + g.current.gap;
+        printf("pad: %s\n", g.current.what.c_str());
+        fflush(stdout);
+        out.pressedNow = true;
+    }
+    const Command& c = g.current;
+    const bool pressing = g.left > c.gap;
+    g.left--;
+    if (c.what[0] == '+' && out.pressedNow)
+        g.held.insert(c.what.substr(1));
+    else if (c.what[0] == '-' && out.pressedNow)
+        g.held.erase(c.what.substr(1));
+    out.down = g.held;
+    if (c.what.rfind("shot ", 0) == 0) {
+        if (out.pressedNow)
+            out.shot = c.what.substr(5);
+    } else if (c.what == "quit") {
+        out.quit = true;
+    } else if (c.what.rfind("stick ", 0) == 0) {
+        if (pressing) {
+            (c.what == "stick r" ? out.rx : out.lx) = c.x;
+            (c.what == "stick r" ? out.ry : out.ly) = c.y;
+        }
+    } else if (c.what != "wait" && c.what[0] != '+' && c.what[0] != '-' && pressing) {
+        out.down.insert(c.what);
+    }
+    return out;
+}
+
+#ifdef SMW_HAS_EDITORS
+editors::input::TestInput editorInput(editors::Editor, int, int pointer)
+{
+    editors::input::TestInput t;
+    if (pointer != 0)
+        return t;
+    const Frame f = step();
+    auto on = [&](const char* name) { return f.down.count(name) > 0; };
+    t.a = on("a"), t.b = on("b"), t.x = on("x"), t.y = on("y");
+    t.lb = on("lb"), t.rb = on("rb"), t.back = on("back"), t.start = on("start");
+    t.up = on("up"), t.down = on("down"), t.left = on("left"), t.right = on("right");
+    t.lt = on("lt"), t.rt = on("rt"), t.ls = on("ls"), t.rs = on("rs");
+    t.lx = f.lx, t.ly = f.ly, t.rx = f.rx, t.ry = f.ry;
+    t.shot = f.shot;
+    return t;
+}
+#endif
+} // namespace padscript
+
 void MenuState::AutoTestAfterDraw()
 {
     if (g_pendingShot.empty())
@@ -334,6 +527,35 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
 
     const std::string nick = at.shotsName.empty() ? (at.shotsRole == "join" ? "Luigi" : "Mario") : at.shotsName;
     rollback::NetLobby* lobby = net.lobby();
+
+    //--at-role pad: a controller played live from <shots dir>/pad.txt (padscript, above)
+    if (at.shotsRole == "pad") {
+        if (step == 0) {
+            padscript::start(at.shotsDir);
+#ifdef SMW_HAS_EDITORS
+            editors::input::setTestDriver(padscript::editorInput, at.shotsDir);
+#endif
+            printf("pad: reading %s/pad.txt\n", at.shotsDir.c_str());
+            fflush(stdout);
+            step = 1;
+        }
+        prompts::setLastDevice(prompts::Device::Controller);
+        const padscript::Frame f = padscript::step();
+        if (f.quit)
+            return exitSoon();
+        if (!f.shot.empty())
+            shot(f.shot.c_str());
+        if (f.pressedNow) {
+            COutputControl& keys = game_values.playerInput.outputControls[0];
+            keys.menu_up.fPressed = f.down.count("up") > 0;
+            keys.menu_down.fPressed = f.down.count("down") > 0;
+            keys.menu_left.fPressed = f.down.count("left") > 0;
+            keys.menu_right.fPressed = f.down.count("right") > 0;
+            keys.menu_select.fPressed = f.down.count("a") > 0;
+            keys.menu_cancel.fPressed = f.down.count("b") > 0;
+        }
+        return MENU_CODE_NONE;
+    }
 
     //The main menu, then the Online menu: the same start for every role
     if (step == 0) {
