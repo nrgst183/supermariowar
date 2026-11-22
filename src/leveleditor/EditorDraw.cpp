@@ -40,8 +40,104 @@ void drawlayer(int layer, bool fUseCopied, short iBlockSize)
     }
 }
 
+namespace {
+// The map's picture as drawmap last drew it (the common case: full size, no platforms), and what it
+// was drawn from. Most frames nothing changed: one copy of it, not the background and every tile of
+// every layer drawn again (the editor's heaviest drawing, slow on the Xbox).
+gfxSprite s_mapPicture;
+uint64_t s_mapPictureKey = 0;
+
+struct Hasher {
+    uint64_t h = 1469598103934665603ull;
+    void bytes(const void* data, size_t size) {
+        const unsigned char* p = static_cast<const unsigned char*>(data);
+        for (size_t k = 0; k < size; k++)
+            h = (h ^ p[k]) * 1099511628211ull;
+    }
+    template<typename T> void value(const T& v) { bytes(&v, sizeof(v)); }
+};
+
+// What the picture is drawn from, but the map's private parts (drawmap adds them: CMap's friend)
+void mapPictureKey(Hasher& k)
+{
+    const SDL_Surface* background = rm->spr_background.getSurface();
+    k.value(background);
+    if (background) {
+        k.value(background->w);
+        k.value(background->h);
+        //(a new image in the same memory: a few of its pixels)
+        const Uint8* pixels = static_cast<const Uint8*>(background->pixels);
+        for (int y = 0; pixels && y < background->h; y += background->h / 8 + 1)
+            k.bytes(pixels + y * background->pitch, static_cast<size_t>(std::min(background->pitch, 64)));
+    }
+    k.value(view_only_layer);
+    k.value(selected_layer);
+    k.value(copiedlayer);
+    k.value(viewblocks);
+    k.value(viewwarps);
+    k.value(move_mode);
+    k.value(move_offset_x);
+    k.value(move_offset_y);
+    if (move_mode == 1 || move_mode == 3) {
+        k.bytes(selectedtiles, sizeof(selectedtiles));
+        for (int i = 0; i < MAPWIDTH; i++) {
+            for (int j = 0; j < MAPHEIGHT; j++) {
+                const EditorMapTile& t = copiedtiles[i][j];
+                k.bytes(t.tile, sizeof(t.tile));
+                k.value(t.block.iType);
+                k.value(t.block.iSettings[0]);
+                k.value(t.warp.connection);
+                k.value(t.warp.direction);
+                k.value(t.item);
+            }
+        }
+    }
+}
+} // namespace
+
 void drawmap(bool fScreenshot, short iBlockSize, bool fWithPlatforms)
 {
+    //(the common case: the picture kept from the last time, if nothing it's drawn from has changed)
+    const bool keep = !fScreenshot && iBlockSize == TILESIZE && !fWithPlatforms && blitdest == screen && screen;
+    uint64_t key = 0;
+    if (keep) {
+        //(everything the picture is drawn from: if any of it changes, the key does)
+        Hasher k;
+        mapPictureKey(k);
+        k.bytes(g_map->mapdata, sizeof(g_map->mapdata));
+        for (int i = 0; i < MAPWIDTH; i++) {
+            for (int j = 0; j < MAPHEIGHT; j++) {
+                const MapBlock& block = g_map->objectdata[i][j];
+                k.value(block.iType);
+                k.value(block.iSettings[0]);
+                const Warp& warp = g_map->warpdata[i][j];
+                k.value(warp.connection);
+                k.value(warp.direction);
+            }
+        }
+        k.bytes(&g_map->iSwitches, sizeof(g_map->iSwitches));
+        for (const MapItem& item : g_map->mapitems) {
+            k.value(item.itype);
+            k.value(item.ix);
+            k.value(item.iy);
+        }
+        key = k.h;
+        if (s_mapPicture && key == s_mapPictureKey && gfx_copypixels(s_mapPicture.getSurface(), screen))
+            return;
+    }
+    struct Keep {
+        bool on;
+        uint64_t key;
+        ~Keep() {
+            if (!on)
+                return;
+            if (!s_mapPicture || s_mapPicture.getWidth() != screen->w || s_mapPicture.getHeight() != screen->h
+                || s_mapPicture.getSurface()->format != screen->format)
+                s_mapPicture = gfxSprite(SdlSurfacePtr(SDL_CreateSurface(screen->w, screen->h, screen->format)), std::nullopt);
+            s_mapPictureKey = gfx_copypixels(screen, s_mapPicture.getSurface()) ? key : 0;
+        }
+    } keepIt {keep, key};
+
     if (iBlockSize != TILESIZE) {
         SDL_Rect srcrect;
         srcrect.x = 0;

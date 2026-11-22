@@ -76,6 +76,8 @@ float displayRefreshRate()
     return 60.0f;
 }
 
+int g_back_buffers = 0;    // (1: double buffering, 2: triple; the overlay shows it)
+
 bool createDevice(SDL_Renderer* renderer)
 {
     Direct3D* d3d = Direct3DCreate8(D3D_SDK_VERSION);
@@ -87,7 +89,10 @@ bool createDevice(SDL_Renderer* renderer)
     pp.BackBufferWidth = k_screen_w;
     pp.BackBufferHeight = k_screen_h;
     pp.BackBufferFormat = D3DFMT_X8R8G8B8;
-    pp.BackBufferCount = 1;
+    //(triple buffering: two back buffers. The GPU draws a finished frame into the free one at once,
+    //without waiting for the refresh that shows the one before, so the game starts the next frame
+    //right away: a frame that takes a little long is made up by the one queued, not shown late)
+    pp.BackBufferCount = 2;
     pp.Windowed = FALSE;
     pp.EnableAutoDepthStencil = FALSE;
     pp.SwapEffect = D3DSWAPEFFECT_DISCARD;
@@ -108,6 +113,14 @@ bool createDevice(SDL_Renderer* renderer)
         hr = Direct3D_CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, NULL,
             D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &renderer->device);
     }
+    if (FAILED(hr)) {
+        // Retry with one back buffer (double buffering)
+        sdlx_log("[xbox] No triple buffering (0x%08x): one back buffer\n", static_cast<unsigned>(hr));
+        pp.BackBufferCount = 1;
+        hr = Direct3D_CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, NULL,
+            D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &renderer->device);
+    }
+    g_back_buffers = static_cast<int>(pp.BackBufferCount);
     if (FAILED(hr))
         return SDL_SetError("Direct3D_CreateDevice failed (0x%08x)", static_cast<unsigned>(hr));
 
@@ -231,11 +244,18 @@ void drawText(Uint8* pixels, int pitch, int x, int y, const char* text)
     }
 }
 
+constexpr int OVERLAY_LINES = 7;
 struct OverlayStats {
     Uint64 window_start_ns = 0;
     Uint64 window_start_cycles = 0;
     Uint32 frames = 0;
-    char lines[6][64] = {};
+    char lines[OVERLAY_LINES][64] = {};
+    //(smoothness: the longest frame, the longest work, and the frames shown late, in the window)
+    Uint64 last_present_ns = 0;     // when the last present began
+    Uint64 last_return_ns = 0;      // when it returned (the game's work starts)
+    Uint64 worst_frame_ns = 0;
+    Uint64 worst_work_ns = 0;
+    Uint32 late = 0;                // frames that took two refreshes or more
 };
 OverlayStats g_overlay;
 
@@ -245,6 +265,15 @@ void updateOverlayStats()
     g_overlay.frames++;
     const Uint64 now_ns = sdlx_ticks_ns();
     const Uint64 now_cycles = sdlx_cycles();
+    if (g_overlay.last_present_ns) {
+        const Uint64 frame = now_ns - g_overlay.last_present_ns;
+        g_overlay.worst_frame_ns = SDL_max(g_overlay.worst_frame_ns, frame);
+        if (frame > 25000000ull)    //(a refresh is 16.7 ms: two or more)
+            g_overlay.late++;
+    }
+    if (g_overlay.last_return_ns)
+        g_overlay.worst_work_ns = SDL_max(g_overlay.worst_work_ns, now_ns - g_overlay.last_return_ns);
+    g_overlay.last_present_ns = now_ns;
     if (g_overlay.window_start_ns == 0) {
         g_overlay.window_start_ns = now_ns;
         g_overlay.window_start_cycles = now_cycles;
@@ -275,7 +304,9 @@ void updateOverlayStats()
     snprintf(g_overlay.lines[2], 64, "FILL %.1f  COPY %.1f  SWAP %.1f", fill, copy, swap);
     snprintf(g_overlay.lines[3], 64, "GAME/OTHER %.1f MS", other);
     snprintf(g_overlay.lines[4], 64, "AUDIO THREAD %.0f%%", audio_pct);
-    snprintf(g_overlay.lines[5], 64, "CPU %.0f MHZ", cycles_per_ms / 1000.0);
+    snprintf(g_overlay.lines[5], 64, "CPU %.0f MHZ  BUFFERS %d", cycles_per_ms / 1000.0, g_back_buffers + 1);
+    snprintf(g_overlay.lines[6], 64, "WORST %.1f MS  WORK %.1f  LATE %u", static_cast<double>(g_overlay.worst_frame_ns) / 1e6,
+        static_cast<double>(g_overlay.worst_work_ns) / 1e6, static_cast<unsigned>(g_overlay.late));
     if (g_sdlx_overlay)
         sdlx_log("[prof] %s | %s | %s | %s | %s\n", g_overlay.lines[0], g_overlay.lines[1], g_overlay.lines[2], g_overlay.lines[3], g_overlay.lines[4]);
 
@@ -287,6 +318,9 @@ void updateOverlayStats()
     g_sdlx_profile.blits = 0;
     g_sdlx_profile.blit_pixels = 0;
     g_overlay.frames = 0;
+    g_overlay.worst_frame_ns = 0;
+    g_overlay.worst_work_ns = 0;
+    g_overlay.late = 0;
     g_overlay.window_start_ns = now_ns;
     g_overlay.window_start_cycles = now_cycles;
 }
@@ -335,7 +369,7 @@ DWORD presentTexture(const SDL_Texture* texture)
     // The game drew straight into the screen texture: no copy
     if (g_screen_pixels && src == g_screen_pixels && texture->w == k_screen_w && texture->h == k_screen_h) {
         if (g_sdlx_overlay) {
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < OVERLAY_LINES; i++)
                 drawText(static_cast<Uint8*>(g_screen_pixels), g_screen_pitch, 40, 40 + i * 20, g_overlay.lines[i]);
         }
         // The memory is cached (fast for the CPU's drawing, which also reads it
@@ -364,7 +398,7 @@ DWORD presentTexture(const SDL_Texture* texture)
                 memcpy(dst + static_cast<size_t>(y) * locked.Pitch, src + static_cast<size_t>(y) * src_pitch, static_cast<size_t>(w) * 4);
         }
         if (g_sdlx_overlay) {
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < OVERLAY_LINES; i++)
                 drawText(dst, locked.Pitch, 40, 40 + i * 20, g_overlay.lines[i]);
         }
     }
@@ -567,6 +601,7 @@ bool SDL_RenderPresent(SDL_Renderer* renderer)
     if (fence)
         D3DDevice_BlockOnFence(fence);
     const Uint64 swap_end = sdlx_cycles();
+    g_overlay.last_return_ns = sdlx_ticks_ns();
     g_sdlx_profile.copy = g_sdlx_profile.copy + (swap_start - copy_start);
     g_sdlx_profile.swap = g_sdlx_profile.swap + (swap_end - swap_start);
     return true;
