@@ -23,6 +23,16 @@ Uint64 sdlx_ticks_ns();
 bool sdlx_make_dir(const char* path);
 Uint64 sdlx_dir_bytes(const char* path);
 
+// Files read and written with the system's calls, in big blocks (sdl_core.cpp). The C library's stdio
+// goes through a 512-byte buffer: a big file read with fread is thousands of small reads, about
+// 2 MB/s from the hard disk (the image cache: 32 MB at startup, 15 seconds). A file is nullptr if
+// it can't be opened; reads and writes are all of `bytes` or false.
+void* sdlx_open(const char* path, bool write);
+Sint64 sdlx_size(void* file);
+bool sdlx_read(void* file, void* dst, Uint64 bytes);
+bool sdlx_write(void* file, const void* src, Uint64 bytes);
+void sdlx_close(void* file);
+
 // Load stats (SDL_XboxTakeLoadStats): the images' (sdl_image.cpp) and the sounds' (sdl_mixer.cpp)
 extern SDL_XboxLoadStats g_sdlx_image_stats;
 extern SDL_XboxLoadStats g_sdlx_sound_stats;

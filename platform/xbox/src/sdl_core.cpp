@@ -558,3 +558,60 @@ long SDL_XboxDiscFileSize(const char* path)
     LeaveCriticalSection(&g_sizesLock);
     return size;
 }
+
+/* ---- Whole files, in big blocks ----------------------------------------- */
+
+void* sdlx_open(const char* path, bool write)
+{
+    if (!path)
+        return nullptr;
+    HANDLE file = CreateFileA(xboxPath(path).c_str(), write ? GENERIC_WRITE : GENERIC_READ, write ? 0 : FILE_SHARE_READ, NULL,
+        write ? CREATE_ALWAYS : OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    return file == INVALID_HANDLE_VALUE ? nullptr : file;
+}
+
+Sint64 sdlx_size(void* file)
+{
+    if (!file)
+        return -1;
+    DWORD high = 0;
+    const DWORD low = GetFileSize(static_cast<HANDLE>(file), &high);
+    if (low == INVALID_FILE_SIZE && GetLastError() != NO_ERROR)
+        return -1;
+    return static_cast<Sint64>((static_cast<Uint64>(high) << 32) | low);
+}
+
+bool sdlx_read(void* file, void* dst, Uint64 bytes)
+{
+    //(in pieces of at most 4 MB: one call per piece)
+    Uint8* out = static_cast<Uint8*>(dst);
+    while (bytes > 0) {
+        const DWORD chunk = static_cast<DWORD>(bytes < (4u << 20) ? bytes : (4u << 20));
+        DWORD read = 0;
+        if (!file || !ReadFile(static_cast<HANDLE>(file), out, chunk, &read, NULL) || read == 0)
+            return false;
+        out += read;
+        bytes -= read;
+    }
+    return true;
+}
+
+bool sdlx_write(void* file, const void* src, Uint64 bytes)
+{
+    const Uint8* in = static_cast<const Uint8*>(src);
+    while (bytes > 0) {
+        const DWORD chunk = static_cast<DWORD>(bytes < (4u << 20) ? bytes : (4u << 20));
+        DWORD written = 0;
+        if (!file || !WriteFile(static_cast<HANDLE>(file), in, chunk, &written, NULL) || written == 0)
+            return false;
+        in += written;
+        bytes -= written;
+    }
+    return true;
+}
+
+void sdlx_close(void* file)
+{
+    if (file)
+        CloseHandle(static_cast<HANDLE>(file));
+}

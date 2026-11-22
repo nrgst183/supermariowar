@@ -356,22 +356,21 @@ void stopOutput()
     }
 }
 
+// (the system's reads, in big blocks: sdlx_open)
 bool readFile(const char* path, std::vector<unsigned char>& out)
 {
-    FILE* file = fopen(path, "rb");
+    void* file = sdlx_open(path, false);
     if (!file)
         return SDL_SetError("Couldn't open %s", path);
-    fseek(file, 0, SEEK_END);
-    const long size = ftell(file);
-    fseek(file, 0, SEEK_SET);
+    const Sint64 size = sdlx_size(file);
     if (size <= 0) {
-        fclose(file);
+        sdlx_close(file);
         return SDL_SetError("Couldn't read %s", path);
     }
     out.resize(static_cast<size_t>(size));
-    const size_t read = fread(out.data(), 1, out.size(), file);
-    fclose(file);
-    if (read != out.size())
+    const bool ok = sdlx_read(file, out.data(), out.size());
+    sdlx_close(file);
+    if (!ok)
         return SDL_SetError("Couldn't read %s", path);
     return true;
 }
@@ -418,11 +417,9 @@ bool readSoundFile(const char* path, std::vector<unsigned char>& out)
     Uint64 t = sdlx_ticks_ns();
     long size = SDL_XboxDiscFileSize(path);
     if (size <= 0) {
-        if (FILE* file = fopen(path, "rb")) {
-            fseek(file, 0, SEEK_END);
-            size = ftell(file);
-            fclose(file);
-        }
+        void* file = sdlx_open(path, false);
+        size = static_cast<long>(sdlx_size(file));
+        sdlx_close(file);
     }
     stats.sizeChecks++;
     stats.sizeCheckNs += sdlx_ticks_ns() - t;
@@ -431,14 +428,14 @@ bool readSoundFile(const char* path, std::vector<unsigned char>& out)
 
     t = sdlx_ticks_ns();
     const std::string cached = soundCacheFile(path);
-    if (FILE* in = fopen(cached.c_str(), "rb")) {
+    if (void* in = sdlx_open(cached.c_str(), false)) {
         Uint32 header[2] = {};
-        bool ok = fread(header, sizeof(header), 1, in) == 1 && header[0] == SOUND_CACHE_MAGIC && header[1] == static_cast<Uint32>(size);
+        bool ok = sdlx_read(in, header, sizeof(header)) && header[0] == SOUND_CACHE_MAGIC && header[1] == static_cast<Uint32>(size);
         if (ok) {
             out.resize(static_cast<size_t>(size));
-            ok = fread(out.data(), 1, out.size(), in) == out.size();
+            ok = sdlx_read(in, out.data(), out.size());
         }
-        fclose(in);
+        sdlx_close(in);
         stats.cacheReadNs += sdlx_ticks_ns() - t;
         if (ok) {
             stats.cacheHits++;
@@ -462,10 +459,10 @@ bool readSoundFile(const char* path, std::vector<unsigned char>& out)
         return true;
     }
     bool written = false;
-    if (FILE* copy = fopen(cached.c_str(), "wb")) {
+    if (void* copy = sdlx_open(cached.c_str(), true)) {
         const Uint32 header[2] = {SOUND_CACHE_MAGIC, static_cast<Uint32>(size)};
-        const bool ok = fwrite(header, sizeof(header), 1, copy) == 1 && fwrite(out.data(), 1, out.size(), copy) == out.size();
-        fclose(copy);
+        const bool ok = sdlx_write(copy, header, sizeof(header)) && sdlx_write(copy, out.data(), out.size());
+        sdlx_close(copy);
         if (ok)
             g_sound_cache_used += static_cast<Sint64>(bytes);
         else
