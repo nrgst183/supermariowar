@@ -199,7 +199,7 @@ void statusFrame(int x, int y, int w, int h, int shadow)
     constexpr SDL_Color edge {42, 154, 240, 255};
     constexpr SDL_Color body {0, 95, 177, 255};
     if (shadow > 0)
-        rounded(x + shadow, y + shadow, w, h, 4, {0, 0, 24, 255});
+        rounded(x + shadow, y + shadow, w, h, 4, BLACK);    //(as panel()'s: solid black)
     rounded(x, y, w, h, 4, BLACK);
     rounded(x + 2, y + 2, w - 4, h - 4, 4, white);
     fill(x + 4, y + h - 4, w - 8, 2, shade);
@@ -472,7 +472,7 @@ void endBanner(int cx, int y, const std::string& headline, const std::string& re
     const int cardW = icon ? 52 : 0;
     const int w = panelW + (icon ? 8 + cardW : 0);
     const int x = cx - w / 2;
-    statusFrame(x, y, panelW, panelH, 4);
+    statusFrame(x, y, panelW, panelH, 6);
     //(the headline in gold over the result: two lines of the large font, inside the frame's rim)
     bigFont().drawCentered(x + panelW / 2, y + 16, headline);
     fill(x + 24, y + 42, panelW - 48, 2, {42, 154, 240, 255});
@@ -480,7 +480,7 @@ void endBanner(int cx, int y, const std::string& headline, const std::string& re
     if (icon) {
         const int cardX = x + panelW + 8;
         const int cardY = y + (panelH - cardW) / 2;
-        statusFrame(cardX, cardY, cardW, cardW, 4);
+        statusFrame(cardX, cardY, cardW, cardW, 6);
         icon(cardX + (cardW - 4) / 2 - 8, cardY + (cardW - 4) / 2 - 8);
     }
 }

@@ -119,7 +119,7 @@ void layered(int x, int y, int w, int h, std::initializer_list<Layer> layers)
 void box(int x, int y, int w, int h)
 {
     //(Super Mario All-Stars' SMB3 status bar, with a solid shadow as its dialogs have)
-    theme::statusFrame(x, y, w - 4, h - 4, 4);
+    theme::statusFrame(x, y, w - 6, h - 6, 6);
 }
 
 void row(int x, int y, int w, int h, bool selected, bool dim)

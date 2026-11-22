@@ -228,48 +228,58 @@ void MI_MatchHistory::drawDetails(short y) const
     }
     const history::Entry& e = m_entries[static_cast<size_t>(m_index)];
 
-    std::string title = e.mode;
+    //The heading: the mode's icon and the map, large; under it the rest in the small font, on one line
+    const short icon = modeIcon(e.modeId);
+    short tx = x;
+    if (icon >= 0) {
+        rm->menu_mode_small.draw(x, y + 14, {static_cast<short>(icon * 16), 0, 16, 16});
+        tx += 24;
+    }
+    rm->menu_font_large.drawChopRight(tx, y + 12, right - tx, e.map.empty() ? e.mode : e.map);
+    std::string info = e.mode;
     if (e.goal > 0)
-        title += ", goal " + std::to_string(e.goal);
-    if (!e.map.empty())
-        title += "  -  " + e.map;
-    rm->menu_font_large.drawChopRight(x, y + 12, m_width - 40, title);
-    std::string info = e.matchType + (e.online ? " (online)" : "") + "    " + history::formatDuration(e.ticks) + "    " + history::formatTime(e.time);
-    menupanel::bestText(x, y + 36, m_width - 40, info);
+        info += " to " + std::to_string(e.goal);
+    info += "   " + e.matchType + (e.online ? " (online)" : "");
+    info += "   " + history::formatDuration(e.ticks) + "   " + history::formatTime(e.time);
+    rm->menu_font_small.drawChopRight(x, y + 38, right - x, info);
+    prompts::fill(x, y + 56, right - x, 2, {42, 154, 240, 255});    //(the frame's light edge: the heading's end)
 
-    //The teams, by place, side by side: the place and the score, then the players' portraits (their
-    //skins, in the lobby's frames) and their names; the winners' crown over theirs
+    //The teams, by place, side by side: a card each (the winner's lit, with a crown), its first
+    //player's portrait (their skin, in the lobby's frame), the place, the name and the score
     std::vector<size_t> order(e.teams.size());
     for (size_t k = 0; k < order.size(); k++)
         order[k] = k;
     std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return e.teams[a].place < e.teams[b].place; });
     loadPortraits(e);
     const int columns = std::max<int>(1, static_cast<int>(order.size()));
-    const int columnW = (m_width - 40) / columns;
+    const int columnW = std::min(180, (right - x + 8) / columns);
+    constexpr short CARD_H = 58;
     for (int c = 0; c < columns && c < static_cast<int>(order.size()); c++) {
         const size_t t = order[static_cast<size_t>(c)];
         const history::Team& team = e.teams[t];
         const short cx = static_cast<short>(x + c * columnW);
-        const short ty = static_cast<short>(y + 54);
+        const short cy = static_cast<short>(y + 66);
+        const short cw = static_cast<short>(columnW - 8);
         const bool won = static_cast<int>(t) == e.winner;
-        rm->menu_font_large.draw(cx, ty, ordinal(team.place));
-        rm->menu_font_small.draw(cx + 52, ty + 6, std::to_string(team.score) + (team.score == 1 ? " point" : " points"));
-        for (size_t k = 0; k < team.players.size() && k < 4; k++) {
-            const short px = static_cast<short>(cx + static_cast<short>(k) * 42);
-            const short py = static_cast<short>(ty + 26);
-            if (px + 38 > cx + columnW - 4)
-                break;
-            theme::statusBar(px, py, 38, 38);
-            const std::vector<SpriteStrip>& strips = m_portraits[t];
-            if (k < strips.size() && strips[k][0].getSurface())
-                strips[k][0].draw(px + 3, py + 3, {0, 0, 32, 32});
-            if (won && k == 0)
-                theme::crown(px + 26, py - 8);
-            if (team.players.size() == 1)
-                rm->menu_font_small.drawChopRight(px + 44, py + 14, columnW - 50, team.players[k].name);
-        }
-        if (team.players.size() > 1 && bottom > ty + 70)
-            rm->menu_font_small.drawChopRight(cx, ty + 68, columnW - 8, team.players[0].name + (team.players.size() > 1 ? " +" + std::to_string(team.players.size() - 1) : ""));
+        menupanel::row(cx, cy, cw, CARD_H, won);
+
+        const short px = static_cast<short>(cx + 6);
+        const short py = static_cast<short>(cy + 10);
+        theme::statusBar(px, py, 38, 38);
+        const std::vector<SpriteStrip>& strips = m_portraits[t];
+        if (!strips.empty() && strips[0][0].getSurface())
+            strips[0][0].draw(px + 3, py + 3, {0, 0, 32, 32});
+        if (won)
+            theme::crown(px + 26, py - 8);
+
+        const short textX = static_cast<short>(px + 46);
+        const short textW = static_cast<short>(cx + cw - 6 - textX);
+        rm->menu_font_large.draw(textX, cy + 5, ordinal(team.place));
+        std::string name = team.players.empty() ? "?" : team.players[0].name;
+        if (team.players.size() > 1)
+            name += " +" + std::to_string(team.players.size() - 1);
+        rm->menu_font_small.drawChopRight(textX, cy + 27, textW, name);
+        rm->menu_font_small.drawChopRight(textX, cy + 41, textW, std::to_string(team.score) + (team.score == 1 ? " point" : " points"));
     }
 
     //What the buttons do: the controller's or the keys, in the footer (as on the other menus)

@@ -26,14 +26,14 @@ namespace {
 constexpr int PANEL_X = 36;
 constexpr int PANEL_Y = 42;
 constexpr int PANEL_W = 568;
-constexpr int PANEL_H = 226;
+constexpr int PANEL_H = 220;
 constexpr int ROW_X = 52;
 constexpr int ROW_Y = 76;
 constexpr int ROW_W = 536;
-constexpr int ROW_H = 42;
-constexpr int ROW_STEP = 46;
-constexpr int DETAILS_Y = 274;
-constexpr int DETAILS_H = 62;
+constexpr int ROW_H = 40;
+constexpr int ROW_STEP = 44;
+constexpr int DETAILS_Y = 268;
+constexpr int DETAILS_H = 72;
 constexpr short HOST_Y = 344;
 
 // Draws with a function (a menu's part that depends on more than one control)
@@ -420,18 +420,18 @@ void UI_SystemLinkMenu::drawDetails() const
     if (m_currentFocus != m_list || !chosen) {
         menupanel::box(PANEL_X, DETAILS_Y, PANEL_W, DETAILS_H);
         const std::string name = systemLinkPlayerName();
-        rm->menu_font_large.draw(PANEL_X + 20, DETAILS_Y + 9, "Your game");
+        rm->menu_font_large.draw(PANEL_X + 20, DETAILS_Y + 12, "Your game");
 #ifdef SMW_XBOX
         const std::string where = systemLinkNetworkStatus();
-        rm->menu_font_small.drawRightJustified(PANEL_X + PANEL_W - 20, DETAILS_Y + 13, fit(rm->menu_font_small, where.rfind("System link: this console is ", 0) == 0 ? where.substr(29) : std::string(), 250));
+        rm->menu_font_small.drawRightJustified(PANEL_X + PANEL_W - 20, DETAILS_Y + 16, fit(rm->menu_font_small, where.rfind("System link: this console is ", 0) == 0 ? where.substr(29) : std::string(), 250));
 #else
         const int port = atoi(game_values.onlineport.c_str());
-        rm->menu_font_small.drawRightJustified(PANEL_X + PANEL_W - 20, DETAILS_Y + 13, "Port " + std::to_string(port > 0 ? port : 7300));
+        rm->menu_font_small.drawRightJustified(PANEL_X + PANEL_W - 20, DETAILS_Y + 16, "Port " + std::to_string(port > 0 ? port : 7300));
 #endif
         //(no nickname: the lobby's "Player 1", as the others' lists show it)
-        theme::statusIcon(PANEL_X + 20, DETAILS_Y + 36, theme::Status::Info);
+        theme::statusIcon(PANEL_X + 20, DETAILS_Y + 42, theme::Status::Info);
         const std::string text = "Others on this network see it as \"" + (name.empty() ? std::string("Player 1") : name) + "\"";
-        rm->menu_font_small.draw(PANEL_X + 44, DETAILS_Y + 40, fit(rm->menu_font_small, text, PANEL_W - 64));
+        rm->menu_font_small.draw(PANEL_X + 44, DETAILS_Y + 46, fit(rm->menu_font_small, text, PANEL_W - 64));
         return;
     }
     const MI_LanGameList::Game& game = *chosen;
@@ -439,8 +439,8 @@ void UI_SystemLinkMenu::drawDetails() const
     //The chosen game: who, where, and whether (and how) it can be joined
     menupanel::box(PANEL_X, DETAILS_Y, PANEL_W, DETAILS_H);
     const std::string name = game.name.empty() ? "A game" : game.name + "'s game";
-    rm->menu_font_large.draw(PANEL_X + 20, DETAILS_Y + 9, fit(rm->menu_font_large, name, 300));
-    rm->menu_font_small.drawRightJustified(PANEL_X + PANEL_W - 20, DETAILS_Y + 13, game.address);
+    rm->menu_font_large.draw(PANEL_X + 20, DETAILS_Y + 12, fit(rm->menu_font_large, name, 300));
+    rm->menu_font_small.drawRightJustified(PANEL_X + PANEL_W - 20, DETAILS_Y + 16, game.address);
 
     const bool full = game.maxMembers > 0 && game.members >= game.maxMembers;
     theme::Status status = theme::Status::Good;
@@ -464,8 +464,8 @@ void UI_SystemLinkMenu::drawDetails() const
     } else {
         text = "In the lobby (" + std::to_string(game.members) + " of " + std::to_string(game.maxMembers) + "). Press A to join";
     }
-    theme::statusIcon(PANEL_X + 20, DETAILS_Y + 36, status);
-    menupanel::bestText(PANEL_X + 44, DETAILS_Y + 40, PANEL_W - 64, text);
+    theme::statusIcon(PANEL_X + 20, DETAILS_Y + 42, status);
+    menupanel::bestText(PANEL_X + 44, DETAILS_Y + 46, PANEL_W - 64, text);
 }
 
 std::string UI_SystemLinkMenu::SelectedAddress(std::string& why) const
