@@ -44,6 +44,9 @@ SDL_MouseButtonFlags gfx_mousestate(float* x, float* y);
 void gfx_flipscreen();
 // How much of the screen the picture fills: 1, or less for a TV that crops its edges (overscan)
 void gfx_setscreenscale(float scale);
+// The pixels of one surface into another of the same size and format, as they are (no key, no
+// blending: a copy of its memory); false if they differ (nothing copied)
+bool gfx_copypixels(SDL_Surface* from, SDL_Surface* to);
 /// Turns VSync on or off; returns true if the renderer now does what was asked
 bool gfx_setvsync(bool enabled);
 /// The refresh rate of the window's display in Hz, 0 if unknown

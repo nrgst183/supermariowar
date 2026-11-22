@@ -1,4 +1,5 @@
 #include "map.h"
+#include "LoadLog.h"
 
 #include "IO_Block.h"
 #include "GameValues.h"
@@ -118,6 +119,8 @@ void CMap::ClearAnimatedTiles()
 
 void CMap::loadMap(const std::string& file, ReadType iReadType)
 {
+    //(timed on the main thread: the log isn't written from two at once)
+    loadlog::Scope timed(mapPreviewOnWorker() ? nullptr : iReadType == read_type_full ? "map load (full)" : "map load (preview, summary)");
     //(the main thread: a preview loading in the background finishes first, and isn't shown)
     if (!mapPreviewOnWorker()) {
         if (this == g_map)

@@ -1,4 +1,5 @@
 #include "GSSplashScreen.h"
+#include "LoadLog.h"
 
 #include "CmdArgs.h"
 #include "FileList.h"
@@ -39,6 +40,7 @@ void SplashScreenState::onLeaveState()
 bool SplashScreenState::init()
 {
     rm->loadStartGraphics();
+    loadlog::mark("splash graphics");
 
     menu_credits = std::make_unique<gfxSprite>();
     *menu_credits = ImageLoader(convertPath("gfx/packs/menu/splash_credits.png", menugraphicspacklist->currentPath())).create();
@@ -162,9 +164,12 @@ void SplashScreenState::update()
     if (state == 7) {
         // load initial coin sound
         rm->backgroundmusic[2] = sfxMusic(musiclist->music(1));
+        loadlog::mark("menu music");
 
         rm->loadAllGraphics();
+        loadlog::mark("all graphics");
         rm->LoadGameSounds();
+        loadlog::mark("game sounds");
 
         if (!game_values.soundcapable) {
             game_values.sound = false;
@@ -176,6 +181,7 @@ void SplashScreenState::update()
         //Read the map filter lists
         maplist->ReadFilters();
         maplist->ApplyFilters(game_values.pfFilters);
+        loadlog::mark("map filters");
 
         ifSoundOnPlay(rm->sfx_coin);
 

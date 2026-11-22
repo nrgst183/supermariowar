@@ -66,12 +66,14 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
 
     // The options page: the players, and the settings that are rarely touched
     miLocalPlayers = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 110, "My players", FIELD_W, FIELD_INDENT);
+    //(none: the CPUs play each other, a game on this machine)
+    miLocalPlayers->add("0 (CPUs only)", 0);
     for (short n = 1; n <= rollback::MAX_LOCAL_PLAYERS; n++)
         miLocalPlayers->add(std::to_string(n), n);
     miLocalPlayers->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
 
     miCpuPlayers = new MI_SelectField<short>(&rm->spr_selectfield, FIELD_X, 146, "CPU players", FIELD_W, FIELD_INDENT);
-    for (short n = 0; n <= 3; n++)
+    for (short n = 0; n <= 4; n++)
         miCpuPlayers->add(std::to_string(n), n);
     miCpuPlayers->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
 

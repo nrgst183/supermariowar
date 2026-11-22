@@ -79,7 +79,8 @@ NetLobby::NetLobby(IMeshTransport& transport, const Options& options, uint32_t n
     , m_lastReportMs(nowMs)
     , m_lastChunkMs(nowMs)
 {
-    m_options.localPlayers = std::clamp(m_options.localPlayers, 1, MAX_LOCAL_PLAYERS);
+    //(the host may have none: CPUs only, a game on this machine; one who joins plays)
+    m_options.localPlayers = std::clamp(m_options.localPlayers, m_mesh.isHost() ? 0 : 1, MAX_LOCAL_PLAYERS);
     m_options.name = cleanName(m_options.name);
     if (m_mesh.isHost()) {
         m_phase = Phase::Lobby;
@@ -291,7 +292,8 @@ void NetLobby::setName(const std::string& name)
 
 void NetLobby::setLocalPlayers(int count)
 {
-    m_options.localPlayers = std::clamp(count, 1, MAX_LOCAL_PLAYERS);
+    //(the host may have none: CPUs only, a game on this machine; one who joins plays)
+    m_options.localPlayers = std::clamp(count, isHost() ? 0 : 1, MAX_LOCAL_PLAYERS);
     if (localPeer() < 0)
         return;
     LobbyPeer& self = m_peers[static_cast<size_t>(localPeer())];
@@ -618,6 +620,15 @@ bool NetLobby::canStart(std::string& why) const
     if (players < 2) {
         why = "at least two players are needed (add a CPU player?)";
         return false;
+    }
+    //(CPUs only: a game on this machine; a match with others needs the host's players in it too)
+    if (localPeer() >= 0 && m_peers[static_cast<size_t>(localPeer())].localPlayers == 0) {
+        for (int p = 0; p < net::MAX_PEERS; p++) {
+            if (p != localPeer() && m_peers[static_cast<size_t>(p)].present) {
+                why = "set My players to 1 or more to play with the others (CPUs only is for a game here)";
+                return false;
+            }
+        }
     }
     if (!twoTeams) {
         why = "all players are on the same team";

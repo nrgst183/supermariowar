@@ -1269,6 +1269,30 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
+    //--at-role cpulobby: Start's lobby with no players of this machine's and four CPUs, then their match
+    if (at.shotsRole == "cpulobby" && step == 1) {
+        rollback::NetGame& net = rollback::NetGame::instance();
+        switch (t) {
+            case 1: return MENU_CODE_TO_LOCAL_LOBBY;
+            case 20:
+                if (net.lobby()) {
+                    net.lobby()->setLocalPlayers(0);
+                    net.lobby()->setCpuCount(4);
+                }
+                break;
+            case 40: shot("c1_lobby_cpus_only"); break;
+            case 45: return MENU_CODE_ONLINE_MATCH_SETTINGS;
+            case 60: return MENU_CODE_MATCH_SELECTION_START;
+            case 75:
+                printf("shots: CPUs only: %d teams, players %d %d %d %d\n", g_sim.score_cnt, game_values.playercontrol[0],
+                    game_values.playercontrol[1], game_values.playercontrol[2], game_values.playercontrol[3]);
+                step = 1000;
+                t = 0;
+                return MENU_CODE_START_GAME;
+        }
+        return MENU_CODE_NONE;
+    }
+
     //--at-role syslink: the LAN games (system link) menu, searching and then with what it found, then
     //A (scripts/menu-screenshots.sh runs hosts on the network for it: it joins the second; with no
     //hosts, it hosts a game from the menu)

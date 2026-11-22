@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
+#include <cstring>
 #include <format>
 #include <iostream>
 #include <string>
@@ -134,6 +135,24 @@ void gfx_changefullscreen(bool fullscreen) {
 #else
     gfx.changeFullScreen(fullscreen);
 #endif
+}
+
+bool gfx_copypixels(SDL_Surface* from, SDL_Surface* to)
+{
+    if (!from || !to || from == to || from->w != to->w || from->h != to->h || from->format != to->format)
+        return false;
+    if (!SDL_LockSurface(from))
+        return false;
+    if (!SDL_LockSurface(to)) {
+        SDL_UnlockSurface(from);
+        return false;
+    }
+    const size_t row = static_cast<size_t>(from->w) * SDL_BYTESPERPIXEL(from->format);
+    for (int y = 0; y < from->h; y++)
+        memcpy(static_cast<Uint8*>(to->pixels) + y * to->pitch, static_cast<const Uint8*>(from->pixels) + y * from->pitch, row);
+    SDL_UnlockSurface(to);
+    SDL_UnlockSurface(from);
+    return true;
 }
 
 void gfx_setscreenscale(float scale)

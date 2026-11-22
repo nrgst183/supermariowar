@@ -1,4 +1,5 @@
 #include "CpuDriver.h"
+#include "LoadLog.h"
 #include "GSGameplay.h"
 
 #include "CmdArgs.h"
@@ -407,8 +408,13 @@ void SetGameModeSettingsFromMenu()
         memcpy(&game_values.gamemodesettings, &game_values.gamemodemenusettings, sizeof(GameModeSettings));
 }
 
+namespace {
+bool g_firstFrameLogged = true;    //(loadlog: the first frame of a match, timed once)
+}
+
 void GameplayState::onEnterState()
 {
+    g_firstFrameLogged = false;
     g_sim.countdownState = 0;
     g_sim.countdownTimer = 0;
 
@@ -993,6 +999,15 @@ void GameplayState::updateNetplay()
 
 void GameplayState::render(float alpha)
 {
+    //(the first frame's drawing: on the Xbox, the tilesets' images load as they're first drawn)
+    struct FirstFrame {
+        ~FirstFrame() {
+            if (!g_firstFrameLogged) {
+                g_firstFrameLogged = true;
+                loadlog::mark("match: first frame drawn");
+            }
+        }
+    } firstFrame;
     for (short iTeam = 0; iTeam < g_sim.score_cnt; iTeam++) {
         iScoreTextOffset[iTeam] = 34 * game_values.teamcounts[iTeam] + 1;
     }

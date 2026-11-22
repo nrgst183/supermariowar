@@ -44,4 +44,6 @@ private:
     void loadThumbnail(const history::Entry& e) const;
     mutable int m_thumbnailFor = -1;
     mutable gfxSprite m_thumbnail;
+    mutable std::string m_thumbnailToMake;    // a map whose thumbnail is to be made (none saved), from
+    mutable Uint64 m_thumbnailAsked = 0;      // when the selection came to it
 };

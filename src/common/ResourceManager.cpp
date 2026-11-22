@@ -8,9 +8,58 @@
 #include "path.h"
 #include "gfx/Color.h"
 
+#include <cstring>
 #include <iostream>
 
 namespace fs = std::filesystem;
+
+namespace {
+// The leftmost pixel of a sprite's line that isn't its color key; -1: none
+int firstDrawn(SDL_Surface* surface, int y, Uint32 key)
+{
+    const int bytes = SDL_BYTESPERPIXEL(surface->format);
+    if (y < 0 || y >= surface->h || bytes < 1 || bytes > 4 || !SDL_LockSurface(surface))
+        return -1;
+    const Uint8* line = static_cast<const Uint8*>(surface->pixels) + y * surface->pitch;
+    int found = -1;
+    for (int x = 0; x < surface->w && found < 0; x++) {
+        Uint32 pixel = 0;
+        memcpy(&pixel, line + x * bytes, static_cast<size_t>(bytes));    //(little-endian: PC and Xbox)
+        if (pixel != key)
+            found = x;
+    }
+    SDL_UnlockSurface(surface);
+    return found;
+}
+
+// The menu pipes (menu_selectfield): the original art draws the highlighted one 8 pixels longer at
+// each end than the others, popping out of the column. With the focus ring round it, it sticks out
+// past the rows above and below; so its rows are made the others' length: 16 pixels of its middle
+// left out, its ends kept. (A pack whose rows are already the same length is left as it is.)
+void insetHighlightedPipes(gfxSprite& sprite)
+{
+    SDL_Surface* surface = sprite.getSurface();
+    Uint32 key = 0;
+    if (!surface || surface->w != 512 || surface->h < 64 || !SDL_GetSurfaceColorKey(surface, &key))
+        return;
+    SdlSurfacePtr copy(SDL_DuplicateSurface(surface));
+    if (!copy)
+        return;
+    for (int row = 32; row + 32 <= surface->h; row += 32) {
+        //(a highlighted row: under a normal one, 8 pixels to the left of it)
+        if (firstDrawn(surface, row + 16, key) != 0 || firstDrawn(surface, row - 16, key) != 8)
+            continue;
+        const SDL_Rect whole {0, row, 512, 32};
+        SDL_FillSurfaceRect(surface, &whole, key);
+        SDL_Rect left {0, row, 248, 32};
+        SDL_Rect leftTo {8, row, 248, 32};
+        SDL_BlitSurface(copy.get(), &left, surface, &leftTo);
+        SDL_Rect right {264, row, 248, 32};
+        SDL_Rect rightTo {256, row, 248, 32};
+        SDL_BlitSurface(copy.get(), &right, surface, &rightTo);
+    }
+}
+} // namespace
 
 static bool isAllBlack(const gfxSprite& sprite);
 
@@ -325,6 +374,8 @@ void CResourceManager::loadMenuGraphics()
     spr_player_select_ready = builder("gfx/packs/menu/player_select_ready.png").create();
     spr_selectfield = builder("gfx/packs/menu/menu_selectfield.png").create();
     spr_selectfielddisabled = builder("gfx/packs/menu/menu_selectfield_disabled.png").create();
+    insetHighlightedPipes(spr_selectfield);
+    insetHighlightedPipes(spr_selectfielddisabled);
     spr_map_filter_icons = builder("gfx/packs/menu/menu_map_flags.png").create();
     spr_tour_markers = builder("gfx/packs/menu/tour_markers.png").create();
     spr_menu_boxed_numbers = builder("gfx/packs/menu/menu_boxed_numbers.png").create();

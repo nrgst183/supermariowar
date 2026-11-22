@@ -15,6 +15,7 @@
 
 #include "CmdArgs.h"
 #include "FileList.h"
+#include "LoadLog.h"
 #include "GameMode.h"
 #include "GameValues.h"
 #include "GSGameplay.h"
@@ -324,7 +325,9 @@ void create_globals()
     g_map = new CMap();
 
     filterslist = new FiltersList();
+    loadlog::mark("start");
     maplist = new MapList(false);
+    loadlog::mark("map list");
 
     if (maplist->isEmpty()) {
         throw "Empty map directory!";
@@ -337,6 +340,7 @@ void create_globals()
     announcerlist = new AnnouncerList();
     tourlist = new TourList();
     worldlist = new WorldList();
+    loadlog::mark("skin, music, sound, announcer, tour and world lists");
 
     menugraphicspacklist = new GraphicsList();
     worldgraphicspacklist = new GraphicsList();
@@ -357,6 +361,7 @@ void create_globals()
     } catch (const std::exception& ex) {
         throw std::format("ERROR: Could not load music overrides: {}", ex.what());
     }
+    loadlog::mark("graphics pack lists, music overrides");
 }
 
 void create_gamemodes()
@@ -483,6 +488,7 @@ void main_game()
 
     gfx_init(App::screenWidth, App::screenHeight, false);		//initialize the graphics (SDL)
     blitdest = screen;
+    loadlog::mark("graphics init");
 
 #if	0
     //Comment this in to performance test the preview map loading
@@ -498,6 +504,7 @@ void main_game()
 
     sfx_init();                     //init the sound system
     JoystickManager::instance().init();
+    loadlog::mark("sound and controllers init");
 
     //currently this only sets the title, not the icon.
     //setting the icon isn't implemented in sdl ->  i'll ask on the mailing list
@@ -511,6 +518,7 @@ void main_game()
     create_gamemodes();
 
     game_values.ReadConfig();
+    loadlog::mark("game values, modes, settings");
     if (cmd::g_autotest.enabled && cmd::g_autotest.prompts >= 0)
         game_values.buttonprompts = static_cast<short>(cmd::g_autotest.prompts);
     if (cmd::g_autotest.enabled && cmd::g_autotest.itemRespawn >= 0)

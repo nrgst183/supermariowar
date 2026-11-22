@@ -1,4 +1,5 @@
 #include "GSMenu.h"
+#include "LoadLog.h"
 
 #include "rollback/MatchConfig.h"
 #include "rollback/NetGame.h"
@@ -255,6 +256,7 @@ bool MenuState::init()
         return prompts::lastDevice() == prompts::Device::Controller;
 #endif
     };
+    loadlog::mark("menus: before");
     mMainMenu = std::make_unique<UI_MainMenu>();
 #ifdef SMW_HAS_EDITORS
     //(a lobby's editing session talks over the lobby)
@@ -272,6 +274,7 @@ bool MenuState::init()
     mGraphicsOptionsMenu = std::make_unique<UI_GraphicsOptionsMenu>();
     mEyeCandyOptionsMenu = std::make_unique<UI_EyeCandyOptionsMenu>();
     mSoundOptionsMenu = std::make_unique<UI_SoundOptionsMenu>();
+    loadlog::mark("menus: main and options");
 
     // Controls menu
     mPlayerControlsSelectMenu = std::make_unique<UI_PlayerControlsSelectMenu>();
@@ -283,13 +286,16 @@ bool MenuState::init()
     };
     mModeOptionsMenu = std::make_unique<UI_ModeOptionsMenu>();
     mMatchSelectionMenu = std::make_unique<UI_MatchSelectionMenu>();
+    loadlog::mark("menus: controls, mode options, match selection");
     mGameSettingsMenu = std::make_unique<UI_GameSettingsMenu>();
+    loadlog::mark("menus: game settings (its map preview)");
     mMapFilterEditMenu = std::make_unique<UI_MapFilterEditMenu>();
     mTourStopMenu = std::make_unique<UI_TourStopMenu>();
     mWorldMenu = std::make_unique<UI_WorldMenu>();
     mTeamSelectMenu = std::make_unique<UI_TeamSelectMenu>();
     mTournamentScoreboardMenu = std::make_unique<UI_TournamentScoreboardMenu>();
     mBonusWheelMenu = std::make_unique<UI_BonusWheelMenu>();
+    loadlog::mark("menus: map filters, tour, world, teams, scoreboard, bonus wheel");
 
     // Online menu
     mOnlineMenu = std::make_unique<UI_OnlineMenu>();
@@ -300,6 +306,7 @@ bool MenuState::init()
 
     mCurrentMenu = mMainMenu.get();
     szCurrentMapName = mGameSettingsMenu->miMapField->GetMapName();
+    loadlog::mark("menus: online, history, editors");
 
     return true;
 }
@@ -949,6 +956,7 @@ MenuCodeEnum MenuState::OptionsPageCode(int dir) const
 // The screen has faded out to start a match: its settings, its map and music, then the gameplay
 void MenuState::LaunchMatch()
 {
+    loadlog::mark("match: the fade out ended");
     SDL_HideCursor();    //(the menus' pointer: not in the match)
 #ifdef SMW_HAS_EDITORS
     editors::freeKeptGraphics();    //(an editor's graphics, kept in the menus: the match's memory)
@@ -1023,7 +1031,9 @@ void MenuState::LaunchMatch()
             sShortMapName = maplist->currentShortmapname();
         }
 
+        loadlog::mark("match: map");
         LoadCurrentMapBackground();
+        loadlog::mark("match: background");
 
         //Allows all players to start the game
         game_values.singleplayermode = -1;
@@ -1033,6 +1043,7 @@ void MenuState::LaunchMatch()
             rm->backgroundmusic[0] = sfxMusic(musiclist->currentMusic());
             rm->backgroundmusic[0].play(game_values.playnextmusic, false);
         }
+        loadlog::mark("match: music");
     }
 
     game_values.appstate = AppState::Game;
@@ -1041,18 +1052,32 @@ void MenuState::LaunchMatch()
     //The replay of this match (match history): from here on, the
     //match plays from the seed that the replay keeps
     replay::beginLocal(g_map->loadedFile());
+    loadlog::mark("match: replay started");
 
     g_map->predrawbackground(rm->spr_background, rm->spr_backmap[0]);
     g_map->predrawforeground(rm->spr_frontmap[0]);
 
-    g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
-    g_map->predrawforeground(rm->spr_frontmap[1]);
+    //(the second copy, the animated tiles' other buffer: the same pixels, copied, not drawn again;
+    //set up as the drawing sets it: the back layer opaque, the front one blended)
+    if (gfx_copypixels(rm->spr_backmap[0].getSurface(), rm->spr_backmap[1].getSurface()))
+        SDL_SetSurfaceBlendMode(rm->spr_backmap[1].getSurface(), SDL_BLENDMODE_NONE);
+    else
+        g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
+    if (gfx_copypixels(rm->spr_frontmap[0].getSurface(), rm->spr_frontmap[1].getSurface())) {
+        SDL_SetSurfaceColorKey(rm->spr_frontmap[1].getSurface(), false, 0);
+        SDL_SetSurfaceBlendMode(rm->spr_frontmap[1].getSurface(), SDL_BLENDMODE_BLEND);
+    } else {
+        g_map->predrawforeground(rm->spr_frontmap[1]);
+    }
     g_map->fitDrawAreas(rm->spr_frontmap[0]);    //(only where it shows)
+    loadlog::mark("match: the map's layers drawn");
 
     g_map->SetupAnimatedTiles();
     LoadMapObjects(false);
+    loadlog::mark("match: animated tiles, map objects");
 
     GameStateManager::instance().changeStateTo(&GameplayState::instance());
+    loadlog::mark("match: gameplay state entered");
 }
 
 // What a menu code the current menu (or the autotest, or the online series) returned does.

@@ -26,25 +26,29 @@ UI_MainMenu::UI_MainMenu()
 
     // Start: the lobby (a game on this computer, which it can open to others); Go!: a random game
     // right away
-    miMainStartButton = new MI_Button(&rm->spr_selectfield, 120, 186, "Start", 310);
+    //(the buttons wider and further apart than the original's: the screen under the title has room)
+    constexpr short LEFT = 88;
+    constexpr short WIDTH = 464;
+    constexpr short GO_W = 112;
+    miMainStartButton = new MI_Button(&rm->spr_selectfield, LEFT, 184, "Start", WIDTH - GO_W);
     miMainStartButton->SetCode(MENU_CODE_TO_LOCAL_LOBBY);
-    miQuickGameButton = new MI_Button(&rm->spr_selectfield, 440, 186, "Go!", 80);
+    miQuickGameButton = new MI_Button(&rm->spr_selectfield, LEFT + WIDTH - GO_W, 184, "Go!", GO_W);
     miQuickGameButton->SetCode(MENU_CODE_QUICK_GAME_START);
 
     // A row each from here: a button the full width, or two side by side
-    constexpr short ROWS_Y = 224;
-    constexpr short ROW_STEP = 38;
+    constexpr short ROWS_Y = 232;
+    constexpr short ROW_STEP = 48;
     std::vector<std::vector<UI_Control*>> rows {{miMainStartButton, miQuickGameButton}};
     auto wide = [&](const char* name, MenuCodeEnum code) {
-        MI_Button* button = new MI_Button(&rm->spr_selectfield, 120, ROWS_Y + ROW_STEP * static_cast<short>(rows.size() - 1), name, 400);
+        MI_Button* button = new MI_Button(&rm->spr_selectfield, LEFT, ROWS_Y + ROW_STEP * static_cast<short>(rows.size() - 1), name, WIDTH);
         button->SetCode(code);
         rows.push_back({button});
         return button;
     };
     auto pair = [&](const char* left, MenuCodeEnum leftCode, const char* right, MenuCodeEnum rightCode) {
         const short y = ROWS_Y + ROW_STEP * static_cast<short>(rows.size() - 1);
-        MI_Button* a = new MI_Button(&rm->spr_selectfield, 120, y, left, 200);
-        MI_Button* b = new MI_Button(&rm->spr_selectfield, 320, y, right, 200);
+        MI_Button* a = new MI_Button(&rm->spr_selectfield, LEFT, y, left, WIDTH / 2);
+        MI_Button* b = new MI_Button(&rm->spr_selectfield, LEFT + WIDTH / 2, y, right, WIDTH / 2);
         a->SetCode(leftCode);
         b->SetCode(rightCode);
         rows.push_back({a, b});

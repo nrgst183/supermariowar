@@ -302,8 +302,11 @@ bool MenuState::OpenLobby(rollback::LobbyAccess access, LobbyOrigin origin, std:
             setup.localPlayers += game_values.playercontrol[k] == 1;
             setup.cpus += game_values.playercontrol[k] == 2;
         }
-        setup.localPlayers = std::clamp(setup.localPlayers, 1, rollback::MAX_LOCAL_PLAYERS);
+        //(the main menu's last players: CPUs only too; nobody at all, one player)
+        setup.localPlayers = std::clamp(setup.localPlayers, 0, rollback::MAX_LOCAL_PLAYERS);
         setup.cpus = std::clamp(setup.cpus, 0, 4 - setup.localPlayers);
+        if (setup.localPlayers + setup.cpus == 0)
+            setup.localPlayers = 1;
     }
     lobby->setLocalPlayers(setup.localPlayers);
     lobby->setCpuCount(setup.cpus);
@@ -387,7 +390,7 @@ void MenuState::LeaveOnlineLobbyNow()
     //(the main menu's lobby: its players and CPUs are the ones Go! plays with, and the next Start's)
     rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
     if (mLobbyOrigin == LobbyOrigin::MainMenu && lobby && lobby->localPeer() >= 0) {
-        const int players = std::clamp(lobby->peer(lobby->localPeer()).localPlayers, 1, rollback::MAX_LOCAL_PLAYERS);
+        const int players = std::clamp(lobby->peer(lobby->localPeer()).localPlayers, 0, rollback::MAX_LOCAL_PLAYERS);
         int cpus = 0;
         for (int k = 0; k < 4; k++)
             cpus += lobby->slot(k).kind == rollback::SlotKind::Cpu;

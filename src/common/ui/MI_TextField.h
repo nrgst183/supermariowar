@@ -57,7 +57,8 @@ public:
 
     MenuCodeEnum MouseClick(short iMouseX, short iMouseY) override;
     Box FocusBox() const override {
-        return {m_pos.x, m_pos.y, iWidth, 32};
+        //(the pipe: its sprite has 8 empty pixels at each end)
+        return {static_cast<short>(m_pos.x + 8), m_pos.y, static_cast<short>(iWidth - 16), 32};
     }
 
     void Refresh() override;

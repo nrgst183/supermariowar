@@ -1,4 +1,5 @@
 #include "CpuDriver.h"
+#include "LoadLog.h"
 #include "GSGameplay.h"
 
 #include "eyecandy.h"
@@ -193,6 +194,7 @@ void GameplayState::initEyeCandy()
 
 void GameplayState::initRunGame()
 {
+    loadlog::Scope timed("match setup (initRunGame)");
     y_shake = 0;
     x_shake = 0;
 

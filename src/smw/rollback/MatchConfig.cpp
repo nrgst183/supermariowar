@@ -653,8 +653,18 @@ void startConfiguredMatch(const MatchConfig& config)
 
     g_map->predrawbackground(rm->spr_background, rm->spr_backmap[0]);
     g_map->predrawforeground(rm->spr_frontmap[0]);
-    g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
-    g_map->predrawforeground(rm->spr_frontmap[1]);
+    //(the second copy, the animated tiles' other buffer: the same pixels, copied, not drawn again;
+    //set up as the drawing sets it: the back layer opaque, the front one blended)
+    if (gfx_copypixels(rm->spr_backmap[0].getSurface(), rm->spr_backmap[1].getSurface()))
+        SDL_SetSurfaceBlendMode(rm->spr_backmap[1].getSurface(), SDL_BLENDMODE_NONE);
+    else
+        g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
+    if (gfx_copypixels(rm->spr_frontmap[0].getSurface(), rm->spr_frontmap[1].getSurface())) {
+        SDL_SetSurfaceColorKey(rm->spr_frontmap[1].getSurface(), false, 0);
+        SDL_SetSurfaceBlendMode(rm->spr_frontmap[1].getSurface(), SDL_BLENDMODE_BLEND);
+    } else {
+        g_map->predrawforeground(rm->spr_frontmap[1]);
+    }
     g_map->fitDrawAreas(rm->spr_frontmap[0]);    //(only where it shows)
     g_map->SetupAnimatedTiles();
     LoadMapObjects(false);

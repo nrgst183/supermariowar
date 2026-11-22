@@ -374,6 +374,40 @@ TEST_CASE("Slots: local players, CPU players, teams and colors") {
     CHECK(host.lobby->canStart(why));
 }
 
+TEST_CASE("CPUs only: the host may have no players of its own, for a game on its machine") {
+    LobbyNet net;
+    Node& host = net.add(true);
+    net.settle();
+
+    host.lobby->setLocalPlayers(0);
+    host.lobby->setCpuCount(4);
+    CHECK(host.lobby->peer(host.lobby->localPeer()).localPlayers == 0);
+    for (int k = 0; k < 4; k++)
+        CHECK(host.lobby->slot(k).kind == SlotKind::Cpu);
+    host.lobby->setSlotTeam(1, 1);
+    std::string why;
+    CHECK(host.lobby->canStart(why));
+
+    //One who joins plays: its players can't be none
+    Node& a = net.add(false);
+    net.settle();
+    a.lobby->setLocalPlayers(0);
+    CHECK(a.lobby->peer(a.lobby->localPeer()).localPlayers == 1);
+
+    //With someone else in, the host's players are needed in the match too
+    host.lobby->setCpuCount(1);
+    a.lobby->setReady(true);
+    net.step(80);
+    CHECK_FALSE(host.lobby->canStart(why));
+    CHECK(why.find("My players") != std::string::npos);
+    host.lobby->setLocalPlayers(1);
+    net.step(10);
+    host.lobby->setSlotTeam(0, 0);
+    host.lobby->setSlotTeam(1, 1);
+    host.lobby->setSlotTeam(2, 2);
+    CHECK(host.lobby->canStart(why));
+}
+
 TEST_CASE("Leaving, kicking, a lost peer and the host closing the lobby") {
     LobbyNet net;
     Node& host = net.add(true);

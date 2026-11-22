@@ -223,6 +223,19 @@ void MI_MatchHistory::loadPortraits(const history::Entry& e) const
 // from the map file if there is none yet; none if the map isn't here any more
 void MI_MatchHistory::loadThumbnail(const history::Entry& e) const
 {
+    //(none saved: made from the map file, a read and a drawing of the whole map, slow from a disc;
+    //so only once the selection has stayed on the match a moment, not for each one moved past)
+    if (!m_thumbnailToMake.empty()) {
+        if (m_thumbnailFor != m_index) {
+            m_thumbnailToMake.clear();
+        } else if (SDL_GetTicks() - m_thumbnailAsked >= 350 && g_map) {
+            g_map->loadMap(m_thumbnailToMake, read_type_preview);
+            m_thumbnail = g_map->createThumbnailSurface(false);
+            IMG_SavePNG(m_thumbnail.getSurface(), mapThumbnailPath(m_thumbnailToMake).c_str());    //(if it can't be saved, it's made again next time)
+            m_thumbnailToMake.clear();
+            return;
+        }
+    }
     if (m_thumbnailFor == m_index)
         return;
     m_thumbnailFor = m_index;
@@ -238,14 +251,11 @@ void MI_MatchHistory::loadThumbnail(const history::Entry& e) const
             m_thumbnail = ImageLoader(cached.c_str()).withoutColorKey().create();
             return;
         } catch (...) {
-            //(a broken file: made again below)
+            //(a broken file: made again)
         }
     }
-    if (!g_map)
-        return;
-    g_map->loadMap(file, read_type_preview);
-    m_thumbnail = g_map->createThumbnailSurface(false);
-    IMG_SavePNG(m_thumbnail.getSurface(), cached.c_str());    //(if it can't be saved, it's made again next time)
+    m_thumbnailToMake = file;
+    m_thumbnailAsked = SDL_GetTicks();
 }
 
 void MI_MatchHistory::drawDetails(short y) const
