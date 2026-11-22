@@ -47,7 +47,7 @@ void MI_Button::Draw()
 
     switch (m_text_align) {
         case TextAlign::LEFT:
-            rm->menu_font_large.drawChopRight(m_pos.x + 16 + (iImageW > 0 ? iImageW + 2 : 0), m_pos.y + 5, iWidth - 32, szName.c_str());
+            rm->menu_font_large.drawScrolling(m_pos.x + 16 + (iImageW > 0 ? iImageW + 2 : 0), m_pos.y + 5, iWidth - 32, szName.c_str(), fSelected);
             if (sprImage)
                 sprImage->draw(m_pos.x + 16, m_pos.y + 16 - (iImageH >> 1), srcRect);
             break;

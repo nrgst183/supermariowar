@@ -1,6 +1,8 @@
 #ifndef MAPLIST_H
 #define MAPLIST_H
 
+#include "path.h"
+
 #include <map>
 #include <string>
 #include <vector>
@@ -46,6 +48,17 @@ public:
                 return true;
         }
         return false;
+    }
+    /// The file of the map (the battle maps', then the worlds') whose name is `name` as
+    /// stripPathAndExtension gives it (the match history's); "" if there is none
+    std::string fileNamed(const std::string& name) const {
+        for (const auto* list : {&maps, &worldmaps}) {
+            for (const auto& [key, node] : *list) {
+                if (stripPathAndExtension(node.filename) == name)
+                    return node.filename;
+            }
+        }
+        return {};
     }
     const std::string& currentFilename() const {
         return (*outercurrent).second.filename;

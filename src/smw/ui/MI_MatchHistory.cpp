@@ -8,8 +8,13 @@
 #include "ui/InputPrompts.h"
 #include "ResourceManager.h"
 #include "FileList.h"
+#include "MapList.h"
+#include "map.h"
+#include "path.h"
 #include "uimenu.h"
 #include "rollback/Replay.h"
+
+#include <SDL3_image/SDL_image.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -72,6 +77,8 @@ void MI_MatchHistory::Refresh()
     m_index = 0;
     m_offset = 0;
     m_message.clear();
+    m_portraitsFor = -1;
+    m_thumbnailFor = -1;
 }
 
 MenuCodeEnum MI_MatchHistory::Modify(bool modify)
@@ -180,7 +187,7 @@ void MI_MatchHistory::Draw()
             rm->menu_mode_small.draw(x + 10, y + 8, {static_cast<short>(icon * 16), 0, 16, 16});
         rm->menu_font_small.drawChopRight(x + 34, y + 9, 118, history::formatShortTime(e.time));
         const std::string what = e.mode + (e.map.empty() ? "" : " - " + e.map);
-        rm->menu_font_large.drawChopRight(x + 160, y + 5, lineW - 160 - 172, what);
+        rm->menu_font_large.drawScrolling(x + 160, y + 5, lineW - 160 - 172, what, selected);
         rm->menu_font_small.drawChopLeft(x + lineW - 12, y + 9, 160, resultText(e));
     }
 
@@ -212,6 +219,35 @@ void MI_MatchHistory::loadPortraits(const history::Entry& e) const
     }
 }
 
+// The selected match's map, as the map browser shows it: its saved thumbnail, or one made (and saved)
+// from the map file if there is none yet; none if the map isn't here any more
+void MI_MatchHistory::loadThumbnail(const history::Entry& e) const
+{
+    if (m_thumbnailFor == m_index)
+        return;
+    m_thumbnailFor = m_index;
+    m_thumbnail = gfxSprite();
+    if (e.map.empty() || !maplist)
+        return;
+    const std::string file = maplist->fileNamed(e.map);
+    if (file.empty())
+        return;
+    const std::string cached = mapThumbnailPath(file);
+    if (FileExists(cached)) {
+        try {
+            m_thumbnail = ImageLoader(cached.c_str()).withoutColorKey().create();
+            return;
+        } catch (...) {
+            //(a broken file: made again below)
+        }
+    }
+    if (!g_map)
+        return;
+    g_map->loadMap(file, read_type_preview);
+    m_thumbnail = g_map->createThumbnailSurface(false);
+    IMG_SavePNG(m_thumbnail.getSurface(), cached.c_str());    //(if it can't be saved, it's made again next time)
+}
+
 void MI_MatchHistory::drawDetails(short y) const
 {
     const short h = static_cast<short>(442 - y);    //(the footer under it)
@@ -220,7 +256,6 @@ void MI_MatchHistory::drawDetails(short y) const
     drawBox(m_pos.x, y, m_width, h);
     const short x = m_pos.x + 20;
     const short right = m_pos.x + m_width - 20;
-    const short bottom = static_cast<short>(y + h - 10);
 
     if (m_entries.empty() || m_index >= static_cast<int>(m_entries.size())) {
         menupanel::footer({{{prompts::Pad::B}, {prompts::menuKey(prompts::MENU_CANCEL)}, "back"}});
@@ -228,43 +263,51 @@ void MI_MatchHistory::drawDetails(short y) const
     }
     const history::Entry& e = m_entries[static_cast<size_t>(m_index)];
 
-    //The heading: the mode's icon and the map, large; under it the rest in the small font, on one line
+    //The map's thumbnail on the left, in the lobby's frame (the map browser's picture of it)
+    loadThumbnail(e);
+    theme::statusBar(x, y + 10, 166, 126);
+    if (m_thumbnail)
+        m_thumbnail.draw(x + 3, y + 13);
+    else
+        rm->menu_font_small.drawCentered(x + 83, y + 69, "No picture");
+
+    //Right of it the heading: the mode's icon and the map, large; under it the rest, small
+    const short ax = static_cast<short>(x + 178);
     const short icon = modeIcon(e.modeId);
-    short tx = x;
+    short tx = ax;
     if (icon >= 0) {
-        rm->menu_mode_small.draw(x, y + 14, {static_cast<short>(icon * 16), 0, 16, 16});
+        rm->menu_mode_small.draw(ax, y + 14, {static_cast<short>(icon * 16), 0, 16, 16});
         tx += 24;
     }
-    rm->menu_font_large.drawChopRight(tx, y + 12, right - tx, e.map.empty() ? e.mode : e.map);
-    std::string info = e.mode;
+    rm->menu_font_large.drawScrolling(tx, y + 12, right - tx, e.map.empty() ? e.mode : e.map);
+    std::string what = e.mode;
     if (e.goal > 0)
-        info += " to " + std::to_string(e.goal);
-    info += "   " + e.matchType + (e.online ? " (online)" : "");
-    info += "   " + history::formatDuration(e.ticks) + "   " + history::formatTime(e.time);
-    rm->menu_font_small.drawChopRight(x, y + 38, right - x, info);
-    prompts::fill(x, y + 56, right - x, 2, {42, 154, 240, 255});    //(the frame's light edge: the heading's end)
+        what += " to " + std::to_string(e.goal);
+    what += "   " + e.matchType + (e.online ? " (online)" : "");
+    rm->menu_font_small.drawScrolling(ax, y + 36, right - ax, what);
+    rm->menu_font_small.drawScrolling(ax, y + 50, right - ax, history::formatDuration(e.ticks) + "   " + history::formatTime(e.time));
+    prompts::fill(ax, y + 66, right - ax, 2, {42, 154, 240, 255});    //(the frame's light edge: the heading's end)
 
-    //The teams, by place, side by side: a card each (the winner's lit, with a crown), its first
-    //player's portrait (their skin, in the lobby's frame), the place, the name and the score
+    //The teams, by place, two to a row: a card each (the winner's lit, with a crown), its first
+    //player's portrait (their skin, in the lobby's frame), the place and the score, then the name
     std::vector<size_t> order(e.teams.size());
     for (size_t k = 0; k < order.size(); k++)
         order[k] = k;
     std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return e.teams[a].place < e.teams[b].place; });
     loadPortraits(e);
-    const int columns = std::max<int>(1, static_cast<int>(order.size()));
-    const int columnW = std::min(180, (right - x + 8) / columns);
-    constexpr short CARD_H = 58;
-    for (int c = 0; c < columns && c < static_cast<int>(order.size()); c++) {
-        const size_t t = order[static_cast<size_t>(c)];
+    const int columnW = (right - ax + 8) / 2;
+    constexpr short CARD_H = 44;
+    for (size_t c = 0; c < order.size() && c < 4; c++) {
+        const size_t t = order[c];
         const history::Team& team = e.teams[t];
-        const short cx = static_cast<short>(x + c * columnW);
-        const short cy = static_cast<short>(y + 66);
+        const short cx = static_cast<short>(ax + static_cast<int>(c % 2) * columnW);
+        const short cy = static_cast<short>(y + 74 + static_cast<int>(c / 2) * (CARD_H + 4));
         const short cw = static_cast<short>(columnW - 8);
         const bool won = static_cast<int>(t) == e.winner;
         menupanel::row(cx, cy, cw, CARD_H, won);
 
-        const short px = static_cast<short>(cx + 6);
-        const short py = static_cast<short>(cy + 10);
+        const short px = static_cast<short>(cx + 3);
+        const short py = static_cast<short>(cy + 3);
         theme::statusBar(px, py, 38, 38);
         const std::vector<SpriteStrip>& strips = m_portraits[t];
         if (!strips.empty() && strips[0][0].getSurface())
@@ -273,13 +316,13 @@ void MI_MatchHistory::drawDetails(short y) const
             theme::crown(px + 26, py - 8);
 
         const short textX = static_cast<short>(px + 46);
-        const short textW = static_cast<short>(cx + cw - 6 - textX);
-        rm->menu_font_large.draw(textX, cy + 5, ordinal(team.place));
+        const short textW = static_cast<short>(cx + cw - 8 - textX);
+        rm->menu_font_large.draw(textX, cy + 4, ordinal(team.place));
+        rm->menu_font_small.drawRightJustified(cx + cw - 8, cy + 9, std::to_string(team.score) + (team.score == 1 ? " point" : " points"));
         std::string name = team.players.empty() ? "?" : team.players[0].name;
         if (team.players.size() > 1)
             name += " +" + std::to_string(team.players.size() - 1);
-        rm->menu_font_small.drawChopRight(textX, cy + 27, textW, name);
-        rm->menu_font_small.drawChopRight(textX, cy + 41, textW, std::to_string(team.score) + (team.score == 1 ? " point" : " points"));
+        rm->menu_font_small.drawScrolling(textX, cy + 27, textW, name);
     }
 
     //What the buttons do: the controller's or the keys, in the footer (as on the other menus)
@@ -289,10 +332,6 @@ void MI_MatchHistory::drawDetails(short y) const
     if (!e.replay.empty())
         row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "watch the replay"});
     row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"});
-    menupanel::footer(row);
-
-    if (!m_message.empty())
-        rm->menu_font_small.drawRightJustified(right, bottom - 14, m_message);
-    else if (e.replay.empty())
-        rm->menu_font_small.drawRightJustified(right, bottom - 14, "No replay");
+    //(why a replay can't play: by the buttons, in the footer)
+    menupanel::footer(row, !m_message.empty() ? m_message : e.replay.empty() ? std::string("No replay") : std::string());
 }

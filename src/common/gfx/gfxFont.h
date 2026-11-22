@@ -33,6 +33,9 @@ public:
     void drawChopLeft(int x, int y, int width, std::string_view text) const {
         draw(x - getWidth(text), y, text, x - width, x);
     }
+    /// Text in `width` pixels: if it's longer, it waits, slides left until its end shows, waits, and
+    /// slides back (then again), so the whole of it can be read; without `scroll`, as drawChopRight
+    void drawScrolling(int x, int y, int width, std::string_view text, bool scroll = true) const;
 
     void setAlpha(Uint8 alpha);
 

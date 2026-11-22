@@ -5,6 +5,8 @@
 #include <SDL3_image/SDL_image.h>
 
 #include <format>
+#include <string>
+#include <unordered_map>
 #include <iostream>
 
 namespace {
@@ -75,6 +77,57 @@ gfxFont::gfxFont(const std::filesystem::path& path)
 
     m_sprite = gfxSprite(std::move(surf_opti), std::nullopt);
     std::cout << "done" << std::endl;
+}
+
+void gfxFont::drawScrolling(int x, int y, int width, std::string_view text, bool scroll) const
+{
+    const int overflow = getWidth(text) - width;
+    if (overflow <= 0 || !scroll || !blitdest) {
+        draw(x, y, text, x, x + width);
+        return;
+    }
+
+    //Each text's own clock: from when it was first drawn (a text not drawn for a moment starts again)
+    struct Clock {
+        Uint64 since;
+        Uint64 last;
+    };
+    static std::unordered_map<std::string, Clock> clocks;
+    const Uint64 now = SDL_GetTicks();
+    auto [it, added] = clocks.try_emplace(std::string(text), Clock {now, now});
+    if (!added && now - it->second.last > 250)
+        it->second.since = now;
+    it->second.last = now;
+    if (clocks.size() > 64)
+        std::erase_if(clocks, [now](const auto& c) { return now - c.second.last > 1000; });
+
+    //Wait, slide to the end, wait, slide back (faster); 2-pixel steps, as the game's doubled pixels
+    constexpr Uint64 WAIT_MS = 1200;
+    constexpr Uint64 PX_PER_S = 40;
+    const Uint64 there = static_cast<Uint64>(overflow) * 1000 / PX_PER_S;
+    const Uint64 back = there / 3;
+    const Uint64 t = (now - it->second.since) % (WAIT_MS + there + WAIT_MS + back);
+    int offset = 0;
+    if (t < WAIT_MS)
+        offset = 0;
+    else if (t < WAIT_MS + there)
+        offset = static_cast<int>((t - WAIT_MS) * overflow / there);
+    else if (t < WAIT_MS + there + WAIT_MS)
+        offset = overflow;
+    else
+        offset = overflow - static_cast<int>((t - WAIT_MS - there - WAIT_MS) * overflow / back);
+    offset &= ~1;
+
+    //(clipped to the box: no letter half out of it)
+    SDL_Rect previous;
+    SDL_GetSurfaceClipRect(blitdest, &previous);
+    SDL_Rect box {x, 0, width, blitdest->h};
+    SDL_Rect clip;
+    if (!SDL_GetRectIntersection(&previous, &box, &clip))
+        return;
+    SDL_SetSurfaceClipRect(blitdest, &clip);
+    draw(x - offset, y, text, x, x + width);
+    SDL_SetSurfaceClipRect(blitdest, &previous);
 }
 
 void gfxFont::draw(int x, int y, std::string_view text, int dst_min_x, int dst_max_x) const

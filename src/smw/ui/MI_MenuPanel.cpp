@@ -143,7 +143,7 @@ void bestText(int x, int y, int w, const std::string& text)
     if (rm->menu_font_large.getWidth(text) <= w)
         rm->menu_font_large.draw(x, y - 6, text);
     else
-        rm->menu_font_small.drawChopRight(x, y, w, text);
+        rm->menu_font_small.drawScrolling(x, y, w, text);
 }
 
 void footer(const std::vector<prompts::Prompt>& row, const std::string& label)

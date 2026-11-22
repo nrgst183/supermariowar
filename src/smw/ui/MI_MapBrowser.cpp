@@ -85,7 +85,7 @@ void MI_MapBrowser::Draw()
             rm->menu_map_filter.draw(rDst.x, rDst.y, {iFilterTagAnimationFrame, 24, 24, 24});
     }
 
-    rm->menu_font_large.drawChopRight(rDst.x, rDst.y + 120, 165, mapNames[iSelectedRow * 3 + iSelectedCol].c_str());
+    rm->menu_font_large.drawScrolling(rDst.x, rDst.y + 120, 165, mapNames[iSelectedRow * 3 + iSelectedCol].c_str());
 }
 
 MenuCodeEnum MI_MapBrowser::Modify(bool modify)

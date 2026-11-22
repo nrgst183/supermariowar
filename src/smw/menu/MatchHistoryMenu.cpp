@@ -5,7 +5,7 @@
 UI_MatchHistoryMenu::UI_MatchHistoryMenu()
     : UI_Menu()
 {
-    miHistory = new MI_MatchHistory(16, 16, 608, 7);    //(room under the list for the players' portraits)
+    miHistory = new MI_MatchHistory(16, 16, 608, 6);    //(room under the list for the map's thumbnail and the players' portraits)
     miHistory->SetAutoModify(true);
 
     AddControl(miHistory, nullptr, nullptr, nullptr, nullptr);

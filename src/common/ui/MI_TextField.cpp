@@ -343,7 +343,7 @@ void MI_TextField::Draw()
     spr->draw(m_pos.x + iIndent - 16, m_pos.y, {0, (fSelected ? 96 : 64), 32, 32});
     spr->draw(m_pos.x + iIndent + 16, m_pos.y, {528 - iWidth + iIndent, (fSelected ? 32 : 0) + iAdjustmentY, iWidth - iIndent - 16, 32});
 
-    rm->menu_font_large.drawChopRight(m_pos.x + 16, m_pos.y + 5, iIndent - 8, szName.c_str());
+    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, iIndent - 8, szName.c_str(), fSelected);
 
     if (szOutValue) {
         if (iStringWidth <= iAllowedWidth || !fModifying) {

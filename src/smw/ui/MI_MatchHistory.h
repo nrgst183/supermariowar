@@ -40,4 +40,8 @@ private:
     void loadPortraits(const history::Entry& e) const;
     mutable int m_portraitsFor = -1;
     mutable std::vector<std::vector<SpriteStrip>> m_portraits;
+    // The selected match's map: its thumbnail (the map browser's), which match it's for
+    void loadThumbnail(const history::Entry& e) const;
+    mutable int m_thumbnailFor = -1;
+    mutable gfxSprite m_thumbnail;
 };

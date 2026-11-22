@@ -240,7 +240,7 @@ void MI_LanGameList::drawRow(int x, int y, const Game& game, bool selected) cons
     menupanel::row(x, y, ROW_W, ROW_H, selected, !joinable);
 
     //Left: the host, and under it what they play
-    rm->menu_font_large.draw(x + 14, y + 4, fit(rm->menu_font_large, game.name.empty() ? game.address : game.name, 300));
+    rm->menu_font_large.drawScrolling(x + 14, y + 4, 300, game.name.empty() ? game.address : game.name, selected);
     std::string what;
     if (!game.sameBuild)
         what = "Another version of the game";
@@ -257,14 +257,14 @@ void MI_LanGameList::drawRow(int x, int y, const Game& game, bool selected) cons
     if (game.sameBuild && game.editor()) {
         const std::string tag = game.activity == 2 ? "WORLD EDIT" : "MAP EDIT";
         const int tagW = rm->menu_font_small.getWidth(tag) + 30;
-        const int nameW = rm->menu_font_large.getWidth(fit(rm->menu_font_large, game.name.empty() ? game.address : game.name, 300));
+        const int nameW = std::min(300, rm->menu_font_large.getWidth(game.name.empty() ? game.address : game.name));
         const int tagX = x + 14 + nameW + 10;
         //(green: being edited now; gold: its lobby waits for the host's start)
         theme::block(tagX, y + 4, tagW, 20, game.editing ? theme::Tone::Green : theme::Tone::Gold);
         theme::icon(tagX + 3, y + 6, game.activity == 2 ? theme::Icon::Star : theme::Icon::QuestionBlock);
         rm->menu_font_small.draw(tagX + 22, y + 8, tag.c_str());
     }
-    rm->menu_font_small.draw(x + 14, y + 26, fit(rm->menu_font_small, what, 360));
+    rm->menu_font_small.drawScrolling(x + 14, y + 26, 360, what, selected);
 
     //Right: the connection, and how many are in
     theme::signal(x + ROW_W - 34, y + 6, game.pingMs);
@@ -431,7 +431,7 @@ void UI_SystemLinkMenu::drawDetails() const
         //(no nickname: the lobby's "Player 1", as the others' lists show it)
         theme::statusIcon(PANEL_X + 20, DETAILS_Y + 42, theme::Status::Info);
         const std::string text = "Others on this network see it as \"" + (name.empty() ? std::string("Player 1") : name) + "\"";
-        rm->menu_font_small.draw(PANEL_X + 44, DETAILS_Y + 46, fit(rm->menu_font_small, text, PANEL_W - 64));
+        rm->menu_font_small.drawScrolling(PANEL_X + 44, DETAILS_Y + 46, PANEL_W - 64, text);
         return;
     }
     const MI_LanGameList::Game& game = *chosen;
@@ -439,7 +439,7 @@ void UI_SystemLinkMenu::drawDetails() const
     //The chosen game: who, where, and whether (and how) it can be joined
     menupanel::box(PANEL_X, DETAILS_Y, PANEL_W, DETAILS_H);
     const std::string name = game.name.empty() ? "A game" : game.name + "'s game";
-    rm->menu_font_large.draw(PANEL_X + 20, DETAILS_Y + 12, fit(rm->menu_font_large, name, 300));
+    rm->menu_font_large.drawScrolling(PANEL_X + 20, DETAILS_Y + 12, 300, name);
     rm->menu_font_small.drawRightJustified(PANEL_X + PANEL_W - 20, DETAILS_Y + 16, game.address);
 
     const bool full = game.maxMembers > 0 && game.members >= game.maxMembers;

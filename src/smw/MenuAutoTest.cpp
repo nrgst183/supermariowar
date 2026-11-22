@@ -1555,7 +1555,12 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                     return MENU_CODE_TO_HISTORY_MENU;
                 if (t == 20)
                     shot("h1_history");
-                if (t == 24)
+                //(later: long names partway and all the way through their scrolling)
+                if (t == 700)
+                    shot("h1b_history_scrolling");
+                if (t == 1100)
+                    shot("h1c_history_scrolled");
+                if (t == 1104)
                     next();
                 return MENU_CODE_NONE;
             case 2:
