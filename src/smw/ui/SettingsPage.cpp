@@ -39,7 +39,7 @@ void MI_SettingsHelp::Draw()
     const UI_Control* focus = m_menu.currentFocus();
     for (const auto& [row, text] : m_lines) {
         if (row == focus) {
-            rm->menu_font_small.drawChopRight(24, 458, 592, text);
+            menupanel::bestText(24, 458, 592, text);
             return;
         }
     }

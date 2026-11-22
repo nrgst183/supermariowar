@@ -235,7 +235,7 @@ void MI_MatchHistory::drawDetails(short y) const
         title += "  -  " + e.map;
     rm->menu_font_large.drawChopRight(x, y + 12, m_width - 40, title);
     std::string info = e.matchType + (e.online ? " (online)" : "") + "    " + history::formatDuration(e.ticks) + "    " + history::formatTime(e.time);
-    rm->menu_font_small.drawChopRight(x, y + 34, m_width - 40, info);
+    menupanel::bestText(x, y + 36, m_width - 40, info);
 
     //The teams, by place, side by side: the place and the score, then the players' portraits (their
     //skins, in the lobby's frames) and their names; the winners' crown over theirs

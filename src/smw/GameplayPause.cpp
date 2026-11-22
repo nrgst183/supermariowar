@@ -137,8 +137,8 @@ void drawOnlinePanel()
 
     using prompts::Pad;
     using prompts::menuKey;
-    prompts::drawPrompts(320, y + 164, {{{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
-        {{Pad::Start}, {menuKey(prompts::MENU_CANCEL)}, "close"}});
+    prompts::drawPromptsLarge(320, y + 164, {{{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
+        {{Pad::Start}, {menuKey(prompts::MENU_CANCEL)}, "close"}}, 14, 400);
 }
 
 bool IsPauseAllowed()

@@ -465,7 +465,7 @@ void UI_SystemLinkMenu::drawDetails() const
         text = "In the lobby (" + std::to_string(game.members) + " of " + std::to_string(game.maxMembers) + "). Press A to join";
     }
     theme::statusIcon(PANEL_X + 20, DETAILS_Y + 36, status);
-    rm->menu_font_small.draw(PANEL_X + 44, DETAILS_Y + 40, fit(rm->menu_font_small, text, PANEL_W - 64));
+    menupanel::bestText(PANEL_X + 44, DETAILS_Y + 40, PANEL_W - 64, text);
 }
 
 std::string UI_SystemLinkMenu::SelectedAddress(std::string& why) const

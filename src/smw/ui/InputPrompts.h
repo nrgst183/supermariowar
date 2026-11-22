@@ -64,6 +64,11 @@ struct Prompt {
     std::string label;
 };
 int promptsWidth(const std::vector<Prompt>& row, int gap);
+// The labels in the menus' large font (the title bar's and the footer's: read from a couch), not the
+// small one; until set back
+void setLargeLabels(bool large);
+// drawPrompts() with the large labels if the row fits in maxW that way, else the small ones
+int drawPromptsLarge(int cx, int y, const std::vector<Prompt>& row, int gap, int maxW);
 // Centered on cx; returns the width
 int drawPrompts(int cx, int y, const std::vector<Prompt>& row, int gap = 14);
 

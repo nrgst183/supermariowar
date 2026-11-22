@@ -546,13 +546,16 @@ void drawHelp()
 void drawConfirmLeave()
 {
     const std::vector<prompts::Prompt> row = {{{Pad::A}, {}, "leave"}, {{Pad::B}, {}, "keep watching"}};
-    const int w = std::max(theme::font().getWidth("Leave the replay?") + 60, prompts::promptsWidth(row, 16) + 48);
+    //(large: read from a couch)
+    prompts::setLargeLabels(true);
+    const int w = std::max(theme::bigFont().getWidth("Leave the replay?") + 60, prompts::promptsWidth(row, 16) + 48);
     const int h = 86;
     const int x = (App::screenWidth - w) / 2;
     const int y = 150;
     theme::panel(x, y, w, h);
-    theme::font().drawCentered(App::screenWidth / 2, y + 22, "Leave the replay?");
-    prompts::drawPrompts(App::screenWidth / 2, y + 50, row, 16);
+    theme::bigFont().drawCentered(App::screenWidth / 2, y + 16, "Leave the replay?");
+    prompts::drawPrompts(App::screenWidth / 2, y + 52, row, 16);
+    prompts::setLargeLabels(false);
 }
 
 void showUi()

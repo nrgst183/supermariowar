@@ -22,26 +22,33 @@ constexpr MenuCodeEnum navDir2menuCode(MenuNavDirection direction)
     return MenuCodeEnum::MENU_CODE_NONE;
 }
 
-// A held direction (a key, the d-pad, the stick) goes on moving through a menu: after a moment, then
-// steadily. How long each player's directions have been down, in frames
-constexpr int REPEAT_DELAY = 24;
-constexpr int REPEAT_EVERY = 5;
+// A held direction (a key, the d-pad, the stick) goes on through a menu, faster the longer it's held:
+// after a moment about 10 steps a second, after a second about 20, after two every frame (a long map
+// list). Its repeats are presses for everything in the menu (the lists, the value fields, the map
+// field: they act on presses), counted from how long each player's directions have been down
+constexpr int REPEAT_DELAY = 20;
 int g_held[4][4] = {};
 
-void countHeld(const CPlayerInput& input)
+bool repeats(int held)
 {
-    for (int p = 0; p < 4; p++) {
-        const COutputControl& keys = input.outputControls[p];
-        const CKeyState* dirs[4] = {&keys.menu_up, &keys.menu_down, &keys.menu_left, &keys.menu_right};
-        for (int d = 0; d < 4; d++)
-            g_held[p][d] = dirs[d]->fDown ? g_held[p][d] + 1 : 0;
-    }
+    if (held <= REPEAT_DELAY)
+        return false;
+    const int t = held - REPEAT_DELAY;
+    const int every = t < 60 ? 6 : t < 125 ? 3 : 1;
+    return t % every == 0;
 }
 
-bool repeats(int player, int dir)
+void countHeld(CPlayerInput& input)
 {
-    const int held = g_held[player][dir];
-    return held > REPEAT_DELAY && (held - REPEAT_DELAY) % REPEAT_EVERY == 0;
+    for (int p = 0; p < 4; p++) {
+        COutputControl& keys = input.outputControls[p];
+        CKeyState* dirs[4] = {&keys.menu_up, &keys.menu_down, &keys.menu_left, &keys.menu_right};
+        for (int d = 0; d < 4; d++) {
+            g_held[p][d] = dirs[d]->fDown ? g_held[p][d] + 1 : 0;
+            if (repeats(g_held[p][d]))
+                dirs[d]->fPressed = true;
+        }
+    }
 }
 } // namespace
 
@@ -186,19 +193,19 @@ MenuCodeEnum UI_Menu::SendInput(CPlayerInput* playerInput)
             continue;
         }
 
-        if (playerInput->outputControls[iPlayer].menu_up.fPressed || repeats(iPlayer, 0)) {
+        if (playerInput->outputControls[iPlayer].menu_up.fPressed) {
             return MoveNextControl(MenuNavDirection::Up);
         }
 
-        if (playerInput->outputControls[iPlayer].menu_down.fPressed || repeats(iPlayer, 1)) {
+        if (playerInput->outputControls[iPlayer].menu_down.fPressed) {
             return MoveNextControl(MenuNavDirection::Down);
         }
 
-        if (playerInput->outputControls[iPlayer].menu_left.fPressed || repeats(iPlayer, 2)) {
+        if (playerInput->outputControls[iPlayer].menu_left.fPressed) {
             return MoveNextControl(MenuNavDirection::Left);
         }
 
-        if (playerInput->outputControls[iPlayer].menu_right.fPressed || repeats(iPlayer, 3)) {
+        if (playerInput->outputControls[iPlayer].menu_right.fPressed) {
             return MoveNextControl(MenuNavDirection::Right);
         }
 

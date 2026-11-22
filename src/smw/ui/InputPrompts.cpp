@@ -30,15 +30,24 @@ float axis(Sint16 value)
     return std::fabs(v) < DEADZONE ? 0.0f : v;
 }
 
+bool g_largeLabels = false;
+
 void text(int x, int y, const std::string& s)
 {
-    if (rm)
+    if (!rm)
+        return;
+    //(the large font's letters centered on the buttons' 16 pixels, as the small one's are)
+    if (g_largeLabels)
+        rm->menu_font_large.draw(x, y - 6, s);
+    else
         rm->menu_font_small.draw(x, y, s);
 }
 
 int textWidth(const std::string& s)
 {
-    return rm ? rm->menu_font_small.getWidth(s) : static_cast<int>(s.size()) * 8;
+    if (!rm)
+        return static_cast<int>(s.size()) * 8;
+    return g_largeLabels ? rm->menu_font_large.getWidth(s) : rm->menu_font_small.getWidth(s);
 }
 
 } // namespace
@@ -762,6 +771,21 @@ std::string menuKey(MenuKey key)
             return to;
     }
     return name;
+}
+
+void setLargeLabels(bool large)
+{
+    g_largeLabels = large;
+}
+
+int drawPromptsLarge(int cx, int y, const std::vector<Prompt>& row, int gap, int maxW)
+{
+    g_largeLabels = true;
+    if (promptsWidth(row, gap) > maxW)
+        g_largeLabels = false;
+    const int w = drawPrompts(cx, y, row, gap);
+    g_largeLabels = false;
+    return w;
 }
 
 int promptsWidth(const std::vector<Prompt>& row, int gap)

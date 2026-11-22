@@ -216,7 +216,7 @@ TEST_CASE("TOML config document covers every descriptor field exactly once")
     }, config::NamedLayout<CGameConfig>::sections);
 
     CHECK(counts[0] == 11);
-    CHECK(counts[1] == 75);
+    CHECK(counts[1] == 76);
     CHECK(counts[2] == 2); // gamemode_settings, gamemode_goals
 }
 

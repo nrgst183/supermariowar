@@ -17,6 +17,9 @@ void box(int x, int y, int w, int h);
 void row(int x, int y, int w, int h, bool selected, bool dim = false);
 /// The button prompts on a dark strip along the bottom of the screen (y 450 to 480), after a label
 /// if there is one; every menu's prompts are drawn here
+// A line of text in the large font if it fits in w (read from a couch), else the small one (cut to w);
+// y: where the small font's line would be
+void bestText(int x, int y, int w, const std::string& text);
 void footer(const std::vector<prompts::Prompt>& row, const std::string& label = "");
 }
 

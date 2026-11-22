@@ -137,6 +137,15 @@ void row(int x, int y, int w, int h, bool selected, bool dim)
         prompts::fill(x + 5, y + 2, w - 10, 2, dim ? SDL_Color {80, 88, 112, 255} : SDL_Color {24, 96, 176, 255});
 }
 
+void bestText(int x, int y, int w, const std::string& text)
+{
+    //(the large font a line higher, its letters on the small one's line)
+    if (rm->menu_font_large.getWidth(text) <= w)
+        rm->menu_font_large.draw(x, y - 6, text);
+    else
+        rm->menu_font_small.drawChopRight(x, y, w, text);
+}
+
 void footer(const std::vector<prompts::Prompt>& row, const std::string& label)
 {
     //The status bar's strip along the bottom of the screen (as the title bar's at the top), the prompts
@@ -144,13 +153,16 @@ void footer(const std::vector<prompts::Prompt>& row, const std::string& label)
     theme::statusBar(0, 448, 640, 32);
     int left = 24;
     if (!label.empty()) {
-        rm->menu_font_small.draw(left, 458, label);
-        left += rm->menu_font_small.getWidth(label) + 14;
+        bestText(left, 458, 300, label);
+        left += std::min(300, rm->menu_font_large.getWidth(label)) + 14;
     }
     if (row.empty())
         return;
+    //(the labels large: read from a couch)
+    prompts::setLargeLabels(true);
     const int w = prompts::promptsWidth(row, 18);
     prompts::drawPrompts(left + w / 2, 458, row, 18);
+    prompts::setLargeLabels(false);
 }
 } // namespace menupanel
 

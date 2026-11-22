@@ -558,7 +558,7 @@ void MI_LobbyScene::Draw()
 void MI_PromptRow::Draw()
 {
     if (m_visible && m_row)
-        prompts::drawPrompts(m_pos.x, m_pos.y, m_row());
+        prompts::drawPromptsLarge(m_pos.x, m_pos.y, m_row(), 14, 600);    //(large if they fit: read from a couch)
 }
 
 

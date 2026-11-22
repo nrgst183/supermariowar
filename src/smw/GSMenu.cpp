@@ -120,6 +120,11 @@ void drawMenuHints(const UI_Menu& menu)
     }
     if (menu.Paged())
         left.push_back({{Pad::LB, Pad::RB}, {"PgUp", "PgDn"}, "page"});
+    //(their labels large, read from a couch: the least needed drop out first if the bar is short)
+    prompts::setLargeLabels(true);
+    struct SmallAgain {
+        ~SmallAgain() { prompts::setLargeLabels(false); }
+    } smallAgain;
     //(clear of the title: the least needed first out)
     while (!left.empty() && 8 + prompts::promptsWidth(left, GAP) > title->left() - 20)
         left.erase(left.begin());
