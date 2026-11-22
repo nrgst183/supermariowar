@@ -9,6 +9,7 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_MenuPanel.h"
 #include "ui/SmwTheme.h"
+#include "uimenu.h"
 
 #include <algorithm>
 #include <cctype>
@@ -32,12 +33,10 @@ std::string defaultSkinPath()
     return skinlist && skinlist->count() > 0 ? skinlist->at(0).path.string() : std::string();
 }
 
-// The blue bar of the original headers (the sprite is 512 wide: two halves, like MI_Button)
+// The headers' bar: All-Stars' SMB3 status bar, as the menus' title bar (SmwTheme)
 void blueBar(int x, int y, int width)
 {
-    const int half = width >> 1;
-    rm->menu_plain_field.draw(x, y, {0, 0, half, 32});
-    rm->menu_plain_field.draw(x + half, y, {512 - width + half, 0, width - half, 32});
+    theme::statusBar(x, y, width, 32);
 }
 
 // The cream frame of the map previews (336 x 254 plus the right and bottom edges)
@@ -384,19 +383,25 @@ void MI_OnlineTeamSelect::Draw()
         }
         rm->spr_player_select_ready.draw(cardX, CARD_Y, {0, 0, 128, 96});
         rm->spr_menu_boxed_numbers.draw(cardX + 16, CARD_Y + 20, {s * 16, i.color * 16, 16, 16});
+        // Their portrait: who they play as (their skin), in a small status bar frame, as All-Stars'
+        // file select shows its players
+        theme::statusBar(cardX + 12, CARD_Y + 36, 38, 38);
+        if (const gfxSprite* sprite = skinFrame(s, i, 0))
+            sprite->draw(cardX + 15, CARD_Y + 39, {0, 0, 32, 32});
         const bool host = i.human && lobby->slot(s).peer == 0 && lobby->slot(s).localIndex == 0;
         const int nameW = host ? 62 : 80;
         rm->menu_font_small.drawChopRight(cardX + 36, CARD_Y + 36 - rm->menu_font_small.getHeight(), nameW, i.name);
         if (host)
             theme::crown(cardX + 36 + std::min(nameW, rm->menu_font_small.getWidth(i.name)) + 2, CARD_Y + 21);
         // (the empty circle of the sprite is not drawn: a player who is not ready shows dots)
+        //(at the portrait's right)
         if (i.ready) {
-            rm->spr_player_select_ready.draw(cardX + 48, CARD_Y + 40, {128, i.human ? 32 : 64, 34, 32});
+            rm->spr_player_select_ready.draw(cardX + 66, CARD_Y + 40, {128, i.human ? 32 : 64, 34, 32});
         } else if (i.human) {
             const int lit = (m_tick / 12) % 4;
             for (int d = 0; d < 3; d++) {
-                prompts::fill(cardX + 50 + d * 10, CARD_Y + 52, 8, 8, BLACK);
-                prompts::fill(cardX + 52 + d * 10, CARD_Y + 54, 4, 4, d < lit ? SDL_Color {248, 200, 40, 255} : SDL_Color {150, 150, 160, 255});
+                prompts::fill(cardX + 66 + d * 10, CARD_Y + 52, 8, 8, BLACK);
+                prompts::fill(cardX + 68 + d * 10, CARD_Y + 54, 4, 4, d < lit ? SDL_Color {248, 200, 40, 255} : SDL_Color {150, 150, 160, 255});
             }
         }
 
@@ -477,15 +482,12 @@ void MI_LobbyMap::Draw()
     }
 
     if (m_fraction >= 0.0f) {
-        // The slider bar of the option menus: the track, with its red flag where the transfer is
-        const int barX = m_map.x + 20;
-        const int barW = m_map.w - 40;
+        // SMB3's P-meter: the arrows light up as the map comes, the P flashes when it's here
         const int barY = m_map.y + m_map.h / 2 + 20;
         rm->menu_font_small.drawCentered(m_map.x + m_map.w / 2, barY - 18, ellipsize(rm->menu_font_small, m_label, m_map.w - 16));
-        for (int px = barX; px < barX + barW; px += 8)
-            rm->menu_slider_bar.draw(px, barY, {8, 0, std::min(8, barX + barW - px), 16});
-        const int flagX = barX + static_cast<int>(static_cast<float>(barW - 12) * std::clamp(m_fraction, 0.0f, 1.0f));
-        rm->menu_slider_bar.draw(flagX, barY, {164, 0, 12, 16});
+        static int tick = 0;
+        ++tick;
+        theme::pmeter(m_map.x + (m_map.w - theme::pmeterWidth(3)) / 2, barY, m_fraction, tick, 3);
     }
 }
 
@@ -512,8 +514,7 @@ void MI_LobbyScene::Draw()
         return;
 
     // The header bar, as on every menu of the game
-    rm->menu_plain_field.draw(0, 0, {0, 0, 320, 32});
-    rm->menu_plain_field.draw(320, 0, {192, 0, 320, 32});
+    UI_Menu::drawTitleBarBack();
     rm->menu_font_large.drawCentered(320, 5, m_title);
 
     using prompts::Pad;

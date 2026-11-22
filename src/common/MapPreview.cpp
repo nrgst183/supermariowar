@@ -289,15 +289,12 @@ void CMap::drawPreviewBlocks(gfxSprite& targetSurface, bool fThumbnail)
     }
 }
 
-void CMap::predrawbackground(gfxSprite &background, gfxSprite &mapspr)
+// The background (its frame `frame`: an animated one's, BackgroundAnimation) and the back layers
+// over it
+void CMap::drawBackgroundLayers(const gfxSprite& background, gfxSprite& mapspr, int frame)
 {
-    SDL_Rect r;
-    r.x = 0;
-    r.y = 0;
-    r.w = App::screenWidth;
-    r.h = App::screenHeight;
-
-    background.draw(mapspr.getSurface(), r);
+    const SDL_Rect src = BackgroundAnimation::frameRect(frame);
+    background.draw(src, mapspr.getSurface(), Vec2i {0, 0});
 
     draw(mapspr, 0);
     draw(mapspr, 1);
@@ -307,11 +304,33 @@ void CMap::predrawbackground(gfxSprite &background, gfxSprite &mapspr)
         draw(mapspr, 3);
     }
 
-    //Add animated tile objects for each animated tile in a platform (to be used later for drawing)
-    addPlatformAnimatedTiles();
-
     //The background is opaque: drawn every frame as a plain copy, not blended pixel by pixel
     SDL_SetSurfaceBlendMode(mapspr.getSurface(), SDL_BLENDMODE_NONE);
+}
+
+void CMap::predrawbackground(gfxSprite &background, gfxSprite &mapspr)
+{
+    //(a match starts with the first frame of an animated background)
+    iBackgroundFrame = 0;
+    iBackgroundTicks = 0;
+    drawBackgroundLayers(background, mapspr, 0);
+
+    //Add animated tile objects for each animated tile in a platform (to be used later for drawing)
+    addPlatformAnimatedTiles();
+}
+
+void CMap::redrawBackgroundFrame(int frame)
+{
+    iBackgroundFrame = frame;
+    //(both of the match's background layers: the animated tiles draw into one while the other shows)
+    for (gfxSprite& layer : rm->spr_backmap)
+        drawBackgroundLayers(rm->spr_background, layer, frame);
+    if (animatedTilesSurface.getSurface()) {
+        for (AnimatedTile* tile : animatedtiles) {
+            if (tile->fBackgroundAnimated)
+                drawAnimatedBackgroundTile(*tile, frame);
+        }
+    }
 }
 
 void CMap::predrawforeground(gfxSprite &foregroundspr)

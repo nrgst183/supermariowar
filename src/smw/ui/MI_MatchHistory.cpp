@@ -7,6 +7,8 @@
 #include "input.h"
 #include "ui/InputPrompts.h"
 #include "ResourceManager.h"
+#include "FileList.h"
+#include "uimenu.h"
 #include "rollback/Replay.h"
 
 #include <algorithm>
@@ -150,8 +152,7 @@ void MI_MatchHistory::Draw()
         return;
 
     // The header bar, as on every menu of the game
-    rm->menu_plain_field.draw(0, 0, {0, 0, 320, 32});
-    rm->menu_plain_field.draw(320, 0, {192, 0, 320, 32});
+    UI_Menu::drawTitleBarBack();
     rm->menu_font_large.drawCentered(320, 5, "Match History");
     if (!m_entries.empty())
         rm->menu_font_small.drawRightJustified(620, 10, std::to_string(m_index + 1) + " / " + std::to_string(m_entries.size()));
@@ -186,6 +187,31 @@ void MI_MatchHistory::Draw()
     drawDetails(static_cast<short>(top + listH + 6));
 }
 
+// The skins of the selected match's players (their menu sprites), loaded when it's chosen
+void MI_MatchHistory::loadPortraits(const history::Entry& e) const
+{
+    if (m_portraitsFor == m_index)
+        return;
+    m_portraitsFor = m_index;
+    m_portraits.clear();
+    m_portraits.resize(e.teams.size());
+    for (size_t t = 0; t < e.teams.size(); t++) {
+        for (const history::Player& p : e.teams[t].players) {
+            std::filesystem::path path;
+            for (size_t k = 0; skinlist && k < skinlist->count(); k++) {
+                if (skinlist->at(k).name == p.skin)
+                    path = skinlist->at(k).path;
+            }
+            if (path.empty() && skinlist && skinlist->count() > 0)
+                path = skinlist->at(0).path;    //(a skin not here any more: the default one)
+            SpriteStrip strip;
+            if (!path.empty())
+                strip = gfx_loadmenuskin(path, static_cast<short>(p.slot & 3), false);
+            m_portraits[t].push_back(std::move(strip));
+        }
+    }
+}
+
 void MI_MatchHistory::drawDetails(short y) const
 {
     const short h = static_cast<short>(442 - y);    //(the footer under it)
@@ -211,25 +237,39 @@ void MI_MatchHistory::drawDetails(short y) const
     std::string info = e.matchType + (e.online ? " (online)" : "") + "    " + history::formatDuration(e.ticks) + "    " + history::formatTime(e.time);
     rm->menu_font_small.drawChopRight(x, y + 34, m_width - 40, info);
 
-    //The teams, by place
+    //The teams, by place, side by side: the place and the score, then the players' portraits (their
+    //skins, in the lobby's frames) and their names; the winners' crown over theirs
     std::vector<size_t> order(e.teams.size());
     for (size_t k = 0; k < order.size(); k++)
         order[k] = k;
     std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return e.teams[a].place < e.teams[b].place; });
-    short ty = static_cast<short>(y + 54);
-    for (size_t t : order) {
-        if (ty + 14 > bottom - 16)
-            break;
+    loadPortraits(e);
+    const int columns = std::max<int>(1, static_cast<int>(order.size()));
+    const int columnW = (m_width - 40) / columns;
+    for (int c = 0; c < columns && c < static_cast<int>(order.size()); c++) {
+        const size_t t = order[static_cast<size_t>(c)];
         const history::Team& team = e.teams[t];
-        rm->menu_font_small.draw(x, ty, ordinal(team.place));
-        rm->menu_font_small.drawRightJustified(x + 70, ty, std::to_string(team.score));
-        std::string players;
-        for (const history::Player& p : team.players)
-            players += (players.empty() ? "" : ",  ") + p.name + (p.skin.empty() ? "" : " (" + p.skin + ")");
-        if (static_cast<int>(t) == e.winner)
-            players += "   - winner";
-        rm->menu_font_small.drawChopRight(x + 90, ty, m_width - 130, players);
-        ty += 15;
+        const short cx = static_cast<short>(x + c * columnW);
+        const short ty = static_cast<short>(y + 54);
+        const bool won = static_cast<int>(t) == e.winner;
+        rm->menu_font_large.draw(cx, ty, ordinal(team.place));
+        rm->menu_font_small.draw(cx + 52, ty + 6, std::to_string(team.score) + (team.score == 1 ? " point" : " points"));
+        for (size_t k = 0; k < team.players.size() && k < 4; k++) {
+            const short px = static_cast<short>(cx + static_cast<short>(k) * 42);
+            const short py = static_cast<short>(ty + 26);
+            if (px + 38 > cx + columnW - 4)
+                break;
+            theme::statusBar(px, py, 38, 38);
+            const std::vector<SpriteStrip>& strips = m_portraits[t];
+            if (k < strips.size() && strips[k][0].getSurface())
+                strips[k][0].draw(px + 3, py + 3, {0, 0, 32, 32});
+            if (won && k == 0)
+                theme::crown(px + 26, py - 8);
+            if (team.players.size() == 1)
+                rm->menu_font_small.drawChopRight(px + 44, py + 14, columnW - 50, team.players[k].name);
+        }
+        if (team.players.size() > 1 && bottom > ty + 70)
+            rm->menu_font_small.drawChopRight(cx, ty + 68, columnW - 8, team.players[0].name + (team.players.size() > 1 ? " +" + std::to_string(team.players.size() - 1) : ""));
     }
 
     //What the buttons do: the controller's or the keys, in the footer (as on the other menus)

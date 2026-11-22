@@ -21,7 +21,7 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     : UI_Menu()
 {
     //The screen, the style, and (without the Online Options menu) the online rows
-    short rows = 8;
+    short rows = 9;
 #ifdef SMW_XBOX
     rows--;
 #endif
@@ -77,6 +77,16 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miTopLayerField->setCurrentValue(game_values.toplayer ? 1 : 0);
     miTopLayerField->setAutoAdvance(true);
     page.add(miTopLayerField, "Draw the map's top layer in front of or behind players");
+
+    //A TV crops the picture's edges (overscan): the picture smaller, so that nothing is lost
+    miScreenSizeField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Screen Size", SettingsPage::ROW_W, SettingsPage::LABEL_W);
+    miScreenSizeField->add("Full", 0);
+    miScreenSizeField->add("95% (TV)", 1);
+    miScreenSizeField->add("90% (TV)", 2);
+    miScreenSizeField->setOutputPtr(&game_values.screensize);
+    miScreenSizeField->setCurrentValue(game_values.screensize);
+    miScreenSizeField->setItemChangedCode(MENU_CODE_SCREEN_SIZE_CHANGED);
+    page.add(miScreenSizeField, "Smaller if your TV cuts off the edges of the picture");
 
     //The colors of the theater's and the editors' panels
     miOverlayColorsField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Overlay Colors", SettingsPage::ROW_W, SettingsPage::LABEL_W);

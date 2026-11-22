@@ -50,6 +50,13 @@ const Scheme& scheme();
 void panel(int x, int y, int w, int h);
 // A small framed bar in those colors (no rivets, no shadow)
 void strip(int x, int y, int w, int h);
+// The menus' boxes (Super Mario All-Stars' SMB3 status bar, always in its colors): black, a white
+// line, black, a light blue edge, the blue body; corners round. `shadow`: a solid one at the right
+// and the bottom (`shadow` pixels), outside the box, as SMB3's dialogs have
+void statusFrame(int x, int y, int w, int h, int shadow = 0);
+// Its slim version for the screen's bars (the title, the help line): black, the white line, the body
+// (4 pixels of rim: room for a line of the large font in 32)
+void statusBar(int x, int y, int w, int h);
 // A pipe lying down, 16 high, with its lips at both ends
 void pipe(int x, int y, int w, bool green);
 
@@ -78,6 +85,13 @@ int announce(int cx, int y, const std::string& text, const std::function<void(in
 // A progress line in the status bar's colors (16 high, the line in its middle): white as far as
 // `fraction`, the rest sunk in the overlay's colors
 void progressLine(int x, int y, int w, float fraction);
+// SMB3's P-meter (drawn after it, not copied): six arrows on a black strip that light up as `fraction`
+// goes, then the P, which flashes (with `tick`) when it's full. `scale` 2: 140 x 22. Returns the width
+int pmeter(int x, int y, float fraction, int tick, int scale = 2);
+int pmeterWidth(int scale = 2);
+// The end of a match: a status bar panel with the headline ("GAME OVER", "TIME UP!") over the result,
+// and a card at its right with `icon` (the crown of the winner) if any; centered on cx
+void endBanner(int cx, int y, const std::string& headline, const std::string& result, const std::function<void(int x, int y)>& icon = {});
 // The status bar's timer: a clock and the time (16 high); returns the width
 int timer(int x, int y, const std::string& time);
 int timerWidth(const std::string& time);

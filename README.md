@@ -65,6 +65,7 @@ See [docs/HistoryReplaysEditors.md](docs/HistoryReplaysEditors.md).
 
 - **Smarter CPU players** that find their way around a map: running jumps, warp pipes, ? blocks and power-ups, and better fighting.
 - **50 more classic community maps**.
+- **Animated backgrounds**: a background image as tall as several screens (640 wide, 480 for each frame) plays its frames in a loop, top to bottom. A text file with the same name next to it (`Waterfall.txt` for `Waterfall.png`) sets how long each frame shows, in game ticks (62.5 a second): one number for all of them, or one per frame. Without it, 8 ticks, as fast as the animated tiles. The menus and the editors show the first frame.
 
 
 ## History

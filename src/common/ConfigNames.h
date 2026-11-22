@@ -462,6 +462,7 @@ template<> struct NamedLayout<CGameConfig> {
             field("show_net_stats", &CGameConfig::shownetstats),
             field("ping_bars", &CGameConfig::showpingbars),
             field("overlay_colors", &CGameConfig::overlaycolors),
+            field("screen_size", &CGameConfig::screensize),
             field("button_prompts", &CGameConfig::buttonprompts),
             field("fullscreen", &CGameConfig::fullscreen),
             field("menu_pack", &Bridge::menugraphicspack),

@@ -69,8 +69,7 @@ UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     miMinigameField->setCurrentValue(game_values.selectedminigame);
     miMinigameField->setVisible(false);
 
-    miMatchSelectionMenuLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miMatchSelectionMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
+    miMatchSelectionMenuLeftHeaderBar = newTitleBarBack();
     miMatchSelectionMenuHeaderText = new MI_HeaderText("Match Type", 320, 5);
 
     miMatchSelectionDisplayImage = new MI_Image(&rm->menu_match_select, 160, 80, 0, 0, 320, 240, 1, 1, 0);
@@ -78,7 +77,6 @@ UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     miWorldPreviewDisplay->setVisible(false);
 
     AddNonControl(miMatchSelectionMenuLeftHeaderBar);
-    AddNonControl(miMatchSelectionMenuRightHeaderBar);
     AddNonControl(miMatchSelectionMenuHeaderText);
 
     AddNonControl(miWorldPreviewDisplay);

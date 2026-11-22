@@ -580,6 +580,14 @@ void CMap::update()
     if (sim::isResimulating())
         return;
 
+    //An animated background: its next frame when it's time (both background layers drawn again)
+    const BackgroundAnimation& background = mapBackgroundAnimation();
+    if (background.frames() > 1) {
+        const int frame = background.frameAt(++iBackgroundTicks);
+        if (frame != iBackgroundFrame)
+            redrawBackgroundFrame(frame);
+    }
+
     //Animate the animated tiles
     if (++iTileAnimationTimer >= NUM_FRAMES_BETWEEN_TILE_ANIMATION) {
         iTileAnimationTimer = 0;

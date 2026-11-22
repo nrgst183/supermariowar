@@ -535,6 +535,8 @@ void main_game()
         game_values.powerupweights[iPowerup] = game_values.allPowerupPresets[game_values.poweruppreset][iPowerup];
     }
 
+    //(a TV's overscan: the picture smaller, as the Graphics options say)
+    gfx_setscreenscale(game_values.screensize == 2 ? 0.90f : game_values.screensize == 1 ? 0.95f : 1.0f);
     if (game_values.fullscreen) {
         gfx_changefullscreen(true);
         blitdest = screen;

@@ -56,8 +56,7 @@ private:
 
     MI_Image* miMapFiltersOnImage = nullptr;
 
-    MI_Image* miGameSettingsLeftHeaderBar = nullptr;
-    MI_Image* miGameSettingsMenuRightHeaderBar = nullptr;
+    UI_Control* miGameSettingsLeftHeaderBar = nullptr;    //(the title bar)
     MI_Text* miGameSettingsMenuHeaderText = nullptr;
 
     MI_LockTag* miHostNote = nullptr;

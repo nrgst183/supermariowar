@@ -165,7 +165,12 @@ public:
     short		runahead = -1;          // online run-ahead: show the match this many ticks ahead (0..3, -1 Auto: the input delay), less input lag
     bool		shownetstats = false;   // online: the network info line (ping, input delay, rollbacks)
     bool		showpingbars = true;    // online and in online replays: signal bars on the other players' score panels
-    short		overlaycolors = 0;      // the theater's and the editors' colors: 0 night, 1 pipe (green), 2 castle, 3 SMB3 (the status bar's blue)
+#ifdef SMW_XBOX
+    short		screensize = 1;         // the picture on the TV: 0 all of it, 1 95%, 2 90% (a TV crops its edges: overscan; on the Xbox, 95% to start with)
+#else
+    short		screensize = 0;         // the picture on the TV: 0 all of it, 1 95%, 2 90% (a TV crops its edges: overscan)
+#endif
+    short		overlaycolors = 3;      // the theater's and the editors' colors: 0 night, 1 pipe (green), 2 castle, 3 SMB3 (the status bar's blue, as the menus': the default)
     short		buttonprompts = 2;      // the controller glyphs in the theater and the editors: 0 auto, 1 Xbox, 2 original Xbox (the default)
     bool		teamcolors;
     bool		sound;

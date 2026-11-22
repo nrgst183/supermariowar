@@ -8,6 +8,8 @@
 #include "TilesetManager.h"
 
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <algorithm>
 #include <array>
 
@@ -74,11 +76,68 @@ const gfxSprite* loadedMapBackground(const std::string& path)
     return nullptr;
 }
 
+namespace {
+BackgroundAnimation s_backgroundAnimation;
+} // namespace
+
 void setLoadedMapBackground(const std::string& path, gfxSprite&& image)
 {
     rm->spr_background = std::move(image);
     s_loadedBackgroundPath = path;
     s_loadedBackgroundSurface = rm->spr_background.getSurface();
+    s_backgroundAnimation = BackgroundAnimation::of(path, rm->spr_background);
+}
+
+const BackgroundAnimation& mapBackgroundAnimation()
+{
+    return s_backgroundAnimation;
+}
+
+int BackgroundAnimation::frameAt(unsigned tick) const
+{
+    if (ticks.size() < 2 || loopTicks <= 0)
+        return 0;
+    int t = static_cast<int>(tick % static_cast<unsigned>(loopTicks));
+    for (size_t k = 0; k < ticks.size(); k++) {
+        if (t < ticks[k])
+            return static_cast<int>(k);
+        t -= ticks[k];
+    }
+    return 0;
+}
+
+BackgroundAnimation BackgroundAnimation::of(const std::string& imagePath, const gfxSprite& image)
+{
+    BackgroundAnimation animation;
+    const int h = image.getSurface() ? image.getHeight() : 0;
+    if (h <= FRAME_H || h % FRAME_H != 0)
+        return animation;    //(a still background: one screen)
+    const int frames = h / FRAME_H;
+
+    //The timing: "Name.txt" next to "Name.png"
+    std::vector<int> given;
+    const size_t dot = imagePath.find_last_of('.');
+    if (FILE* f = fopen((imagePath.substr(0, dot == std::string::npos ? imagePath.size() : dot) + ".txt").c_str(), "r")) {
+        char line[256];
+        while (fgets(line, sizeof(line), f)) {
+            if (char* hash = strchr(line, '#'))
+                *hash = '\0';
+            for (char* word = strtok(line, " ,;\t\r\n"); word; word = strtok(nullptr, " ,;\t\r\n")) {
+                const int n = atoi(word);
+                if (n > 0)
+                    given.push_back(std::min(n, 60 * 62));    //(a minute at most)
+            }
+        }
+        fclose(f);
+    }
+    for (int k = 0; k < frames; k++) {
+        //(one number: every frame's; fewer than the frames: the last one for the rest)
+        const int t = given.empty() ? DEFAULT_TICKS : given[std::min<size_t>(static_cast<size_t>(k), given.size() - 1)];
+        animation.ticks.push_back(t);
+        animation.loopTicks += t;
+    }
+    printf("[map] Animated background: %d frames, %d ticks a loop\n", frames, animation.loopTicks);
+    return animation;
 }
 
 void LoadCurrentMapBackground()

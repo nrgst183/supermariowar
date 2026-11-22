@@ -1,3 +1,4 @@
+#include "ui/SmwTheme.h"
 #include "NetOverlay.h"
 #include "GSGameplay.h"
 
@@ -53,7 +54,21 @@ void GameplayState::drawScoreboard(short iScoreTextOffset[4])
                 gameovertext = "Tie Game";
             }
 
-            rm->game_font_large.drawCentered(App::screenWidth/2, 90, gameovertext.c_str());
+            //(SMB3's way: a status bar panel, the headline over who won, their crown in a card)
+            const bool timeUp = game_values.gamemode->gamemode == game_mode_timelimit;
+            const bool winner = game_values.gamemode->winningteam > -1;
+            //(in the card: the winner jumping, as on the scoreboard, a crown on the card's corner)
+            CPlayer* champion = winner ? GetPlayerFromGlobalID(game_values.teamids[game_values.gamemode->winningteam][0]) : nullptr;
+            std::function<void(int, int)> card;
+            if (champion) {
+                card = [champion](int x, int y) {
+                    champion->GetScoreboardSprite()->at(PGFX_JUMPING_R).draw(x - 8, y - 8, {champion->iSrcOffsetX, 0, 32, 32});
+                    theme::crown(x + 22, y - 22);
+                };
+            } else if (winner) {
+                card = [](int x, int y) { theme::crown(x + 1, y + 1); };
+            }
+            theme::endBanner(App::screenWidth / 2, 60, timeUp ? "TIME UP!" : "GAME OVER", gameovertext, card);
         }
 
         //in game scoreboards

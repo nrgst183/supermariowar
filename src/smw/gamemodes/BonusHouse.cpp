@@ -8,6 +8,7 @@
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "WorldTourStop.h"
+#include "uimenu.h"
 #include "objects/moving/MO_BonusHouseChest.h"
 
 
@@ -74,8 +75,7 @@ void CGM_Bonus::draw_background()
     rm->spr_worldbonushouse.draw(544, 256, {g_sim.players[0]->leftX() > 544 ? 224 : 192, 0, 32, 64});
 
     //Draw Bonus House Title
-    rm->menu_plain_field.draw(0, 0, {0, 0, App::screenWidth/2, 32});
-    rm->menu_plain_field.draw(App::screenWidth/2, 0, {192, 0, App::screenWidth/2, 32});
+    UI_Menu::drawTitleBarBack();
     rm->game_font_large.drawCentered(App::screenWidth/2, 5, tsTourStop->szName.c_str());
 
     //Draw Bonus House Text

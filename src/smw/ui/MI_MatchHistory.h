@@ -2,6 +2,7 @@
 
 #include "uicontrol.h"
 #include "MatchHistory.h"
+#include "gfx.h"
 
 #include <string>
 #include <vector>
@@ -35,4 +36,8 @@ private:
     int m_index = 0;
     int m_offset = 0;
     std::string m_message;
+    // The selected match's players' skins (MI_MatchHistory.cpp): which match they're for, per team
+    void loadPortraits(const history::Entry& e) const;
+    mutable int m_portraitsFor = -1;
+    mutable std::vector<std::vector<SpriteStrip>> m_portraits;
 };

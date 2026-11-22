@@ -136,6 +136,11 @@ void gfx_changefullscreen(bool fullscreen) {
 #endif
 }
 
+void gfx_setscreenscale(float scale)
+{
+    gfx.setScreenScale(scale);
+}
+
 void gfx_eventtoscreen(SDL_Event* event)
 {
     if (event)

@@ -69,7 +69,7 @@ void drawWaitingBox(const rollback::NetGame& net, const rollback::NetGame::WaitI
     //The time left until the CPU takes over: a line running down
     const uint32_t timeoutMs = static_cast<uint32_t>(std::max(1000, cmd::g_net.timeoutMs));
     const float left = 1.0f - std::min(1.0f, static_cast<float>(wait.waitingMs) / static_cast<float>(timeoutMs));
-    theme::progressLine(x + 26, y + 104, w - 52, left);
+    theme::pmeter(x + (w - theme::pmeterWidth()) / 2, y + 100, left, static_cast<int>(wait.waitingMs / 16));
     if (wait.waitingMs >= SHOW_HINT_AFTER_MS)
         theme::font().drawCentered(cx, y + 124, std::format("CPU takes over in {} s", (timeoutMs - std::min(timeoutMs, wait.waitingMs) + 999) / 1000));
 }

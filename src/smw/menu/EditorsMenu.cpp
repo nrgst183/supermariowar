@@ -140,8 +140,7 @@ private:
 UI_EditorsMenu::UI_EditorsMenu()
     : UI_Menu()
 {
-    AddNonControl(new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0));
-    AddNonControl(new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0));
+    AddNonControl(newTitleBarBack());
     AddNonControl(new MI_HeaderText("Editors", 320, 5));
     SetHints(false);    //(its own prompts, at the bottom)
 

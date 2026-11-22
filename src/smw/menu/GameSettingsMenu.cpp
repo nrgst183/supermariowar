@@ -91,8 +91,7 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
         miMapFilterScroll->Add(std::move(szTemp), game_values.piFilterIcons[NUM_AUTO_FILTERS + iFilter]);
     }
 
-    miGameSettingsLeftHeaderBar = new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miGameSettingsMenuRightHeaderBar = new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
+    miGameSettingsLeftHeaderBar = newTitleBarBack();
     miGameSettingsMenuHeaderText = new MI_HeaderText("Single Game", 320, 5);
 
     // Exit tournament dialog box
@@ -129,7 +128,6 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     AddControl(miMapFilterScroll, nullptr, nullptr, nullptr, nullptr);
 
     AddNonControl(miGameSettingsLeftHeaderBar);
-    AddNonControl(miGameSettingsMenuRightHeaderBar);
     AddNonControl(miGameSettingsMenuHeaderText);
 
     AddNonControl(miGameSettingsExitDialogImage);

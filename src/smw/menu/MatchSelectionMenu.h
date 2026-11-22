@@ -35,7 +35,6 @@ private:
 
     MI_Button* miMatchSelectionStartButton;
 
-    MI_Image* miMatchSelectionMenuLeftHeaderBar;
-    MI_Image* miMatchSelectionMenuRightHeaderBar;
+    UI_Control* miMatchSelectionMenuLeftHeaderBar;    //(the title bar)
     MI_Text* miMatchSelectionMenuHeaderText;
 };

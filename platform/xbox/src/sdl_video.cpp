@@ -28,6 +28,7 @@ struct SDL_Renderer {
     int vsync = 1;
     D3DCOLOR clear_color = D3DCOLOR_XRGB(0, 0, 0);
     SDL_Texture* pending = nullptr;  // texture to present
+    SDL_FRect dst {0, 0, 0, 0};      // where (w 0: the whole screen)
 };
 
 struct SDL_Texture {
@@ -290,11 +291,21 @@ void updateOverlayStats()
     g_overlay.window_start_cycles = now_cycles;
 }
 
+SDL_FRect g_dst {0, 0, 0, 0};    // the present's quad (w 0: the whole screen)
+
 void drawQuad(D3DTexture* texture)
 {
-    // One quad over the screen; -0.5 lines the texels up with the pixels
-    const float x0 = -0.5f, y0 = -0.5f;
-    const float x1 = k_screen_w - 0.5f, y1 = k_screen_h - 0.5f;
+    // One quad over the screen; -0.5 lines the texels up with the pixels. A smaller one (a TV's
+    // overscan, gfx_setscreenscale): the border black, and the picture filtered, not point sampled
+    const bool scaled = g_dst.w > 0 && (g_dst.w < k_screen_w || g_dst.h < k_screen_h);
+    const float x0 = (scaled ? g_dst.x : 0.0f) - 0.5f, y0 = (scaled ? g_dst.y : 0.0f) - 0.5f;
+    const float x1 = (scaled ? g_dst.x + g_dst.w : static_cast<float>(k_screen_w)) - 0.5f;
+    const float y1 = (scaled ? g_dst.y + g_dst.h : static_cast<float>(k_screen_h)) - 0.5f;
+    if (scaled) {
+        D3DDevice_Clear(0, NULL, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
+        D3DDevice_SetTextureStageState(0, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
+        D3DDevice_SetTextureStageState(0, D3DTSS_MAGFILTER, D3DTEXF_LINEAR);
+    }
     const float u1 = static_cast<float>(k_screen_w), v1 = static_cast<float>(k_screen_h);
     const QuadVertex quad[4] = {
         {x0, y0, 0.0f, 1.0f, 0.0f, 0.0f},
@@ -308,6 +319,10 @@ void drawQuad(D3DTexture* texture)
     D3DDevice_DrawVerticesUP(D3DPT_QUADLIST, 4, quad, sizeof(QuadVertex));
     D3DDevice_SetTexture(0, NULL);
     D3DDevice_EndScene();
+    if (scaled) {
+        D3DDevice_SetTextureStageState(0, D3DTSS_MINFILTER, D3DTEXF_POINT);
+        D3DDevice_SetTextureStageState(0, D3DTSS_MAGFILTER, D3DTEXF_POINT);
+    }
 }
 
 // Draws the frame; returns a fence to wait on before the game may draw into
@@ -522,10 +537,10 @@ bool SDL_RenderClear(SDL_Renderer* renderer)
 bool SDL_RenderTexture(SDL_Renderer* renderer, SDL_Texture* texture, const SDL_FRect* srcrect, const SDL_FRect* dstrect)
 {
     (void)srcrect;
-    (void)dstrect;
     if (!renderer || !texture)
         return SDL_SetError("Invalid renderer or texture");
     renderer->pending = texture;
+    renderer->dst = dstrect ? *dstrect : SDL_FRect {0, 0, 0, 0};
     return true;
 }
 
@@ -539,6 +554,7 @@ bool SDL_RenderPresent(SDL_Renderer* renderer)
     const Uint64 copy_start = sdlx_cycles();
     DWORD fence = 0;
     if (renderer->pending) {
+        g_dst = renderer->dst;
         fence = presentTexture(renderer->pending);
     } else {
         D3DDevice_Clear(0, NULL, D3DCLEAR_TARGET, renderer->clear_color, 1.0f, 0);

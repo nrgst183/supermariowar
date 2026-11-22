@@ -243,12 +243,18 @@ class CMap
         void shift(int xshift, int yshift);
 
         void predrawbackground(gfxSprite &background, gfxSprite &mapspr);
+        // The match's background layers again for another frame of an animated background (the
+        // layers drawn over it, and the animated tiles' copies of what's under them)
+        void redrawBackgroundFrame(int frame);
         void predrawforeground(gfxSprite &foregroundspr);
         /// The front layer's draw areas fitted to the front image drawn for the match (only the
         /// cells it shows something in)
         void fitDrawAreas(const gfxSprite& front);
 
         void SetupAnimatedTiles();
+        // A background tile's animation frames (its cell of the background, frame `backgroundFrame`,
+        // under the tiles of its layers) into animatedTilesSurface, at its rAnimationSrc
+        void drawAnimatedBackgroundTile(const AnimatedTile& tile, int backgroundFrame);
 
         void preDrawPreviewBackground(gfxSprite& targetSurface, bool fThumbnail);
         void preDrawPreviewBackground(const gfxSprite& spr_background, gfxSprite& targetSurface, bool fThumbnail);
@@ -403,6 +409,10 @@ class CMap
         short		iTileAnimationTimer = 0;
         short		iTileAnimationFrame = 0;
 
+        //An animated background: the frame shown, and the ticks into its loop (cosmetic, as the tiles')
+        int			iBackgroundFrame = 0;
+        unsigned	iBackgroundTicks = 0;
+
         short iAnimatedBackgroundLayers = 0;
         SDL_Surface * animatedFrontmapSurface = nullptr;
         gfxSprite animatedTilesSurface;
@@ -417,6 +427,7 @@ class CMap
         void ClearAnimatedTiles();
 
         void draw(gfxSprite& targetsurf, int layer);
+        void drawBackgroundLayers(const gfxSprite& background, gfxSprite& mapspr, int frame);
         void drawThumbnailHazards(gfxSprite& targetSurface);
                 void drawThumbnailPlatforms(gfxSprite& targetSurface);
         void drawPreview(gfxSprite& targetsurf, int layer, bool fThumbnail);
@@ -533,6 +544,32 @@ std::string mapBackgroundPath(const CMap& map);
 const gfxSprite* loadedMapBackground(const std::string& path);
 // That file's image becomes rm->spr_background (loaded elsewhere: a map preview's worker)
 void setLoadedMapBackground(const std::string& path, gfxSprite&& image);
+
+// ANIMATED BACKGROUNDS. A background image as tall as several screens (640 x 480 * N) is N frames,
+// from the top down, that play in a loop during the match (the menus, the thumbnails and the
+// editors show the first). How long each frame shows is in a text file of the same name next to it
+// ("Waterfall.png": "Waterfall.txt"), in game ticks (62.5 a second): one number for every frame, or
+// one per frame (spaces, commas or lines between them; a line from # on is a comment). Without it,
+// 8 ticks each: as fast as the animated tiles.
+struct BackgroundAnimation {
+    static constexpr int FRAME_W = 640;
+    static constexpr int FRAME_H = 480;
+    static constexpr int DEFAULT_TICKS = 8;
+
+    std::vector<int> ticks;    // each frame's (one per frame; empty: a still background)
+    int loopTicks = 0;         // all of them
+
+    int frames() const { return ticks.empty() ? 1 : static_cast<int>(ticks.size()); }
+    // The frame that shows `tick` ticks into the loop
+    int frameAt(unsigned tick) const;
+    // Where frame k is in the image
+    static SDL_Rect frameRect(int frame) { return {0, frame * FRAME_H, FRAME_W, FRAME_H}; }
+
+    // An image's frames (its height) and their timing (its text file, if it has one)
+    static BackgroundAnimation of(const std::string& imagePath, const gfxSprite& image);
+};
+// The current map background's (rm->spr_background)
+const BackgroundAnimation& mapBackgroundAnimation();
 
 
 // Defined in map.cpp

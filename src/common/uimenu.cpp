@@ -56,6 +56,35 @@ void UI_Menu::AddControl(UI_Control* control, UI_Control* up, UI_Control* down, 
 }
 
 void (*UI_Menu::drawHints)(const UI_Menu& menu) = nullptr;
+void (*UI_Menu::drawTitleBar)() = nullptr;
+
+namespace {
+// The bar under the title: the game's look, or the plain field image
+class MI_TitleBarBack : public UI_Control {
+public:
+    MI_TitleBarBack() : UI_Control(0, 0) {}
+    void Draw() override
+    {
+        if (m_visible)
+            UI_Menu::drawTitleBarBack();
+    }
+};
+} // namespace
+
+void UI_Menu::drawTitleBarBack()
+{
+    if (drawTitleBar) {
+        drawTitleBar();
+        return;
+    }
+    rm->menu_plain_field.draw(0, 0, {0, 0, 320, 32});
+    rm->menu_plain_field.draw(320, 0, {192, 0, 320, 32});
+}
+
+UI_Control* UI_Menu::newTitleBarBack()
+{
+    return new MI_TitleBarBack();
+}
 void (*UI_Menu::drawFocus)(const UI_Control& control, bool modifying) = nullptr;
 
 void UI_Menu::AddNonControl(UI_Control* control)
@@ -75,8 +104,7 @@ void UI_Menu::AddBackdrop(UI_Control* control)
 
 void UI_Menu::AddTitleBar(const std::string& title)
 {
-    AddNonControl(new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0));
-    AddNonControl(new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0));
+    AddNonControl(new MI_TitleBarBack());
     AddNonControl(new MI_HeaderText(title, 320, 5));
 }
 

@@ -118,22 +118,30 @@ void layered(int x, int y, int w, int h, std::initializer_list<Layer> layers)
 
 void box(int x, int y, int w, int h)
 {
-    layered(x, y, w, h, {{0, 8, {248, 248, 248, 255}}, {2, 6, {0, 40, 104, 255}}, {3, 5, {0, 95, 177, 255}}});
+    //(Super Mario All-Stars' SMB3 status bar, with a solid shadow as its dialogs have)
+    theme::statusFrame(x, y, w - 4, h - 4, 4);
 }
 
 void row(int x, int y, int w, int h, bool selected, bool dim)
 {
-    if (selected)
-        layered(x, y, w, h, {{0, 6, {248, 248, 248, 255}}, {2, 4, dim ? SDL_Color {104, 112, 136, 255} : SDL_Color {32, 144, 232, 255}}});
-    else
-        layered(x, y, w, h, {{0, 6, dim ? SDL_Color {56, 64, 88, 255} : SDL_Color {0, 64, 136, 255}}});
+    //(SMB3's status bar strips: the one chosen lit, a white line round it as the title bar's; the others
+    //sunk into the panel, a dark line round them and a lighter one along their top)
+    if (selected && !dim) {
+        theme::statusBar(x, y, w, h);
+        return;
+    }
+    const SDL_Color body = dim ? SDL_Color {56, 64, 88, 255} : SDL_Color {0, 64, 136, 255};
+    //(2-pixel lines: the game's doubled pixels, no flicker on an interlaced TV picture)
+    layered(x, y, w, h, {{0, 5, selected ? SDL_Color {248, 248, 248, 255} : SDL_Color {0, 24, 64, 255}}, {2, 4, body}});
+    if (!selected)
+        prompts::fill(x + 5, y + 2, w - 10, 2, dim ? SDL_Color {80, 88, 112, 255} : SDL_Color {24, 96, 176, 255});
 }
 
 void footer(const std::vector<prompts::Prompt>& row, const std::string& label)
 {
-    //A dark strip along the bottom of the screen, the prompts from its left
-    prompts::fill(0, 450, 640, 30, {0, 0, 0, 255});
-    prompts::fill(0, 452, 640, 28, {16, 28, 84, 255});
+    //The status bar's strip along the bottom of the screen (as the title bar's at the top), the prompts
+    //from its left
+    theme::statusBar(0, 448, 640, 32);
     int left = 24;
     if (!label.empty()) {
         rm->menu_font_small.draw(left, 458, label);

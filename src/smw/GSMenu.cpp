@@ -12,6 +12,7 @@
 #include "gfx.h"
 #include "ui/InputPrompts.h"
 #include "ui/MenuPad.h"
+#include "ui/SmwTheme.h"
 #include "ui/MI_MenuPanel.h"
 #include "ui/MI_TextField.h"
 #include "GSGameplay.h"
@@ -124,13 +125,14 @@ void drawMenuHints(const UI_Menu& menu)
         left.erase(left.begin());
     //(each group on a dark pill, as the hint bar at the bottom: apart from the title bar's own)
     auto pill = [](int x, int w) {
-        roundBox(x - 6, 1, w + 12, 22, {0, 0, 0, 255});
-        roundBox(x - 5, 2, w + 10, 20, {16, 28, 84, 255});
+        //(inside the title bar's rim)
+        roundBox(x - 6, 4, w + 12, 24, {0, 0, 0, 255});
+        roundBox(x - 4, 6, w + 8, 20, {16, 28, 84, 255});
     };
     if (!left.empty()) {
         const int w = prompts::promptsWidth(left, GAP);
         pill(8, w);
-        prompts::drawPrompts(8 + w / 2, Y + 1, left, GAP);
+        prompts::drawPrompts(8 + w / 2, Y + 5, left, GAP);
     }
 
     if (menu.CancelCode() != MENU_CODE_NONE) {
@@ -138,7 +140,7 @@ void drawMenuHints(const UI_Menu& menu)
         const int w = prompts::promptsWidth(right, GAP);
         if (App::screenWidth - 8 - w > title->right() + 20) {
             pill(App::screenWidth - 8 - w, w);
-            prompts::drawPrompts(App::screenWidth - 8 - w / 2, Y + 1, right, GAP);
+            prompts::drawPrompts(App::screenWidth - 8 - w / 2, Y + 5, right, GAP);
         }
     }
 }
@@ -199,14 +201,15 @@ void drawMenuFocus(const UI_Control& control, bool modifying)
     const SDL_Color gold {248, 192, 32, 255};
     const SDL_Color light = modifying ? gold : mix({252, 252, 252, 255}, {255, 226, 120, 255}, wave * 0.7f);
 
-    roundRing(b.x - 5, b.y - 5, b.w + 10, b.h + 10, 4, dark);
+    //(2 pixels each, dark, light, dark: no 1-pixel line to flicker on an interlaced TV)
+    roundRing(b.x - 6, b.y - 6, b.w + 12, b.h + 12, 6, dark);
     roundRing(b.x - 4, b.y - 4, b.w + 8, b.h + 8, 2, light);
 
     if (prompts::lastDevice() != prompts::Device::Controller || modifying)
         return;
     //(the pointer: a gold arrowhead, a few pixels to and fro)
     const int bob = static_cast<int>(wave * 3.0f + 0.5f);
-    const int px = b.x - 5 - 3 - 12 - bob;
+    const int px = b.x - 6 - 2 - 12 - bob;
     const int py = b.y + b.h / 2 - 9;
     if (px < 2)
         return;
@@ -237,6 +240,7 @@ MenuState& MenuState::instance()
 bool MenuState::init()
 {
     UI_Menu::drawHints = drawMenuHints;
+    UI_Menu::drawTitleBar = [] { theme::statusBar(0, 0, 640, 32); };
     UI_Menu::drawFocus = drawMenuFocus;
     //(text fields: the on-screen keyboard with a controller; on the Xbox, always)
     MI_TextField::useOnScreenKeyboard = [] {
@@ -1321,6 +1325,8 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
             mCurrentMenu = mTeamSelectMenu.get();
             mCurrentMenu->ResetMenu();
         }
+    } else if (MENU_CODE_SCREEN_SIZE_CHANGED == code) {
+        gfx_setscreenscale(game_values.screensize == 2 ? 0.90f : game_values.screensize == 1 ? 0.95f : 1.0f);
     } else if (MENU_CODE_SOUND_VOLUME_CHANGED == code) {
         game_values.sound = game_values.soundvolume > 0;
         sfx_setsoundvolume(game_values.soundvolume);

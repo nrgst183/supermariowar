@@ -5,6 +5,7 @@
 
 #include <SDL3_image/SDL_image.h>
 
+#include <algorithm>
 #include <chrono>
 #include <iomanip>
 #include <sstream>
@@ -156,11 +157,27 @@ void GraphicsSDL::setTitle(const char* title) const
     SDL_SetWindowTitle(sdl_window, title);
 }
 
+SDL_FRect GraphicsSDL::pictureRect() const
+{
+    const float w = GFX_SCREEN_W * m_screenScale;
+    const float h = GFX_SCREEN_H * m_screenScale;
+    return {(GFX_SCREEN_W - w) / 2.0f, (GFX_SCREEN_H - h) / 2.0f, w, h};
+}
+
+void GraphicsSDL::setScreenScale(float scale)
+{
+    m_screenScale = std::clamp(scale, 0.5f, 1.0f);
+    //(smaller: smoothed, not every few pixels dropped)
+    if (sdl_screen_texture)
+        SDL_SetTextureScaleMode(sdl_screen_texture, m_screenScale < 1.0f ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+}
+
 void GraphicsSDL::flipScreen() const
 {
     SDL_UpdateTexture(sdl_screen_texture, nullptr, sdl_screen_surface->pixels, sdl_screen_surface->pitch);
     SDL_RenderClear(sdl_renderer);
-    SDL_RenderTexture(sdl_renderer, sdl_screen_texture, nullptr, nullptr);
+    const SDL_FRect dst = pictureRect();
+    SDL_RenderTexture(sdl_renderer, sdl_screen_texture, nullptr, m_screenScale < 1.0f ? &dst : nullptr);
     SDL_RenderPresent(sdl_renderer);
 }
 
@@ -226,8 +243,25 @@ void GraphicsSDL::takeScreenshot() const
 
 void GraphicsSDL::eventToScreen(SDL_Event& event) const
 {
-    if (sdl_renderer)
-        SDL_ConvertEventToRenderCoordinates(sdl_renderer, &event);
+    if (!sdl_renderer)
+        return;
+    SDL_ConvertEventToRenderCoordinates(sdl_renderer, &event);
+    //(a smaller picture: from the screen's place to the picture's)
+    if (m_screenScale >= 1.0f)
+        return;
+    const SDL_FRect r = pictureRect();
+    if (event.type == SDL_EVENT_MOUSE_MOTION) {
+        event.motion.x = (event.motion.x - r.x) / m_screenScale;
+        event.motion.y = (event.motion.y - r.y) / m_screenScale;
+        event.motion.xrel /= m_screenScale;
+        event.motion.yrel /= m_screenScale;
+    } else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        event.button.x = (event.button.x - r.x) / m_screenScale;
+        event.button.y = (event.button.y - r.y) / m_screenScale;
+    } else if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+        event.wheel.mouse_x = (event.wheel.mouse_x - r.x) / m_screenScale;
+        event.wheel.mouse_y = (event.wheel.mouse_y - r.y) / m_screenScale;
+    }
 }
 
 void GraphicsSDL::windowToScreen(float& x, float& y) const
@@ -235,7 +269,8 @@ void GraphicsSDL::windowToScreen(float& x, float& y) const
     float rx = x;
     float ry = y;
     if (sdl_renderer && SDL_RenderCoordinatesFromWindow(sdl_renderer, x, y, &rx, &ry)) {
-        x = rx;
-        y = ry;
+        const SDL_FRect r = pictureRect();
+        x = (rx - r.x) / m_screenScale;
+        y = (ry - r.y) / m_screenScale;
     }
 }

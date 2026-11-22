@@ -179,6 +179,28 @@ void CMap::addPlatformAnimatedTiles()
     }
 }
 
+void CMap::drawAnimatedBackgroundTile(const AnimatedTile& tile, int backgroundFrame)
+{
+    //(its cell of the background's frame)
+    SDL_Rect cell = tile.rDest;
+    cell.y += static_cast<int>(BackgroundAnimation::frameRect(backgroundFrame).y);
+    for (short sTileAnimationFrame = 0; sTileAnimationFrame < 4; sTileAnimationFrame++) {
+        SDL_Rect rDst = tile.rAnimationSrc[0][sTileAnimationFrame];
+        rm->spr_background.draw(cell, animatedTilesSurface.getSurface(), rDst);
+
+        for (short iLayer = 0; iLayer < iAnimatedBackgroundLayers; iLayer++) {
+            const TilesetTile* tilesetTile = &tile.layers[iLayer];
+            if (tilesetTile->iID >= 0) {
+                g_tilesetmanager->tileset(tilesetTile->iID)->draw(DrawSize::Ingame, tile.rSrc[iLayer][0], animatedTilesSurface.getSurface(), rDst);
+            } else if (tilesetTile->iID == TILESETANIMATED) {
+                rm->spr_tileanimation[0].draw(tile.rSrc[iLayer][sTileAnimationFrame], animatedTilesSurface.getSurface(), rDst);
+            } else if (tilesetTile->iID == TILESETUNKNOWN) {
+                rm->spr_unknowntile[0].draw(CTilesetManager::rect(DrawSize::Ingame, 0, 0), animatedTilesSurface.getSurface(), rDst);
+            }
+        }
+    }
+}
+
 void CMap::SetupAnimatedTiles()
 {
     iAnimatedBackgroundLayers = 2;
@@ -212,19 +234,6 @@ void CMap::SetupAnimatedTiles()
                 for (short sTileAnimationFrame = 0; sTileAnimationFrame < 4; sTileAnimationFrame++) {
                     tile->rAnimationSrc[0][sTileAnimationFrame] = rDst;
 
-                    rm->spr_background.draw(tile->rDest, animatedTilesSurface.getSurface(), rDst);
-
-                    for (short iLayer = 0; iLayer < iAnimatedBackgroundLayers; iLayer++) {
-                        TilesetTile * tilesetTile = &tile->layers[iLayer];
-                        if (tilesetTile->iID >= 0) {
-                            g_tilesetmanager->tileset(tilesetTile->iID)->draw(DrawSize::Ingame, tile->rSrc[iLayer][0], animatedTilesSurface.getSurface(), rDst);
-                        } else if (tilesetTile->iID == TILESETANIMATED) {
-                            rm->spr_tileanimation[0].draw(tile->rSrc[iLayer][sTileAnimationFrame], animatedTilesSurface.getSurface(), rDst);
-                        } else if (tilesetTile->iID == TILESETUNKNOWN) {
-                            rm->spr_unknowntile[0].draw(CTilesetManager::rect(DrawSize::Ingame, 0, 0), animatedTilesSurface.getSurface(), rDst);
-                        }
-                    }
-
                     rDst.x += 32;
                     if (rDst.x >= 1024) {
                         rDst.x = 0;
@@ -237,6 +246,9 @@ void CMap::SetupAnimatedTiles()
                     }
                 }
             }
+
+            if (tile->fBackgroundAnimated && !fSrcSurfaceFull)
+                drawAnimatedBackgroundTile(*tile, 0);
 
             //If we have run out of room on the animatedTilesSurface surface, then stop reading animated tiles
             if (fSrcSurfaceFull) {

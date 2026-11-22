@@ -43,6 +43,11 @@ public:
     /// What the buttons do, drawn in the title bar of the menus that have one (the game sets it: the
     /// prompts are its; the editors have none); a menu with hints of its own turns them off
     static void (*drawHints)(const UI_Menu& menu);
+    // The title bar's look (the game's: SmwTheme); none: the menus' plain field image
+    static void (*drawTitleBar)();
+    // The bar under a title, in that look: drawn now, or as a control of a menu (the first thing on it)
+    static void drawTitleBarBack();
+    static UI_Control* newTitleBarBack();
     const MI_HeaderText* Title() const {
         return m_hints ? m_title : nullptr;
     }

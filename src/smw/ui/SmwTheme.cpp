@@ -190,6 +190,34 @@ void panel(int x, int y, int w, int h)
     framed(bx, by, bw, bh, true);
 }
 
+void statusFrame(int x, int y, int w, int h, int shadow)
+{
+    if (w < 16 || h < 16)
+        return;
+    constexpr SDL_Color white {255, 255, 255, 255};
+    constexpr SDL_Color shade {189, 189, 188, 255};
+    constexpr SDL_Color edge {42, 154, 240, 255};
+    constexpr SDL_Color body {0, 95, 177, 255};
+    if (shadow > 0)
+        rounded(x + shadow, y + shadow, w, h, 4, {0, 0, 24, 255});
+    rounded(x, y, w, h, 4, BLACK);
+    rounded(x + 2, y + 2, w - 4, h - 4, 4, white);
+    fill(x + 4, y + h - 4, w - 8, 2, shade);
+    rounded(x + 4, y + 4, w - 8, h - 8, 2, BLACK);
+    rounded(x + 6, y + 6, w - 12, h - 12, 2, edge);
+    fill(x + 8, y + 8, w - 16, h - 16, body);
+}
+
+void statusBar(int x, int y, int w, int h)
+{
+    //(every line 2 pixels, the game's doubled pixels: a 1-pixel line flickers on a TV's interlaced picture)
+    rounded(x, y, w, h, 4, BLACK);
+    rounded(x + 2, y + 2, w - 4, h - 4, 2, {255, 255, 255, 255});
+    fill(x + 4, y + 4, w - 8, h - 8, {0, 95, 177, 255});
+    fill(x + 4, y + 4, w - 8, 2, {42, 154, 240, 255});
+    fill(x + 4, y + h - 6, w - 8, 2, {0, 48, 104, 255});
+}
+
 void strip(int x, int y, int w, int h)
 {
     const Scheme& c = scheme();
@@ -385,6 +413,76 @@ int announce(int cx, int y, const std::string& text, const std::function<void(in
         icon(x + barW + 6 + 6, y + 6);
     }
     return w;
+}
+
+int pmeterWidth(int scale)
+{
+    //(black strip: 3 at the left, the arrows 6 apart, 2, the P badge 14, 3: in pixels of `scale`)
+    return (3 + 6 * 6 + 2 + 14 + 3) * scale;
+}
+
+int pmeter(int x, int y, float fraction, int tick, int scale)
+{
+    const int w = pmeterWidth(scale);
+    const int h = 11 * scale;
+    const SDL_Color dark {16, 24, 48, 255};
+    //The black strip, as the status bar's
+    fill(x + scale, y, w - 2 * scale, h, BLACK);
+    fill(x, y + scale, w, h - 2 * scale, BLACK);
+
+    //Six arrows, lit as far as the fraction goes (a part-lit one: lit when half way to it)
+    const float f = std::clamp(fraction, 0.0f, 1.0f);
+    const int lit = static_cast<int>(f * 6.0f + 0.5f);
+    const bool full = f >= 1.0f;
+    for (int k = 0; k < 6; k++) {
+        const bool on = k < lit;
+        const SDL_Color body = on ? SDL_Color {248, 248, 248, 255} : SDL_Color {72, 80, 104, 255};
+        const SDL_Color top = on ? SDL_Color {255, 255, 255, 255} : SDL_Color {96, 104, 128, 255};
+        prompts::art(x + (3 + k * 6) * scale, y + 2 * scale, {
+            "dd    ",
+            "dtd   ",
+            "dbbd  ",
+            "dbbbd ",
+            "dbbd  ",
+            "dbd   ",
+            "dd    ",
+        }, {{'d', dark}, {'b', body}, {'t', top}}, scale);
+    }
+    //The P: red, flashing white and red when the meter is full; dark until then
+    const bool flashOn = full && (tick / 8) % 2 == 0;
+    const SDL_Color badge = full ? (flashOn ? SDL_Color {248, 248, 248, 255} : SDL_Color {232, 40, 24, 255}) : SDL_Color {72, 80, 104, 255};
+    const SDL_Color letter = full ? (flashOn ? SDL_Color {232, 40, 24, 255} : SDL_Color {248, 248, 248, 255}) : SDL_Color {128, 136, 160, 255};
+    prompts::art(x + (3 + 36 + 2) * scale, y + 2 * scale, {
+        " dddddddddddd ",
+        "dbbbbPPPbbbbbd",
+        "dbbbbPbbPbbbbd",
+        "dbbbbPPPbbbbbd",
+        "dbbbbPbbbbbbbd",
+        "dbbbbPbbbbbbbd",
+        " dddddddddddd ",
+    }, {{'d', dark}, {'b', badge}, {'P', letter}}, scale);
+    return w;
+}
+
+void endBanner(int cx, int y, const std::string& headline, const std::string& result, const std::function<void(int x, int y)>& icon)
+{
+    const int textW = std::max(bigFont().getWidth(headline), bigFont().getWidth(result));
+    const int panelW = textW + 56;
+    const int panelH = 84;
+    const int cardW = icon ? 52 : 0;
+    const int w = panelW + (icon ? 8 + cardW : 0);
+    const int x = cx - w / 2;
+    statusFrame(x, y, panelW, panelH, 4);
+    //(the headline in gold over the result: two lines of the large font, inside the frame's rim)
+    bigFont().drawCentered(x + panelW / 2, y + 16, headline);
+    fill(x + 24, y + 42, panelW - 48, 2, {42, 154, 240, 255});
+    bigFont().drawCentered(x + panelW / 2, y + 50, result);
+    if (icon) {
+        const int cardX = x + panelW + 8;
+        const int cardY = y + (panelH - cardW) / 2;
+        statusFrame(cardX, cardY, cardW, cardW, 4);
+        icon(cardX + (cardW - 4) / 2 - 8, cardY + (cardW - 4) / 2 - 8);
+    }
 }
 
 void progressLine(int x, int y, int w, float fraction)

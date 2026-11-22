@@ -153,8 +153,9 @@ void LoadBackgroundPage(std::array<gfxSprite, 16>& sBackgrounds, short iPage)
 
         SDL_FillSurfaceRect(sBackgrounds[iIndex].getSurface(), nullptr, 0x0);
 
-        if (temp.getWidth() != 640 || temp.getHeight() != 480) {
-            printf("WARNING: Background %s is %dx%d but must be 640x480. Skipping.\n",
+        //(640x480, or an animated one: 640x480 frames under each other, the first one shown here)
+        if (temp.getWidth() != 640 || temp.getHeight() < 480 || temp.getHeight() % 480 != 0) {
+            printf("WARNING: Background %s is %dx%d but must be 640x480 (or 480 per frame). Skipping.\n",
                 path.generic_string().c_str(), temp.getWidth(), temp.getHeight());
             continue;
         }
