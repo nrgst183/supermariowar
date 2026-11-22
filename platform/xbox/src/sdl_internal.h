@@ -23,6 +23,10 @@ Uint64 sdlx_ticks_ns();
 bool sdlx_make_dir(const char* path);
 Uint64 sdlx_dir_bytes(const char* path);
 
+// Load stats (SDL_XboxTakeLoadStats): the images' (sdl_image.cpp) and the sounds' (sdl_mixer.cpp)
+extern SDL_XboxLoadStats g_sdlx_image_stats;
+extern SDL_XboxLoadStats g_sdlx_sound_stats;
+
 // Sets the x87 FPU to 53-bit (double) precision, so double maths gives the same
 // results every time (game replays and rollback need that); floats use SSE.
 // Called at startup and every frame, in case a library changed it.

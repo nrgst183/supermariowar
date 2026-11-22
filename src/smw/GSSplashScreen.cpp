@@ -110,6 +110,7 @@ void SplashScreenState::update()
             game_values.playerInput.outputControls[iPlayer].menu_cancel.fPressed ||
             game_values.playerInput.outputControls[iPlayer].menu_random.fPressed) {
             {
+                loadlog::mark("splash: waiting for \"press any key\" (not loading)");
                 blitdest = rm->menu_backdrop.getSurface();
                 rm->drawShade(App::menuTransparency);
                 blitdest = screen;

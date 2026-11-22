@@ -832,6 +832,22 @@ void* SDL_XboxGetScreenPixels(int w, int h, int* pitch);
 // "T:/cache/" if the utility drive can't be mounted. Ends with '/'.
 const char* SDL_XboxGetCachePath(void);
 
+// Where the loading time goes (the game's load log): totals since the last call, which resets them.
+// Times in nanoseconds.
+typedef struct SDL_XboxLoadStats {
+    Uint64 sizeChecks, sizeCheckNs;       // a disc file's size looked up (to check a cached copy)
+    Uint64 cacheHits, cacheReadNs, cacheReadBytes;
+    Uint64 discReads, discReadNs, discReadBytes;
+    Uint64 decodes, decodeNs;             // PNG decoding (images), WAV conversion (sounds)
+    Uint64 cacheWrites, cacheWriteNs, cacheWriteBytes;
+    Uint64 cacheWritesSkipped;            // over the budget, or the drive full
+} SDL_XboxLoadStats;
+void SDL_XboxTakeLoadStats(SDL_XboxLoadStats* images, SDL_XboxLoadStats* sounds);
+
+// The size of a file on the disc (D:), or -1: the folder is listed once and its sizes kept, a
+// directory read instead of a DVD seek per file
+long SDL_XboxDiscFileSize(const char* path);
+
 // Game saves on the hard disk (U:), as the dashboard's memory screen shows
 // them: each one is a folder, named `name` (ASCII; at most 127 characters).
 // Opens the save `name` (making it first if `create`), and returns its folder

@@ -1,4 +1,5 @@
 #include "MatchConfig.h"
+#include "LoadLog.h"
 #include "Replay.h"
 
 #include "ConfigNames.h"
@@ -578,6 +579,7 @@ bool checkMatchConfig(const MatchConfig& config, std::string& error, bool* needM
 
 void startConfiguredMatch(const MatchConfig& config)
 {
+    loadlog::mark("match (lobby's): starting");
     //The game mode
     game_values.matchtype = config.matchType;
     switch (config.gameMode) {
@@ -636,11 +638,14 @@ void startConfiguredMatch(const MatchConfig& config)
         if (game_values.playercontrol[k] > 0)
             loadMatchSkin(k, game_values.colorids[k]);
     }
+    loadlog::mark("match (lobby's): settings, players' skins");
 
     //The same steps as the menu's match start (MenuState::update)
     const std::string path = mapPathFor(config);
     g_map->loadMap(path, read_type_full);
+    loadlog::mark("match (lobby's): map");
     LoadCurrentMapBackground();
+    loadlog::mark("match (lobby's): background");
 
     if (game_values.music) {
         musiclist->setRandomMusic(static_cast<MusicCategory>(g_map->musicCategoryID), stripPathAndExtension(path), g_map->szBackgroundFile);
@@ -648,6 +653,7 @@ void startConfiguredMatch(const MatchConfig& config)
         rm->backgroundmusic[0].play(game_values.playnextmusic, false);
         replay::noteMusic();
     }
+    loadlog::mark("match (lobby's): music");
 
     game_values.appstate = AppState::Game;
 
@@ -666,10 +672,13 @@ void startConfiguredMatch(const MatchConfig& config)
         g_map->predrawforeground(rm->spr_frontmap[1]);
     }
     g_map->fitDrawAreas(rm->spr_frontmap[0]);    //(only where it shows)
+    loadlog::mark("match (lobby's): the map's layers drawn");
     g_map->SetupAnimatedTiles();
     LoadMapObjects(false);
+    loadlog::mark("match (lobby's): animated tiles, map objects");
 
     GameStateManager::instance().changeStateTo(&GameplayState::instance());
+    loadlog::mark("match (lobby's): gameplay state entered");
 }
 
 } // namespace rollback

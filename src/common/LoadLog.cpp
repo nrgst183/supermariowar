@@ -6,6 +6,7 @@
 
 #include <cstdio>
 #include <string>
+#include <utility>
 
 namespace loadlog {
 namespace {
@@ -33,7 +34,68 @@ std::string ms(Uint64 ns)
     snprintf(buffer, sizeof(buffer), "%llu ms", static_cast<unsigned long long>(ns / 1000000));
     return buffer;
 }
+
+struct Counter {
+    const char* what = nullptr;
+    Uint64 times = 0;
+    Uint64 ns = 0;
+    Uint64 bytes = 0;
+};
+Counter g_counters[24];
+
+void line(const char* what, Uint64 times, Uint64 ns, Uint64 bytes)
+{
+    char buffer[160];
+    snprintf(buffer, sizeof(buffer), "    %s: %llu, %llu ms, %llu KB", what, static_cast<unsigned long long>(times),
+        static_cast<unsigned long long>(ns / 1000000), static_cast<unsigned long long>(bytes / 1024));
+    write(buffer);
+}
+
+// What count() summed, and (the Xbox) the system layer's load stats; then from 0 again
+void writeCounters()
+{
+    for (Counter& c : g_counters) {
+        if (c.what && c.times > 0)
+            line(c.what, c.times, c.ns, c.bytes);
+        c.times = c.ns = c.bytes = 0;
+    }
+#ifdef SMW_XBOX
+    SDL_XboxLoadStats images {}, sounds {};
+    SDL_XboxTakeLoadStats(&images, &sounds);
+    for (const auto& [kind, s] : {std::pair {"images", images}, std::pair {"sounds", sounds}}) {
+        if (s.sizeChecks + s.cacheHits + s.discReads == 0)
+            continue;
+        const std::string k = kind;
+        line((k + " size checks on the disc").c_str(), s.sizeChecks, s.sizeCheckNs, 0);
+        line((k + " from the cache drive").c_str(), s.cacheHits, s.cacheReadNs, s.cacheReadBytes);
+        line((k + " read from the disc").c_str(), s.discReads, s.discReadNs, s.discReadBytes);
+        line((k + " decoded").c_str(), s.decodes, s.decodeNs, 0);
+        line((k + " written to the cache drive").c_str(), s.cacheWrites, s.cacheWriteNs, s.cacheWriteBytes);
+        if (s.cacheWritesSkipped)
+            line((k + " NOT written to the cache (full, or no drive)").c_str(), s.cacheWritesSkipped, 0, 0);
+    }
+#endif
+}
 } // namespace
+
+unsigned long long nowNs()
+{
+    return SDL_GetTicksNS();
+}
+
+void count(const char* what, unsigned long long ns, unsigned long long bytes)
+{
+    for (Counter& c : g_counters) {
+        if (!c.what)
+            c.what = what;
+        if (c.what == what) {
+            c.times++;
+            c.ns += ns;
+            c.bytes += bytes;
+            return;
+        }
+    }
+}
 
 void mark(const char* what)
 {
@@ -43,6 +105,7 @@ void mark(const char* what)
         g_first = g_last = now;
     }
     write(std::string(what) + "  " + ms(now - g_last) + "  (at " + ms(now - g_first) + ")");
+    writeCounters();
     g_last = now;
 }
 
@@ -53,8 +116,10 @@ Scope::Scope(const char* what)
 
 Scope::~Scope()
 {
-    if (m_what)
+    if (m_what) {
         write(std::string(m_what) + "  " + ms(SDL_GetTicksNS() - m_start));
+        writeCounters();
+    }
 }
 
 } // namespace loadlog

@@ -490,3 +490,71 @@ Uint64 sdlx_dir_bytes(const char* path)
     FindClose(find);
     return total;
 }
+
+/* ---- Load stats, and the disc's file sizes ------------------------------ */
+
+SDL_XboxLoadStats g_sdlx_image_stats {};
+SDL_XboxLoadStats g_sdlx_sound_stats {};
+
+void SDL_XboxTakeLoadStats(SDL_XboxLoadStats* images, SDL_XboxLoadStats* sounds)
+{
+    if (images)
+        *images = g_sdlx_image_stats;
+    if (sounds)
+        *sounds = g_sdlx_sound_stats;
+    g_sdlx_image_stats = {};
+    g_sdlx_sound_stats = {};
+}
+
+namespace {
+// The disc's folders listed so far: each file's size, by its lower-case name
+CRITICAL_SECTION g_sizesLock;
+bool g_sizesLockReady = false;
+std::map<std::string, std::map<std::string, long>> g_discSizes;
+
+std::string lower(std::string s)
+{
+    for (char& c : s) {
+        if (c >= 'A' && c <= 'Z')
+            c = static_cast<char>(c - 'A' + 'a');
+    }
+    return s;
+}
+} // namespace
+
+long SDL_XboxDiscFileSize(const char* path)
+{
+    if (!path)
+        return -1;
+    const std::string full = xboxPath(path);
+    const size_t slash = full.find_last_of('\\');
+    if (slash == std::string::npos)
+        return -1;
+    const std::string dir = lower(full.substr(0, slash));
+    const std::string name = lower(full.substr(slash + 1));
+
+    //(the map preview's worker loads images too)
+    if (!g_sizesLockReady) {
+        InitializeCriticalSection(&g_sizesLock);
+        g_sizesLockReady = true;
+    }
+    EnterCriticalSection(&g_sizesLock);
+    auto folder = g_discSizes.find(dir);
+    if (folder == g_discSizes.end()) {
+        std::map<std::string, long> sizes;
+        WIN32_FIND_DATAA data;
+        HANDLE find = FindFirstFileA((full.substr(0, slash) + "\\*").c_str(), &data);
+        if (find != INVALID_HANDLE_VALUE) {
+            do {
+                if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+                    sizes[lower(data.cFileName)] = static_cast<long>(data.nFileSizeLow);
+            } while (FindNextFileA(find, &data));
+            FindClose(find);
+        }
+        folder = g_discSizes.emplace(dir, std::move(sizes)).first;
+    }
+    const auto file = folder->second.find(name);
+    const long size = file == folder->second.end() ? -1 : file->second;
+    LeaveCriticalSection(&g_sizesLock);
+    return size;
+}

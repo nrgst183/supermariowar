@@ -134,21 +134,21 @@ SDL_Surface* loadCached(const char* file, long sourceSize)
     return surface;
 }
 
-void saveCached(const char* file, long sourceSize, SDL_Surface* surface, bool opaque)
+bool saveCached(const char* file, long sourceSize, SDL_Surface* surface, bool opaque)
 {
     const size_t row = static_cast<size_t>(surface->w) * 4;
     const Uint64 bytes = sizeof(CacheHeader) + row * surface->h;
     if (sourceSize <= 0)
-        return;
+        return false;
     if (s_cacheUsed < 0)
         s_cacheUsed = static_cast<Sint64>(sdlx_dir_bytes(cacheDir().c_str()));
     if (static_cast<Uint64>(s_cacheUsed) + bytes > CACHE_BUDGET)
-        return;
+        return false;
     if (!sdlx_make_dir(cacheDir().c_str()))
-        return;
+        return false;
     FILE* out = fopen(cacheFile(file).c_str(), "wb");
     if (!out)
-        return;
+        return false;
     const CacheHeader header {CACHE_MAGIC, CACHE_VERSION, static_cast<Uint32>(sourceSize), surface->w, surface->h, opaque ? 1u : 0u};
     bool ok = fwrite(&header, sizeof(header), 1, out) == 1;
     for (int y = 0; ok && y < surface->h; y++)
@@ -158,6 +158,7 @@ void saveCached(const char* file, long sourceSize, SDL_Surface* surface, bool op
         s_cacheUsed += static_cast<Sint64>(bytes);
     else
         std::remove(cacheFile(file).c_str());    //(the drive is full: not kept half written)
+    return ok;
 }
 } // namespace
 
@@ -174,17 +175,39 @@ SDL_Surface* IMG_Load(const char* file)
         return nullptr;
     }
 
-    //(a big image from the disc: decoded already, on the cache drive)
-    const long sourceSize = fromDisc(file) ? fileSize(file) : -1;
+    SDL_XboxLoadStats& stats = g_sdlx_image_stats;
+
+    //(an image from the disc: decoded already, on the cache drive. Its size, to know the copy is of
+    //this file: from its folder's listing, not a DVD seek to the file)
+    Uint64 t = sdlx_ticks_ns();
+    long sourceSize = -1;
+    if (fromDisc(file)) {
+        sourceSize = SDL_XboxDiscFileSize(file);
+        if (sourceSize <= 0)
+            sourceSize = fileSize(file);
+        stats.sizeChecks++;
+        stats.sizeCheckNs += sdlx_ticks_ns() - t;
+    }
     if (sourceSize > 0) {
-        if (SDL_Surface* cached = loadCached(file, sourceSize))
+        t = sdlx_ticks_ns();
+        if (SDL_Surface* cached = loadCached(file, sourceSize)) {
+            stats.cacheHits++;
+            stats.cacheReadNs += sdlx_ticks_ns() - t;
+            stats.cacheReadBytes += static_cast<Uint64>(cached->w) * cached->h * 4;
             return cached;
+        }
+        stats.cacheReadNs += sdlx_ticks_ns() - t;
     }
 
+    t = sdlx_ticks_ns();
     std::vector<unsigned char> data;
     if (!readFile(file, data))
         return nullptr;
+    stats.discReads++;
+    stats.discReadNs += sdlx_ticks_ns() - t;
+    stats.discReadBytes += data.size();
 
+    t = sdlx_ticks_ns();
     int w = 0, h = 0, channels = 0;
     unsigned char* rgba = stbi_load_from_memory(data.data(), static_cast<int>(data.size()), &w, &h, &channels, 4);
     if (!rgba) {
@@ -218,9 +241,19 @@ SDL_Surface* IMG_Load(const char* file)
     // color key or an alpha.
     if (opaque)
         surface->blend_mode = SDL_BLENDMODE_NONE;
+    stats.decodes++;
+    stats.decodeNs += sdlx_ticks_ns() - t;
 
-    if (sourceSize > 0)
-        saveCached(file, sourceSize, surface, opaque);
+    if (sourceSize > 0) {
+        t = sdlx_ticks_ns();
+        if (saveCached(file, sourceSize, surface, opaque)) {
+            stats.cacheWrites++;
+            stats.cacheWriteBytes += static_cast<Uint64>(surface->w) * surface->h * 4;
+        } else {
+            stats.cacheWritesSkipped++;
+        }
+        stats.cacheWriteNs += sdlx_ticks_ns() - t;
+    }
     return surface;
 }
 

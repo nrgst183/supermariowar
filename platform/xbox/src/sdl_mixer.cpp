@@ -412,15 +412,24 @@ bool readSoundFile(const char* path, std::vector<unsigned char>& out)
     if (!((path[0] == 'D' || path[0] == 'd') && path[1] == ':'))
         return readFile(path, out);
 
-    long size = -1;
-    if (FILE* file = fopen(path, "rb")) {
-        fseek(file, 0, SEEK_END);
-        size = ftell(file);
-        fclose(file);
+    SDL_XboxLoadStats& stats = g_sdlx_sound_stats;
+
+    //(its size from its folder's listing: no DVD seek to the file)
+    Uint64 t = sdlx_ticks_ns();
+    long size = SDL_XboxDiscFileSize(path);
+    if (size <= 0) {
+        if (FILE* file = fopen(path, "rb")) {
+            fseek(file, 0, SEEK_END);
+            size = ftell(file);
+            fclose(file);
+        }
     }
+    stats.sizeChecks++;
+    stats.sizeCheckNs += sdlx_ticks_ns() - t;
     if (size <= 0)
         return readFile(path, out);
 
+    t = sdlx_ticks_ns();
     const std::string cached = soundCacheFile(path);
     if (FILE* in = fopen(cached.c_str(), "rb")) {
         Uint32 header[2] = {};
@@ -430,17 +439,29 @@ bool readSoundFile(const char* path, std::vector<unsigned char>& out)
             ok = fread(out.data(), 1, out.size(), in) == out.size();
         }
         fclose(in);
-        if (ok)
+        stats.cacheReadNs += sdlx_ticks_ns() - t;
+        if (ok) {
+            stats.cacheHits++;
+            stats.cacheReadBytes += out.size();
             return true;
+        }
     }
 
+    t = sdlx_ticks_ns();
     if (!readFile(path, out))
         return false;
+    stats.discReads++;
+    stats.discReadNs += sdlx_ticks_ns() - t;
+    stats.discReadBytes += out.size();
+    t = sdlx_ticks_ns();
     const Uint64 bytes = sizeof(Uint32) * 2 + out.size();
     if (g_sound_cache_used < 0)
         g_sound_cache_used = static_cast<Sint64>(sdlx_dir_bytes(soundCacheDir().c_str()));
-    if (static_cast<Uint64>(g_sound_cache_used) + bytes > SOUND_CACHE_BUDGET || !sdlx_make_dir(soundCacheDir().c_str()))
+    if (static_cast<Uint64>(g_sound_cache_used) + bytes > SOUND_CACHE_BUDGET || !sdlx_make_dir(soundCacheDir().c_str())) {
+        stats.cacheWritesSkipped++;
         return true;
+    }
+    bool written = false;
     if (FILE* copy = fopen(cached.c_str(), "wb")) {
         const Uint32 header[2] = {SOUND_CACHE_MAGIC, static_cast<Uint32>(size)};
         const bool ok = fwrite(header, sizeof(header), 1, copy) == 1 && fwrite(out.data(), 1, out.size(), copy) == out.size();
@@ -449,7 +470,15 @@ bool readSoundFile(const char* path, std::vector<unsigned char>& out)
             g_sound_cache_used += static_cast<Sint64>(bytes);
         else
             std::remove(cached.c_str());    //(the drive is full: not kept half written)
+        written = ok;
     }
+    if (written) {
+        stats.cacheWrites++;
+        stats.cacheWriteBytes += bytes;
+    } else {
+        stats.cacheWritesSkipped++;
+    }
+    stats.cacheWriteNs += sdlx_ticks_ns() - t;
     return true;
 }
 
@@ -623,6 +652,14 @@ MIX_Audio* MIX_LoadAudio(MIX_Mixer* mixer, const char* path, bool predecode)
     if (!readSoundFile(path, data))
         return nullptr;
 
+    const Uint64 decodeStart = sdlx_ticks_ns();
+    struct Timed {
+        Uint64 start;
+        ~Timed() {
+            g_sdlx_sound_stats.decodes++;
+            g_sdlx_sound_stats.decodeNs += sdlx_ticks_ns() - start;
+        }
+    } timed {decodeStart};
     auto* audio = new MIX_Audio();
     if (data.size() >= 4 && memcmp(data.data(), "OggS", 4) == 0) {
         int error = 0;

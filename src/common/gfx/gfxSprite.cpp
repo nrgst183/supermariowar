@@ -1,4 +1,5 @@
 #include "gfxSprite.h"
+#include "LoadLog.h"
 
 #include "gfx.h"
 
@@ -89,7 +90,10 @@ SdlSurfacePtr loadImage(
     }
     std::cout << path_str << " ...";
 
+    Uint64 t = loadlog::nowNs();
     auto raw = SdlSurfacePtr(IMG_Load(path_str.c_str()));
+    if (raw)
+        loadlog::count("image files loaded (IMG_Load)", loadlog::nowNs() - t, static_cast<Uint64>(raw->w) * raw->h * 4);
     if (!raw) {
         throw std::format("Couldn't load {}: {}", path_str, SDL_GetError());
     }
@@ -101,13 +105,19 @@ SdlSurfacePtr loadImage(
         }
     }
 
+    t = loadlog::nowNs();
 #ifdef SMW_XBOX
     //(loaded in the screen's format already, and no key to turn into transparency: the conversion
     //would only copy it, a second big allocation for an ingame tileset)
-    auto img = !color_key && raw->format == screen->format ? std::move(raw) : SdlSurfacePtr(SDL_ConvertSurface(raw.get(), screen->format));
+    const bool convert = color_key || raw->format != screen->format;
+    auto img = !convert ? std::move(raw) : SdlSurfacePtr(SDL_ConvertSurface(raw.get(), screen->format));
 #else
+    const bool convert = true;
     auto img = SdlSurfacePtr(SDL_ConvertSurface(raw.get(), screen->format));
 #endif
+    if (img && convert)
+        loadlog::count("images converted (their color key)", loadlog::nowNs() - t, static_cast<Uint64>(img->w) * img->h * 4);
+    t = loadlog::nowNs();
     if (!img) {
         throw std::format("Couldn't convert {} to the display's pixel format: {}", path_str, SDL_GetError());
     }
@@ -122,6 +132,8 @@ SdlSurfacePtr loadImage(
     //a whole screen each, every frame (the Xbox's SDL blends a pixel at a time; a copy is a memcpy)
     if (!alpha && !color_key && !SDL_SurfaceHasColorKey(img.get()) && isOpaque(img.get()))
         SDL_SetSurfaceBlendMode(img.get(), SDL_BLENDMODE_NONE);
+
+    loadlog::count("images' alpha baked, opaque checked", loadlog::nowNs() - t);
 
     if (alpha && !baked) {
         if (!SDL_SetSurfaceBlendMode(img.get(), SDL_BLENDMODE_BLEND)) {
