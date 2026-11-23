@@ -1,8 +1,19 @@
 #include "MI_SliderField.h"
 
+#include "gfx.h"
 #include "input.h"
 #include "ResourceManager.h"
 #include "ui/MI_Image.h"
+
+#include <cmath>
+
+namespace {
+void fillRect(int x, int y, int w, int h, Uint8 r, Uint8 g, Uint8 b)
+{
+    SDL_Rect rect {x, y, w, h};
+    SDL_FillSurfaceRect(blitdest, &rect, SDL_MapSurfaceRGB(blitdest, r, g, b));
+}
+} // namespace
 
 
 /**************************************
@@ -28,6 +39,61 @@ void MI_SliderField::SetPosition(short x, short y)
     miModifyImageRight->SetPosition(m_pos.x + m_width - 16, m_pos.y + 4);
 }
 
+void MI_SliderField::Update()
+{
+    MI_SelectField<short>::Update();
+    const float target = static_cast<float>(m_index);
+    if (m_knob < 0.0f || std::fabs(target - m_knob) < 0.05f)
+        m_knob = target;
+    else
+        m_knob += (target - m_knob) * 0.4f;    //(a few frames: it slides)
+}
+
+void MI_SliderField::drawTrack(int x0, int x1, int y) const
+{
+    const int count = static_cast<int>(m_items.size());
+    if (count <= 0 || x1 <= x0)
+        return;
+    const bool dim = fLocked || fDisable;
+    const int span = x1 - x0;
+    auto stepX = [&](float i) { return x0 + (count > 1 ? static_cast<int>(i * static_cast<float>(span) / static_cast<float>(count - 1) + 0.5f) : 0); };
+
+    //The ticks along the top, one a value (the ends taller)
+    for (int i = 0; i < count; i++) {
+        const int tx = stepX(static_cast<float>(i));
+        const bool end = i == 0 || i == count - 1;
+        fillRect(tx - 1, y - (end ? 11 : 9), 2, end ? 6 : 4, 16, 24, 48);
+    }
+
+    //The groove: a dark rim, dark green inside, a shade along its top
+    constexpr int GH = 8;
+    const int gy = y - GH / 2;
+    fillRect(x0 - 2, gy, span + 4, GH, 16, 24, 48);
+    fillRect(x0 - 4, gy + 2, span + 8, GH - 4, 16, 24, 48);
+    if (dim)
+        fillRect(x0 - 2, gy + 2, span + 4, GH - 4, 110, 116, 120);
+    else
+        fillRect(x0 - 2, gy + 2, span + 4, GH - 4, 40, 104, 32);
+    fillRect(x0 - 2, gy + 2, span + 4, 2, dim ? 84 : 24, dim ? 88 : 72, dim ? 92 : 20);
+
+    //The knob: gold (a coin's), taller than the groove, a shade and a grip line
+    constexpr int KW = 12;
+    constexpr int KH = 18;
+    const float at = m_knob < 0.0f ? static_cast<float>(m_index) : m_knob;
+    const int kx = stepX(at) - KW / 2;
+    const int ky = y - KH / 2;
+    fillRect(kx + 2, ky, KW - 4, KH, 16, 24, 48);
+    fillRect(kx, ky + 2, KW, KH - 4, 16, 24, 48);
+    if (dim) {
+        fillRect(kx + 2, ky + 2, KW - 4, KH - 4, 200, 196, 184);
+        fillRect(kx + 2, ky + KH - 6, KW - 4, 4, 150, 146, 136);
+    } else {
+        fillRect(kx + 2, ky + 2, KW - 4, KH - 4, 248, 208, 48);
+        fillRect(kx + 2, ky + KH - 6, KW - 4, 4, 200, 136, 16);
+    }
+    fillRect(kx + KW / 2 - 1, ky + 5, 2, KH - 11, dim ? 150 : 200, dim ? 146 : 136, dim ? 136 : 16);
+}
+
 void MI_SliderField::Draw()
 {
     if (!m_visible)
@@ -43,19 +109,8 @@ void MI_SliderField::Draw()
         rm->menu_font_large.drawScrolling(m_pos.x + m_indent2 + 16, m_pos.y + 5, m_width - m_indent2 - 24, currentItem().name.c_str(), fSelected);
     }
 
-    short iSpacing = (m_indent2 - m_indent - 20) / (static_cast<short>(m_items.size()) - 1);
-    short iSpot = 0;
-
-    for (unsigned int index = 0; index < m_items.size(); index++) {
-        if (index < m_items.size() - 1)
-            m_sprSlider->draw(m_pos.x + m_indent + iSpot + 16, m_pos.y + 10, {0, 0, iSpacing, 13});
-        else
-            m_sprSlider->draw(m_pos.x + m_indent + iSpot + 16, m_pos.y + 10, {164, 0, 4, 13});
-
-        iSpot += iSpacing;
-    }
-
-    m_sprSlider->draw(m_pos.x + m_indent + (m_index * iSpacing) + 14, m_pos.y + 8, {168, 0, 8, 16});
+    //(the slider between the joint and the value's name)
+    drawTrack(m_pos.x + m_indent + 26, m_pos.x + m_indent2 - 14, m_pos.y + 18);
 
     const bool drawLeft = m_index > 0;
     if (m_wraps || drawLeft)

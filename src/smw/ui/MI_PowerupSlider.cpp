@@ -22,19 +22,8 @@ void MI_PowerupSlider::Draw()
     m_spr->draw(m_pos.x + 38, m_pos.y, {0, (fSelected ? 32 : 0) + m_adjustmentY, m_halfWidth, 32});
     m_spr->draw(m_pos.x + 38 + m_halfWidth, m_pos.y, {550 - m_width + m_halfWidth, (fSelected ? 32 : 0) + m_adjustmentY, m_width - m_halfWidth - 38, 32});
 
-    short iSpacing = (m_width - 100) / (static_cast<short>(m_items.size()) - 1);
-    short iSpot = 0;
-
-    for (unsigned int index = 0; index < m_items.size(); index++) {
-        if (index < m_items.size() - 1)
-            m_sprSlider->draw(m_pos.x + iSpot + 56, m_pos.y + 10, {0, 0, iSpacing, 13});
-        else
-            m_sprSlider->draw(m_pos.x + iSpot + 56, m_pos.y + 10, {164, 0, 4, 13});
-
-        iSpot += iSpacing;
-    }
-
-    m_sprSlider->draw(m_pos.x + (m_index * iSpacing) + 54, m_pos.y + 8, {168, 0, 8, 16});
+    //The slider (as the other sliders: MI_SliderField::drawTrack), then the value in its box
+    drawTrack(m_pos.x + 60, m_pos.x + m_width - 46, m_pos.y + 18);
     m_sprSlider->draw(m_pos.x + m_width - 34, m_pos.y + 8, {static_cast<int>(m_index) * 16, 16, 16, 16});
     m_sprPowerup->draw(m_pos.x, m_pos.y, {m_powerupIndex * 32, 0, 32, 32});
 

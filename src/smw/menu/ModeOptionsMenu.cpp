@@ -35,7 +35,8 @@ void addTitleBar(UI_Menu& menu, const char* title)
 // fields in a column: the d-pad goes down it and round through Back, right goes to Back
 void finishModeMenu(UI_Menu& menu, const char* title, std::initializer_list<UI_Control*> fields)
 {
-    MI_Button* back = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
+    //(above the footer of prompts, as the settings pages' Back)
+    MI_Button* back = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
     back->SetCode(MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS);
 
     const std::vector<UI_Control*> column(fields);

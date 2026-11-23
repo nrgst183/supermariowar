@@ -390,8 +390,16 @@ void UI_OnlineLobbyMenu::Sync()
         tone = host || on ? Tone::Good : Tone::Info;
     } else if (status.empty() && inLobby && local >= 0) {
         if (host) {
-            status = canStart ? "Everyone is ready. Select Continue" : capitalized(why);
-            tone = canStart ? Tone::Good : Tone::Warn;
+            //(the host's own ready is only on its own screen: the lobby counts the others; its players
+            //not set yet: say so, not "everyone")
+            const bool meReady = !miTeam->hasOwnPlayers() || miTeam->locked();
+            if (canStart && !meReady) {
+                status = "Everyone else is ready. Press A when you're set";
+                tone = Tone::Info;
+            } else {
+                status = canStart ? "Everyone is ready. Select Continue" : capitalized(why);
+                tone = canStart ? Tone::Good : Tone::Warn;
+            }
         } else {
             const bool ready = lobby->peer(local).ready;
             status = ready ? "Waiting for the host to start the match" : "Pick your character and team, then get ready";
