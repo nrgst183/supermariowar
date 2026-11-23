@@ -146,23 +146,72 @@ void bestText(int x, int y, int w, const std::string& text)
         rm->menu_font_small.drawScrolling(x, y, w, text);
 }
 
-void footer(const std::vector<prompts::Prompt>& row, const std::string& label)
+namespace {
+bool s_footerDrawn = false;
+}
+
+void beginFrame()
 {
-    //The status bar's strip along the bottom of the screen (as the title bar's at the top), the prompts
-    //from its left
+    s_footerDrawn = false;
+}
+
+bool footerDrawn()
+{
+    return s_footerDrawn;
+}
+
+std::vector<prompts::Prompt> standardPrompts(bool change, const char* back)
+{
+    using prompts::Pad;
+    using prompts::menuKey;
+    std::vector<prompts::Prompt> row = {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"}};
+    if (change)
+        row.push_back({{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"});
+    row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"});
+    if (back)
+        row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, back});
+    return row;
+}
+
+void footer(const std::vector<prompts::Prompt>& row, const std::string& label, int icon)
+{
+    s_footerDrawn = true;
+    //The status bar's strip along the bottom of the screen (as the title bar's at the top)
     theme::statusBar(0, 448, 640, 32);
-    int left = 24;
-    if (!label.empty()) {
-        bestText(left, 458, 300, label);
-        left += std::min(300, rm->menu_font_large.getWidth(label)) + 14;
+    constexpr int LEFT = 16;
+    constexpr int RIGHT = 624;
+    constexpr int GAP = 18;
+
+    //The prompts at the right (their labels large, read from a couch, unless that leaves the label
+    //too little room)
+    int promptsLeft = RIGHT;
+    if (!row.empty()) {
+        prompts::setLargeLabels(true);
+        int w = prompts::promptsWidth(row, GAP);
+        if (!label.empty() && RIGHT - w - LEFT < 240) {
+            prompts::setLargeLabels(false);
+            w = prompts::promptsWidth(row, GAP);
+        }
+        promptsLeft = RIGHT - w;
+        prompts::drawPrompts(promptsLeft + w / 2, 458, row, GAP);
+        prompts::setLargeLabels(false);
     }
-    if (row.empty())
+
+    //The label in the room left (moving to show all of it when it's longer)
+    if (label.empty())
         return;
-    //(the labels large: read from a couch)
-    prompts::setLargeLabels(true);
-    const int w = prompts::promptsWidth(row, 18);
-    prompts::drawPrompts(left + w / 2, 458, row, 18);
-    prompts::setLargeLabels(false);
+    int x = LEFT;
+    if (icon >= 0) {
+        theme::statusIcon(x, 456, static_cast<theme::Status>(icon));
+        x += 22;
+    }
+    const int room = promptsLeft - (row.empty() ? 0 : 20) - x;
+    if (room <= 0)
+        return;
+    if (rm->menu_font_large.getWidth(label) <= room)
+        rm->menu_font_large.draw(x, 455, label);
+    else
+        rm->menu_font_small.drawScrolling(x, 459, room, label);
 }
 } // namespace menupanel
 

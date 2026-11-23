@@ -47,12 +47,18 @@ public:
 /// computer: up/down choose the skin, left/right the team and select is ready (the original's keys); the
 /// others (remote players, CPU players) are shown, locked. While a player is ready (locked), "down" moves
 /// to the buttons under the box and "cancel" takes the ready back; cancel when not ready leaves the lobby.
-/// A select field shown as a switch: a pill, lit with its knob at the right for any value but the
-/// first (0: off), and the value's name beside it (left/right changes it, as the select fields)
+/// A select field shown as a slider switch: its name on the select fields' pipe, then a groove cut into
+/// the pipe with a knob riding on it that slides to the value (one stop per value: the first is off,
+/// at the left), the value's name after it. Left/right changes it, as
+/// the select fields.
 class MI_SwitchField : public MI_SelectField<short> {
 public:
     using MI_SelectField<short>::MI_SelectField;
+    void Update() override;
     void Draw() override;
+
+private:
+    float m_knob = -1.0f;    // where the knob is drawn, 0 (left) to 1 (right): it slides to the value
 };
 
 class MI_OnlineTeamSelect : public UI_Control {
@@ -171,8 +177,6 @@ public:
     void SetOptionsPage(bool options) { m_optionsPage = options; }
 
 private:
-    LobbyRect m_statusRect;
-    LobbyRect m_hintRect;
     std::string m_title;
     std::string m_status;
     std::string m_hint;

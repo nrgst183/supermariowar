@@ -681,7 +681,17 @@ void MenuState::update()
         (mSeriesSkipUpdate || game_values.appstate != AppState::Menu);
     if (!worldWaits)
         mCurrentMenu->Update();
+    menupanel::beginFrame();
     mCurrentMenu->Draw();
+    //(every menu has the footer of prompts: the ones that don't draw their own, the usual one; not
+    //the screens the whole of which is their picture (the world map, the map thumbnails, the
+    //tournament's scoreboard and bonus wheel, a tour's stop), nor the ones with controls down there)
+    const bool wholeScreen = mCurrentMenu == mWorldMenu.get() || mCurrentMenu == mMapFilterEditMenu.get() ||
+        mCurrentMenu == mTournamentScoreboardMenu.get() || mCurrentMenu == mBonusWheelMenu.get() || mCurrentMenu == mTourStopMenu.get() ||
+        mCurrentMenu == mOptionsMenu.get() || mCurrentMenu == mProjectileOptionsMenu.get() || mCurrentMenu == mPowerupDropRatesMenu.get() ||
+        mCurrentMenu == mGameSettingsMenu.get() || mCurrentMenu == mMatchSelectionMenu.get() || mCurrentMenu == mModeOptionsMenu.get();
+    if (!menupanel::footerDrawn() && !wholeScreen)
+        menupanel::footer(menupanel::standardPrompts(false, mCurrentMenu == mMainMenu.get() ? nullptr : "back"));
     DrawOnlineSeriesNotice();
 
     if (iDisplayError > DISPLAY_ERROR_NONE) {

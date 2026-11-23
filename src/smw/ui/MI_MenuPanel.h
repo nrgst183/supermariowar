@@ -15,12 +15,18 @@ void box(int x, int y, int w, int h);
 /// A row of a list in a panel: darker than the panel, or (selected) bright with a white rim;
 /// `dim`: a row that can't be chosen (greyer)
 void row(int x, int y, int w, int h, bool selected, bool dim = false);
-/// The button prompts on a dark strip along the bottom of the screen (y 450 to 480), after a label
-/// if there is one; every menu's prompts are drawn here
 // A line of text in the large font if it fits in w (read from a couch), else the small one (cut to w);
 // y: where the small font's line would be
 void bestText(int x, int y, int w, const std::string& text);
-void footer(const std::vector<prompts::Prompt>& row, const std::string& label = "");
+/// Every menu's footer: a status bar strip along the bottom of the screen (y 448 to 480), the button
+/// prompts at its right, a label (what the focused thing does, or how things stand) in the room left
+/// at its left, after an icon if `icon` is a theme::Status (-1: none)
+void footer(const std::vector<prompts::Prompt>& row, const std::string& label = "", int icon = -1);
+/// A frame of the menus: whether a footer was drawn in it (the menus without one get the usual one)
+void beginFrame();
+bool footerDrawn();
+/// The usual prompts: up/down chooses, A selects (left/right changes, for settings), B goes back
+std::vector<prompts::Prompt> standardPrompts(bool change, const char* back = "back");
 }
 
 /// A panel, with a title at its top left (and a line of small text at its top right)

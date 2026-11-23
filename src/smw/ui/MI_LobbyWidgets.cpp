@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <format>
 #include <vector>
 
@@ -32,12 +33,6 @@ std::string ellipsize(const gfxFont& font, std::string text, int maxWidth)
 std::string defaultSkinPath()
 {
     return skinlist && skinlist->count() > 0 ? skinlist->at(0).path.string() : std::string();
-}
-
-// The headers' bar: All-Stars' SMB3 status bar, as the menus' title bar (SmwTheme)
-void blueBar(int x, int y, int width)
-{
-    theme::statusBar(x, y, width, 32);
 }
 
 // The cream frame of the map previews (336 x 254 plus the right and bottom edges)
@@ -82,12 +77,30 @@ void MI_OnlineTeamSelect::Reset()
         m_overrideFrames[i] = m_holdFrames[i] = 0;
 }
 
+namespace {
+// Where the switch's knob stops for its value (0 left .. 1 right)
+float knobStop(size_t index, size_t count)
+{
+    return count > 1 ? static_cast<float>(index) / static_cast<float>(count - 1) : 0.0f;
+}
+} // namespace
+
+void MI_SwitchField::Update()
+{
+    MI_SelectField<short>::Update();
+    const float target = knobStop(m_index, m_items.size());
+    if (m_knob < 0.0f || std::fabs(target - m_knob) < 0.02f)
+        m_knob = target;
+    else
+        m_knob += (target - m_knob) * 0.35f;    //(a few frames: it slides)
+}
+
 void MI_SwitchField::Draw()
 {
     if (!m_visible)
         return;
 
-    //The pipe, as the select fields'
+    //The select fields' pipe: its name, the joint, then the slider where their value would be
     gfxSprite* body = fLocked ? &rm->spr_selectfielddisabled : m_spr;
     const short row = fSelected ? (fLocked ? m_adjustmentY + 32 : 32) : m_adjustmentY;
     body->draw(m_pos.x, m_pos.y, {0, row, m_indent - 16, 32});
@@ -97,28 +110,40 @@ void MI_SwitchField::Draw()
     if (m_items.empty())
         return;
 
-    //The switch: a dark outline, green and the knob at the right when on, gray and at the left when off
-    const bool on = m_index > 0;
-    constexpr int W = 34, H = 18;
-    const int x = m_pos.x + m_indent + 10;
-    const int y = m_pos.y + 7;
+    //The groove: cut into the pipe, a darker green (a dark rim, a shade along its top)
+    constexpr int GW = 58;
+    constexpr int GH = 10;
+    const int gx = m_pos.x + m_indent + 22;
+    const int gy = m_pos.y + 11;
     const SDL_Color dark {16, 24, 48, 255};
-    const SDL_Color track = fLocked ? SDL_Color {120, 120, 120, 255} : on ? SDL_Color {72, 200, 72, 255} : SDL_Color {150, 150, 158, 255};
-    const SDL_Color knob {248, 248, 240, 255};
-    prompts::fill(x + 2, y, W - 4, H, dark);
-    prompts::fill(x, y + 2, W, H - 4, dark);
-    prompts::fill(x + 2, y + 2, W - 4, H - 4, track);
-    const int kx = on ? x + W - 2 - 14 : x + 2;
-    prompts::fill(kx, y + 2, 14, H - 4, dark);
-    prompts::fill(kx + 2, y + 4, 10, H - 8, knob);
+    prompts::fill(gx + 2, gy, GW - 4, GH, dark);
+    prompts::fill(gx, gy + 2, GW, GH - 4, dark);
+    prompts::fill(gx + 2, gy + 2, GW - 4, GH - 4, {40, 104, 32, 255});
+    prompts::fill(gx + 2, gy + 2, GW - 4, 2, {24, 72, 20, 255});
 
-    const int tx = x + W + 8;
-    rm->menu_font_large.drawScrolling(tx, m_pos.y + 5, m_pos.x + m_width - 24 - tx, currentItem().name.c_str(), fSelected);
+    //The knob: a gold block (a coin's), taller than the groove, riding on it at the value (sliding
+    //there), with a shade and a grip line
+    constexpr int KW = 16;
+    constexpr int KH = 22;
+    const float t = m_knob < 0.0f ? knobStop(m_index, m_items.size()) : m_knob;
+    const int kx = gx - 2 + static_cast<int>(t * static_cast<float>(GW + 4 - KW) + 0.5f);
+    const int ky = m_pos.y + 5;
+    const SDL_Color face = fLocked ? SDL_Color {200, 196, 184, 255} : SDL_Color {248, 208, 48, 255};
+    const SDL_Color shade = fLocked ? SDL_Color {150, 146, 136, 255} : SDL_Color {200, 136, 16, 255};
+    prompts::fill(kx + 2, ky, KW - 4, KH, dark);
+    prompts::fill(kx, ky + 2, KW, KH - 4, dark);
+    prompts::fill(kx + 2, ky + 2, KW - 4, KH - 4, face);
+    prompts::fill(kx + 2, ky + KH - 6, KW - 4, 4, shade);
+    prompts::fill(kx + KW / 2 - 1, ky + 6, 2, KH - 14, shade);
 
-    if (m_wraps || m_index > 0)
-        miModifyImageLeft->Draw();
-    if (m_wraps || m_index + 1 < m_items.size())
-        miModifyImageRight->Draw();
+    //The value's name after it
+    const int tx = gx + GW + 10;
+    const int room = m_pos.x + m_width - 14 - tx;
+    const std::string& name = currentItem().name;
+    if (rm->menu_font_large.getWidth(name) <= room)
+        rm->menu_font_large.draw(tx, m_pos.y + 5, name);
+    else
+        rm->menu_font_small.drawChopRight(tx, m_pos.y + 9, room, name);
 }
 
 bool MI_OnlineTeamSelect::hasOwnPlayers() const
@@ -438,29 +463,25 @@ void MI_OnlineTeamSelect::Draw()
         }
         rm->spr_player_select_ready.draw(cardX, CARD_Y, {0, 0, 128, 96});
         rm->spr_menu_boxed_numbers.draw(cardX + 16, CARD_Y + 20, {s * 16, i.color * 16, 16, 16});
-        // Their portrait: who they play as (their skin), in a small status bar frame, as All-Stars'
-        // file select shows its players
-        theme::statusBar(cardX + 12, CARD_Y + 36, 38, 38);
-        if (const gfxSprite* sprite = skinFrame(s, i, 0))
-            sprite->draw(cardX + 15, CARD_Y + 39, {0, 0, 32, 32});
+        //(who they play as shows in the team box above: no portrait here)
         const bool host = i.human && lobby->slot(s).peer == 0 && lobby->slot(s).localIndex == 0;
         const int nameW = host ? 62 : 80;
         rm->menu_font_small.drawChopRight(cardX + 36, CARD_Y + 36 - rm->menu_font_small.getHeight(), nameW, i.name);
         if (host)
             theme::crown(cardX + 36 + std::min(nameW, rm->menu_font_small.getWidth(i.name)) + 2, CARD_Y + 21);
-        // (the empty circle of the sprite is not drawn: a player who is not ready shows dots)
-        //(at the portrait's right)
+        // (the empty circle of the sprite is not drawn: a player who is not ready shows dots; in the
+        // middle of the card)
         if (i.ready) {
-            rm->spr_player_select_ready.draw(cardX + 66, CARD_Y + 40, {128, i.human ? 32 : 64, 34, 32});
+            rm->spr_player_select_ready.draw(cardX + 47, CARD_Y + 38, {128, i.human ? 32 : 64, 34, 32});
         } else if (i.human) {
             const int lit = (m_tick / 12) % 4;
             for (int d = 0; d < 3; d++) {
-                prompts::fill(cardX + 66 + d * 10, CARD_Y + 52, 8, 8, BLACK);
-                prompts::fill(cardX + 68 + d * 10, CARD_Y + 54, 4, 4, d < lit ? SDL_Color {248, 200, 40, 255} : SDL_Color {150, 150, 160, 255});
+                prompts::fill(cardX + 50 + d * 10, CARD_Y + 50, 8, 8, BLACK);
+                prompts::fill(cardX + 52 + d * 10, CARD_Y + 52, 4, 4, d < lit ? SDL_Color {248, 200, 40, 255} : SDL_Color {150, 150, 160, 255});
             }
         }
 
-        std::string line = i.role;
+        std::string line = i.cpu ? std::string() : i.role;    //(a computer player's card says CPU already)
         const bool showPing = i.human && !i.mine && lobby->slot(s).localIndex == 0;
         if (i.downloadingSkin)
             line = "skin...";
@@ -551,8 +572,6 @@ void MI_LobbyMap::Draw()
 
 MI_LobbyScene::MI_LobbyScene()
     : UI_Control(0, 0)
-    , m_statusRect {20, 40, 600, 32}
-    , m_hintRect {10, 354, 620, 16}
     , m_title("Team and Character Selection")
 {}
 
@@ -587,17 +606,17 @@ void MI_LobbyScene::Draw()
     }
     ++m_tick;
 
-    // The status bar: what the selected thing does, else what is going on (its icon: fine, a
-    // warning, a problem)
-    const LobbyRect& r = m_statusRect;
+    // Under the title: what the selected thing does, else how things stand (its icon: fine, a
+    // warning, a problem), a plain line (no bar of its own: less to look at)
     const std::string& line = m_hint.empty() ? m_status : m_hint;
-    blueBar(r.x, r.y, r.w);
-    //(the large font when the line fits, else the small one)
-    const bool large = rm->menu_font_large.getWidth(line) <= r.w - 80;
-    const gfxFont& font = large ? rm->menu_font_large : rm->menu_font_small;
-    const int lineW = std::min(font.getWidth(line), r.w - 80);
-    theme::statusIcon(r.x + r.w / 2 - lineW / 2 - 14, r.y + 8, m_hint.empty() ? static_cast<theme::Status>(m_tone) : theme::Status::Info);
-    font.drawCentered(r.x + r.w / 2 + 12, r.y + (large ? 5 : 9), ellipsize(font, line, r.w - 80));
+    if (!line.empty()) {
+        const bool large = rm->menu_font_large.getWidth(line) <= 560;
+        const gfxFont& font = large ? rm->menu_font_large : rm->menu_font_small;
+        const int lineW = std::min(font.getWidth(line), 560);
+        const int x = 320 - (lineW + 22) / 2;
+        theme::statusIcon(x, 47, m_hint.empty() ? static_cast<theme::Status>(m_tone) : theme::Status::Info);
+        font.drawChopRight(x + 22, large ? 44 : 48, 560, line.c_str());
+    }
 
     // The options page: its fields in a panel
     if (m_optionsPage)

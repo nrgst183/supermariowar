@@ -35,14 +35,17 @@ void MI_SettingsHelp::Draw()
 {
     if (!m_visible)
         return;
-    menupanel::footer({});
     const UI_Control* focus = m_menu.currentFocus();
+    std::string help;
     for (const auto& [row, text] : m_lines) {
-        if (row == focus) {
-            menupanel::bestText(24, 458, 592, text);
-            return;
-        }
+        if (row == focus)
+            help = text;
     }
+    //(up/down and select go without saying here: the help line needs the room)
+    using prompts::Pad;
+    using prompts::menuKey;
+    menupanel::footer({{{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
+                       {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}}, help);
 }
 
 
