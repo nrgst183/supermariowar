@@ -283,7 +283,10 @@ void gameloop_frame()
             const bool measured = perfstats::inMatch();
             const double t0 = measured ? perfstats::nowNs() : 0;
             prof::Scope profile(prof::Section::Update);
-            GameStateManager::instance().currentState->update();
+            GameState* const ticking = GameStateManager::instance().currentState;
+            ticking->setDrawsThisTick(i + 1 == ticks);
+            ticking->update();
+            ticking->setDrawsThisTick(true);
             if (measured && perfstats::inMatch())
                 perfstats::s_tick.add(perfstats::nowNs() - t0);
         }

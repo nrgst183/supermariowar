@@ -3,6 +3,7 @@
 #include "GSGameplay.h"
 
 #include "CmdArgs.h"
+#include "DebugProfile.h"
 #include "eyecandy.h"
 #include "FileList.h"
 #include "GameValues.h"
@@ -1022,7 +1023,21 @@ void GameplayState::render(float alpha)
     if (!frozen)
         s_pausedPictureValid = false;
 
-    if (frozen && s_pausedPictureValid && gfx_copypixels(s_pausedPicture.getSurface(), blitdest)) {
+    //(the screen still has that picture from the last frame: only what's drawn over it is put back, the
+    //dialogs' place and, while it's up, the Xbox debug overlay's; the whole screen is a megabyte a frame)
+    //(the overlay's place the frame after it's closed too: its last picture is on the screen)
+    static bool s_pausedPictureShown = false;
+    static bool s_debugOverlayWasOn = false;
+    const bool debugOverlayOn = prof::on();
+    const SDL_Rect dialogs {160, 166, 320, 144};
+    const SDL_Rect debugOverlay {0, 0, 360, App::screenHeight};
+    const bool restored = frozen && s_pausedPictureValid && (s_pausedPictureShown
+        ? gfx_copyrect(s_pausedPicture.getSurface(), blitdest, dialogs)
+            && (!(debugOverlayOn || s_debugOverlayWasOn) || gfx_copyrect(s_pausedPicture.getSurface(), blitdest, debugOverlay))
+        : gfx_copypixels(s_pausedPicture.getSurface(), blitdest));
+    s_pausedPictureShown = restored;
+    s_debugOverlayWasOn = debugOverlayOn;
+    if (restored) {
         drawExitPauseDialog();
     } else {
         //Smooth motion: draw between the previous and the latest tick (not while paused)
@@ -1050,9 +1065,16 @@ void GameplayState::render(float alpha)
         }
     }
 
+    //(what's drawn over the match doesn't shake with it: an online match goes on behind its dialog)
+    const short matchShakeX = x_shake;
+    const short matchShakeY = y_shake;
+    x_shake = 0;
+    y_shake = 0;
     drawNetOverlay();    //online only; pure drawing
     drawOnlinePanel();
     drawReplayOverlay();
+    x_shake = matchShakeX;
+    y_shake = matchShakeY;
 
 #ifdef _DEBUG
     if (g_fAutoTest)

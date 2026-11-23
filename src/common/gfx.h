@@ -42,11 +42,15 @@ bool gfx_isfullscreen();
 void gfx_eventtoscreen(SDL_Event* event);
 SDL_MouseButtonFlags gfx_mousestate(float* x, float* y);
 void gfx_flipscreen();
+// Shows `surface` (the screen's size and format) instead of the screen, which is left as it is
+void gfx_flipsurface(SDL_Surface* surface);
 // How much of the screen the picture fills: 1, or less for a TV that crops its edges (overscan)
 void gfx_setscreenscale(float scale);
 // The pixels of one surface into another of the same size and format, as they are (no key, no
 // blending: a copy of its memory); false if they differ (nothing copied)
 bool gfx_copypixels(SDL_Surface* from, SDL_Surface* to);
+// The same for `rect` of them only (clipped to them)
+bool gfx_copyrect(SDL_Surface* from, SDL_Surface* to, SDL_Rect rect);
 /// Turns VSync on or off; returns true if the renderer now does what was asked
 bool gfx_setvsync(bool enabled);
 /// The refresh rate of the window's display in Hz, 0 if unknown

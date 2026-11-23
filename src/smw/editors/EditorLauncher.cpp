@@ -175,6 +175,13 @@ bool run(Editor editor)
     g_closeRequested = false;
     //(a quit event of ours still queued isn't the game's)
     SDL_FlushEvent(SDL_EVENT_QUIT);
+    //(nor are the presses still queued: the editor leaves as the press that chose "Yes" is read, and
+    //the rest of that frame's events, the controller's own for that button among them, would reach the
+    //menus as a press of the button the editor was opened from: the editor again)
+    for (const SDL_EventType type : {SDL_EVENT_KEY_DOWN, SDL_EVENT_KEY_UP, SDL_EVENT_TEXT_INPUT, SDL_EVENT_MOUSE_BUTTON_DOWN,
+             SDL_EVENT_MOUSE_BUTTON_UP, SDL_EVENT_JOYSTICK_BUTTON_DOWN, SDL_EVENT_JOYSTICK_BUTTON_UP, SDL_EVENT_JOYSTICK_HAT_MOTION,
+             SDL_EVENT_JOYSTICK_AXIS_MOTION, SDL_EVENT_GAMEPAD_BUTTON_DOWN, SDL_EVENT_GAMEPAD_BUTTON_UP, SDL_EVENT_GAMEPAD_AXIS_MOTION})
+        SDL_FlushEvent(type);
 
     //The world editor's tour stops (a loaded world's stages) aren't the game's
     std::vector<TourStop*> editorStops = game_values.tourstops;

@@ -94,9 +94,13 @@ namespace {
 // before the title), back at the right when it goes back
 void roundBox(int x, int y, int w, int h, SDL_Color c);
 
+// Whether the menu drawn has no footer (a screen the whole of which is its picture): only then are the
+// prompts in its title bar (the others have them in their footer)
+bool s_hintsInTitle = false;
+
 void drawMenuHints(const UI_Menu& menu)
 {
-    if (prompts::lastDevice() != prompts::Device::Controller)
+    if (!s_hintsInTitle || prompts::lastDevice() != prompts::Device::Controller)
         return;
     using prompts::Pad;
     using prompts::Prompt;
@@ -670,8 +674,13 @@ void MenuState::update()
 
     //--------------- draw everything ----------------------
 
+    //(a frame behind runs ticks to catch up: only its last draws, the others only update)
+    const bool draw = drawsThisTick();
+
     //Don't draw backdrop for world
-    if (mCurrentMenu != mWorldMenu.get())
+    if (!draw)
+        ;
+    else if (mCurrentMenu != mWorldMenu.get())
         rm->menu_backdrop.draw(0, 0);
     else
         SDL_FillSurfaceRect(screen, nullptr, SDL_MapSurfaceRGB(screen, 0, 0, 0));
@@ -682,30 +691,35 @@ void MenuState::update()
     if (!worldWaits)
         mCurrentMenu->Update();
     menupanel::beginFrame();
-    mCurrentMenu->Draw();
     //(every menu has the footer of prompts: the ones that don't draw their own, the usual one; not
     //the screens the whole of which is their picture: the world map, the map thumbnails, the
     //tournament's scoreboard and bonus wheel, a tour's stop)
     const bool wholeScreen = mCurrentMenu == mWorldMenu.get() || mCurrentMenu == mMapFilterEditMenu.get() ||
         mCurrentMenu == mTournamentScoreboardMenu.get() || mCurrentMenu == mBonusWheelMenu.get() || mCurrentMenu == mTourStopMenu.get();
-    if (!menupanel::footerDrawn() && !wholeScreen) {
-        if (mCurrentMenu == mMainMenu.get())
-            menupanel::footer(menupanel::standardPrompts(false, nullptr), mMainMenu->focusHint());
-        else
-            menupanel::footer(menupanel::standardPrompts(false, "back"));
+    s_hintsInTitle = wholeScreen;
+    if (draw) {
+        mCurrentMenu->Draw();
+        if (!menupanel::footerDrawn() && !wholeScreen) {
+            if (mCurrentMenu == mMainMenu.get())
+                menupanel::footer(menupanel::standardPrompts(false, nullptr), mMainMenu->focusHint());
+            else
+                menupanel::footer(menupanel::standardPrompts(mCurrentMenu->NudgesFocus(), "back"));
+        }
+        DrawOnlineSeriesNotice();
     }
-    DrawOnlineSeriesNotice();
 
     if (iDisplayError > DISPLAY_ERROR_NONE) {
-        rm->spr_selectfield.draw(70, 400, {0, 0, 484, 32});
-        rm->spr_selectfield.draw(554, 400, {496, 0, 16, 32});
+        if (draw) {
+            rm->spr_selectfield.draw(70, 400, {0, 0, 484, 32});
+            rm->spr_selectfield.draw(554, 400, {496, 0, 16, 32});
 
-        if (iDisplayError == DISPLAY_ERROR_READ_TOUR_FILE)
-            rm->menu_font_large.drawCentered(320, 405, "Error Reading Tour File!");
-        if (iDisplayError == DISPLAY_ERROR_READ_WORLD_FILE)
-            rm->menu_font_large.drawCentered(320, 405, "Error Reading World File!");
-        else if (iDisplayError == DISPLAY_ERROR_MAP_FILTER)
-            rm->menu_font_large.drawCentered(320, 405, "No Maps Meet All Filter Conditions!");
+            if (iDisplayError == DISPLAY_ERROR_READ_TOUR_FILE)
+                rm->menu_font_large.drawCentered(320, 405, "Error Reading Tour File!");
+            if (iDisplayError == DISPLAY_ERROR_READ_WORLD_FILE)
+                rm->menu_font_large.drawCentered(320, 405, "Error Reading World File!");
+            else if (iDisplayError == DISPLAY_ERROR_MAP_FILTER)
+                rm->menu_font_large.drawCentered(320, 405, "No Maps Meet All Filter Conditions!");
+        }
 
         if (--iDisplayErrorTimer == 0)
             iDisplayError = DISPLAY_ERROR_NONE;
@@ -723,11 +737,11 @@ void MenuState::update()
         }
     }
 
-    if (game_values.screenfade > 0) {
+    if (draw && game_values.screenfade > 0) {
         rm->drawShade(static_cast<Uint8>(game_values.screenfade));
     }
 
-    if (cmd::g_autotest.enabled && cmd::g_autotest.kind == cmd::AutoTestArgs::Kind::Shots)
+    if (draw && cmd::g_autotest.enabled && cmd::g_autotest.kind == cmd::AutoTestArgs::Kind::Shots)
         AutoTestAfterDraw();
 
     if (game_values.screenfade == 255) {
@@ -1830,6 +1844,8 @@ bool MenuState::RunEditor(editors::Editor editor)
     //Maps saved in the editor: the map field shows the list again
     mGameSettingsMenu->miMapField->LoadCurrentMap();
     game_values.playerInput.ResetKeys();
+    //(a controller's buttons held as the editor closed aren't presses in the menus)
+    menupad::resync();
     return true;
 }
 #endif

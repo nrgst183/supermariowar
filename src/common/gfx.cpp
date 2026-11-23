@@ -155,6 +155,29 @@ bool gfx_copypixels(SDL_Surface* from, SDL_Surface* to)
     return true;
 }
 
+bool gfx_copyrect(SDL_Surface* from, SDL_Surface* to, SDL_Rect rect)
+{
+    if (!from || !to || from == to || from->w != to->w || from->h != to->h || from->format != to->format)
+        return false;
+    const int x0 = std::max(0, rect.x), y0 = std::max(0, rect.y);
+    const int x1 = std::min(from->w, rect.x + rect.w), y1 = std::min(from->h, rect.y + rect.h);
+    if (x1 <= x0 || y1 <= y0)
+        return true;
+    if (!SDL_LockSurface(from))
+        return false;
+    if (!SDL_LockSurface(to)) {
+        SDL_UnlockSurface(from);
+        return false;
+    }
+    const size_t bpp = SDL_BYTESPERPIXEL(from->format);
+    const size_t row = static_cast<size_t>(x1 - x0) * bpp;
+    for (int y = y0; y < y1; y++)
+        memcpy(static_cast<Uint8*>(to->pixels) + y * to->pitch + x0 * bpp, static_cast<const Uint8*>(from->pixels) + y * from->pitch + x0 * bpp, row);
+    SDL_UnlockSurface(to);
+    SDL_UnlockSurface(from);
+    return true;
+}
+
 void gfx_setscreenscale(float scale)
 {
     gfx.setScreenScale(scale);
@@ -185,6 +208,10 @@ bool gfx_isfullscreen() {
 
 void gfx_flipscreen() {
     gfx.flipScreen();
+}
+
+void gfx_flipsurface(SDL_Surface* surface) {
+    gfx.flipSurface(surface);
 }
 
 bool gfx_setvsync(bool enabled) {

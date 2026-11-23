@@ -17,7 +17,14 @@ public:
     virtual void render(float /*alpha*/) {}
     virtual void cleanup() {}
 
+    // Whether the frame drawn in update() is this frame's (the last of its ticks): a frame behind runs
+    // ticks to catch up, and only the last needs drawing (drawing them all is what keeps it behind)
+    void setDrawsThisTick(bool draws) { m_drawsThisTick = draws; }
+    bool drawsThisTick() const { return m_drawsThisTick; }
+
 protected:
+    bool m_drawsThisTick = true;
+
     virtual void onEnterState() {}
     virtual void onLeaveState() {}
 

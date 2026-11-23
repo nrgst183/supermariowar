@@ -1838,6 +1838,9 @@ void drawOverlay()
 }
 
 // Presents the frame with the overlay; the screen keeps the editor's frame
+//(the overlay is drawn on a copy of the frame, which is shown: the screen is left as the editor drew
+//it, for the editors that draw only what changes. One copy of the screen a frame, not two: on the
+//Xbox a copy of the whole screen is some 4 ms)
 void present()
 {
     if (!screen)
@@ -1847,19 +1850,34 @@ void present()
             SDL_DestroySurface(s.frame);
         s.frame = SDL_CreateSurface(screen->w, screen->h, screen->format);
     }
-    const bool overlay = overlayWanted();
-    if (overlay && s.frame) {
+    const bool overlay = overlayWanted() && s.frame;
+    if (overlay) {
         SDL_BlitSurface(screen, nullptr, s.frame, nullptr);
+        SDL_Surface* const editorScreen = screen;
+        SDL_Surface* const editorDest = blitdest;
+        screen = s.frame;
+        blitdest = s.frame;
         drawOverlay();
+        screen = editorScreen;
+        blitdest = editorDest;
     }
     if (!g_pendingShot.empty()) {
+        //(the screenshot is of the screen: the overlay on it for a moment)
+        SDL_Surface* const frame = overlay ? SDL_DuplicateSurface(screen) : nullptr;
+        if (frame)
+            SDL_BlitSurface(s.frame, nullptr, screen, nullptr);
         gfx_save_screenshot(g_testShotDir + "/" + g_pendingShot + ".png");
+        if (frame) {
+            SDL_BlitSurface(frame, nullptr, screen, nullptr);
+            SDL_DestroySurface(frame);
+        }
         printf("shots: saved %s/%s.png\n", g_testShotDir.c_str(), g_pendingShot.c_str());
         g_pendingShot.clear();
     }
-    gfx_flipscreen();
-    if (overlay && s.frame)
-        SDL_BlitSurface(s.frame, nullptr, screen, nullptr);
+    if (overlay)
+        gfx_flipsurface(s.frame);
+    else
+        gfx_flipscreen();
     s.lastPresentMs = SDL_GetTicks();
     s.overlayDirty = false;
 }

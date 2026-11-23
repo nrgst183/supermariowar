@@ -181,6 +181,15 @@ void GraphicsSDL::flipScreen() const
     SDL_RenderPresent(sdl_renderer);
 }
 
+void GraphicsSDL::flipSurface(SDL_Surface* surface) const
+{
+    SDL_UpdateTexture(sdl_screen_texture, nullptr, surface->pixels, surface->pitch);
+    SDL_RenderClear(sdl_renderer);
+    const SDL_FRect dst = pictureRect();
+    SDL_RenderTexture(sdl_renderer, sdl_screen_texture, nullptr, m_screenScale < 1.0f ? &dst : nullptr);
+    SDL_RenderPresent(sdl_renderer);
+}
+
 bool GraphicsSDL::setVSync(bool enabled) const
 {
     if (!SDL_SetRenderVSync(sdl_renderer, enabled ? 1 : 0)) {

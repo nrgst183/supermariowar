@@ -20,6 +20,16 @@
 
 void drawExitPauseDialog()
 {
+    //(the dialog stays still: an online match goes on, shaking, behind it)
+    const short shakeX = x_shake;
+    const short shakeY = y_shake;
+    x_shake = 0;
+    y_shake = 0;
+    struct Restore {
+        short x, y;
+        ~Restore() { x_shake = x; y_shake = y; }
+    } restore {shakeX, shakeY};
+
     if (game_values.flags.pausegame) {
         menupanel::dialogBox(190, 172, 260, 128);
         rm->menu_font_large.drawCentered(App::screenWidth/2, 194, "Pause");
@@ -42,9 +52,8 @@ void drawExitPauseDialog()
         menupanel::dialogBox(170, 172, 300, 128);
         if (rollback::NetGame::instance().inMatch()) {
             //Leaving disconnects us from the others: the match ends for everyone
-            const int titleY = static_cast<int>(App::screenHeight*0.46f) - (rm->menu_font_large.getHeight() >> 1);
-            rm->menu_font_large.drawCentered(App::screenWidth / 2, titleY - 14, "Leave online");
-            rm->menu_font_large.drawCentered(App::screenWidth / 2, titleY + 6, "match?");
+            rm->menu_font_large.drawCentered(App::screenWidth / 2, 192, "Leave the match?");
+            rm->menu_font_small.drawCentered(App::screenWidth / 2, 222, "It ends for everyone");
         } else {
             rm->menu_font_large.drawCentered(App::screenWidth * 0.5f, App::screenHeight*0.46f - (rm->menu_font_large.getHeight() >> 1), "Quit the match?");
         }

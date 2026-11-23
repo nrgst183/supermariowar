@@ -12,6 +12,8 @@ public:
     bool init(bool fullscreen);
 
     void flipScreen() const;
+    /// Shows `surface` (the screen's size and format) instead of the screen
+    void flipSurface(SDL_Surface* surface) const;
     void changeFullScreen(bool fullcreen) const;
     bool isFullScreen() const;
     void setTitle(const char*) const;

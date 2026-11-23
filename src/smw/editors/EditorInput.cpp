@@ -1308,10 +1308,9 @@ void update()
 
     //An editor waiting in a dialog only draws when something changes: show
     //the overlay's changes anyway
-    if (s.overlayDirty && s.frame && (SDL_GetTicks() - s.lastPresentMs > 30 || !g_pendingShot.empty())) {
-        SDL_BlitSurface(s.frame, nullptr, screen, nullptr);
+    //(the screen is still the editor's frame, without the overlay: present draws it again)
+    if (s.overlayDirty && s.frame && (SDL_GetTicks() - s.lastPresentMs > 30 || !g_pendingShot.empty()))
         present();
-    }
 }
 
 } // namespace editors::input::detail
