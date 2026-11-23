@@ -391,6 +391,10 @@ public:
         eyecandies.clear();
     }
 
+    size_t count() const {
+        return eyecandies.size();
+    }
+
     void cleanDeadObjects();
 
 public:

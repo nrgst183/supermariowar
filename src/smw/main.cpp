@@ -14,6 +14,8 @@
     along with SMW.  If not, see <http://www.gnu.org/licenses/>. */
 
 #include "CmdArgs.h"
+#include "DebugProfile.h"
+#include "eyecandy.h"
 #include "FileList.h"
 #include "LoadLog.h"
 #include "GameMode.h"
@@ -280,9 +282,21 @@ void gameloop_frame()
         for (int i = 0; i < ticks && game_values.appstate != AppState::Quit; i++) {
             const bool measured = perfstats::inMatch();
             const double t0 = measured ? perfstats::nowNs() : 0;
+            prof::Scope profile(prof::Section::Update);
             GameStateManager::instance().currentState->update();
             if (measured && perfstats::inMatch())
                 perfstats::s_tick.add(perfstats::nowNs() - t0);
+        }
+        if (prof::on()) {
+            prof::count(prof::Counter::Ticks, ticks);
+            size_t objects = g_sim.noncolcontainer.list().size();
+            for (const CObjectContainer& container : g_sim.objectcontainer)
+                objects += container.list().size();
+            prof::count(prof::Counter::Objects, static_cast<int>(objects));
+            size_t candy = 0;
+            for (const CEyecandyContainer& container : eyecandy)
+                candy += container.count();
+            prof::count(prof::Counter::Eyecandy, static_cast<int>(candy));
         }
 
         GameState* state = GameStateManager::instance().currentState;
@@ -292,8 +306,10 @@ void gameloop_frame()
         } else if (limiter.shouldRender(ticks, state->rendersBetweenTicks())) {
             const bool measured = perfstats::inMatch();
             double t0 = measured ? perfstats::nowNs() : 0;
-            if (state->rendersBetweenTicks())
+            if (state->rendersBetweenTicks()) {
+                prof::Scope profile(prof::Section::Draw);
                 state->render(limiter.alpha());
+            }
             if (measured) {
                 const double t1 = perfstats::nowNs();
                 perfstats::s_draw.add(t1 - t0);

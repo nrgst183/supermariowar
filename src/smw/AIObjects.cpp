@@ -480,7 +480,10 @@ void CPlayerAI::ScanFrontLayerObjects()
             if (movingobject_cheepcheep == movingtype) {
                 DistanceToObject(movingobject, &nearestObjects.stomp, &nearestObjects.stompdistance, &nearestObjects.stompwrap);
             } else if (movingobject_bulletbill == movingtype) {
-                if (fInvincible)
+                // Ours, or a teammate's without team collision, passes through us (MO_BulletBill::hitother)
+                const bool harmless = movingobject->iPlayerID == pPlayer->globalID ||
+                    (game_values.teamcollision != TeamCollisionStyle::On && movingobject->iTeamID == iTeamID);
+                if (fInvincible || harmless)
                     continue;
 
                 DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
@@ -588,6 +591,11 @@ void CPlayerAI::ScanPowerupBlocks()
     //The ? blocks ready to give a power-up: a goal too (hit from the spot under them), a little
     //ahead of other things as far away: the power-ups are what the bots were missing out on
     if (improved() && g_map) {
+        // Where we are on the paths (a block we have no way to, a box in a closed-off room, isn't a
+        // goal: we'd only jump about near it)
+        int myCol = -1, myRow = -1;
+        const bool onPlatform = pPlayer->platform != nullptr;
+        const bool placed = onPlatform || ainav::PlayerSpot(pPlayer->ix, pPlayer->iy, myCol, myRow);
         for (short c = 0; c < MAPWIDTH; c++) {
             for (short r = 0; r < MAPHEIGHT; r++) {
                 IO_Block* b = g_map->block(c, r);
@@ -598,6 +606,14 @@ void CPlayerAI::ScanPowerupBlocks()
                 const int spotRow = ainav::SpotBelow(c, r);
                 if (spotRow < 0)
                     continue;
+                if (placed && !(myCol == c && myRow == spotRow)) {
+                    const int x = c * TILESIZE + TILESIZE / 2;
+                    const int y = spotRow * TILESIZE + TILESIZE / 2;
+                    const ainav::Step step = onPlatform ? ainav::NextStepFromPlatform(pPlayer->platform, pPlayer->ix, pPlayer->iy, x, y)
+                                                        : ainav::NextStep(myCol, myRow, x, y);
+                    if (step.move == ainav::Move::None)
+                        continue;
+                }
                 short tx = static_cast<short>(c * TILESIZE + TILESIZE / 2 - (pPlayer->ix + PW / 2));
                 const short ty = static_cast<short>(spotRow * TILESIZE + TILESIZE / 2 - (pPlayer->iy + PH / 2));
                 bool wrap = false;

@@ -1,4 +1,5 @@
 #include "Snapshot.h"
+#include "DebugProfile.h"
 
 #include "GameMode.h"
 #include "GameValues.h"
@@ -128,6 +129,7 @@ size_t findHoles(std::array<Hole, 4>& holes)
 
 void saveState(Snapshot& snapshot)
 {
+    prof::Scope profile(prof::Section::SaveState);
     sim::Arena& arena = sim::Arena::instance();
 
     // The arena: the spans between the bytes that don't matter
@@ -188,6 +190,7 @@ void saveState(Snapshot& snapshot)
 
 void loadState(const Snapshot& snapshot)
 {
+    prof::Scope profile(prof::Section::LoadState);
     if (snapshot.empty())
         return;
 

@@ -1,5 +1,7 @@
 #include "StateChecksum.h"
 
+#include "DebugProfile.h"
+
 #include "GameMode.h"
 #include "GameValues.h"
 #include "map.h"
@@ -79,6 +81,7 @@ struct PeerChecksumAccess {
 
 uint64_t peerChecksum()
 {
+    prof::Scope profile(prof::Section::Checksum);
     Hasher h;
 
     h.add(g_sim.tick);

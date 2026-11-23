@@ -1,6 +1,6 @@
 #include "AINav.h"
 
-
+#include "DebugProfile.h"
 #include "Game.h"
 #include "GlobalConstants.h"
 #include "IO_Block.h"
@@ -767,6 +767,7 @@ void ensureGraph()
 {
     const uint64_t stamp = mapStamp();
     if (!g_graph.built || g_graph.stamp != stamp) {
+        prof::Scope profile(prof::Section::NavBuild);
         build();
         addPlatformPoints();
         std::vector<std::vector<Edge>> extra(static_cast<size_t>(g_graph.nodes()));

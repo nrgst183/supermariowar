@@ -46,6 +46,7 @@ struct SDL_Texture {
 
 SdlxProfile g_sdlx_profile;
 bool g_sdlx_overlay = false;
+int g_sdlx_back_buffers = 0;    // (1: double buffering, 2: triple; the overlay shows it)
 
 namespace {
 constexpr int k_screen_w = 640;
@@ -76,7 +77,6 @@ float displayRefreshRate()
     return 60.0f;
 }
 
-int g_back_buffers = 0;    // (1: double buffering, 2: triple; the overlay shows it)
 
 bool createDevice(SDL_Renderer* renderer)
 {
@@ -120,7 +120,7 @@ bool createDevice(SDL_Renderer* renderer)
         hr = Direct3D_CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, NULL,
             D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &renderer->device);
     }
-    g_back_buffers = static_cast<int>(pp.BackBufferCount);
+    g_sdlx_back_buffers = static_cast<int>(pp.BackBufferCount);
     if (FAILED(hr))
         return SDL_SetError("Direct3D_CreateDevice failed (0x%08x)", static_cast<unsigned>(hr));
 
@@ -163,166 +163,6 @@ bool createDevice(SDL_Renderer* renderer)
     D3DDevice_Clear(0, NULL, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
     D3DDevice_Swap(0);
     return true;
-}
-
-/* ---- Profiler overlay ----------------------------------------------------- */
-
-// 5x7 font: digits, upper case letters and a few symbols
-const Uint8* glyph(char c)
-{
-    static const Uint8 k_digits[10][7] = {
-        {0x0E,0x11,0x13,0x15,0x19,0x11,0x0E}, {0x04,0x0C,0x04,0x04,0x04,0x04,0x0E},
-        {0x0E,0x11,0x01,0x02,0x04,0x08,0x1F}, {0x1F,0x02,0x04,0x02,0x01,0x11,0x0E},
-        {0x02,0x06,0x0A,0x12,0x1F,0x02,0x02}, {0x1F,0x10,0x1E,0x01,0x01,0x11,0x0E},
-        {0x06,0x08,0x10,0x1E,0x11,0x11,0x0E}, {0x1F,0x01,0x02,0x04,0x08,0x08,0x08},
-        {0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E}, {0x0E,0x11,0x11,0x0F,0x01,0x02,0x0C},
-    };
-    static const Uint8 k_letters[26][7] = {
-        {0x0E,0x11,0x11,0x11,0x1F,0x11,0x11}, {0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E},
-        {0x0E,0x11,0x10,0x10,0x10,0x11,0x0E}, {0x1C,0x12,0x11,0x11,0x11,0x12,0x1C},
-        {0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F}, {0x1F,0x10,0x10,0x1E,0x10,0x10,0x10},
-        {0x0E,0x11,0x10,0x17,0x11,0x11,0x0F}, {0x11,0x11,0x11,0x1F,0x11,0x11,0x11},
-        {0x0E,0x04,0x04,0x04,0x04,0x04,0x0E}, {0x07,0x02,0x02,0x02,0x02,0x12,0x0C},
-        {0x11,0x12,0x14,0x18,0x14,0x12,0x11}, {0x10,0x10,0x10,0x10,0x10,0x10,0x1F},
-        {0x11,0x1B,0x15,0x15,0x11,0x11,0x11}, {0x11,0x11,0x19,0x15,0x13,0x11,0x11},
-        {0x0E,0x11,0x11,0x11,0x11,0x11,0x0E}, {0x1E,0x11,0x11,0x1E,0x10,0x10,0x10},
-        {0x0E,0x11,0x11,0x11,0x15,0x12,0x0D}, {0x1E,0x11,0x11,0x1E,0x14,0x12,0x11},
-        {0x0F,0x10,0x10,0x0E,0x01,0x01,0x1E}, {0x1F,0x04,0x04,0x04,0x04,0x04,0x04},
-        {0x11,0x11,0x11,0x11,0x11,0x11,0x0E}, {0x11,0x11,0x11,0x11,0x11,0x0A,0x04},
-        {0x11,0x11,0x11,0x15,0x15,0x15,0x0A}, {0x11,0x11,0x0A,0x04,0x0A,0x11,0x11},
-        {0x11,0x11,0x11,0x0A,0x04,0x04,0x04}, {0x1F,0x01,0x02,0x04,0x08,0x10,0x1F},
-    };
-    static const Uint8 k_dot[7] = {0, 0, 0, 0, 0, 0x0C, 0x0C};
-    static const Uint8 k_colon[7] = {0, 0x0C, 0x0C, 0, 0x0C, 0x0C, 0};
-    static const Uint8 k_percent[7] = {0x18, 0x19, 0x02, 0x04, 0x08, 0x13, 0x03};
-    static const Uint8 k_slash[7] = {0, 0x01, 0x02, 0x04, 0x08, 0x10, 0};
-    static const Uint8 k_dash[7] = {0, 0, 0, 0x1F, 0, 0, 0};
-    if (c >= '0' && c <= '9') return k_digits[c - '0'];
-    if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
-    if (c >= 'A' && c <= 'Z') return k_letters[c - 'A'];
-    switch (c) {
-        case '.': return k_dot;
-        case ':': return k_colon;
-        case '%': return k_percent;
-        case '/': return k_slash;
-        case '-': return k_dash;
-        default: return nullptr;
-    }
-}
-
-// Draws text at 2x scale with a dark background, into a 32-bit buffer
-void drawText(Uint8* pixels, int pitch, int x, int y, const char* text)
-{
-    const int len = static_cast<int>(strlen(text));
-    for (int py = y - 2; py < y + 16; py++) {
-        if (py < 0 || py >= k_screen_h)
-            continue;
-        Uint32* row = reinterpret_cast<Uint32*>(pixels + static_cast<size_t>(py) * pitch);
-        for (int px = x - 2; px < x + len * 12 && px < k_screen_w; px++) {
-            if (px >= 0)
-                row[px] = 0xFF000000u;
-        }
-    }
-    for (int i = 0; i < len; i++) {
-        const Uint8* g = glyph(text[i]);
-        if (!g)
-            continue;
-        for (int gy = 0; gy < 7; gy++) {
-            for (int gx = 0; gx < 5; gx++) {
-                if (!(g[gy] & (0x10 >> gx)))
-                    continue;
-                const int px = x + i * 12 + gx * 2;
-                const int py = y + gy * 2;
-                if (px + 1 >= k_screen_w || py + 1 >= k_screen_h)
-                    continue;
-                for (int dy = 0; dy < 2; dy++) {
-                    Uint32* row = reinterpret_cast<Uint32*>(pixels + static_cast<size_t>(py + dy) * pitch);
-                    row[px] = row[px + 1] = 0xFFFFFF40u;
-                }
-            }
-        }
-    }
-}
-
-constexpr int OVERLAY_LINES = 7;
-struct OverlayStats {
-    Uint64 window_start_ns = 0;
-    Uint64 window_start_cycles = 0;
-    Uint32 frames = 0;
-    char lines[OVERLAY_LINES][64] = {};
-    //(smoothness: the longest frame, the longest work, and the frames shown late, in the window)
-    Uint64 last_present_ns = 0;     // when the last present began
-    Uint64 last_return_ns = 0;      // when it returned (the game's work starts)
-    Uint64 worst_frame_ns = 0;
-    Uint64 worst_work_ns = 0;
-    Uint32 late = 0;                // frames that took two refreshes or more
-};
-OverlayStats g_overlay;
-
-// Once a second: turns the profiler counters into per-frame averages
-void updateOverlayStats()
-{
-    g_overlay.frames++;
-    const Uint64 now_ns = sdlx_ticks_ns();
-    const Uint64 now_cycles = sdlx_cycles();
-    if (g_overlay.last_present_ns) {
-        const Uint64 frame = now_ns - g_overlay.last_present_ns;
-        g_overlay.worst_frame_ns = SDL_max(g_overlay.worst_frame_ns, frame);
-        if (frame > 25000000ull)    //(a refresh is 16.7 ms: two or more)
-            g_overlay.late++;
-    }
-    if (g_overlay.last_return_ns)
-        g_overlay.worst_work_ns = SDL_max(g_overlay.worst_work_ns, now_ns - g_overlay.last_return_ns);
-    g_overlay.last_present_ns = now_ns;
-    if (g_overlay.window_start_ns == 0) {
-        g_overlay.window_start_ns = now_ns;
-        g_overlay.window_start_cycles = now_cycles;
-        return;
-    }
-    const Uint64 elapsed_ns = now_ns - g_overlay.window_start_ns;
-    if (elapsed_ns < 1000000000ull)
-        return;
-
-    const double cycles_per_ms = static_cast<double>(now_cycles - g_overlay.window_start_cycles) / (static_cast<double>(elapsed_ns) / 1e6);
-    const double frames = g_overlay.frames > 0 ? g_overlay.frames : 1;
-    const double frame_ms = static_cast<double>(elapsed_ns) / 1e6 / frames;
-    const auto ms = [&](Uint64 cycles) { return cycles_per_ms > 0 ? static_cast<double>(cycles) / cycles_per_ms / frames : 0.0; };
-
-    const double blit = ms(g_sdlx_profile.blit);
-    const double fill = ms(g_sdlx_profile.fill);
-    const double copy = ms(g_sdlx_profile.copy);
-    const double swap = ms(g_sdlx_profile.swap);
-    const double audio_pct = cycles_per_ms > 0
-        ? static_cast<double>(g_sdlx_profile.mixer) / cycles_per_ms / (static_cast<double>(elapsed_ns) / 1e6) * 100.0 : 0.0;
-    double other = frame_ms - blit - fill - copy - swap;
-    if (other < 0)
-        other = 0;
-
-    snprintf(g_overlay.lines[0], 64, "FPS %.1f  FRAME %.1f MS", frames * 1e9 / static_cast<double>(elapsed_ns), frame_ms);
-    snprintf(g_overlay.lines[1], 64, "BLIT %.1f MS  %u/F  %uK PX", blit, static_cast<unsigned>(g_sdlx_profile.blits / frames),
-        static_cast<unsigned>(g_sdlx_profile.blit_pixels / frames / 1000));
-    snprintf(g_overlay.lines[2], 64, "FILL %.1f  COPY %.1f  SWAP %.1f", fill, copy, swap);
-    snprintf(g_overlay.lines[3], 64, "GAME/OTHER %.1f MS", other);
-    snprintf(g_overlay.lines[4], 64, "AUDIO THREAD %.0f%%", audio_pct);
-    snprintf(g_overlay.lines[5], 64, "CPU %.0f MHZ  BUFFERS %d", cycles_per_ms / 1000.0, g_back_buffers + 1);
-    snprintf(g_overlay.lines[6], 64, "WORST %.1f MS  WORK %.1f  LATE %u", static_cast<double>(g_overlay.worst_frame_ns) / 1e6,
-        static_cast<double>(g_overlay.worst_work_ns) / 1e6, static_cast<unsigned>(g_overlay.late));
-    if (g_sdlx_overlay)
-        sdlx_log("[prof] %s | %s | %s | %s | %s\n", g_overlay.lines[0], g_overlay.lines[1], g_overlay.lines[2], g_overlay.lines[3], g_overlay.lines[4]);
-
-    g_sdlx_profile.blit = 0;
-    g_sdlx_profile.fill = 0;
-    g_sdlx_profile.copy = 0;
-    g_sdlx_profile.swap = 0;
-    g_sdlx_profile.mixer = 0;
-    g_sdlx_profile.blits = 0;
-    g_sdlx_profile.blit_pixels = 0;
-    g_overlay.frames = 0;
-    g_overlay.worst_frame_ns = 0;
-    g_overlay.worst_work_ns = 0;
-    g_overlay.late = 0;
-    g_overlay.window_start_ns = now_ns;
-    g_overlay.window_start_cycles = now_cycles;
 }
 
 SDL_FRect g_dst {0, 0, 0, 0};    // the present's quad (w 0: the whole screen)
@@ -368,10 +208,7 @@ DWORD presentTexture(const SDL_Texture* texture)
 
     // The game drew straight into the screen texture: no copy
     if (g_screen_pixels && src == g_screen_pixels && texture->w == k_screen_w && texture->h == k_screen_h) {
-        if (g_sdlx_overlay) {
-            for (int i = 0; i < OVERLAY_LINES; i++)
-                drawText(static_cast<Uint8*>(g_screen_pixels), g_screen_pitch, 40, 40 + i * 20, g_overlay.lines[i]);
-        }
+        sdlx_overlay_draw(static_cast<Uint8*>(g_screen_pixels), g_screen_pitch);
         // The memory is cached (fast for the CPU's drawing, which also reads it
         // to blend), and the GPU doesn't see the CPU's caches: write them back
         __asm__ volatile("wbinvd" ::: "memory");
@@ -397,10 +234,7 @@ DWORD presentTexture(const SDL_Texture* texture)
             for (int y = 0; y < h; y++)
                 memcpy(dst + static_cast<size_t>(y) * locked.Pitch, src + static_cast<size_t>(y) * src_pitch, static_cast<size_t>(w) * 4);
         }
-        if (g_sdlx_overlay) {
-            for (int i = 0; i < OVERLAY_LINES; i++)
-                drawText(dst, locked.Pitch, 40, 40 + i * 20, g_overlay.lines[i]);
-        }
+        sdlx_overlay_draw(dst, locked.Pitch);
     }
     D3DTexture_UnlockRect(frame, 0);
 
@@ -583,7 +417,7 @@ bool SDL_RenderPresent(SDL_Renderer* renderer)
     if (!renderer || !renderer->device)
         return SDL_SetError("Parameter 'renderer' is invalid");
 
-    updateOverlayStats();
+    sdlx_overlay_frame();
 
     const Uint64 copy_start = sdlx_cycles();
     DWORD fence = 0;
@@ -601,7 +435,7 @@ bool SDL_RenderPresent(SDL_Renderer* renderer)
     if (fence)
         D3DDevice_BlockOnFence(fence);
     const Uint64 swap_end = sdlx_cycles();
-    g_overlay.last_return_ns = sdlx_ticks_ns();
+    sdlx_overlay_presented(swap_end - copy_start);
     g_sdlx_profile.copy = g_sdlx_profile.copy + (swap_start - copy_start);
     g_sdlx_profile.swap = g_sdlx_profile.swap + (swap_end - swap_start);
     return true;

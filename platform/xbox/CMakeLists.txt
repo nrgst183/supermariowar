@@ -13,6 +13,7 @@ add_library(sdl3_xbox STATIC
     src/sdl_image.cpp
     src/sdl_mixer.cpp
     src/sdl_surface.cpp
+    src/sdl_overlay.cpp
     src/sdl_video.cpp
     src/stb_image_impl.c
     src/stb_vorbis_impl.c

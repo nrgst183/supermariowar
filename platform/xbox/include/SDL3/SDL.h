@@ -848,6 +848,14 @@ void SDL_XboxTakeLoadStats(SDL_XboxLoadStats* images, SDL_XboxLoadStats* sounds)
 // directory read instead of a DVD seek per file
 long SDL_XboxDiscFileSize(const char* path);
 
+// The debug overlay (L3 + R3): the game's own timings. A section's time (nanoseconds) adds up over
+// the frame; `top` sections are the frame's parts (they don't overlap: the chart stacks them), the
+// others are inside one of those (the table shows them). A counter is the frame's value. Ids:
+// sections 0..15, counters 0..7; the name is kept (a string that lives on).
+void SDL_XboxProfileAdd(int section, const char* name, bool top, Uint64 ns);
+void SDL_XboxProfileCount(int counter, const char* name, int value);
+bool SDL_XboxProfileOn(void);
+
 // Game saves on the hard disk (U:), as the dashboard's memory screen shows
 // them: each one is a folder, named `name` (ASCII; at most 127 characters).
 // Opens the save `name` (making it first if `create`), and returns its folder

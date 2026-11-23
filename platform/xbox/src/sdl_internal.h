@@ -16,6 +16,12 @@ void sdlx_mixer_dispatch_callbacks();
 // Video (sdl_video.cpp)
 void sdlx_video_quit();
 
+// The debug overlay (sdl_overlay.cpp): a frame begins presenting (the game's work is done), the
+// present's own time (cycles), and the overlay drawn into the frame's pixels (when it's on)
+void sdlx_overlay_frame();
+void sdlx_overlay_presented(Uint64 cycles);
+void sdlx_overlay_draw(Uint8* pixels, int pitch);
+
 // Time (sdl_core.cpp)
 Uint64 sdlx_ticks_ns();
 

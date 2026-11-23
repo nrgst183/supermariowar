@@ -2,6 +2,8 @@ add_library(CommonFiles STATIC
     CmdArgs.cpp
     CmdArgs.h
     eyecandy.cpp
+    DebugProfile.cpp
+    DebugProfile.h
     LoadLog.cpp
     LoadLog.h
     eyecandy.h

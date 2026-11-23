@@ -1,4 +1,5 @@
 #include "Replay.h"
+#include "DebugProfile.h"
 
 #include "FileList.h"
 #include "GameMode.h"
@@ -980,6 +981,7 @@ void syncMusic()
     const std::string& song = it == music.begin() ? music.front().second : std::prev(it)->second;
     if (song == g_play.musicNow)
         return;
+    prof::Scope profile(prof::Section::Music);
     g_play.musicNow = song;
     const std::filesystem::path path = songPath(song);
     std::error_code ec;
@@ -1053,6 +1055,7 @@ void seek(int tick)
 {
     if (!g_play.active || g_play.keyframes.empty())
         return;
+    prof::Scope profile(prof::Section::Seek);
     tick = std::clamp(tick, 0, static_cast<int>(g_play.replay.ticks.size()));
     //Close ahead: on from here; else from the snapshot before it
     if (tick < g_sim.tick || tick - g_sim.tick > KEYFRAME_TICKS) {

@@ -2,6 +2,7 @@
 
 #include "AINav.h"
 #include "CmdArgs.h"
+#include "DebugProfile.h"
 
 #include "GameValues.h"
 #include "movingplatform.h"
@@ -193,6 +194,7 @@ constexpr float AIR_BRAKE_FRAMES = 6.0f;  // steering in the air allows for this
 
 void CPlayerAI::Think(COutputControl * playerKeys)
 {
+    prof::Scope profile(prof::Section::Ai);
     short iDecisionPercentage[5] = {25, 35, 50, 75, 100};
 
     //Clear out the old input settings

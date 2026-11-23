@@ -116,11 +116,11 @@ std::string systemLinkNetworkStatus()
         case SDL_XBOX_NETWORK_READY:
             return std::string("System link: this console is ") + address;
         case SDL_XBOX_NETWORK_NO_CABLE:
-            return "No network cable. Connect the consoles, a hub or a router";
+            return "No network cable. Plug in a hub, router or console";
         case SDL_XBOX_NETWORK_PENDING:
             return "Getting a network address...";
         case SDL_XBOX_NETWORK_NO_ADDRESS:
-            return "No network address. Check the dashboard's network settings";
+            return "No network address. Check the dashboard's settings";
         default:
             return "The network didn't start";
     }
