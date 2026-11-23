@@ -166,5 +166,5 @@ UI_ProjectileLimitsMenu::UI_ProjectileLimitsMenu()
     miWandLimitField->setCurrentValue(game_values.wandlimit);
     page.add(miWandLimitField, "Shots per Wand");
 
-    miProjectilesLimitsMenuBackButton = page.finish(*this, "Weapon Use Limits", MENU_CODE_BACK_TO_OPTIONS_MENU);
+    page.finish(*this, "Weapon Use Limits", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

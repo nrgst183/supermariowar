@@ -148,6 +148,7 @@ void bestText(int x, int y, int w, const std::string& text)
 
 namespace {
 bool s_footerDrawn = false;
+SDL_Rect s_footerBack {0, 0, 0, 0};    // the last footer's B prompt (w 0: none)
 }
 
 void beginFrame()
@@ -158,6 +159,12 @@ void beginFrame()
 bool footerDrawn()
 {
     return s_footerDrawn;
+}
+
+bool footerBackAt(short x, short y)
+{
+    const SDL_Rect& r = s_footerBack;
+    return r.w > 0 && x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
 }
 
 std::vector<prompts::Prompt> standardPrompts(bool change, const char* back)
@@ -176,6 +183,7 @@ std::vector<prompts::Prompt> standardPrompts(bool change, const char* back)
 void footer(const std::vector<prompts::Prompt>& row, const std::string& label, int icon)
 {
     s_footerDrawn = true;
+    s_footerBack = {0, 0, 0, 0};
     //The status bar's strip along the bottom of the screen (as the title bar's at the top)
     theme::statusBar(0, 448, 640, 32);
     constexpr int LEFT = 16;
@@ -194,6 +202,16 @@ void footer(const std::vector<prompts::Prompt>& row, const std::string& label, i
         }
         promptsLeft = RIGHT - w;
         prompts::drawPrompts(promptsLeft + w / 2, 458, row, GAP);
+        //(where its B prompt is: a click there goes back, as B)
+        int px = promptsLeft;
+        for (const prompts::Prompt& p : row) {
+            const int pw = prompts::promptsWidth({p}, GAP);
+            const bool back = std::find(p.pads.begin(), p.pads.end(), prompts::Pad::B) != p.pads.end() ||
+                              std::find(p.keys.begin(), p.keys.end(), prompts::menuKey(prompts::MENU_CANCEL)) != p.keys.end();
+            if (back)
+                s_footerBack = {px - 4, 448, pw + 8, 32};
+            px += pw + GAP;
+        }
         prompts::setLargeLabels(false);
     }
 

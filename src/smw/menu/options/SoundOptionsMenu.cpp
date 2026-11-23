@@ -80,7 +80,7 @@ UI_SoundOptionsMenu::UI_SoundOptionsMenu()
     miWorldMusicField->setItemChangedCode(MENU_CODE_WORLD_MUSIC_CHANGED);
     page.add(miWorldMusicField, "Music played on world maps");
 
-    miSoundOptionsMenuBackButton = page.finish(*this, "Sound Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
+    page.finish(*this, "Sound Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };
 
 short UI_SoundOptionsMenu::GetCurrentWorldMusicID() const

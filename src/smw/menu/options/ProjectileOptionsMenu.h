@@ -27,6 +27,5 @@ private:
     MI_SelectField<short>* miBoomerangLifeField;
     MI_SelectField<short>* miFeatherJumpsField;
 
-    MI_Button* miProjectileOptionsMenuBackButton;
 
 };

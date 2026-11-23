@@ -120,5 +120,5 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     page.add(miNetStatsField, "Shows connection stats in online matches (or press F3)");
 #endif
 
-    miGraphicsOptionsMenuBackButton = page.finish(*this, "Graphics Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
+    page.finish(*this, "Graphics Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

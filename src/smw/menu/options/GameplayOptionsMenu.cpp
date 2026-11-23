@@ -144,5 +144,5 @@ UI_GameplayOptionsMenu::UI_GameplayOptionsMenu()
     miSecretsField->setCurrentValue(game_values.secretsenabled ? 1 : 0);
     page.add(miSecretsField, "Allow hidden unlockables to turn up in matches");
 
-    miGameplayOptionsMenuBackButton = page.finish(*this, "Gameplay Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
+    page.finish(*this, "Gameplay Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

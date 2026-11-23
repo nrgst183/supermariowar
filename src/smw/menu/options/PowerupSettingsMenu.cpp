@@ -88,5 +88,5 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miStoredPowerupResetButton->SetCode(MENU_CODE_RESET_STORED_POWERUPS);
     page.add(miStoredPowerupResetButton, "Clear every player's stored item");
 
-    miPowerupSettingsMenuBackButton = page.finish(*this, "Item Settings", MENU_CODE_BACK_TO_OPTIONS_MENU);
+    page.finish(*this, "Item Settings", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

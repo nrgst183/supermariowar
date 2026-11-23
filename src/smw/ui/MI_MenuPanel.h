@@ -25,6 +25,8 @@ void footer(const std::vector<prompts::Prompt>& row, const std::string& label = 
 /// A frame of the menus: whether a footer was drawn in it (the menus without one get the usual one)
 void beginFrame();
 bool footerDrawn();
+/// Whether (x,y) is on the last footer's B prompt (its "back", "leave"...): a click there is a B press
+bool footerBackAt(short x, short y);
 /// The usual prompts: up/down chooses, A selects (left/right changes, for settings), B goes back
 std::vector<prompts::Prompt> standardPrompts(bool change, const char* back = "back");
 }

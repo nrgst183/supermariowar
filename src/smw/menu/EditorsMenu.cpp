@@ -186,10 +186,8 @@ UI_EditorsMenu::UI_EditorsMenu()
                                 {{prompts::Pad::Back}, {}, "leave"}}
                           : std::vector<prompts::Prompt> {{{}, {"Tab"}, "tools"}, {{}, {"F1"}, "help"}, {{}, {"Esc"}, "leave"}};
     }));
-    miBack = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
-
     const std::pair<MI_Button*, Action> buttons[] = {{miMaps, Action::Maps}, {miWorlds, Action::Worlds}, {miLocal, Action::Local},
-        {miOnline, Action::Online}, {miHost, Action::Host}, {miJoin, Action::Join}, {miStart, Action::Start}, {miBack, Action::None}};
+        {miOnline, Action::Online}, {miHost, Action::Host}, {miJoin, Action::Join}, {miStart, Action::Start}};
     for (const auto& [button, action] : buttons) {
         button->SetCode(MENU_CODE_EDITORS_ACTION);
         button->SetOnPress(want(action));
@@ -275,13 +273,12 @@ void UI_EditorsMenu::Relink()
     //The rows, top to bottom (the d-pad goes around)
     std::vector<std::vector<UI_Control*>> rows;
     if (!setup) {
-        rows = {{miMaps, miWorlds}, {miBack}};
+        rows = {{miMaps, miWorlds}};
     } else {
         rows.push_back({miLocal, miOnline});
         if (m_online)
             rows.push_back({miHost, miJoin});
         rows.push_back({miStart});
-        rows.push_back({miBack});
     }
     const size_t n = rows.size();
     for (size_t r = 0; r < n; r++) {

@@ -25,5 +25,4 @@ private:
     MI_SelectField<bool>* miKeepPowerupField = nullptr;
     MI_SelectField<short>* miHiddenBlockRespawnField = nullptr;
     MI_StoredPowerupResetButton* miStoredPowerupResetButton = nullptr;
-    MI_Button* miPowerupSettingsMenuBackButton = nullptr;
 };

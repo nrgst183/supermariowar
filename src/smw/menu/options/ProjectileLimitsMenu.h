@@ -26,5 +26,4 @@ private:
     MI_SelectField<short>* miBombLimitField;
     MI_SelectField<short>* miWandLimitField;
 
-    MI_Button* miProjectilesLimitsMenuBackButton;
 };

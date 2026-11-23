@@ -81,8 +81,6 @@ UI_OnlineMenu::UI_OnlineMenu()
     miNetStatsField->setCurrentValue(game_values.shownetstats ? 1 : 0);
     miNetStatsField->setAutoAdvance(true);
 
-    miSettingsBack = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
-    miSettingsBack->SetCode(MENU_CODE_BACK_TO_OPTIONS_MENU);
 
     // Join by address (from the games list: a game that isn't on this network)
     miJoinPanel = new MI_MenuPanel(36, 42, 568, 112, "Join a game", "Type in the host's address");
@@ -94,8 +92,6 @@ UI_OnlineMenu::UI_OnlineMenu()
     miJoinButton = new MI_Button(&rm->spr_selectfield, 170, 114, "Join game", 300, TextAlign::CENTER);
     miJoinButton->SetCode(MENU_CODE_ONLINE_JOIN);
 
-    miJoinBack = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
-    miJoinBack->SetCode(MENU_CODE_TO_SYSTEM_LINK_MENU);
 
     //What went wrong (or what's happening), under the panels, in a panel of its own
     miMessage = new MI_WrappedText(320, 170, 512, 3);
@@ -109,16 +105,15 @@ UI_OnlineMenu::UI_OnlineMenu()
             {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select / type"}, {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}};
     });
 
-    AddControl(miNameField, miSettingsBack, miRunAheadField, nullptr, miSettingsBack);
-    AddControl(miRunAheadField, miNameField, miPortField, nullptr, miSettingsBack);
-    AddControl(miPortField, miRunAheadField, miPingBarsField, nullptr, miSettingsBack);
-    AddControl(miPingBarsField, miPortField, miNetStatsField, nullptr, miSettingsBack);
-    AddControl(miNetStatsField, miPingBarsField, miSettingsBack, nullptr, miSettingsBack);
-    AddControl(miSettingsBack, miNetStatsField, miNameField, miNetStatsField, nullptr);
+    //(round from the last to the first; B, or the footer's "back": back)
+    AddControl(miNameField, miNetStatsField, miRunAheadField, nullptr, nullptr);
+    AddControl(miRunAheadField, miNameField, miPortField, nullptr, nullptr);
+    AddControl(miPortField, miRunAheadField, miPingBarsField, nullptr, nullptr);
+    AddControl(miPingBarsField, miPortField, miNetStatsField, nullptr, nullptr);
+    AddControl(miNetStatsField, miPingBarsField, miNameField, nullptr, nullptr);
 
-    AddControl(miAddressField, miJoinBack, miJoinButton, nullptr, miJoinBack);
-    AddControl(miJoinButton, miAddressField, miJoinBack, nullptr, miJoinBack);
-    AddControl(miJoinBack, miJoinButton, miAddressField, miJoinButton, nullptr);
+    AddControl(miAddressField, miJoinButton, miJoinButton, nullptr, nullptr);
+    AddControl(miJoinButton, miAddressField, miAddressField, nullptr, nullptr);
 
     AddNonControl(miMessage);
     AddNonControl(miPrompts);
@@ -132,9 +127,9 @@ void UI_OnlineMenu::ShowMode(Mode mode)
     const bool settings = mode == Mode::Settings;
     miTitle->SetText(settings ? "Online Options" : "Join by Address");
     for (UI_Control* control : std::initializer_list<UI_Control*> {miYouPanel, miHostPanel, miNameField, miRunAheadField, miPortField, miMatchPanel,
-             miPingBarsField, miNetStatsField, miSettingsBack})
+             miPingBarsField, miNetStatsField})
         control->setVisible(settings);
-    for (UI_Control* control : std::initializer_list<UI_Control*> {miJoinPanel, miAddressField, miJoinButton, miJoinBack})
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miJoinPanel, miAddressField, miJoinButton})
         control->setVisible(!settings);
     setInitialFocus(settings ? static_cast<UI_Control*>(miNameField) : static_cast<UI_Control*>(miAddressField));
     SetCancelCode(settings ? MENU_CODE_BACK_TO_OPTIONS_MENU : MENU_CODE_TO_SYSTEM_LINK_MENU);

@@ -80,5 +80,5 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miCrunchField->setAutoAdvance(true);
     page.add(miCrunchField, "Shake the screen when a player dies");
 
-    miEyeCandyOptionsMenuBackButton = page.finish(*this, "Eye Candy Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
+    page.finish(*this, "Eye Candy Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

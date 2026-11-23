@@ -23,11 +23,11 @@ private:
     std::vector<std::pair<const UI_Control*, std::string>> m_lines;
 };
 
-/// The layout of a settings screen (Gameplay, Graphics...): the original's column of rows, in the
-/// middle of the screen, the Back button at the bottom right, and along the bottom of the screen what
-/// the selected row does.
+/// The layout of a settings screen (Gameplay, Graphics...): the original's column of rows on a panel
+/// in the middle of the screen, and the footer along the bottom: what the selected row does, and the
+/// prompts (B, or a click on its "back": back).
 /// Make each row at x(), rowY() (ROW_W wide, LABEL_W for its name), then add() it; finish() puts it
-/// all in the menu and links the rows: up and down, and right to Back.
+/// all in the menu and links the rows up and down (round from the last to the first).
 class SettingsPage {
 public:
     static constexpr short ROW_X = 70;
@@ -42,9 +42,8 @@ public:
     short rowY() const { return m_next; }
     void add(UI_Control* row, std::string help);
 
-    /// Into `menu`: the title bar, the rows, the Back button (`backCode`, which B is too) and the
-    /// help line. Returns the Back button.
-    MI_Button* finish(UI_Menu& menu, const std::string& title, MenuCodeEnum backCode);
+    /// Into `menu`: the title bar, the rows, the panel and the footer; B goes back with `backCode`
+    void finish(UI_Menu& menu, const std::string& title, MenuCodeEnum backCode);
 
 private:
     struct Row {

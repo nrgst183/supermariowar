@@ -27,5 +27,4 @@ private:
     MI_SelectField<short>* miBotsField;
     MI_SelectField<short>* miPointSpeedField;
     MI_SelectField<bool>* miSecretsField;
-    MI_Button* miGameplayOptionsMenuBackButton;
 };

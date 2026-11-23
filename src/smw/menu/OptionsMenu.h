@@ -31,7 +31,6 @@ private:
     MI_Button* miGenerateMapThumbsButton;
     MI_Button* miOnlineOptionsMenuButton = nullptr;    // Options > Online (builds with the network, not the Xbox)
 
-    MI_Button* miOptionsMenuBackButton;
 
     MI_Image* miGenerateThumbsDialogImage;
     MI_Text* miGenerateThumbsDialogAreYouText;

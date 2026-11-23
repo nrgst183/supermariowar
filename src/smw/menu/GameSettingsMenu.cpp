@@ -35,12 +35,12 @@ const short g_iAutoFilterIcons[NUM_AUTO_FILTERS] {37, 29, 33, 1, 0, 6, 40, 73, 1
 UI_GameSettingsMenu::UI_GameSettingsMenu()
     : UI_Menu()
 {
-    miSettingsStartButton = new MI_Button(&rm->spr_selectfield, 70, 45, "Start", 500);
+    miSettingsStartButton = new MI_Button(&rm->spr_selectfield, 70, 38, "Start", 500);    //(the rows 36 apart: the map's preview clear of the footer)
     miSettingsStartButton->SetCode(MENU_CODE_START_GAME);
 
     //A row each for the mode, its goal (lives, frags, ...) and the map: left and right change them; the
     //map preview's side has the other buttons, in a column (the mode's rules, then the map list's)
-    miModeField = new MI_ImageSelectField(&rm->spr_selectfield, &rm->menu_mode_small, 70, 85, "Mode", 500, 120, 16, 16);
+    miModeField = new MI_ImageSelectField(&rm->spr_selectfield, &rm->menu_mode_small, 70, 74, "Mode", 500, 120, 16, 16);
 
     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
         miModeField->add(gamemodes[iGameMode]->GetModeName(), iGameMode);
@@ -50,7 +50,7 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     miModeField->setItemChangedCode(MENU_CODE_MODE_CHANGED);
 
     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
-        miGoalField[iGameMode] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 125, gamemodes[iGameMode]->GetGoalName().c_str(), 500, 120);
+        miGoalField[iGameMode] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 110, gamemodes[iGameMode]->GetGoalName().c_str(), 500, 120);
         miGoalField[iGameMode]->setVisible(iGameMode == 0);
 
         for (short iGameModeOption = 0; iGameModeOption < GAMEMODE_NUM_OPTIONS; iGameModeOption++) {
@@ -62,18 +62,18 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
         miGoalField[iGameMode]->setCurrentValue(gamemodes[iGameMode]->goal);
     }
 
-    miModeSettingsButton = new MI_Button(&rm->spr_selectfield, 430, 205, "Rules", 140);
+    miModeSettingsButton = new MI_Button(&rm->spr_selectfield, 430, 186, "Rules", 140);
     miModeSettingsButton->SetCode(MENU_CODE_TO_MODE_SETTINGS_MENU);
 
-    miMapField = new MI_MapField(&rm->spr_selectfield, 70, 165, "Map", 500, 120, true);
+    miMapField = new MI_MapField(&rm->spr_selectfield, 70, 146, "Map", 500, 120, true);
 
-    miMapFiltersButton = new MI_Button(&rm->spr_selectfield, 430, 245, "Filters", 140);
+    miMapFiltersButton = new MI_Button(&rm->spr_selectfield, 430, 226, "Filters", 140);
     miMapFiltersButton->SetCode(MENU_CODE_TO_MAP_FILTERS);
 
-    miMapFiltersOnImage = new MI_Image(&rm->menu_map_filter, 530, 253, 0, 48, 16, 16, 1, 1, 0);
+    miMapFiltersOnImage = new MI_Image(&rm->menu_map_filter, 530, 234, 0, 48, 16, 16, 1, 1, 0);
     miMapFiltersOnImage->setVisible(false);
 
-    miMapThumbnailsButton = new MI_Button(&rm->spr_selectfield, 430, 285, "Thumbs", 140);
+    miMapThumbnailsButton = new MI_Button(&rm->spr_selectfield, 430, 266, "Thumbs", 140);
     miMapThumbnailsButton->SetCode(MENU_CODE_TO_MAP_BROWSER_THUMBNAILS);
 
     miMapFilterScroll = new MI_MapFilterScroll(&rm->menu_plain_field, 120, 72, 400, 9);
@@ -141,10 +141,10 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
 
     // What only the host can change, in the online lobby (hidden until SetOnlineView())
     miHostNote = new MI_LockTag(622, 10, "");
-    miHostTag[0] = new MI_LockTag(562, 93, "Host");
-    miHostTag[1] = new MI_LockTag(562, 133, "Host");
-    miHostTag[2] = new MI_LockTag(562, 173, "Host");
-    miMapOverlay = new MI_LobbyMap({70, 195, 352, 270}, {86, 211, 320, 240});
+    miHostTag[0] = new MI_LockTag(562, 82, "Host");
+    miHostTag[1] = new MI_LockTag(562, 118, "Host");
+    miHostTag[2] = new MI_LockTag(562, 154, "Host");
+    miMapOverlay = new MI_LobbyMap({70, 176, 352, 270}, {86, 192, 320, 240});
     miMapOverlay->setVisible(false);
     miMapOverlay->SetAvailable(false);
     AddNonControl(miMapOverlay);

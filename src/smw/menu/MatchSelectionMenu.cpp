@@ -13,10 +13,10 @@
 UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     : UI_Menu()
 {
-    miMatchSelectionStartButton = new MI_Button(&rm->spr_selectfield, 270, 420, "Start", 100);
+    miMatchSelectionStartButton = new MI_Button(&rm->spr_selectfield, 270, 386, "Start", 100);    //(all of it clear of the footer)
     miMatchSelectionStartButton->SetCode(MENU_CODE_MATCH_SELECTION_START);
 
-    miMatchSelectionField = new MI_SelectField<MatchType>(&rm->spr_selectfield, 130, 340, "Match", 380, 100);
+    miMatchSelectionField = new MI_SelectField<MatchType>(&rm->spr_selectfield, 130, 306, "Match", 380, 100);
     miMatchSelectionField->add("Single Game", MatchType::SingleGame);
     miMatchSelectionField->add("Tournament", MatchType::Tournament);
     miMatchSelectionField->add("Tour", MatchType::Tour);
@@ -26,7 +26,7 @@ UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     miMatchSelectionField->setCurrentValue(game_values.matchtype);
     miMatchSelectionField->setItemChangedCode(MENU_CODE_MATCH_SELECTION_MATCH_CHANGED);
 
-    miTournamentField = new MI_SelectField<short>(&rm->spr_selectfield, 130, 380, "Wins", 380, 100);
+    miTournamentField = new MI_SelectField<short>(&rm->spr_selectfield, 130, 346, "Wins", 380, 100);
     miTournamentField->add("2", 2);
     miTournamentField->add("3", 3);
     miTournamentField->add("4", 4);
@@ -40,7 +40,7 @@ UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     miTournamentField->setCurrentValue(game_values.tournamentgames);
     miTournamentField->setVisible(false);
 
-    miTourField = new MI_SelectField<short>(&rm->spr_selectfield, 130, 380, "Tour", 380, 100);
+    miTourField = new MI_SelectField<short>(&rm->spr_selectfield, 130, 346, "Tour", 380, 100);
     for (size_t iTour = 0; iTour < tourlist->count(); iTour++) {
         std::string szTemp = GetNameFromFileName(tourlist->at(iTour).string(), true);
         miTourField->add(std::move(szTemp), iTour);
@@ -49,7 +49,7 @@ UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     miTourField->setCurrentValue(game_values.tourindex);
     miTourField->setVisible(false);
 
-    miWorldField = new MI_SelectField<short>(&rm->spr_selectfield, 130, 380, "World", 380, 100);
+    miWorldField = new MI_SelectField<short>(&rm->spr_selectfield, 130, 346, "World", 380, 100);
     for (size_t iWorld = 0; iWorld < worldlist->count(); iWorld++) {
         std::string szTemp = GetNameFromFileName(worldlist->at(iWorld).string(), true);
         miWorldField->add(std::move(szTemp), iWorld);
@@ -59,7 +59,7 @@ UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     miWorldField->setItemChangedCode(MENU_CODE_WORLD_MAP_CHANGED);
     miWorldField->setVisible(false);
 
-    miMinigameField = new MI_SelectField<Minigame>(&rm->spr_selectfield, 130, 380, "Game", 380, 100);
+    miMinigameField = new MI_SelectField<Minigame>(&rm->spr_selectfield, 130, 346, "Game", 380, 100);
     miMinigameField->add("Pipe Coin Game", Minigame::PipeCoin);
     miMinigameField->add("Hammer Boss Game", Minigame::HammerBoss);
     miMinigameField->add("Bomb Boss Game", Minigame::BombBoss);
@@ -72,8 +72,8 @@ UI_MatchSelectionMenu::UI_MatchSelectionMenu()
     miMatchSelectionMenuLeftHeaderBar = newTitleBarBack();
     miMatchSelectionMenuHeaderText = new MI_HeaderText("Match Type", 320, 5);
 
-    miMatchSelectionDisplayImage = new MI_Image(&rm->menu_match_select, 160, 80, 0, 0, 320, 240, 1, 1, 0);
-    miWorldPreviewDisplay = new MI_WorldPreviewDisplay(160, 80, 20, 15);
+    miMatchSelectionDisplayImage = new MI_Image(&rm->menu_match_select, 160, 46, 0, 0, 320, 240, 1, 1, 0);
+    miWorldPreviewDisplay = new MI_WorldPreviewDisplay(160, 46, 20, 15);
     miWorldPreviewDisplay->setVisible(false);
 
     AddNonControl(miMatchSelectionMenuLeftHeaderBar);

@@ -57,9 +57,6 @@ UI_OptionsMenu::UI_OptionsMenu()
     miOnlineOptionsMenuButton->SetCode(MENU_CODE_TO_ONLINE_OPTIONS_MENU);
 #endif
 
-    miOptionsMenuBackButton = new MI_Button(&rm->spr_selectfield, 544, 432, "Back", 80, TextAlign::CENTER);
-    miOptionsMenuBackButton->SetCode(MENU_CODE_TO_MAIN_MENU);
-
     miGenerateThumbsDialogImage = new MI_Image(&rm->spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);
     miGenerateThumbsDialogAreYouText = new MI_HeaderText("Are You", 320, 195);
     miGenerateThumbsDialogSureText = new MI_HeaderText("Sure?", 320, 220);
@@ -75,23 +72,21 @@ UI_OptionsMenu::UI_OptionsMenu()
     miGenerateThumbsDialogYesButton->setVisible(false);
     miGenerateThumbsDialogNoButton->setVisible(false);
 
-    // Up and down in a column, left and right in a row; right of the right column: Back
+    // Up and down in a column (round from the bottom to the top), left and right in a row; B (or the
+    // footer's "back"): back
     UI_Control* const last = miOnlineOptionsMenuButton ? static_cast<UI_Control*>(miOnlineOptionsMenuButton) : nullptr;
-    UI_Control* const back = miOptionsMenuBackButton;
-    AddControl(miGameplayOptionsMenuButton, back, miPowerupOptionsMenuButton, nullptr, miTeamOptionsMenuButton);
-    AddControl(miTeamOptionsMenuButton, back, miPowerupSettingsMenuButton, miGameplayOptionsMenuButton, back);
+    AddControl(miGameplayOptionsMenuButton, last ? last : miSoundOptionsMenuButton, miPowerupOptionsMenuButton, nullptr, miTeamOptionsMenuButton);
+    AddControl(miTeamOptionsMenuButton, last ? last : miGenerateMapThumbsButton, miPowerupSettingsMenuButton, miGameplayOptionsMenuButton, nullptr);
     AddControl(miPowerupOptionsMenuButton, miGameplayOptionsMenuButton, miProjectilesOptionsMenuButton, nullptr, miPowerupSettingsMenuButton);
-    AddControl(miPowerupSettingsMenuButton, miTeamOptionsMenuButton, miProjectilesLimitsMenuButton, miPowerupOptionsMenuButton, back);
+    AddControl(miPowerupSettingsMenuButton, miTeamOptionsMenuButton, miProjectilesLimitsMenuButton, miPowerupOptionsMenuButton, nullptr);
     AddControl(miProjectilesOptionsMenuButton, miPowerupOptionsMenuButton, miGraphicsOptionsMenuButton, nullptr, miProjectilesLimitsMenuButton);
-    AddControl(miProjectilesLimitsMenuButton, miPowerupSettingsMenuButton, miEyeCandyOptionsMenuButton, miProjectilesOptionsMenuButton, back);
+    AddControl(miProjectilesLimitsMenuButton, miPowerupSettingsMenuButton, miEyeCandyOptionsMenuButton, miProjectilesOptionsMenuButton, nullptr);
     AddControl(miGraphicsOptionsMenuButton, miProjectilesOptionsMenuButton, miSoundOptionsMenuButton, nullptr, miEyeCandyOptionsMenuButton);
-    AddControl(miEyeCandyOptionsMenuButton, miProjectilesLimitsMenuButton, miGenerateMapThumbsButton, miGraphicsOptionsMenuButton, back);
-    AddControl(miSoundOptionsMenuButton, miGraphicsOptionsMenuButton, last ? last : back, nullptr, miGenerateMapThumbsButton);
-    AddControl(miGenerateMapThumbsButton, miEyeCandyOptionsMenuButton, last ? last : back, miSoundOptionsMenuButton, back);
+    AddControl(miEyeCandyOptionsMenuButton, miProjectilesLimitsMenuButton, miGenerateMapThumbsButton, miGraphicsOptionsMenuButton, nullptr);
+    AddControl(miSoundOptionsMenuButton, miGraphicsOptionsMenuButton, last ? last : miGameplayOptionsMenuButton, nullptr, miGenerateMapThumbsButton);
+    AddControl(miGenerateMapThumbsButton, miEyeCandyOptionsMenuButton, last ? last : miTeamOptionsMenuButton, miSoundOptionsMenuButton, nullptr);
     if (miOnlineOptionsMenuButton)
-        AddControl(miOnlineOptionsMenuButton, miSoundOptionsMenuButton, back, nullptr, back);
-
-    AddControl(miOptionsMenuBackButton, last ? last : miGenerateMapThumbsButton, miGameplayOptionsMenuButton, last ? last : miGenerateMapThumbsButton, nullptr);
+        AddControl(miOnlineOptionsMenuButton, miSoundOptionsMenuButton, miGameplayOptionsMenuButton, nullptr, nullptr);
 
     AddTitleBar("Options");
 

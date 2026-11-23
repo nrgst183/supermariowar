@@ -25,5 +25,4 @@ private:
     MI_PlaylistField* miPlaylistField;
     MI_SelectField<short>* miWorldMusicField;
     MI_PacksField* miSoundPackField;
-    MI_Button* miSoundOptionsMenuBackButton;
 };

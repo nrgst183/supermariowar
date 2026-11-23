@@ -9,10 +9,10 @@
 #include <cassert>
 
 namespace {
-// The rows' panel goes between the title bar and the Back button (over the help line), the rows in
-// the middle of it with as much of the panel around them on every side
+// The rows' panel goes between the title bar and the footer (its help line and prompts, B: back),
+// the rows in the middle of it with as much of the panel around them on every side
 constexpr short AREA_TOP = 36;
-constexpr short AREA_BOTTOM = 404;
+constexpr short AREA_BOTTOM = 432;
 constexpr short PAD = 15;           // (the panel around the rows: clear of the focused row's frame)
 constexpr short PAD_X = 30;          // (and of the controller's pointer, at the focused row's left)
 constexpr short ROW_H = 32;
@@ -65,20 +65,16 @@ void SettingsPage::add(UI_Control* row, std::string help)
     m_next += m_step;
 }
 
-MI_Button* SettingsPage::finish(UI_Menu& menu, const std::string& title, MenuCodeEnum backCode)
+void SettingsPage::finish(UI_Menu& menu, const std::string& title, MenuCodeEnum backCode)
 {
     assert(static_cast<short>(m_rows.size()) == m_expected);
 
-    MI_Button* back = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
-    back->SetCode(backCode);
-
-    //Up and down the rows (and round through Back); right, or B: Back
+    //Up and down the rows, round from the last to the first; B (or the footer's "back"): back
     const size_t n = m_rows.size();
     for (size_t i = 0; i < n; i++)
-        menu.AddControl(m_rows[i].control, i == 0 ? back : m_rows[i - 1].control, i + 1 == n ? back : m_rows[i + 1].control, nullptr, back);
-    menu.AddControl(back, m_rows[n - 1].control, m_rows[0].control, m_rows[n - 1].control, nullptr);
+        menu.AddControl(m_rows[i].control, m_rows[i == 0 ? n - 1 : i - 1].control, m_rows[i + 1 == n ? 0 : i + 1].control, nullptr, nullptr);
 
-    //The rows on a panel (clear of the Back button below it)
+    //The rows on a panel
     std::vector<const UI_Control*> rows;
     for (const Row& row : m_rows)
         rows.push_back(row.control);
@@ -87,7 +83,6 @@ MI_Button* SettingsPage::finish(UI_Menu& menu, const std::string& title, MenuCod
     MI_SettingsHelp* help = new MI_SettingsHelp(menu);
     for (const Row& row : m_rows)
         help->set(row.control, row.help);
-    help->set(back, backCode == MENU_CODE_TO_MAIN_MENU ? "Back to the main menu" : "Back to the options");
     menu.AddNonControl(help);
 
     menu.AddTitleBar(title);
@@ -95,5 +90,4 @@ MI_Button* SettingsPage::finish(UI_Menu& menu, const std::string& title, MenuCod
     menu.SetCancelCode(backCode);
     //(the options screens are pages: LB and RB turn them)
     menu.SetPaged(backCode == MENU_CODE_BACK_TO_OPTIONS_MENU);
-    return back;
 }

@@ -38,5 +38,5 @@ UI_PlayerControlsSelectMenu::UI_PlayerControlsSelectMenu()
     miButtonPromptsField->setCurrentValue(game_values.buttonprompts);
     page.add(miButtonPromptsField, "Button icons to show (Auto matches your controller)");
 
-    miPlayerControlsBackButton = page.finish(*this, "Player Controls", MENU_CODE_TO_MAIN_MENU);
+    page.finish(*this, "Player Controls", MENU_CODE_TO_MAIN_MENU);
 }

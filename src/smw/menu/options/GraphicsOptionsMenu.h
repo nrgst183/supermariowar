@@ -29,5 +29,4 @@ private:
     MI_PacksField* miWorldGraphicsPackField;
     MI_PacksField* miGameGraphicsPackField;
     MI_SelectField<bool>* miNetStatsField;
-    MI_Button* miGraphicsOptionsMenuBackButton;
 };

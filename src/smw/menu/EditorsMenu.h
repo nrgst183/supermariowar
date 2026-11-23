@@ -55,7 +55,6 @@ private:
     MI_Button* miJoin = nullptr;
     MI_TextField* miAddressField = nullptr;
     MI_Button* miStart = nullptr;
-    MI_Button* miBack = nullptr;
     UI_Control* miSetupPanel = nullptr;
     MI_Text* miPickText = nullptr;
     UI_Control* miPickBox = nullptr;

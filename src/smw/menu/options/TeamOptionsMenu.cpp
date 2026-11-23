@@ -42,5 +42,5 @@ UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     miTournamentControlField->setCurrentValue(game_values.tournamentcontrolstyle);
     page.add(miTournamentControlField, "Who picks the next game of a tournament");
 
-    miTeamOptionsMenuBackButton = page.finish(*this, "Team Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
+    page.finish(*this, "Team Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

@@ -24,5 +24,4 @@ private:
     MI_SelectField<bool>* miStartModeDisplayField;
     MI_SelectField<bool>* miDeadTeamNoticeField;
 
-    MI_Button* miEyeCandyOptionsMenuBackButton;
 };

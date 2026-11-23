@@ -31,19 +31,14 @@ void addTitleBar(UI_Menu& menu, const char* title)
     menu.AddNonControl(new MI_HeaderText(title, 320, 5));
 }
 
-// What every mode's menu has: the title bar, the Back button (also what cancelling does), and the
-// fields in a column: the d-pad goes down it and round through Back, right goes to Back
+// What every mode's menu has: the title bar and the fields in a column (the d-pad goes down it, round
+// from the last to the first); B (or the footer's "back") goes back
 void finishModeMenu(UI_Menu& menu, const char* title, std::initializer_list<UI_Control*> fields)
 {
-    //(above the footer of prompts, as the settings pages' Back)
-    MI_Button* back = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
-    back->SetCode(MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS);
-
     const std::vector<UI_Control*> column(fields);
     const size_t n = column.size();
     for (size_t i = 0; i < n; i++)
-        menu.AddControl(column[i], i == 0 ? back : column[i - 1], i + 1 == n ? back : column[i + 1], nullptr, back);
-    menu.AddControl(back, column[n - 1], column[0], column[n - 1], nullptr);
+        menu.AddControl(column[i], column[i == 0 ? n - 1 : i - 1], column[i + 1 == n ? 0 : i + 1], nullptr, nullptr);
     //(the rules on a panel, as the options screens)
     if (UI_ModeOptionsMenu::addPanel)
         UI_ModeOptionsMenu::addPanel(menu, std::vector<const UI_Control*>(column.begin(), column.end()));

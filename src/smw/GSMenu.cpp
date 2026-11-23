@@ -684,12 +684,10 @@ void MenuState::update()
     menupanel::beginFrame();
     mCurrentMenu->Draw();
     //(every menu has the footer of prompts: the ones that don't draw their own, the usual one; not
-    //the screens the whole of which is their picture (the world map, the map thumbnails, the
-    //tournament's scoreboard and bonus wheel, a tour's stop), nor the ones with controls down there)
+    //the screens the whole of which is their picture: the world map, the map thumbnails, the
+    //tournament's scoreboard and bonus wheel, a tour's stop)
     const bool wholeScreen = mCurrentMenu == mWorldMenu.get() || mCurrentMenu == mMapFilterEditMenu.get() ||
-        mCurrentMenu == mTournamentScoreboardMenu.get() || mCurrentMenu == mBonusWheelMenu.get() || mCurrentMenu == mTourStopMenu.get() ||
-        mCurrentMenu == mOptionsMenu.get() || mCurrentMenu == mProjectileOptionsMenu.get() || mCurrentMenu == mPowerupDropRatesMenu.get() ||
-        mCurrentMenu == mGameSettingsMenu.get() || mCurrentMenu == mMatchSelectionMenu.get() || mCurrentMenu == mModeOptionsMenu.get();
+        mCurrentMenu == mTournamentScoreboardMenu.get() || mCurrentMenu == mBonusWheelMenu.get() || mCurrentMenu == mTourStopMenu.get();
     if (!menupanel::footerDrawn() && !wholeScreen)
         menupanel::footer(menupanel::standardPrompts(false, mCurrentMenu == mMainMenu.get() ? nullptr : "back"));
     DrawOnlineSeriesNotice();
@@ -932,7 +930,10 @@ MenuCodeEnum MenuState::ApplyPointer()
     MenuCodeEnum code = MENU_CODE_NONE;
     if (pointer.moved)
         code = mCurrentMenu->PointerMove(pointer.x, pointer.y);
-    if (pointer.click)
+    //(a click on the footer's "back": as B, as a right click)
+    if (pointer.click == 1 && menupanel::footerBackAt(pointer.clickX, pointer.clickY))
+        code = mCurrentMenu->PointerClick(pointer.clickX, pointer.clickY, true);
+    else if (pointer.click)
         code = mCurrentMenu->PointerClick(pointer.clickX, pointer.clickY, pointer.click == 2);
     else if (pointer.wheel)
         code = mCurrentMenu->PointerWheel(pointer.wheel > 0 ? 1 : -1);

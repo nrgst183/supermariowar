@@ -337,8 +337,6 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
         row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"});
         return row;
     });
-    MI_Button* backButton = new MI_Button(&rm->spr_selectfield, 544, 410, "Back", 80, TextAlign::CENTER);
-    backButton->SetCode(back);
 
     //(the list takes up and down itself: down from its last game comes to the Host button)
     AddControl(m_list, nullptr, nullptr, nullptr, nullptr);
@@ -352,7 +350,6 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
         AddControl(m_host, m_list, nullptr, nullptr, nullptr);
     }
     AddNonControl(new MI_DrawFn([this] { drawDetails(); }));
-    AddNonControl(backButton);
     AddNonControl(m_message);
     AddNonControl(prompts);
     AddNonControl(new MI_EveryFrame([this] { RefreshGames(); }));

@@ -92,8 +92,6 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
 
     miKickButton = new MI_LobbyButton(&rm->spr_selectfield, FIELD_X, 292, "Kick", 200, false);
     miKickButton->SetCode(MENU_CODE_ONLINE_KICK);
-    miOptionsDone = new MI_LobbyButton(&rm->spr_selectfield, static_cast<short>(FIELD_X + FIELD_W - 200), 292, "Back", 200, true);
-    miOptionsDone->SetCode(MENU_CODE_ONLINE_OPTIONS_BACK);
 
     // What only the host can change says so
     const short tagY[4] = {154, 190, 226, 262};
@@ -124,8 +122,7 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     AddControl(miInputDelay, miCpuPlayers, miEveryone, nullptr, nullptr);
     AddControl(miEveryone, miInputDelay, miKickWho, nullptr, nullptr);
     AddControl(miKickWho, miEveryone, miKickButton, nullptr, nullptr);
-    AddControl(miKickButton, miKickWho, nullptr, nullptr, miOptionsDone);
-    AddControl(miOptionsDone, miKickWho, nullptr, miKickButton, nullptr);
+    AddControl(miKickButton, miKickWho, nullptr, nullptr, nullptr);    //(B, or the footer's "back": back to the team)
     for (MI_LockTag* tag : miHostTag)
         AddNonControl(tag);
 
@@ -201,7 +198,7 @@ void UI_OnlineLobbyMenu::ShowPage(Page page)
     miWhoCanJoin->setVisible(team && !joining);
     miOptionsButton->setVisible(team && !joining);
     miContinueButton->setVisible(team && !joining);
-    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton, miOptionsDone})
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton})
         control->setVisible(!team && !joining);
     for (MI_LockTag* tag : miHostTag)
         tag->setVisible(!team && !joining);
@@ -253,7 +250,7 @@ void UI_OnlineLobbyMenu::ApplyLayout(bool host, bool joining)
     miWhoCanJoin->setVisible(team && !joining);
     miOptionsButton->setVisible(team && !joining);
     miContinueButton->setVisible(team && !joining);
-    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton, miOptionsDone})
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton})
         control->setVisible(!team && !joining);
     for (MI_LockTag* tag : miHostTag)
         tag->setVisible(!team && !joining && !host);

@@ -21,5 +21,4 @@ private:
     MI_Button* miPlayer4ControlsButton;
     MI_SelectField<short>* miButtonPromptsField;
 
-    MI_Button* miPlayerControlsBackButton;
 };

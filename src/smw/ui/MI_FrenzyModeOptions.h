@@ -48,7 +48,6 @@ private:
     MI_SelectField<short> * miRateField;
     MI_SelectField<bool>* miStoredShellsField;
     MI_PowerupSlider * miPowerupSlider[NUMFRENZYCARDS];
-    MI_Button * miBackButton;
 
     MI_Image * miUpArrow;
     MI_Image * miDownArrow;

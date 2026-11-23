@@ -54,12 +54,10 @@ private:
     MI_MenuPanel* miMatchPanel;
     MI_SelectField<bool>* miPingBarsField;
     MI_SelectField<bool>* miNetStatsField;
-    MI_Button* miSettingsBack;
 
     MI_MenuPanel* miJoinPanel;
     MI_TextField* miAddressField;
     MI_Button* miJoinButton;
-    MI_Button* miJoinBack;
 
     MI_WrappedText* miMessage;
     MI_PromptStrip* miPrompts;

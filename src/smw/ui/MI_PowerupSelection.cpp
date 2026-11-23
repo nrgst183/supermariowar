@@ -4,6 +4,7 @@
 #include "ResourceManager.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
+#include "ui/MI_MenuPanel.h"
 #include "ui/MI_PowerupSlider.h"
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
@@ -119,10 +120,10 @@ MI_PowerupSelection::MI_PowerupSelection(short x, short y, short width, short nu
         miPowerupSlider[iPowerup]->setItemChangedCode(MENU_CODE_POWERUP_SETTING_CHANGED);
     }
 
-    miRestoreDefaultsButton = new MI_Button(&rm->spr_selectfield, 160, 432, "Defaults", 150, TextAlign::CENTER);
+    miRestoreDefaultsButton = new MI_Button(&rm->spr_selectfield, 160, 404, "Defaults", 150, TextAlign::CENTER);
     miRestoreDefaultsButton->SetCode(MENU_CODE_RESTORE_DEFAULT_POWERUP_WEIGHTS);
 
-    miClearButton = new MI_Button(&rm->spr_selectfield, 330, 432, "Clear", 150, TextAlign::CENTER);
+    miClearButton = new MI_Button(&rm->spr_selectfield, 330, 404, "Clear", 150, TextAlign::CENTER);
     miClearButton->SetCode(MENU_CODE_CLEAR_POWERUP_WEIGHTS);
 
     //Are You Sure dialog box
@@ -145,7 +146,8 @@ MI_PowerupSelection::MI_PowerupSelection(short x, short y, short width, short nu
     mMenu->AddControl(miPreset, miOverride, miPowerupSlider[0], nullptr, nullptr);
 
     miUpArrow = new MI_Image(&rm->menu_verticalarrows, 310, 128, 20, 0, 20, 20, 1, 4, 8);
-    miDownArrow = new MI_Image(&rm->menu_verticalarrows, 310, 406, 0, 0, 20, 20, 1, 4, 8);
+    //(under the last row shown, between the columns and between Defaults and Clear)
+    miDownArrow = new MI_Image(&rm->menu_verticalarrows, 310, static_cast<short>(m_pos.y + 84 + 38 * iNumLines - 4), 0, 0, 20, 20, 1, 4, 8);
     miUpArrow->setVisible(false);
 
     for (short iPowerup = 0; iPowerup < NUM_POWERUPS; iPowerup++) {
@@ -195,6 +197,9 @@ MI_PowerupSelection::MI_PowerupSelection(short x, short y, short width, short nu
 
     mMenu->AddNonControl(miUpArrow);
     mMenu->AddNonControl(miDownArrow);
+
+    //Everything on one panel, as every settings screen's
+    mMenu->AddBackdrop(new MI_MenuPanel(36, 36, 568, 404));
 
     mMenu->setInitialFocus(miOverride);
     mMenu->SetCancelCode(MENU_CODE_BACK_TO_OPTIONS_MENU);

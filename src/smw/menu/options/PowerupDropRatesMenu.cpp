@@ -8,7 +8,7 @@
 UI_PowerupDropRatesMenu::UI_PowerupDropRatesMenu()
     : UI_Menu()
 {
-    miPowerupSelection = new MI_PowerupSelection(50, 44, 640, 8);
+    miPowerupSelection = new MI_PowerupSelection(50, 44, 640, 7);    //(7 rows: room for the footer under the panel)
     miPowerupSelection->SetAutoModify(true);
 
     AddControl(miPowerupSelection, nullptr, nullptr, nullptr, nullptr);
