@@ -1012,22 +1012,42 @@ void GameplayState::render(float alpha)
         iScoreTextOffset[iTeam] = 34 * game_values.teamcounts[iTeam] + 1;
     }
 
-    //Smooth motion: draw between the previous and the latest tick (not while paused)
-    //(the theater: at every speed, see theaterAlpha)
-    const bool smooth = game_values.smoothmotion && (replay::playing() ? theaterAlpha(alpha) : lastUpdateTicked && alpha < 1.0f);
-    if (smooth)
-        interpolator.apply(alpha);
-    correctionSmoother.apply();
+    //Paused (or the exit dialog up) on this machine: the match under the shade doesn't move, so it's
+    //drawn and shaded once and that picture shown again, not the whole scene drawn and the screen
+    //darkened pixel by pixel every frame (about 10 ms a frame on the Xbox: the pause dropped to 44 FPS)
+    const bool paused = game_values.flags.pausegame || game_values.flags.exitinggame;
+    const bool frozen = paused && !rollback::NetGame::instance().inMatch() && !replay::playing();
+    static gfxSprite s_pausedPicture;
+    static bool s_pausedPictureValid = false;
+    if (!frozen)
+        s_pausedPictureValid = false;
 
-    drawEverything(g_sim.countdownState, iScoreTextOffset);
-
-    correctionSmoother.restore();
-    if (smooth)
-        interpolator.restore();
-
-    if (game_values.flags.pausegame || game_values.flags.exitinggame) {
-        rm->drawShade(App::menuTransparency);
+    if (frozen && s_pausedPictureValid && gfx_copypixels(s_pausedPicture.getSurface(), blitdest)) {
         drawExitPauseDialog();
+    } else {
+        //Smooth motion: draw between the previous and the latest tick (not while paused)
+        //(the theater: at every speed, see theaterAlpha)
+        const bool smooth = game_values.smoothmotion && (replay::playing() ? theaterAlpha(alpha) : lastUpdateTicked && alpha < 1.0f);
+        if (smooth)
+            interpolator.apply(alpha);
+        correctionSmoother.apply();
+
+        drawEverything(g_sim.countdownState, iScoreTextOffset);
+
+        correctionSmoother.restore();
+        if (smooth)
+            interpolator.restore();
+
+        if (paused) {
+            rm->drawShade(App::menuTransparency);
+            if (frozen && blitdest) {
+                if (!s_pausedPicture || s_pausedPicture.getWidth() != blitdest->w || s_pausedPicture.getHeight() != blitdest->h
+                    || s_pausedPicture.getSurface()->format != blitdest->format)
+                    s_pausedPicture = gfxSprite(SdlSurfacePtr(SDL_CreateSurface(blitdest->w, blitdest->h, blitdest->format)), std::nullopt);
+                s_pausedPictureValid = gfx_copypixels(blitdest, s_pausedPicture.getSurface());
+            }
+            drawExitPauseDialog();
+        }
     }
 
     drawNetOverlay();    //online only; pure drawing

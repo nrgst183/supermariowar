@@ -169,6 +169,7 @@ private:
     short navMove = 0;
     short navLastCol = -1;    // where we stood when we chose that move
     short navLastRow = -1;
+    short navPlatform = -1;   // Board, Ride: the platform (AINav's index)
     bool navActive = false;   // this think followed a path
     // Stabilize(): where we were last turn, and getting unstuck
     short lastIx = -1000;

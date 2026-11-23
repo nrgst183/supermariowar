@@ -89,9 +89,19 @@ int FPSLimiter::frameStart()
     if (!modeApplied || wantedMode != mode)
         applyFrameRateMode(wantedMode);
 
-    const uint64_t now = SDL_GetTicksNS();
+    const uint64_t realNs = SDL_GetTicksNS();
+    uint64_t now = realNs;
+    //(VSync, the last iteration drew: one refresh after that frame, a 32nd of the way to real time;
+    //real time again after a stall, or when the last iteration didn't draw)
+    if (frameClocked && vsyncActive && renderPeriodNs > 0 && !unthrottled()) {
+        const int64_t off = static_cast<int64_t>(realNs) - static_cast<int64_t>(nextFrameNs);
+        const int64_t limit = 4 * static_cast<int64_t>(renderPeriodNs);
+        if (off > -limit && off < limit)
+            now = static_cast<uint64_t>(static_cast<int64_t>(nextFrameNs) + off / 32);
+    }
+    frameClocked = false;
     frameStartNs = now;
-    updateStats(now);
+    updateStats(realNs);
 
     // The --autotest harness runs the game as fast as possible: one tick per iteration
     if (unthrottled()) {
@@ -173,6 +183,8 @@ void FPSLimiter::beforeFlip()
 void FPSLimiter::afterFlip()
 {
     statsRenders++;
+    nextFrameNs = frameStartNs + renderPeriodNs;
+    frameClocked = true;
 
     const uint64_t now = SDL_GetTicksNS();
     if (now >= nextRenderNs + renderPeriodNs)

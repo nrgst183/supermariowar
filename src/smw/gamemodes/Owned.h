@@ -8,6 +8,7 @@ class CGM_Owned : public CGameMode
     public:
         CGM_Owned();
 
+        void init() override;
         void think() override;
         PlayerKillType playerkilledplayer(CPlayer &inflictor, CPlayer &other, KillStyle style) override;
         PlayerKillType playerkilledself(CPlayer &player, KillStyle style) override;

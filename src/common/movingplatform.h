@@ -65,6 +65,17 @@ class MovingPlatform : public sim::ArenaAllocated
     TileType tileTypeAt(size_t col, size_t row) const;
 
     // Render-only (smooth motion, see RenderInterpolation.h); the simulation never reads these
+    // For the CPU players' paths (AINav): the middle, the size and the way it moves
+    float centerX() const { return fx; }
+    float centerY() const { return fy; }
+    float velX() const { return fVelX; }
+    float velY() const { return fVelY; }
+    short width() const { return iWidth; }
+    short height() const { return iHeight; }
+    short tileWidth() const { return iTileWidth; }
+    short tileHeight() const { return iTileHeight; }
+    const MovingPlatformPath* path() const { return pPath; }
+
     RenderPosition renderPosition() const { return {fx, fy, ix, iy}; }
     void setRenderPosition(const RenderPosition& pos) { fx = pos.fx; fy = pos.fy; ix = pos.ix; iy = pos.iy; }
     RenderPrevious renderPrevious;

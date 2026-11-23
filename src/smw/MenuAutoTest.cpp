@@ -1385,6 +1385,43 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
+    //--at-role recplay: a quick game, then its replay played in the same run (memory used by the match
+    //before: a replay must play the same as in a fresh run)
+    //(recplay2: two quick games, then the second's replay: its recording made after another match too)
+    if (at.shotsRole == "recplay" || at.shotsRole == "recplay2") {
+        switch (step) {
+            case 1:
+                next();
+                if (at.shotsRole == "recplay2")
+                    step = 10;
+                return MENU_CODE_QUICK_GAME_START;
+            case 10:
+                //(back from the first match: the second)
+                if (t == 10) {
+                    step = 2;
+                    t = 0;
+                    return MENU_CODE_QUICK_GAME_START;
+                }
+                return MENU_CODE_NONE;
+            case 2:
+                //(back in the menus after the match)
+                if (t == 1)
+                    return MENU_CODE_TO_HISTORY_MENU;
+                if (t == 20) {
+                    next();
+                    return MENU_CODE_HISTORY_PLAY_REPLAY;
+                }
+                return MENU_CODE_NONE;
+            case 3:
+                if (mCurrentMenu == mMatchHistoryMenu.get() && t > 5) {
+                    step = 1000;
+                    t = 0;
+                }
+                timedOut(60 * 120, "the end of the replay");
+                return MENU_CODE_NONE;
+        }
+    }
+
     //--at-role go: the main menu's Go! (a random game right away; --at-shot-every for its screens)
     if (at.shotsRole == "go" && step == 1) {
         step = 1000;

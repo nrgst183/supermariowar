@@ -63,6 +63,12 @@ class FPSLimiter
         uint64_t        nextTickNs = 0;        // deadline of the next tick (drift-free schedule)
         uint64_t        nextRenderNs = 0;
         uint64_t        workNs = 0;            // time spent updating and drawing in the last iteration
+        // The display clock (VSync): the time a frame shows things at, one refresh after the last
+        // frame's, following real time gently. The frames go out one refresh apart; with frames
+        // started at uneven times (triple buffering: the next one starts as soon as a buffer is
+        // free) the real clock would show uneven moments, and smooth motion would jitter
+        uint64_t        nextFrameNs = 0;       // the next frame's time, if the last iteration drew
+        bool            frameClocked = false;
         float           tickStretch = 1.0f;
 
         // Measured over the last second

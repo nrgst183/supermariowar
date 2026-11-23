@@ -17,6 +17,14 @@ CGM_Owned::CGM_Owned() : CGameMode()
     SetupModeStrings("Owned", "Points", 50);
 }
 
+void CGM_Owned::init()
+{
+    CGameMode::init();
+    //(the time-based points start counting from zero every match: the last match's count carried
+    //over, and a replay watched after its match played differently from it)
+    pointCounter = 0;
+}
+
 void CGM_Owned::think()
 {
     if (gameover) {

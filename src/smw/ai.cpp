@@ -354,9 +354,11 @@ void CPlayerAI::Think(COutputControl * playerKeys)
 
     //Jump if trying to move left/right and x velocity is zero
     // On the way up a jump onto a higher spot of our path: keep to it until the top (steering after
-    // something else now drops us back where we jumped from); after, whatever is best
-    if (improved() && !navActive && pPlayer->inair && pPlayer->vely < 0.0f && navRow < navLastRow &&
-        (navMove == static_cast<short>(ainav::Move::Jump) || navMove == static_cast<short>(ainav::Move::RunJump))) {
+    // something else now drops us back where we jumped from); after, whatever is best. Onto a moving
+    // platform: all the way
+    if (improved() && !navActive && pPlayer->inair && (navMove == static_cast<short>(ainav::Move::Board) ||
+        (pPlayer->vely < 0.0f && navRow < navLastRow &&
+         (navMove == static_cast<short>(ainav::Move::Jump) || navMove == static_cast<short>(ainav::Move::RunJump))))) {
         playerKeys->game_left.fDown = false;
         playerKeys->game_right.fDown = false;
         NavigateTo(playerKeys, 0, 0);
@@ -447,7 +449,12 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     else
         iDeathX2 = (ix + PW) / TILESIZE;
 
-    CheckFallDanger(playerKeys, ix, iy, iDeathX1, iDeathX2);
+    // Coming down onto a moving platform: whatever is under us now, it will be there
+    if (improved() && pPlayer->inair && (navMove == static_cast<short>(ainav::Move::Board) || navMove == static_cast<short>(ainav::Move::Ride)) &&
+            ainav::OverPlatform(navPlatform, ix, iy, static_cast<int>(AIR_BRAKE_FRAMES)))
+        iFallDanger = 0;
+    else
+        CheckFallDanger(playerKeys, ix, iy, iDeathX1, iDeathX2);
 
     //There is a death tile below us so move to the side that is safest
     if (iFallDanger < 0) {
@@ -1176,7 +1183,14 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
         if (navMove == 0)
             return false;
         navActive = true;
-        if (navMove == static_cast<short>(ainav::Move::Jump)) {
+        if (navMove == static_cast<short>(ainav::Move::Board) || navMove == static_cast<short>(ainav::Move::Ride)) {
+            // Onto the platform (back onto it, off it riding): where it will be when we come down
+            int aim;
+            if (pPlayer->vely < 0.0f)
+                playerKeys->game_jump.fDown = true;
+            if (ainav::PlatformAim(navPlatform, px, static_cast<int>(AIR_BRAKE_FRAMES), aim))
+                steerToX(aim);
+        } else if (navMove == static_cast<short>(ainav::Move::Jump)) {
             // Rise straight up until our feet are above the floor we're jumping onto, then steer
             const int floorTop = (navRow + 1) * TILESIZE;
             if (pPlayer->vely < 0.0f)
@@ -1215,9 +1229,23 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
     }
 
     int col, row;
-    if (!ainav::PlayerSpot(pPlayer->ix, pPlayer->iy, col, row))
-        return false;
-    if (cmd::g_autotest.aiBench && navMove != 0 && !(col == navLastCol && row == navLastRow)) {
+    ainav::Step step;
+    if (pPlayer->platform) {
+        // Riding a platform: where we are on its way (and our column and row on the screen)
+        int cx = px + PW / 2;
+        if (cx < 0)
+            cx += App::screenWidth;
+        else if (cx >= App::screenWidth)
+            cx -= App::screenWidth;
+        col = cx / TILESIZE;
+        row = (pPlayer->iy + PH - 1) / TILESIZE;
+        step = ainav::NextStepFromPlatform(pPlayer->platform, px, pPlayer->iy, x, y);
+    } else {
+        if (!ainav::PlayerSpot(pPlayer->ix, pPlayer->iy, col, row))
+            return false;
+        step = ainav::NextStep(col, row, x, y);
+    }
+    if (cmd::g_autotest.aiBench && navMove != 0 && !pPlayer->platform && !(col == navLastCol && row == navLastRow)) {
         // We were following a move and have landed: did we get where it leads?
         const int k = navMove == static_cast<short>(ainav::Move::Jump) || navMove == static_cast<short>(ainav::Move::RunJump) ? 0
                       : navMove == static_cast<short>(ainav::Move::Drop) ? 1 : 2;
@@ -1225,7 +1253,6 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
         if (col == navCol && row == navRow)
             aibench::navReached[k]++;
     }
-    const ainav::Step step = ainav::NextStep(col, row, x, y);
     if (step.move == ainav::Move::None) {
         navMove = 0;
         return false;
@@ -1237,8 +1264,39 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
     navCol = static_cast<short>(step.toCol);
     navRow = static_cast<short>(step.toRow);
     navMove = static_cast<short>(step.move);
+    navPlatform = static_cast<short>(step.platform);
 
     switch (step.move) {
+        case ainav::Move::Ride: {
+            // Stay on (away from its ends) while it carries us
+            int aim;
+            if (ainav::PlatformAim(step.platform, px, 0, aim))
+                steerToX(aim);
+            break;
+        }
+        case ainav::Move::Board: {
+            // Wait in the middle of our spot until it's in reach, then onto it
+            int aim;
+            const ainav::BoardKind how = ainav::BoardNow(step, col, row, x, y, aim);
+            if (how == ainav::BoardNone) {
+                // In the middle of our spot; now and then a tap toward it all the same (standing
+                // still too long, the game kills us)
+                // (by where we'll come to a stop: walking on we'd swing past it, to and fro)
+                const int stop = static_cast<int>(pPlayer->velx * 6.0f);
+                const int d = col * TILESIZE + (TILESIZE - PW) / 2 - (px + stop);
+                if (d < -6)
+                    left = true;
+                else if (d > 6)
+                    right = true;
+                else if ((g_sim.tick / 4) % 12 == 0 && pPlayer->velx > -0.5f && pPlayer->velx < 0.5f)
+                    (d < 0 ? left : right) = true;
+                break;
+            }
+            steerToX(aim);
+            if (how == ainav::BoardJump)
+                playerKeys->game_jump.fDown = !pPlayer->lockjump;
+            break;
+        }
         case ainav::Move::Walk:
             if (step.dir < 0)
                 left = true;

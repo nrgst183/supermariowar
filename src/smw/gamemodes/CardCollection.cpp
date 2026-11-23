@@ -38,7 +38,8 @@ void CGM_Collection::think()
     if (++timer >= game_values.gamemodesettings.collection.rate) {
         timer = 0;
 
-        short iPowerupQuantity = game_values.gamemodemenusettings.collection.quantity;
+        //(the match's settings, not the menu's: a quick game's are random, and a replay plays with its own)
+        short iPowerupQuantity = game_values.gamemodesettings.collection.quantity;
 
         if (5 < iPowerupQuantity)
             iPowerupQuantity = g_sim.players.size() + iPowerupQuantity - 7;
@@ -63,7 +64,7 @@ void CGM_Collection::think()
     //Check if this team has collected 3 cards
     for (short iScore = 0; iScore < g_sim.score_cnt; iScore++) {
         if (g_sim.score[iScore].subscore[0] >= 3) {
-            if (++g_sim.score[iScore].subscore[2] >= game_values.gamemodemenusettings.collection.banktime) {
+            if (++g_sim.score[iScore].subscore[2] >= game_values.gamemodesettings.collection.banktime) {
                 short iPoints = 1;
 
                 if ((g_sim.score[iScore].subscore[1] & 63) == 0) //All Mushrooms

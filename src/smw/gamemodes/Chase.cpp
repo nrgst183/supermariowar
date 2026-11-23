@@ -22,6 +22,9 @@ CGM_Chase::CGM_Chase() : CGameMode()
 void CGM_Chase::init()
 {
     CGameMode::init();
+    //(the time-based points start counting from zero every match: the last match's count carried
+    //over, and a replay watched after its match played differently from it)
+    pointCounter = 0;
 
     //Add phantos based on settings
     for (short iPhanto = 0; iPhanto < 3; iPhanto++) {

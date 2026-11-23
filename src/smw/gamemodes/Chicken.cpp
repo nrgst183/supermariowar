@@ -21,6 +21,9 @@ CGM_Chicken::CGM_Chicken() : CGameMode()
 void CGM_Chicken::init()  //called once when the game is started
 {
     CGameMode::init();
+    //(the time-based points start counting from zero every match: the last match's count carried
+    //over, and a replay watched after its match played differently from it)
+    pointCounter = 0;
     clearChicken();
 };
 
