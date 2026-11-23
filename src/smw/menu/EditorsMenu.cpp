@@ -273,7 +273,7 @@ void UI_EditorsMenu::Relink()
     //The rows, top to bottom (the d-pad goes around)
     std::vector<std::vector<UI_Control*>> rows;
     if (!setup) {
-        rows = {{miMaps, miWorlds}};
+        rows = {{miMaps}, {miWorlds}};    //(one above the other: up and down)
     } else {
         rows.push_back({miLocal, miOnline});
         if (m_online)
