@@ -10,6 +10,7 @@ class MI_LobbyButton;
 class MI_LobbyScene;
 class MI_LockTag;
 class MI_OnlineTeamSelect;
+class MI_SwitchField;
 class MI_Text;
 template<typename T> class MI_SelectField;
 
@@ -66,7 +67,7 @@ private:
     MI_LobbyButton* miContinueButton = nullptr;
 
     // The options page
-    MI_SelectField<short>* miWhoCanJoin = nullptr;     // host: nobody (a local game), the network, anyone
+    MI_SwitchField* miWhoCanJoin = nullptr;     // host: nobody (a local game), the network, anyone
     int m_pendingAccess = 0;
     UI_Control* FirstOption();
     bool LocalGame() const;    // where the options page starts: who can join (the host), else my players

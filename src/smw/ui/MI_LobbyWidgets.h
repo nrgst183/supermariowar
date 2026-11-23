@@ -5,6 +5,7 @@
 #include "ui/MI_Button.h"
 #include "ui/MI_MapPreview.h"
 #include "ui/InputPrompts.h"
+#include "ui/MI_SelectField.h"
 
 #include <functional>
 #include <memory>
@@ -46,6 +47,14 @@ public:
 /// computer: up/down choose the skin, left/right the team and select is ready (the original's keys); the
 /// others (remote players, CPU players) are shown, locked. While a player is ready (locked), "down" moves
 /// to the buttons under the box and "cancel" takes the ready back; cancel when not ready leaves the lobby.
+/// A select field shown as a switch: a pill, lit with its knob at the right for any value but the
+/// first (0: off), and the value's name beside it (left/right changes it, as the select fields)
+class MI_SwitchField : public MI_SelectField<short> {
+public:
+    using MI_SelectField<short>::MI_SelectField;
+    void Draw() override;
+};
+
 class MI_OnlineTeamSelect : public UI_Control {
 public:
     MI_OnlineTeamSelect(short x, short y);
@@ -60,6 +69,8 @@ public:
     /// Whether this computer's players are ready (the host's lock is only a feature of the screen)
     bool locked() const;
     void Lock(bool lock);
+    /// Whether this computer has players in the lobby to pick a character and team for (none: only CPUs)
+    bool hasOwnPlayers() const;
     /// Called when the focus should go to the buttons under the box
     void SetLeaveDown(std::function<void()> leave) { m_leaveDown = std::move(leave); }
     /// What the local players can do now, for the hint line

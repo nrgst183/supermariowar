@@ -48,11 +48,12 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     miTeam->SetAutoModify(true);
     // Under it: who can join (the lobby is local until it's opened to the others), the options
     // and Continue
-    miWhoCanJoin = new MI_SelectField<short>(&rm->spr_selectfield, 40, 298, "Open to", 238, 98);
-    miWhoCanJoin->add("No one", static_cast<short>(rollback::LobbyAccess::Nobody));
+    //(a switch: off, a game on this machine; on, others can join over the network)
+    miWhoCanJoin = new MI_SwitchField(&rm->spr_selectfield, 40, 298, "Online", 238, 98);
+    miWhoCanJoin->add("Off", static_cast<short>(rollback::LobbyAccess::Nobody));
 #ifndef NETWORK_DISABLED
 #ifdef SMW_XBOX
-    miWhoCanJoin->add("System link", static_cast<short>(rollback::LobbyAccess::Lan));
+    miWhoCanJoin->add("On", static_cast<short>(rollback::LobbyAccess::Lan));
 #else
     miWhoCanJoin->add("LAN", static_cast<short>(rollback::LobbyAccess::Lan));
     miWhoCanJoin->add("Internet", static_cast<short>(rollback::LobbyAccess::Internet));
@@ -286,6 +287,12 @@ void UI_OnlineLobbyMenu::Sync()
     ApplyLayout(host, joining);
     if (!joining && !m_currentFocus && m_dialog == Dialog::None)
         Focus(m_page == Page::Team ? static_cast<UI_Control*>(miTeam) : FirstOption());
+    //(no players of ours to pick a character for, only CPUs: nothing to do in the team box, it's
+    //ready; the buttons have the focus)
+    if (inLobby && m_page == Page::Team && m_dialog == Dialog::None && m_currentFocus == miTeam && !miTeam->hasOwnPlayers()) {
+        miTeam->Lock(true);
+        Focus(miContinueButton);
+    }
 
     // The options page
     if (local >= 0) {
@@ -339,9 +346,9 @@ void UI_OnlineLobbyMenu::Sync()
 #if defined(NETWORK_DISABLED)
         settingsNote = "Local game";
 #elif defined(SMW_XBOX)
-        settingsNote = "Set Open to System link so friends can join";
+        settingsNote = "Turn Online on so friends can join by system link";
 #else
-        settingsNote = "Set Open to LAN or Internet so friends can join";
+        settingsNote = "Turn Online on (LAN or Internet) so friends can join";
 #endif
     miScene->SetSettingsNote(m_page == Page::Team && !joining ? settingsNote : std::string());
     //(a lobby that edits together: its button opens the editor, or goes into the host's)
@@ -425,7 +432,8 @@ void UI_OnlineLobbyMenu::Sync()
         else if (m_currentFocus == miWhoCanJoin && !host)
             hint = "The host chooses who can join";
         else if (m_currentFocus == miWhoCanJoin)
-            hint = net.access() == rollback::LobbyAccess::Nobody ? "Only players on this computer can play" : "Others can join this lobby now";
+            hint = net.access() == rollback::LobbyAccess::Nobody ? "Off: a game on this console only. Left/Right turns it on"
+                                                                 : "On: others on the network can join this lobby now";
     } else if (m_dialog == Dialog::None && !joining) {
         if (!host && (m_currentFocus == miCpuPlayers || m_currentFocus == miInputDelay || m_currentFocus == miEveryone || m_currentFocus == miKickWho))
             hint = "Only the host can change this";
@@ -454,7 +462,7 @@ void UI_OnlineLobbyMenu::Sync()
     else if (m_page == Page::Team && m_currentFocus == miTeam)
         row = miTeam->prompts();
     else if (m_page == Page::Team)
-        row = {across, select, cancel(miTeam->locked() ? "not ready" : "leave")};
+        row = {across, select, cancel("leave")};
     else
         row = {choose, change, select, cancel("back")};
     miScene->SetPrompts(std::move(row));

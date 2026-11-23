@@ -100,6 +100,10 @@ std::vector<std::string> skinDownloadDirs();
 // Loads the sprites of the player in a slot of the running online match: the skin of its owner
 // (downloaded if need be), the default skin while it isn't here. Cosmetic only.
 void loadMatchSkin(int slot, short color);
+// A computer player's skin (an index into the skin list, -1: the slot isn't a CPU): a random one,
+// picked when the slot became a CPU and kept (the lobby's card and the match show the same).
+// Cosmetic only: each machine picks its own.
+short cpuSkin(int slot);
 // A replay: the skin files of its players, used instead of the lobby's (null: none)
 void setMatchSkinOverride(const std::array<std::string, INPUT_MAX_PLAYERS>* paths);
 

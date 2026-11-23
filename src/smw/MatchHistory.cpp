@@ -8,6 +8,7 @@
 #include "MatchTypes.h"
 #include "path.h"
 #include "SimulationState.h"
+#include "rollback/MatchConfig.h"
 #include "rollback/NetGame.h"
 #include "rollback/Replay.h"
 
@@ -196,7 +197,8 @@ struct JsonParser {
 
 std::string skinName(int slot)
 {
-    const short id = game_values.skinids[slot];
+    const short cpu = game_values.playercontrol[slot] == 2 ? rollback::cpuSkin(slot) : -1;
+    const short id = cpu >= 0 ? cpu : game_values.skinids[slot];
     if (skinlist && id >= 0 && static_cast<size_t>(id) < skinlist->count())
         return skinlist->at(static_cast<size_t>(id)).name;
     return {};

@@ -5,6 +5,7 @@
 #include "gfx.h"
 #include "ResourceManager.h"
 #include "RandomNumberGenerator.h"
+#include "rollback/MatchConfig.h"
 #include "rollback/NetGame.h"
 #include "ui/MI_Image.h"
 #include "ui/MI_MenuPanel.h"
@@ -79,6 +80,54 @@ void MI_OnlineTeamSelect::Reset()
     m_hostLocked = false;
     for (int i = 0; i < 4; i++)
         m_overrideFrames[i] = m_holdFrames[i] = 0;
+}
+
+void MI_SwitchField::Draw()
+{
+    if (!m_visible)
+        return;
+
+    //The pipe, as the select fields'
+    gfxSprite* body = fLocked ? &rm->spr_selectfielddisabled : m_spr;
+    const short row = fSelected ? (fLocked ? m_adjustmentY + 32 : 32) : m_adjustmentY;
+    body->draw(m_pos.x, m_pos.y, {0, row, m_indent - 16, 32});
+    body->draw(m_pos.x + m_indent - 16, m_pos.y, {0, (fSelected ? 96 : 64), 32, 32});
+    body->draw(m_pos.x + m_indent + 16, m_pos.y, {528 - m_width + m_indent, row, m_width - m_indent - 16, 32});
+    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, m_indent - 8, m_name.c_str(), fSelected);
+    if (m_items.empty())
+        return;
+
+    //The switch: a dark outline, green and the knob at the right when on, gray and at the left when off
+    const bool on = m_index > 0;
+    constexpr int W = 34, H = 18;
+    const int x = m_pos.x + m_indent + 10;
+    const int y = m_pos.y + 7;
+    const SDL_Color dark {16, 24, 48, 255};
+    const SDL_Color track = fLocked ? SDL_Color {120, 120, 120, 255} : on ? SDL_Color {72, 200, 72, 255} : SDL_Color {150, 150, 158, 255};
+    const SDL_Color knob {248, 248, 240, 255};
+    prompts::fill(x + 2, y, W - 4, H, dark);
+    prompts::fill(x, y + 2, W, H - 4, dark);
+    prompts::fill(x + 2, y + 2, W - 4, H - 4, track);
+    const int kx = on ? x + W - 2 - 14 : x + 2;
+    prompts::fill(kx, y + 2, 14, H - 4, dark);
+    prompts::fill(kx + 2, y + 4, 10, H - 8, knob);
+
+    const int tx = x + W + 8;
+    rm->menu_font_large.drawScrolling(tx, m_pos.y + 5, m_pos.x + m_width - 24 - tx, currentItem().name.c_str(), fSelected);
+
+    if (m_wraps || m_index > 0)
+        miModifyImageLeft->Draw();
+    if (m_wraps || m_index + 1 < m_items.size())
+        miModifyImageRight->Draw();
+}
+
+bool MI_OnlineTeamSelect::hasOwnPlayers() const
+{
+    for (int i = 0; i < 4; i++) {
+        if (mySlot(i) >= 0)
+            return true;
+    }
+    return false;
 }
 
 bool MI_OnlineTeamSelect::locked() const
@@ -319,6 +368,12 @@ const gfxSprite* MI_OnlineTeamSelect::skinFrame(int slot, const Info& info, int 
     const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
     //(the skin the match will load: rollback::loadMatchSkin, the default one for computer players)
     std::string path = lobby->slotSkinPath(slot);
+    //(a computer player: its random skin, as the match will load it)
+    if (path.empty() && info.cpu) {
+        const short cpu = rollback::cpuSkin(slot);
+        if (cpu >= 0)
+            path = skinlist->at(static_cast<size_t>(cpu)).path.string();
+    }
     if (path.empty())
         path = defaultSkinPath();
     Skin& skin = m_skins[slot];

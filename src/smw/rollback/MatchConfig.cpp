@@ -19,6 +19,8 @@
 #include "gamemodes/MiniBoxes.h"
 #include "gamemodes/MiniPipe.h"
 
+#include <SDL3/SDL.h>
+
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
@@ -259,6 +261,51 @@ std::vector<std::string> skinDownloadDirs()
 
 namespace {
 std::array<std::string, INPUT_MAX_PLAYERS> g_skinOverride;
+
+// The CPUs' skins (cpuSkin), and the random numbers they're picked with: not the game's (those are
+// the simulation's, the same on every machine)
+std::array<short, INPUT_MAX_PLAYERS> g_cpuSkins {-1, -1, -1, -1};
+std::array<bool, INPUT_MAX_PLAYERS> g_wasCpu {};
+uint32_t g_skinRandom = 0;
+
+uint32_t skinRandom()
+{
+    if (g_skinRandom == 0)
+        g_skinRandom = static_cast<uint32_t>(SDL_GetTicksNS()) | 1u;
+    g_skinRandom ^= g_skinRandom << 13;
+    g_skinRandom ^= g_skinRandom >> 17;
+    g_skinRandom ^= g_skinRandom << 5;
+    return g_skinRandom;
+}
+}
+
+short cpuSkin(int slot)
+{
+    if (slot < 0 || slot >= INPUT_MAX_PLAYERS || !skinlist || skinlist->count() == 0)
+        return -1;
+    const size_t s = static_cast<size_t>(slot);
+    const NetLobby* lobby = NetGame::instance().lobby();
+    const bool cpu = lobby ? lobby->slot(slot).kind == SlotKind::Cpu : game_values.playercontrol[slot] == 2;
+    if (!cpu) {
+        g_wasCpu[s] = false;
+        return -1;
+    }
+    const short count = static_cast<short>(skinlist->count());
+    if (!g_wasCpu[s] || g_cpuSkins[s] < 0 || g_cpuSkins[s] >= count) {
+        g_wasCpu[s] = true;
+        //(not another CPU's, when there are skins enough)
+        short pick = 0;
+        for (int attempt = 0; attempt < 8; attempt++) {
+            pick = static_cast<short>(skinRandom() % static_cast<uint32_t>(count));
+            bool taken = false;
+            for (size_t o = 0; o < g_cpuSkins.size(); o++)
+                taken |= o != s && g_wasCpu[o] && g_cpuSkins[o] == pick;
+            if (!taken)
+                break;
+        }
+        g_cpuSkins[s] = pick;
+    }
+    return g_cpuSkins[s];
 }
 
 void setMatchSkinOverride(const std::array<std::string, INPUT_MAX_PLAYERS>* paths)
@@ -272,6 +319,12 @@ void loadMatchSkin(int slot, short color)
     std::string path = slot >= 0 && slot < INPUT_MAX_PLAYERS ? g_skinOverride[static_cast<size_t>(slot)] : std::string();
     if (path.empty() && lobby)
         path = lobby->slotSkinPath(slot);
+    //(a computer player: its random skin)
+    if (path.empty()) {
+        const short skin = cpuSkin(slot);
+        if (skin >= 0)
+            path = skinlist->at(static_cast<size_t>(skin)).path.string();
+    }
     if (!path.empty()) {
         try {
             rm->spr_player[slot] = rm->LoadFullSkin(std::filesystem::path(path), color);

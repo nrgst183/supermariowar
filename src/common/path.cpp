@@ -86,19 +86,22 @@ std::string homeCopyDir(const std::string& relDir)
 
 std::string mapThumbnailPath(const std::string& mapFile)
 {
+    //(in a folder of their own, named for the tilesets' thumbnail images: the ones made before
+    //those lost the pink left over from the color key are made again)
+    constexpr const char* folder = "maps/cache/thumbnails2/";
     const std::string name = GetNameFromFileName(mapFile) + ".png";
+    static const std::string dir = [folder] {
 #ifdef SMW_XBOX
-    //(on the cache drive: see SDL_XboxGetCachePath)
-    static const std::string dir = [] {
-        std::string d = std::string(SDL_XboxGetCachePath()) + "maps/cache/";
+        //(on the cache drive: see SDL_XboxGetCachePath)
+        std::string d = std::string(SDL_XboxGetCachePath()) + folder;
+#else
+        std::string d = convertPath(folder);
+#endif
         std::error_code ec;
         fs::create_directories(d, ec);
         return d;
     }();
     return dir + name;
-#else
-    return convertPath("maps/cache/" + name);
-#endif
 }
 
 std::string GetRootDirectory()
