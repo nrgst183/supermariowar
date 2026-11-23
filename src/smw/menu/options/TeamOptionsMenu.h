@@ -20,5 +20,6 @@ public:
 private:
     MI_SelectField<TeamCollisionStyle>* miTeamKillsField;
     MI_SelectField<bool>* miTeamColorsField;
+    MI_SelectField<bool>* miCpuSkinsField;
     MI_SelectField<TournamentControlStyle>* miTournamentControlField;
 };

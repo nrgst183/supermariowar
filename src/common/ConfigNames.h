@@ -490,6 +490,7 @@ template<> struct NamedLayout<CGameConfig> {
         section("team",
             field("team_collision_style", &CGameConfig::teamcollision),
             field("team_colors", &CGameConfig::teamcolors),
+            field("random_cpu_skins", &CGameConfig::randomcpuskins),
             field("tournament_control_style", &CGameConfig::tournamentcontrolstyle)),
         section("online",
             field("nickname", &CGameConfig::onlinename),

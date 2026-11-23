@@ -1,5 +1,6 @@
 #include "GSMenu.h"
 
+#include "rollback/MatchConfig.h"
 #include "rollback/NetGame.h"
 
 #include "FileList.h"
@@ -105,7 +106,8 @@ void MenuState::StartGame()
                 rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
             }
             else {
-                rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
+                //(a computer player: its random skin, the one the lobby showed)
+                rm->spr_player[k] = rm->LoadFullSkin(rollback::matchSkinId(k), game_values.colorids[k]);
             }
         }
     }

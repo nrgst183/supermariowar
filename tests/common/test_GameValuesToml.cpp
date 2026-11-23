@@ -60,6 +60,7 @@ std::pair<CGameConfig, config::Bridge> makePeculiar()
     // team
     config.teamcollision = TeamCollisionStyle::Assist;
     config.teamcolors = true;
+    config.randomcpuskins = false;
     config.tournamentcontrolstyle = TournamentControlStyle::RoundRobin;
 
     // players
@@ -216,7 +217,7 @@ TEST_CASE("TOML config document covers every descriptor field exactly once")
     }, config::NamedLayout<CGameConfig>::sections);
 
     CHECK(counts[0] == 11);
-    CHECK(counts[1] == 76);
+    CHECK(counts[1] == 77);
     CHECK(counts[2] == 2); // gamemode_settings, gamemode_goals
 }
 

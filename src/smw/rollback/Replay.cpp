@@ -430,7 +430,7 @@ void restoreMenu(const MenuBackup& b)
     //The players' own skins again (a replay loaded its players')
     for (int k = 0; k < 4; k++) {
         if (game_values.playercontrol[k] > 0)
-            rm->spr_player[k] = rm->LoadFullSkin(game_values.skinids[k], game_values.colorids[k]);
+            rm->spr_player[k] = rm->LoadFullSkin(rollback::matchSkinId(k), game_values.colorids[k]);
     }
     RandomNumberGenerator::gameplay().seedFromTime();
 }

@@ -104,6 +104,8 @@ void loadMatchSkin(int slot, short color);
 // picked when the slot became a CPU and kept (the lobby's card and the match show the same).
 // Cosmetic only: each machine picks its own.
 short cpuSkin(int slot);
+/// The skin a local match gives `slot`: a computer player's random one (cpuSkin), else its own
+short matchSkinId(int slot);
 // A replay: the skin files of its players, used instead of the lobby's (null: none)
 void setMatchSkinOverride(const std::array<std::string, INPUT_MAX_PLAYERS>* paths);
 

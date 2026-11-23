@@ -281,7 +281,8 @@ uint32_t skinRandom()
 
 short cpuSkin(int slot)
 {
-    if (slot < 0 || slot >= INPUT_MAX_PLAYERS || !skinlist || skinlist->count() == 0)
+    //(the setting off: the slot's own skin, as a human's)
+    if (!game_values.randomcpuskins || slot < 0 || slot >= INPUT_MAX_PLAYERS || !skinlist || skinlist->count() == 0)
         return -1;
     const size_t s = static_cast<size_t>(slot);
     const NetLobby* lobby = NetGame::instance().lobby();
@@ -306,6 +307,12 @@ short cpuSkin(int slot)
         g_cpuSkins[s] = pick;
     }
     return g_cpuSkins[s];
+}
+
+short matchSkinId(int slot)
+{
+    const short cpu = slot >= 0 && slot < INPUT_MAX_PLAYERS && game_values.playercontrol[slot] == 2 ? cpuSkin(slot) : -1;
+    return cpu >= 0 ? cpu : slot >= 0 && slot < INPUT_MAX_PLAYERS ? game_values.skinids[slot] : 0;
 }
 
 void setMatchSkinOverride(const std::array<std::string, INPUT_MAX_PLAYERS>* paths)

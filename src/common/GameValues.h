@@ -173,6 +173,7 @@ public:
     short		overlaycolors = 3;      // the theater's and the editors' colors: 0 night, 1 pipe (green), 2 castle, 3 SMB3 (the status bar's blue, as the menus': the default)
     short		buttonprompts = 2;      // the controller glyphs in the theater and the editors: 0 auto, 1 Xbox, 2 original Xbox (the default)
     bool		teamcolors;
+    bool		randomcpuskins = true;  // the computer players: a skin each picked at random, not the one in their slot
     bool		sound;
     bool		startgamecountdown;
     bool		startmodedisplay;
