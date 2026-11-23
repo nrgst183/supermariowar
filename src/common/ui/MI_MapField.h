@@ -23,6 +23,10 @@ public:
 
     //Sends player input to control on every frame
     MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
+    Box FocusBox() const override {
+        //(the field's pipe, not the preview under it: its sprite has 8 empty pixels at each end)
+        return {static_cast<short>(m_pos.x + 8), m_pos.y, static_cast<short>(iWidth - 16), 32};
+    }
     bool CanNudge() const override { return !fDisable; }
     MenuCodeEnum Nudge(int dir) override;
     MenuCodeEnum MouseClick(short iMouseX, short iMouseY)  override;

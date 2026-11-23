@@ -1449,7 +1449,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             {MENU_CODE_TO_SYSTEM_LINK_MENU, "t15_join"}, {MENU_CODE_TO_MAIN_MENU, ""},
             {MENU_CODE_TO_LOCAL_LOBBY, "t16_lobby"}, {MENU_CODE_ONLINE_OPTIONS, "t17_lobby_options"},
             {MENU_CODE_ONLINE_OPTIONS_BACK, ""}, {MENU_CODE_ONLINE_MATCH_SETTINGS, "t18_match_type"},
-            {MENU_CODE_MATCH_SELECTION_START, "t19_game_settings"}, {MENU_CODE_TO_MODE_SETTINGS_MENU, "t20_mode_settings"},
+            {MENU_CODE_MATCH_SELECTION_START, "t19_game_settings"}, {MENU_CODE_NONE, "t19b_map_field"}, {MENU_CODE_TO_MODE_SETTINGS_MENU, "t20_mode_settings"},
             {MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS, ""}, {MENU_CODE_TO_MAP_BROWSER_THUMBNAILS, "t21_map_thumbnails"}};
         constexpr int HOLD = 20;
         const int index = (t - 1) / HOLD;
