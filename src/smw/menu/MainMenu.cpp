@@ -93,3 +93,23 @@ UI_MainMenu::UI_MainMenu()
     AddNonControl(miSMWTitle);
     AddNonControl(miSMWVersion);
 };
+
+const char* UI_MainMenu::focusHint() const
+{
+    const UI_Control* focus = currentFocus();
+    if (focus == miMainStartButton)
+        return "Pick players and teams, then play";
+    if (focus == miQuickGameButton)
+        return "A quick game now: random mode and map";
+    if (focus != nullptr && focus == miOnlineButton)
+        return "Join a game someone else hosts";
+    if (focus == miOptionsButton)
+        return "Rules, items, sound and picture";
+    if (focus == miControlsButton)
+        return "Set each player's buttons";
+    if (focus != nullptr && focus == miHistoryButton)
+        return "Past matches and their replays";
+    if (focus != nullptr && focus == miEditorsButton)
+        return "Make maps and worlds";
+    return "";
+}

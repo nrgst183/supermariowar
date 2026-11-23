@@ -2,6 +2,7 @@
 
 #include "ResourceManager.h"
 #include "rollback/NetGame.h"
+#include "ui/MI_MenuPanel.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
 #include "ui/MI_LobbyWidgets.h"
@@ -56,7 +57,7 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     miWhoCanJoin->add("On", static_cast<short>(rollback::LobbyAccess::Lan));
 #else
     miWhoCanJoin->add("LAN", static_cast<short>(rollback::LobbyAccess::Lan));
-    miWhoCanJoin->add("Internet", static_cast<short>(rollback::LobbyAccess::Internet));
+    miWhoCanJoin->add("Net", static_cast<short>(rollback::LobbyAccess::Internet));    //(the Internet: "Internet" doesn't fit beside the slider)
 #endif
 #endif
     miWhoCanJoin->setItemChangedCode(MENU_CODE_ONLINE_LOBBY_CHANGED);
@@ -99,9 +100,9 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
         miHostTag[i] = new MI_LockTag(FIELD_X + FIELD_W - 16, tagY[i], "Host");
 
     // Confirmation dialog (leave the lobby, kick a player)
-    miDialogImage = new MI_Image(&rm->spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);
-    miDialogLine1 = new MI_HeaderText("Leave", 320, 195);
-    miDialogLine2 = new MI_HeaderText("Lobby?", 320, 220);
+    miDialogImage = new MI_DialogBox();
+    miDialogLine1 = new MI_HeaderText("Leave the lobby?", 320, 195);
+    miDialogLine2 = new MI_HeaderText("", 320, 220);
     miDialogYes = new MI_Button(&rm->spr_selectfield, 235, 250, "Yes", 80, TextAlign::CENTER);
     miDialogYes->SetCode(MENU_CODE_ONLINE_LEAVE_YES);
     miDialogNo = new MI_Button(&rm->spr_selectfield, 325, 250, "No", 80, TextAlign::CENTER);
@@ -438,7 +439,8 @@ void UI_OnlineLobbyMenu::Sync()
             hint = "The host chooses who can join";
         else if (m_currentFocus == miWhoCanJoin)
             hint = net.access() == rollback::LobbyAccess::Nobody ? "Off: a game on this console only. Left/Right turns it on"
-                                                                 : "On: others on the network can join this lobby now";
+                 : net.access() == rollback::LobbyAccess::Internet ? "Net: anyone over the Internet can join this lobby now"
+                                                                   : "On: others on the network can join this lobby now";
     } else if (m_dialog == Dialog::None && !joining) {
         if (!host && (m_currentFocus == miCpuPlayers || m_currentFocus == miInputDelay || m_currentFocus == miEveryone || m_currentFocus == miKickWho))
             hint = "Only the host can change this";
@@ -552,11 +554,12 @@ void UI_OnlineLobbyMenu::OpenDialog(Dialog dialog)
     m_dialog = dialog;
 
     if (dialog == Dialog::Kick) {
-        miDialogLine1->SetText("Kick");
-        miDialogLine2->SetText("Player?");
+        miDialogLine1->SetText("Kick this player?");
+        miDialogLine2->SetText("They can join again");
     } else {
-        miDialogLine1->SetText(lobby && lobby->isHost() ? "Close" : "Leave");
-        miDialogLine2->SetText("Lobby?");
+        const bool host = lobby && lobby->isHost();
+        miDialogLine1->SetText(host ? "Close the lobby?" : "Leave the lobby?");
+        miDialogLine2->SetText(host ? "Everyone in it leaves" : "");
     }
 
     miDialogImage->setVisible(true);

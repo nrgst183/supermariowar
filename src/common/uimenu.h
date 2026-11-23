@@ -20,6 +20,8 @@ public:
     void AddNonControl(UI_Control* control);
     /// A non-control drawn under everything else in the menu (a panel behind its controls)
     void AddBackdrop(UI_Control* control);
+    /// Moves everything in the menu so far by (dx, dy)
+    void ShiftAll(short dx, short dy);
     /// The bar along the top of the screen, with the menu's title (a non-control)
     void AddTitleBar(const std::string& title);
 

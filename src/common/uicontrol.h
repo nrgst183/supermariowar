@@ -117,9 +117,12 @@ public:
         return fAutoModify;
     }
 
-    void SetPosition(short x, short y) {
+    /// Moves the control (a control with parts of its own moves them along)
+    virtual void SetPosition(short x, short y) {
         m_pos = {x, y};
     }
+    short x() const { return m_pos.x; }
+    short y() const { return m_pos.y; }
 
     void setNeighbor(MenuNavDirection iNeighbor, UI_Control* uiControl);
 

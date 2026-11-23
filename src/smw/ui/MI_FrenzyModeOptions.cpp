@@ -4,7 +4,9 @@
 #include "ResourceManager.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
+#ifndef IS_WORLDEDIT
 #include "ui/MI_MenuPanel.h"
+#endif
 
 
 /**************************************
@@ -124,7 +126,9 @@ MI_FrenzyModeOptions::MI_FrenzyModeOptions(short x, short y, short width, short 
     mMenu->AddNonControl(miDownArrow);
 
     //Everything on one panel, as every settings screen's
+#ifndef IS_WORLDEDIT
     mMenu->AddBackdrop(new MI_MenuPanel(36, 36, 568, 404));
+#endif
 
     mMenu->setInitialFocus(miQuantityField);
     mMenu->SetCancelCode(MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS);

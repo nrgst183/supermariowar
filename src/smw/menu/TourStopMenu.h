@@ -2,6 +2,7 @@
 
 #include "uimenu.h"
 
+class MI_DialogBox;
 class MI_Button;
 class MI_Image;
 class MI_Text;
@@ -18,7 +19,7 @@ public:
     MI_TourStop* miTourStop;
 
 private:
-    MI_Image* miTourStopExitDialogImage;
+    MI_DialogBox* miTourStopExitDialogImage;
     MI_Text* miTourStopExitDialogExitTourText;
     MI_Button* miTourStopExitDialogYesButton;
     MI_Button* miTourStopExitDialogNoButton;

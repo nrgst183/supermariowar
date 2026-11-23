@@ -688,8 +688,12 @@ void MenuState::update()
     //tournament's scoreboard and bonus wheel, a tour's stop)
     const bool wholeScreen = mCurrentMenu == mWorldMenu.get() || mCurrentMenu == mMapFilterEditMenu.get() ||
         mCurrentMenu == mTournamentScoreboardMenu.get() || mCurrentMenu == mBonusWheelMenu.get() || mCurrentMenu == mTourStopMenu.get();
-    if (!menupanel::footerDrawn() && !wholeScreen)
-        menupanel::footer(menupanel::standardPrompts(false, mCurrentMenu == mMainMenu.get() ? nullptr : "back"));
+    if (!menupanel::footerDrawn() && !wholeScreen) {
+        if (mCurrentMenu == mMainMenu.get())
+            menupanel::footer(menupanel::standardPrompts(false, nullptr), mMainMenu->focusHint());
+        else
+            menupanel::footer(menupanel::standardPrompts(false, "back"));
+    }
     DrawOnlineSeriesNotice();
 
     if (iDisplayError > DISPLAY_ERROR_NONE) {

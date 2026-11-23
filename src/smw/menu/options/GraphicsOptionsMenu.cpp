@@ -31,10 +31,10 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     SettingsPage page(rows);
 
 #ifdef SMW_XBOX
-    //The Xbox is always full screen: no Screen Size field
+    //The Xbox is always full screen: no Display field
     miFullscreenField = nullptr;
 #else
-    miFullscreenField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Screen Size", SettingsPage::ROW_W, SettingsPage::LABEL_W);
+    miFullscreenField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Display", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miFullscreenField->add("Windowed", false);
     miFullscreenField->add("Fullscreen", true);
     miFullscreenField->setOutputPtr(&game_values.fullscreen);
@@ -79,7 +79,7 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     page.add(miTopLayerField, "Draw the map's top layer in front of or behind players");
 
     //A TV crops the picture's edges (overscan): the picture smaller, so that nothing is lost
-    miScreenSizeField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Screen Size", SettingsPage::ROW_W, SettingsPage::LABEL_W);
+    miScreenSizeField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Picture Size", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miScreenSizeField->add("Full", 0);
     miScreenSizeField->add("95% (TV)", 1);
     miScreenSizeField->add("90% (TV)", 2);

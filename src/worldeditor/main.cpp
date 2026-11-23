@@ -339,10 +339,10 @@ void inner_main()
     mCurrentMenu = &mStageSettingsMenu;
 
     //Name
-    miNameField = new MI_TextField(&rm->spr_selectfield, 70, 20, "Name", 500, 120);
+    miNameField = new MI_TextField(&rm->spr_selectfield, 70, 10, "Name", 500, 120);
     miNameField->SetDisallowedChars(",");
 
-    miModeField = new MI_ImageSelectField(&rm->spr_selectfield, &rm->menu_mode_small, 70, 60, "Mode", 500, 120, 16, 16);
+    miModeField = new MI_ImageSelectField(&rm->spr_selectfield, &rm->menu_mode_small, 70, 44, "Mode", 500, 120, 16, 16);
     //miModeField->SetData(game_values.tourstops[0]->iMode, nullptr, nullptr);
     //miModeField->SetKey(0);
     miModeField->setItemChangedCode(MENU_CODE_MODE_CHANGED);
@@ -350,7 +350,7 @@ void inner_main()
     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
         miModeField->add(stagemodes[iGameMode].szName, iGameMode);
 
-        miGoalField[iGameMode] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 100, stagemodes[iGameMode].szGoal, 352, 120);
+        miGoalField[iGameMode] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 78, stagemodes[iGameMode].szGoal, 352, 120);
         miGoalField[iGameMode]->setVisible(iGameMode == 0);
 
         for (short iGameModeOption = 0; iGameModeOption < GAMEMODE_NUM_OPTIONS - 1; iGameModeOption++) {
@@ -368,7 +368,7 @@ void inner_main()
     miModeField->add("Boxes Minigame", 27);
 
     //Create goal field for pipe game
-    miSpecialGoalField[0] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 100, "Points", 352, 120);
+    miSpecialGoalField[0] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 78, "Points", 352, 120);
     miSpecialGoalField[0]->setVisible(false);
 
     for (short iGameModeOption = 0; iGameModeOption < GAMEMODE_NUM_OPTIONS - 1; iGameModeOption++) {
@@ -379,7 +379,7 @@ void inner_main()
     }
 
     //Create goal field for boss game
-    miSpecialGoalField[1] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 100, "Lives", 352, 120);
+    miSpecialGoalField[1] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 78, "Lives", 352, 120);
     miSpecialGoalField[1]->setVisible(false);
 
     for (short iGameLives = 1; iGameLives <= 30; iGameLives++) {
@@ -389,7 +389,7 @@ void inner_main()
     }
 
     //Create goal field for boxes game
-    miSpecialGoalField[2] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 100, "Lives", 352, 120);
+    miSpecialGoalField[2] = new MI_SelectField<short>(&rm->spr_selectfield, 70, 78, "Lives", 352, 120);
     miSpecialGoalField[2]->setVisible(false);
 
     for (short iGameLives = 1; iGameLives <= 30; iGameLives++) {
@@ -399,11 +399,11 @@ void inner_main()
     }
 
     //Mode Settings Button
-    miModeSettingsButton = new MI_Button(&rm->spr_selectfield, 430, 100, "Settings", 140);
+    miModeSettingsButton = new MI_Button(&rm->spr_selectfield, 430, 78, "Settings", 140);
     miModeSettingsButton->SetCode(MENU_CODE_TO_MODE_SETTINGS_MENU);
 
     //Points Field
-    miPointsField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 140, "Points", 245, 120);
+    miPointsField = new MI_SelectField<short>(&rm->spr_selectfield, 70, 112, "Points", 245, 120);
     for (short iPoints = 0; iPoints <= 20; iPoints++) {
         char szPoints[8];
         snprintf(szPoints, sizeof(szPoints), "%d", iPoints);
@@ -411,30 +411,30 @@ void inner_main()
     }
 
     //Final Stage Field
-    miFinalStageField = new MI_SelectField<bool>(&rm->spr_selectfield, 325, 140, "End Stage", 245, 120);
+    miFinalStageField = new MI_SelectField<bool>(&rm->spr_selectfield, 325, 112, "End Stage", 245, 120);
     miFinalStageField->add("No", false);
     miFinalStageField->add("Yes", true);
     miFinalStageField->setAutoAdvance(true);
 
     //Map Select Field
-    miMapField = new MI_MapField(&rm->spr_selectfield, 70, 180, "Map", 500, 120, true);
+    miMapField = new MI_MapField(&rm->spr_selectfield, 70, 146, "Map", 500, 120, true);
 
     //Bonus Item Picker Menu Button
-    miBonusItemsButton= new MI_Button(&rm->spr_selectfield, 430, 220, "Bonuses", 140);
+    miBonusItemsButton= new MI_Button(&rm->spr_selectfield, 430, 186, "Bonuses", 140);
     miBonusItemsButton->SetCode(MENU_CODE_TO_BONUS_PICKER_MENU);
 
     //Bonus Type
-    miBonusType = new MI_SelectField<short>(&rm->spr_selectfield, 70, 100, "Type", 500, 120);
+    miBonusType = new MI_SelectField<short>(&rm->spr_selectfield, 70, 78, "Type", 500, 120);
     miBonusType->add("Fixed", false);
     miBonusType->add("Random", true);
     miBonusType->setAutoAdvance(true);
 
     //Bonus House Text * 5
-    miBonusTextField[0] = new MI_TextField(&rm->spr_selectfield, 70, 140, "Text", 500, 120);
-    miBonusTextField[1] = new MI_TextField(&rm->spr_selectfield, 70, 180, "Text", 500, 120);
-    miBonusTextField[2] = new MI_TextField(&rm->spr_selectfield, 70, 220, "Text", 500, 120);
-    miBonusTextField[3] = new MI_TextField(&rm->spr_selectfield, 70, 260, "Text", 500, 120);
-    miBonusTextField[4] = new MI_TextField(&rm->spr_selectfield, 70, 300, "Text", 500, 120);
+    miBonusTextField[0] = new MI_TextField(&rm->spr_selectfield, 70, 112, "Text", 500, 120);
+    miBonusTextField[1] = new MI_TextField(&rm->spr_selectfield, 70, 146, "Text", 500, 120);
+    miBonusTextField[2] = new MI_TextField(&rm->spr_selectfield, 70, 180, "Text", 500, 120);
+    miBonusTextField[3] = new MI_TextField(&rm->spr_selectfield, 70, 214, "Text", 500, 120);
+    miBonusTextField[4] = new MI_TextField(&rm->spr_selectfield, 70, 248, "Text", 500, 120);
 
     miBonusTextField[0]->SetDisallowedChars(",|");
     miBonusTextField[1]->SetDisallowedChars(",|");
@@ -443,13 +443,20 @@ void inner_main()
     miBonusTextField[4]->SetDisallowedChars(",|");
 
     //Delete Stage Button
-    miDeleteStageButton = new MI_Button(&rm->spr_selectfield, 430, 440, "Delete", 140);
+    miDeleteStageButton = new MI_Button(&rm->spr_selectfield, 430, 226, "Delete", 140);
     miDeleteStageButton->SetCode(MENU_CODE_DELETE_STAGE_BUTTON);
 
     //Are You Sure Dialog for Delete Stage
+#ifdef SMW_EMBEDDED_EDITOR
+    //In the game: its themed dialog, asking the real question
+    miDeleteStageDialogImage = new ::MI_DialogBox();
+    miDeleteStageDialogAreYouText = new MI_HeaderText("Delete this stage?", 320, 190);
+    miDeleteStageDialogSureText = new MI_Text("It can't be undone", 320, 222, 0, false, TextAlign::CENTER);
+#else
     miDeleteStageDialogImage = new MI_Image(&spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);
     miDeleteStageDialogAreYouText = new MI_HeaderText("Are You", 320, 195);
     miDeleteStageDialogSureText = new MI_HeaderText("Sure?", 320, 220);
+#endif
     miDeleteStageDialogYesButton = new MI_Button(&rm->spr_selectfield, 235, 250, "Yes", 80, TextAlign::CENTER);
     miDeleteStageDialogNoButton = new MI_Button(&rm->spr_selectfield, 325, 250, "No", 80, TextAlign::CENTER);
 
@@ -505,6 +512,11 @@ void inner_main()
 
     //Add Delete Stage Button
     mStageSettingsMenu.AddControl(miDeleteStageButton, miBonusItemsButton, miNameField, miMapField, nullptr);
+
+#ifdef SMW_EMBEDDED_EDITOR
+    //One panel behind the fields, so they don't sit on the world map
+    mStageSettingsMenu.AddBackdrop(new ::MI_MenuPanel(56, 2, 528, 452));
+#endif
 
     //Add Are You Sure Dialog
     mStageSettingsMenu.AddNonControl(miDeleteStageDialogImage);

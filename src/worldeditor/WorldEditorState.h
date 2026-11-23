@@ -260,7 +260,7 @@ extern MI_SelectField<short> * miBonusType;
 extern MI_TextField * miBonusTextField[5];
 extern MI_MapField * miMapField;
 extern MI_Button * miDeleteStageButton;
-extern MI_Image * miDeleteStageDialogImage;
+extern UI_Control * miDeleteStageDialogImage;
 extern MI_Text * miDeleteStageDialogAreYouText;
 extern MI_Text * miDeleteStageDialogSureText;
 extern MI_Button * miDeleteStageDialogYesButton;

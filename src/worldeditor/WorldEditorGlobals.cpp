@@ -201,7 +201,7 @@ MI_MapField * miMapField;
 
 MI_Button * miDeleteStageButton;
 
-MI_Image * miDeleteStageDialogImage;
+UI_Control * miDeleteStageDialogImage;
 MI_Text * miDeleteStageDialogAreYouText;
 MI_Text * miDeleteStageDialogSureText;
 MI_Button * miDeleteStageDialogYesButton;

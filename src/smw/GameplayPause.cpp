@@ -21,7 +21,7 @@
 void drawExitPauseDialog()
 {
     if (game_values.flags.pausegame) {
-        rm->spr_dialog.draw(224, 176);
+        menupanel::dialogBox(190, 172, 260, 128);
         rm->menu_font_large.drawCentered(App::screenWidth/2, 194, "Pause");
 
         short iMode = GetModeIconIndexFromMode(game_values.gamemode->gamemode);
@@ -39,21 +39,17 @@ void drawExitPauseDialog()
     }
 
     if (game_values.flags.exitinggame) {
-        rm->spr_dialog.draw(App::screenWidth * 0.35f, App::screenHeight*0.37f);
+        menupanel::dialogBox(170, 172, 300, 128);
         if (rollback::NetGame::instance().inMatch()) {
             //Leaving disconnects us from the others: the match ends for everyone
             const int titleY = static_cast<int>(App::screenHeight*0.46f) - (rm->menu_font_large.getHeight() >> 1);
             rm->menu_font_large.drawCentered(App::screenWidth / 2, titleY - 14, "Leave online");
             rm->menu_font_large.drawCentered(App::screenWidth / 2, titleY + 6, "match?");
         } else {
-            rm->menu_font_large.drawCentered(App::screenWidth * 0.5f, App::screenHeight*0.46f - (rm->menu_font_large.getHeight() >> 1), "Exit Game");
+            rm->menu_font_large.drawCentered(App::screenWidth * 0.5f, App::screenHeight*0.46f - (rm->menu_font_large.getHeight() >> 1), "Quit the match?");
         }
 
-        rm->spr_dialogbutton.draw(App::screenWidth * 0.37f, App::screenHeight*0.52f, {0, (game_values.flags.exityes ? 34 : 0), 80, 34});
-        rm->spr_dialogbutton.draw(App::screenWidth * 0.51f, App::screenHeight*0.52f, {0, (game_values.flags.exityes ? 0 : 34), 80, 34});
-
-        rm->menu_font_large.draw(App::screenWidth * 0.43f - (rm->menu_font_large.getWidth("Yes") >> 1),  App::screenHeight*0.56f - (rm->menu_font_large.getHeight() >> 1), "Yes");
-        rm->menu_font_large.draw(App::screenWidth * 0.57f - (rm->menu_font_large.getWidth("No") >> 1),  App::screenHeight*0.56f - (rm->menu_font_large.getHeight() >> 1), "No");
+        menupanel::dialogChoice(App::screenWidth / 2, 252, "Yes", "No", game_values.flags.exityes);
     }
 }
 

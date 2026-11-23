@@ -694,6 +694,10 @@ int editor_edit()
 
         //Ask if you are sure you want to exit
         if (fExiting) {
+#ifdef SMW_EMBEDDED_EDITOR
+            //(in the game: its dialogs' look)
+            ::leveleditor::shell::drawConfirm("Leave the editor?", "Unsaved changes are lost", fSelectedYes);
+#else
             spr_dialog.draw(224, 176, {0, 0, 192, 128});
             rm->menu_font_large.drawCentered(320, 195, "Exit");
             rm->menu_font_large.drawCentered(320, 220, "Are You Sure?");
@@ -701,6 +705,7 @@ int editor_edit()
             rm->menu_font_large.drawCentered(356, 254, "No");
 
             spr_dialog.draw(fSelectedYes ? 250 : 326, 250, {192, 0, 64, 32});
+#endif
         } else {
             //Draw Paths
             if (edit_mode == 2) {

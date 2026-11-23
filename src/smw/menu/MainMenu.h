@@ -12,6 +12,9 @@ class UI_MainMenu : public UI_Menu {
 public:
     UI_MainMenu();
 
+    /// What the focused button does, for the footer ("Go!" says nothing by itself)
+    const char* focusHint() const;
+
 private:
     MI_Image* miSMWTitle;
     MI_Image* miSMWVersion;

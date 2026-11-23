@@ -8,8 +8,10 @@
 
 #define SMW_EMBEDDED_EDITOR
 #include "CoEdit.h"
+#include "LevelShell.h"    //(the game's dialog look: leveleditor::shell::drawConfirm)
 #include "Version.h"
 #include "WorldShell.h"
+#include "ui/MI_MenuPanel.h"    //(the game's panel and dialog box for the stage menu)
 #include "../../worldeditor/WorldEditorState.h"
 
 namespace worldeditor {

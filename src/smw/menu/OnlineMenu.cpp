@@ -32,8 +32,8 @@ UI_OnlineMenu::UI_OnlineMenu()
     AddNonControl(miTitle);
 
     // Settings: you, and hosting
-    miYouPanel = new MI_MenuPanel(36, 42, 568, 112, "You", "Your nickname and run-ahead");
-    miHostPanel = new MI_MenuPanel(36, 158, 568, 76, "Hosting", "The port friends join on");
+    miYouPanel = new MI_MenuPanel(36, 42, 568, 120, "You", "Your nickname and run-ahead");
+    miHostPanel = new MI_MenuPanel(36, 166, 568, 84, "Hosting", "The port friends join on");
     miHostPanel->SetNoteSource([]() -> std::string {
         const std::string address = rollback::NetGame::lanAddress();
         if (address.empty())
@@ -58,23 +58,23 @@ UI_OnlineMenu::UI_OnlineMenu()
     miRunAheadField->setCurrentValue(game_values.runahead);
     miRunAheadField->setAutoAdvance(true);
 
-    miPortField = new MI_TextField(&rm->spr_selectfield, 64, 194, "Port", 512, 150);
+    miPortField = new MI_TextField(&rm->spr_selectfield, 64, 202, "Port", 512, 150);
     miPortField->SetData(game_values.onlineport, MAX_PORT_CHARS);
     miPortField->SetDisallowedChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ !@#$%^&*()-_=+`~[]{}\\|;:'\",<>./?");
 
     // In the matches (and online replays): the others' connection on their score panels, and the
     // connection's numbers (F3 in a match toggles them too)
-    miMatchPanel = new MI_MenuPanel(36, 238, 568, 112, "In online matches", "What the screen shows");
+    miMatchPanel = new MI_MenuPanel(36, 254, 568, 120, "In online matches", "What the screen shows");
     AddNonControl(miMatchPanel);
 
-    miPingBarsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 274, "Ping Bars", 512, 150);
+    miPingBarsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 290, "Ping Bars", 512, 150);
     miPingBarsField->add("Off", false);
     miPingBarsField->add("On", true);
     miPingBarsField->setOutputPtr(&game_values.showpingbars);
     miPingBarsField->setCurrentValue(game_values.showpingbars ? 1 : 0);
     miPingBarsField->setAutoAdvance(true);
 
-    miNetStatsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 310, "Net Stats", 512, 150);
+    miNetStatsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 326, "Net Stats", 512, 150);
     miNetStatsField->add("Off", false);
     miNetStatsField->add("On", true);
     miNetStatsField->setOutputPtr(&game_values.shownetstats);
@@ -82,19 +82,20 @@ UI_OnlineMenu::UI_OnlineMenu()
     miNetStatsField->setAutoAdvance(true);
 
 
-    // Join by address (from the games list: a game that isn't on this network)
-    miJoinPanel = new MI_MenuPanel(36, 42, 568, 112, "Join a game", "Type in the host's address");
+    // Join by address (from the games list: a game that isn't on this network), in the middle of the
+    // screen: it's all the screen has
+    miJoinPanel = new MI_MenuPanel(36, 150, 568, 120, "Join a game", "Type in the host's address");
     AddNonControl(miJoinPanel);
 
-    miAddressField = new MI_TextField(&rm->spr_selectfield, 64, 78, "Address", 512, 150);
+    miAddressField = new MI_TextField(&rm->spr_selectfield, 64, 186, "Address", 512, 150);
     miAddressField->SetData(game_values.onlineaddress, MAX_ADDRESS_CHARS);
     miAddressField->SetDisallowedChars(" ");
-    miJoinButton = new MI_Button(&rm->spr_selectfield, 170, 114, "Join game", 300, TextAlign::CENTER);
+    miJoinButton = new MI_Button(&rm->spr_selectfield, 170, 222, "Join game", 300, TextAlign::CENTER);
     miJoinButton->SetCode(MENU_CODE_ONLINE_JOIN);
 
 
     //What went wrong (or what's happening), under the panels, in a panel of its own
-    miMessage = new MI_WrappedText(320, 170, 512, 3);
+    miMessage = new MI_WrappedText(320, 382, 512, 3);
     miMessage->SetBoxed(true);
 
     //What the buttons do here (a controller's, or the keys), and back
@@ -133,6 +134,8 @@ void UI_OnlineMenu::ShowMode(Mode mode)
         control->setVisible(!settings);
     setInitialFocus(settings ? static_cast<UI_Control*>(miNameField) : static_cast<UI_Control*>(miAddressField));
     SetCancelCode(settings ? MENU_CODE_BACK_TO_OPTIONS_MENU : MENU_CODE_TO_SYSTEM_LINK_MENU);
+    //(what went wrong: under the panels, the settings' or the join panel)
+    miMessage->SetPosition(320, settings ? 382 : 282);
 }
 
 void UI_OnlineMenu::Open(Mode mode)

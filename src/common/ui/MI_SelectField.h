@@ -106,6 +106,8 @@ public:
         //(the pipe: its sprite has 8 empty pixels at each end)
         return {static_cast<short>(m_pos.x + 8), m_pos.y, static_cast<short>(m_width - 16), 32};
     }
+    //(its arrows along, by as much)
+    void SetPosition(short x, short y) override;
 
 protected:
     gfxSprite* m_spr = nullptr;

@@ -8,7 +8,7 @@ public:
     MI_SliderField(gfxSprite * nspr, gfxSprite * nsprSlider, short x, short y, const char * name, short width, short indent1, short indent2);
     ~MI_SliderField() override;
 
-    void SetPosition(short x, short y);
+    void SetPosition(short x, short y) override;
 
     //Slides the knob toward the value
     void Update() override;

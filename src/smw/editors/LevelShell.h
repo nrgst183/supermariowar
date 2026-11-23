@@ -47,6 +47,9 @@ bool moveReplace();
 void drawHelp();
 bool helpShown();
 
+// A yes/no question in the game's dialog look (the exit question), Yes chosen or No
+void drawConfirm(const char* question, const char* detail, bool yes);
+
 // The no-spawn zone being painted: 0 everyone's, 1-4 a team's
 int zoneTeam();
 

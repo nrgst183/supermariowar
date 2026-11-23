@@ -4,6 +4,7 @@
 
 #include <string>
 
+class MI_DialogBox;
 class MI_Button;
 class MI_Image;
 class MI_LobbyMap;
@@ -64,7 +65,7 @@ private:
     MI_LobbyMap* miMapOverlay = nullptr;
     OnlineView m_onlineView = OnlineView::Off;
 
-    MI_Image* miGameSettingsExitDialogImage = nullptr;
+    MI_DialogBox* miGameSettingsExitDialogImage = nullptr;
     MI_Text* miGameSettingsExitDialogExitText = nullptr;
     MI_Text* miGameSettingsExitDialogTournamentText = nullptr;
     MI_Button* miGameSettingsExitDialogYesButton = nullptr;

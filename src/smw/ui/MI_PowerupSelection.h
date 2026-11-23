@@ -7,6 +7,7 @@
 #include <array>
 #include <memory>
 
+class MI_DialogBox;
 class MI_Button;
 class MI_Image;
 class MI_PowerupSlider;
@@ -49,7 +50,7 @@ private:
     MI_Button* miRestoreDefaultsButton = nullptr;
     MI_Button* miClearButton = nullptr;
 
-    MI_Image* miDialogImage = nullptr;
+    MI_DialogBox* miDialogImage = nullptr;
     MI_Text* miDialogAreYouText = nullptr;
     MI_Text* miDialogSureText = nullptr;
     MI_Button* miDialogYesButton = nullptr;

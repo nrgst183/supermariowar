@@ -103,6 +103,12 @@ void UI_Menu::AddNonControl(UI_Control* control)
         m_title = title;
 }
 
+void UI_Menu::ShiftAll(short dx, short dy)
+{
+    for (const std::unique_ptr<UI_Control>& control : controls)
+        control->SetPosition(static_cast<short>(control->x() + dx), static_cast<short>(control->y() + dy));
+}
+
 void UI_Menu::AddBackdrop(UI_Control* control)
 {
     control->setParent(this);

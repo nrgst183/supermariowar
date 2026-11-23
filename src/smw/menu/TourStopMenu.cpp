@@ -1,6 +1,7 @@
 #include "TourStopMenu.h"
 
 #include "ResourceManager.h"
+#include "ui/MI_MenuPanel.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
 #include "ui/MI_Text.h"
@@ -13,8 +14,8 @@ UI_TourStopMenu::UI_TourStopMenu()
     miTourStop = new MI_TourStop(70, 45, false);
 
     // Exit tour dialog box
-    miTourStopExitDialogImage = new MI_Image(&rm->spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);
-    miTourStopExitDialogExitTourText = new MI_HeaderText("Exit Tour", 320, 205);
+    miTourStopExitDialogImage = new MI_DialogBox();
+    miTourStopExitDialogExitTourText = new MI_HeaderText("Quit the tour?", 320, 205);
 
     miTourStopExitDialogYesButton = new MI_Button(&rm->spr_selectfield, 235, 250, "Yes", 80, TextAlign::CENTER);
     miTourStopExitDialogNoButton = new MI_Button(&rm->spr_selectfield, 325, 250, "No", 80, TextAlign::CENTER);

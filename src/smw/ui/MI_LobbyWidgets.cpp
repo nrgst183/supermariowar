@@ -706,9 +706,11 @@ void MI_WrappedText::Draw()
             widest = std::max(widest, font.getWidth(text));
         const int w = widest + 64;
         const int x = m_pos.x - w / 2;
-        const int h = static_cast<int>(lines.size()) * lineHeight + 8;
-        menupanel::box(x, m_pos.y - 5, w, h);
-        theme::statusIcon(x + 12, m_pos.y - 5 + (h - 16) / 2, static_cast<theme::Status>(m_tone));
+        //(the box's frame is 6 shorter than it, its shadow under it: room enough round the lines, as
+        //much below the last as above the first)
+        const int h = static_cast<int>(lines.size()) * lineHeight + 18;
+        menupanel::box(x, m_pos.y - 7, w, h);
+        theme::statusIcon(x + 12, m_pos.y - 7 + (h - 6 - 16) / 2, static_cast<theme::Status>(m_tone));
         centerX += 12;
     }
     int y = m_pos.y;

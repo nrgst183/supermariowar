@@ -180,6 +180,21 @@ std::vector<prompts::Prompt> standardPrompts(bool change, const char* back)
     return row;
 }
 
+void dialogBox(int x, int y, int w, int h)
+{
+    box(x, y, w, h);
+}
+
+void dialogChoice(int cx, int y, const char* left, const char* right, bool leftChosen)
+{
+    constexpr int W = 84;
+    constexpr int H = 30;
+    theme::block(cx - W - 6, y, W, H, leftChosen ? theme::Tone::Gold : theme::Tone::Gray);
+    theme::block(cx + 6, y, W, H, leftChosen ? theme::Tone::Gray : theme::Tone::Gold);
+    rm->menu_font_large.drawCentered(cx - W / 2 - 6, y + 5, left);
+    rm->menu_font_large.drawCentered(cx + 6 + W / 2, y + 5, right);
+}
+
 void footer(const std::vector<prompts::Prompt>& row, const std::string& label, int icon)
 {
     s_footerDrawn = true;
@@ -279,6 +294,12 @@ void MI_MenuPanel::SetTitle(std::string title, std::string note)
 {
     m_title = std::move(title);
     m_note = std::move(note);
+}
+
+void MI_DialogBox::Draw()
+{
+    if (m_visible)
+        menupanel::dialogBox(m_pos.x, m_pos.y);
 }
 
 void MI_MenuPanel::Draw()

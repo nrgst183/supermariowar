@@ -2,6 +2,7 @@
 
 #include "GameValues.h"
 #include "ResourceManager.h"
+#include "ui/MI_MenuPanel.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
 #include "ui/MI_Text.h"
@@ -19,8 +20,8 @@ UI_WorldMenu::UI_WorldMenu()
     miWorldStop->setVisible(false);
 
     // Exit tour dialog box
-    miWorldExitDialogImage = new MI_Image(&rm->spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);
-    miWorldExitDialogExitTourText = new MI_HeaderText("Exit World", 320, 205);
+    miWorldExitDialogImage = new MI_DialogBox();
+    miWorldExitDialogExitTourText = new MI_HeaderText("Quit the world?", 320, 205);
 
     miWorldExitDialogYesButton = new MI_Button(&rm->spr_selectfield, 235, 250, "Yes", 80, TextAlign::CENTER);
     miWorldExitDialogNoButton = new MI_Button(&rm->spr_selectfield, 325, 250, "No", 80, TextAlign::CENTER);

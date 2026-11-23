@@ -9,6 +9,7 @@
 #include "ui/MI_PowerupSlider.h"
 #include "ui/MI_Text.h"
 
+#include <algorithm>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -39,6 +40,22 @@ void finishModeMenu(UI_Menu& menu, const char* title, std::initializer_list<UI_C
     const size_t n = column.size();
     for (size_t i = 0; i < n; i++)
         menu.AddControl(column[i], column[i == 0 ? n - 1 : i - 1], column[i + 1 == n ? 0 : i + 1], nullptr, nullptr);
+
+    //(the rules in the middle of the screen, between the title bar and the footer: a short page's
+    //aren't left low on it, where the original put them; everything on it moves with them)
+    int top = 480, bottom = 0;
+    for (const UI_Control* field : column) {
+        const UI_Control::Box b = field->FocusBox();
+        if (b.w <= 0)
+            continue;
+        top = std::min<int>(top, b.y);
+        bottom = std::max<int>(bottom, b.y + b.h);
+    }
+    if (bottom > top) {
+        const int dy = (36 + 444) / 2 - (top + bottom) / 2;
+        if (dy < -8 || dy > 8)
+            menu.ShiftAll(0, static_cast<short>(dy));
+    }
     //(the rules on a panel, as the options screens)
     if (UI_ModeOptionsMenu::addPanel)
         UI_ModeOptionsMenu::addPanel(menu, std::vector<const UI_Control*>(column.begin(), column.end()));

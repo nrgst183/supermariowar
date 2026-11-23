@@ -4,6 +4,7 @@
 
 #include <string>
 
+class MI_DialogBox;
 class MI_Button;
 class MI_Image;
 class MI_LobbyButton;
@@ -79,7 +80,7 @@ private:
     MI_LobbyButton* miKickButton = nullptr;
     MI_LockTag* miHostTag[4] {};
 
-    MI_Image* miDialogImage = nullptr;
+    MI_DialogBox* miDialogImage = nullptr;
     MI_Text* miDialogLine1 = nullptr;
     MI_Text* miDialogLine2 = nullptr;
     MI_Button* miDialogYes = nullptr;

@@ -126,8 +126,8 @@ MI_PowerupSelection::MI_PowerupSelection(short x, short y, short width, short nu
     miClearButton = new MI_Button(&rm->spr_selectfield, 330, 404, "Clear", 150, TextAlign::CENTER);
     miClearButton->SetCode(MENU_CODE_CLEAR_POWERUP_WEIGHTS);
 
-    //Are You Sure dialog box
-    miDialogImage = new MI_Image(&rm->spr_dialog, 224, 176, 0, 0, 192, 128, 1, 1, 0);
+    //The yes/no dialog (its question set when it opens)
+    miDialogImage = new MI_DialogBox();
     miDialogAreYouText = new MI_HeaderText("Are You", 320, 195);
     miDialogSureText = new MI_HeaderText("Sure?", 320, 220);
     miDialogYesButton = new MI_Button(&rm->spr_selectfield, 235, 250, "Yes", 80, TextAlign::CENTER);
@@ -262,10 +262,16 @@ MenuCodeEnum MI_PowerupSelection::SendInput(CPlayerInput* playerInput)
         mMenu->SetCancelCode(MENU_CODE_POWERUP_RESET_NO);
         mMenu->ResetMenu();
 
-        if (MENU_CODE_CLEAR_POWERUP_WEIGHTS == ret)
+        //(what it asks: which of the two)
+        if (MENU_CODE_CLEAR_POWERUP_WEIGHTS == ret) {
             miDialogYesButton->SetCode(MENU_CODE_POWERUP_CLEAR_YES);
-        else
+            miDialogAreYouText->SetText("Clear every item?");
+            miDialogSureText->SetText("Their rates go to 0");
+        } else {
             miDialogYesButton->SetCode(MENU_CODE_POWERUP_RESET_YES);
+            miDialogAreYouText->SetText("Back to the defaults?");
+            miDialogSureText->SetText("Every item's rate is reset");
+        }
     } else if (MENU_CODE_POWERUP_RESET_YES == ret || MENU_CODE_POWERUP_RESET_NO == ret || MENU_CODE_POWERUP_CLEAR_YES == ret) {
         miDialogImage->setVisible(false);
         miDialogAreYouText->setVisible(false);

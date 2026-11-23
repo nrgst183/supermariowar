@@ -29,7 +29,23 @@ bool footerDrawn();
 bool footerBackAt(short x, short y);
 /// The usual prompts: up/down chooses, A selects (left/right changes, for settings), B goes back
 std::vector<prompts::Prompt> standardPrompts(bool change, const char* back = "back");
+/// A question's box (every yes/no dialog: the menus', the pause screen's, the editors'): a panel in
+/// the middle of the screen, where the original's dialog was (its lines at y 195 and 220, its
+/// buttons at 250)
+void dialogBox(int x = 150, int y = 172, int w = 340, int h = 128);
+/// For a dialog that draws its own two choices (not buttons): SMB3 blocks side by side around cx, at
+/// y, the chosen one gold
+void dialogChoice(int cx, int y, const char* left, const char* right, bool leftChosen);
 }
+
+/// A yes/no dialog's box (menupanel::dialogBox), as a menu's control: shown and hidden with the dialog
+class MI_DialogBox : public UI_Control {
+public:
+    MI_DialogBox()
+        : UI_Control(150, 172)
+    {}
+    void Draw() override;
+};
 
 /// A panel, with a title at its top left (and a line of small text at its top right)
 class MI_MenuPanel : public UI_Control {

@@ -120,6 +120,21 @@ MenuCodeEnum MI_SelectField<T>::Modify(bool modify)
 
 
 template<typename T>
+void MI_SelectField<T>::SetPosition(short x, short y)
+{
+    const short dx = static_cast<short>(x - m_pos.x);
+    const short dy = static_cast<short>(y - m_pos.y);
+    UI_Control::SetPosition(x, y);
+    for (MI_Image* arrow : {miModifyImageLeft.get(), miModifyImageRight.get()}) {
+        if (!arrow)
+            continue;
+        short ax, ay, aw, ah;
+        arrow->GetPositionAndSize(ax, ay, aw, ah);
+        arrow->SetPosition(static_cast<short>(ax + dx), static_cast<short>(ay + dy));
+    }
+}
+
+template<typename T>
 bool MI_SelectField<T>::CanNudge() const
 {
     //(not the fields that act as buttons: a press does something else, or steps through the values)

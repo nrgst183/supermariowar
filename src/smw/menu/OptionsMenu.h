@@ -2,6 +2,7 @@
 
 #include "uimenu.h"
 
+class MI_DialogBox;
 class MI_Button;
 class MI_Image;
 class MI_Text;
@@ -32,7 +33,7 @@ private:
     MI_Button* miOnlineOptionsMenuButton = nullptr;    // Options > Online (builds with the network, not the Xbox)
 
 
-    MI_Image* miGenerateThumbsDialogImage;
+    MI_DialogBox* miGenerateThumbsDialogImage;
     MI_Text* miGenerateThumbsDialogAreYouText;
     MI_Text* miGenerateThumbsDialogSureText;
     MI_Button* miGenerateThumbsDialogYesButton;

@@ -1873,4 +1873,12 @@ void drawHelp()
     editors::input::detail::drawLevelHelp();
 }
 
+void drawConfirm(const char* question, const char* detail, bool yes)
+{
+    menupanel::dialogBox();
+    rm->menu_font_large.drawCentered(320, 195, question);
+    rm->menu_font_large.drawCentered(320, 220, detail);
+    menupanel::dialogChoice(320, 252, "Yes", "No", yes);
+}
+
 } // namespace leveleditor::shell
