@@ -1,4 +1,5 @@
 #include "EditorInputInternal.h"
+#include "Platform.h"
 
 #include "CoEdit.h"
 #include "LevelShell.h"
@@ -1112,7 +1113,8 @@ void drawGhost(int c0, int r0, int c1, int r1, bool erase)
         return;
     static SDL_Surface* canvas = nullptr;
     if (!canvas) {
-        canvas = SDL_CreateSurface(SCREEN_W, SCREEN_H, SDL_PIXELFORMAT_ARGB8888);
+        //(the screen's format: see-through or not, and its alpha modulation, is all it needs)
+        canvas = SDL_CreateSurface(SCREEN_W, SCREEN_H, platform::screenFormat());
         if (!canvas)
             return;
         SDL_SetSurfaceBlendMode(canvas, SDL_BLENDMODE_BLEND);

@@ -1137,6 +1137,7 @@ void SpotlightManager::release(const void* owner, int ownerId)
 
 void SpotlightManager::DrawSpotlights()
 {
+    rm->ensureSpotlightOverlay();
     // Clear the overlay surface again with black
     SDL_FillSurfaceRect(rm->spr_overlay.getSurface(), nullptr, 0x0);
 

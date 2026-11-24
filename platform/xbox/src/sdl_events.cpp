@@ -685,3 +685,38 @@ Sint16 SDL_GetGamepadAxis(SDL_Gamepad* gamepad, SDL_GamepadAxis axis)
         default: return 0;
     }
 }
+
+
+/* ---- The crash screen's button ------------------------------------------ */
+
+void sdlx_wait_for_button()
+{
+    // Straight from the controllers (the game's events don't run any more); a button held
+    // when it crashed doesn't count: everything released first
+    if (!g_events_ready)
+        sdlx_events_init();
+    bool released = false;
+    for (;;) {
+        pollControllers();
+        bool any = false;
+        for (PortState& state : g_ports) {
+            if (!state.handle)
+                continue;
+            XINPUT_STATE input;
+            if (XInputGetState(state.handle, &input) != ERROR_SUCCESS)
+                continue;
+            const XINPUT_GAMEPAD& pad = input.Gamepad;
+            if (pad.wButtons & (XINPUT_GAMEPAD_START | XINPUT_GAMEPAD_BACK))
+                any = true;
+            for (int b = XINPUT_GAMEPAD_A; b <= XINPUT_GAMEPAD_Y; b++) {
+                if (pad.bAnalogButtons[b] > XINPUT_GAMEPAD_MAX_CROSSTALK)
+                    any = true;
+            }
+        }
+        if (!any)
+            released = true;
+        else if (released)
+            return;
+        Sleep(16);
+    }
+}

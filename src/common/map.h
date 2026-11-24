@@ -371,6 +371,12 @@ class CMap
         bool		nospawn[NUMSPAWNAREATYPES][MAPWIDTH][MAPHEIGHT];
 
         std::vector<AnimatedTile*> animatedtiles;
+    public:
+        bool hasAnimatedTiles() const { return !animatedtiles.empty(); }
+        // How much goes on in the loaded map (moving platforms, hazards, items, animated tiles, tilesets):
+        // the memory test plays the busiest (--at-rank-maps)
+        int busyScore() const;
+    private:
 
                 std::vector<MovingPlatform*> platforms;
         sim::list<MovingPlatform*> tempPlatforms;     // allocated in the simulation arena

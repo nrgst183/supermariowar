@@ -5,6 +5,7 @@
 #include "GameValues.h"
 #include "gfx.h"
 #include "TilesetManager.h"
+#include "Platform.h"
 #include "path.h"
 #include "gfx/Color.h"
 
@@ -110,6 +111,9 @@ void CResourceManager::loadAllSprites() {
     const auto builder = [&graphicspack](std::string_view relpath) {
         return ImageLoader(convertPath(relpath, graphicspack));
     };
+    //(low memory: the matches' sprites and World mode's aren't loaded with the menus': they're loaded
+    //when used, and the game loads the matches' before one starts, gfxSprite::loadGroup)
+    const gfxSprite::LoadingGroup group(SpriteGroup::Game, platform::lowMemory());
 
     std::string shyguyPath = convertPath("gfx/packs/modeskins/shyguy.png", graphicspack);
     if (!FileExists(shyguyPath))
@@ -349,9 +353,17 @@ void CResourceManager::loadMenuGraphics()
     const auto builder = [&graphicspack](std::string_view relpath) {
         return ImageLoader(convertPath(relpath, graphicspack));
     };
+    const gfxSprite::LoadingGroup group(SpriteGroup::Menu);
 
-    menu_shade = builder("gfx/packs/menu/menu_shade.png").withAlpha(App::menuTransparency).withChangingAlpha().withoutColorKey().create();
+    {
+        //(read after loading, its pixels: full color, outside the groups)
+        const gfxSprite::LoadingGroup none(SpriteGroup::None);
+        menu_shade = builder("gfx/packs/menu/menu_shade.png").withAlpha(App::menuTransparency).withChangingAlpha().withoutColorKey().create();
+    }
     menu_shade_black = isAllBlack(menu_shade);
+    //(checked: now compact, as the other images; it's drawn from only)
+    if (SDL_Surface* small = platform::compactSurface(menu_shade.getSurface()))
+        menu_shade = gfxSprite(SdlSurfacePtr(small), std::nullopt);
 
     spr_scoreboard = builder("gfx/packs/menu/scoreboard.png").create();
     menu_slider_bar = builder("gfx/packs/menu/menu_slider_bar.png").create();
@@ -372,10 +384,17 @@ void CResourceManager::loadMenuGraphics()
     spr_tournament_powerup_splash = builder("gfx/packs/menu/tournament_powerup_splash.png").create();
     spr_player_select_background = builder("gfx/packs/menu/player_select_background.png").create();
     spr_player_select_ready = builder("gfx/packs/menu/player_select_ready.png").create();
-    spr_selectfield = builder("gfx/packs/menu/menu_selectfield.png").create();
-    spr_selectfielddisabled = builder("gfx/packs/menu/menu_selectfield_disabled.png").create();
+    {
+        //(edited after loading: insetHighlightedPipes)
+        const gfxSprite::LoadingGroup none(SpriteGroup::None);
+        spr_selectfield = builder("gfx/packs/menu/menu_selectfield.png").create();
+        spr_selectfielddisabled = builder("gfx/packs/menu/menu_selectfield_disabled.png").create();
+    }
     insetHighlightedPipes(spr_selectfield);
     insetHighlightedPipes(spr_selectfielddisabled);
+    //(changed after loading: a load again would lose that)
+    spr_selectfield.keepLoaded();
+    spr_selectfielddisabled.keepLoaded();
     spr_map_filter_icons = builder("gfx/packs/menu/menu_map_flags.png").create();
     spr_tour_markers = builder("gfx/packs/menu/tour_markers.png").create();
     spr_menu_boxed_numbers = builder("gfx/packs/menu/menu_boxed_numbers.png").create();
@@ -386,6 +405,10 @@ void CResourceManager::loadMenuGraphics()
     spr_thumbnail_mapitems[1] = builder("gfx/packs/menu/menu_mapitems_thumbnail.png").create();
 
     spr_announcementicons = builder("gfx/packs/menu/menu_announcement_icons.png").create();
+
+    //(the menus' that the matches draw too: kept loaded in matches)
+    for (gfxSprite* shared : {&menu_shade, &menu_dialog, &menu_mode_large, &spr_dialog, &spr_countdown_numbers, &spr_announcementicons})
+        shared->setGroup(SpriteGroup::Shared);
 
     spr_platformstarttile = builder("gfx/leveleditor/leveleditor_platformstarttile.png").withAlpha(64).withWrapping().create();
     spr_platformendtile = builder("gfx/leveleditor/leveleditor_selectedtile.png").withAlpha(64).withWrapping().create();
@@ -398,18 +421,15 @@ void CResourceManager::loadWorldGraphics()
     const auto builder = [&graphicspack](std::string_view relpath) {
         return ImageLoader(convertPath(relpath, graphicspack));
     };
+    const gfxSprite::LoadingGroup group(SpriteGroup::World, platform::lowMemory());
 
-    spr_worldbackground[0] = builder("gfx/packs/world/world_background.png").create();
     spr_worldbackground[1] = builder("gfx/packs/world/preview/world_background.png").create();
-
-    spr_worldforeground[0] = builder("gfx/packs/world/world_foreground.png").create();
     spr_worldforeground[1] = builder("gfx/packs/world/preview/world_foreground.png").create();
-
-    spr_worldforegroundspecial[0] = builder("gfx/packs/world/world_foreground_special.png").create();
     spr_worldforegroundspecial[1] = builder("gfx/packs/world/preview/world_foreground_special.png").create();
-
-    spr_worldpaths[0] = builder("gfx/packs/world/world_paths.png").create();
     spr_worldpaths[1] = builder("gfx/packs/world/preview/world_paths.png").create();
+    freeFullWorldGraphics();    //(the pack's, if it changed)
+    if (!platform::lowMemory())
+        ensureFullWorldGraphics();
 
     spr_worldvehicle[0] = builder("gfx/packs/world/world_vehicles.png").create();
     spr_worldvehicle[1] = builder("gfx/packs/world/preview/world_vehicles.png").create();
@@ -419,6 +439,29 @@ void CResourceManager::loadWorldGraphics()
     spr_worlditemssmall = builder("gfx/packs/world/world_powerupssmall.png").create();
     spr_worlditemsplace = builder("gfx/packs/world/world_bonusplace.png").create();
     spr_worldbonushouse = builder("gfx/packs/world/world_bonushouse.png").create();
+}
+
+void CResourceManager::ensureFullWorldGraphics()
+{
+    if (spr_worldbackground[0])
+        return;
+    const fs::path graphicspack = worldgraphicspacklist->currentPath();
+    const auto builder = [&graphicspack](std::string_view relpath) {
+        return ImageLoader(convertPath(relpath, graphicspack));
+    };
+    const gfxSprite::LoadingGroup group(SpriteGroup::World);
+    spr_worldbackground[0] = builder("gfx/packs/world/world_background.png").create();
+    spr_worldforeground[0] = builder("gfx/packs/world/world_foreground.png").create();
+    spr_worldforegroundspecial[0] = builder("gfx/packs/world/world_foreground_special.png").create();
+    spr_worldpaths[0] = builder("gfx/packs/world/world_paths.png").create();
+}
+
+void CResourceManager::freeFullWorldGraphics()
+{
+    spr_worldbackground[0] = gfxSprite();
+    spr_worldforeground[0] = gfxSprite();
+    spr_worldforegroundspecial[0] = gfxSprite();
+    spr_worldpaths[0] = gfxSprite();
 }
 
 void CResourceManager::loadGameGraphics()
@@ -445,9 +488,20 @@ void CResourceManager::loadStartGraphics()
 
     //load basic stuff
     menu_backdrop = builder("gfx/packs/menu/menu_background.png").withoutColorKey().create();
+    //(compact, as the screen: drawn on and copied to it)
+    if (SDL_Surface* small = platform::compactSurface(menu_backdrop.getSurface()))
+        menu_backdrop = gfxSprite(SdlSurfacePtr(small), std::nullopt);
     menu_smw = builder("gfx/packs/menu/menu_smw.png").create();
     menu_version = builder("gfx/packs/menu/menu_version.png").create();
 }
+
+namespace {
+// A map layer: the screen's format (16 bits on the Xbox; the front one's see-through parts its alpha)
+gfxSprite mapLayer()
+{
+    return gfxSprite::blankScreenFormat(App::screenWidth, App::screenHeight, std::nullopt);
+}
+} // namespace
 
 void CResourceManager::loadAllGraphics()
 {
@@ -462,12 +516,50 @@ void CResourceManager::loadAllGraphics()
 
     //The map's layers, drawn over in full before they're shown (predrawbackground, predrawforeground):
     //blank screens, not an image read (and decoded) four times
-    for (int k = 0; k < 2; k++) {
-        spr_backmap[k] = gfxSprite::blank(App::screenWidth, App::screenHeight, std::nullopt);
-        spr_frontmap[k] = gfxSprite::blank(App::screenWidth, App::screenHeight, std::nullopt);
+    //(the screen's format, copied to it as they are. Low memory: the second pair made for a match
+    //with animated tiles, useSecondMapLayers)
+    for (int k = 0; k < (platform::lowMemory() ? 1 : 2); k++) {
+        spr_backmap[k] = mapLayer();
+        spr_frontmap[k] = mapLayer();
     }
 
-    spr_overlay = builder("gfx/packs/menu/menu_shade.png").create();
+    //(low memory: loaded for a map with spotlights)
+    if (!platform::lowMemory())
+        ensureSpotlightOverlay();
+}
+
+void CResourceManager::freeMenuGraphicsForMatch(bool worldMatch)
+{
+    if (!platform::lowMemory())
+        return;
+    mapPreviewWaitForLoads();
+    gfxSprite::unloadGroup(SpriteGroup::Menu);
+    g_tilesetmanager->unloadImages();
+    if (!worldMatch) {
+        gfxSprite::unloadGroup(SpriteGroup::World);
+        freeFullWorldGraphics();
+    }
+}
+
+bool CResourceManager::useSecondMapLayers(bool animated)
+{
+    if (platform::lowMemory() && !animated) {
+        spr_backmap[1] = gfxSprite();
+        spr_frontmap[1] = gfxSprite();
+        return false;
+    }
+    if (!spr_backmap[1])
+        spr_backmap[1] = mapLayer();
+    if (!spr_frontmap[1])
+        spr_frontmap[1] = mapLayer();
+    return true;
+}
+
+void CResourceManager::ensureSpotlightOverlay()
+{
+    //(on the Xbox, loaded only once a map with spotlights is played: 1.2 MB)
+    if (!spr_overlay)
+        spr_overlay = ImageLoader(convertPath("gfx/packs/menu/menu_shade.png", gamegraphicspacklist->currentPath())).create();
 }
 
 bool CResourceManager::LoadGameSounds()

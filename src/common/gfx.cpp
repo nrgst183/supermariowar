@@ -228,6 +228,14 @@ void gfx_settitle(const char* title) {
 
 void gfx_show_catched_error(const std::string& error)
 {
+#ifdef SMW_XBOX
+    //(the crash screen: the error, the memory and what led to it; there's no room for the rest)
+    if (error.find("bad_alloc") != std::string::npos)
+        gfx.showErrorBox(("Out of memory (" + error + ")").c_str());
+    else
+        gfx.showErrorBox(error.empty() ? "An unknown error (an exception that isn't a std::exception)" : error.c_str());
+    return;
+#endif
     std::string message = ""
         "It seems the game has unexpectedly crashed. If you could tell us\n"
         "what happened exactly, we might be able to fix this bug. Consider\n"
@@ -302,10 +310,32 @@ SpriteStrip gfx_loadfullskin(const fs::path& path, short colorScheme)
 
 bool gfx_darken(SDL_Surface* surface, Uint8 alpha)
 {
-    if (!surface || SDL_BYTESPERPIXEL(surface->format) != 4)
+    if (!surface)
         return false;
     if (alpha == 0)
         return true;
+    //(a 16-bit screen, the Xbox's, ARGB1555: each 5-bit channel scaled)
+    if (surface->format == SDL_PIXELFORMAT_ARGB1555) {
+        if (!SDL_LockSurface(surface))
+            return false;
+        const Uint32 keep = 255u - alpha;
+        Uint16 scale[32];
+        for (Uint32 v = 0; v < 32; v++)
+            scale[v] = static_cast<Uint16>((v * keep + 127) / 255);
+        const int w = surface->w, h = surface->h, pitch = surface->pitch;
+        Uint8* const pixels = static_cast<Uint8*>(surface->pixels);
+        for (int y = 0; y < h; y++) {
+            Uint16* const row = reinterpret_cast<Uint16*>(pixels + static_cast<ptrdiff_t>(y) * pitch);
+            for (int x = 0; x < w; x++) {
+                const Uint32 p = row[x];
+                row[x] = static_cast<Uint16>((p & 0x8000u) | (scale[(p >> 10) & 31] << 10) | (scale[(p >> 5) & 31] << 5) | scale[p & 31]);
+            }
+        }
+        SDL_UnlockSurface(surface);
+        return true;
+    }
+    if (SDL_BYTESPERPIXEL(surface->format) != 4)
+        return false;
     if (!SDL_LockSurface(surface))
         return false;
     //Each color channel times (255 - alpha) / 255; the alpha channel is kept

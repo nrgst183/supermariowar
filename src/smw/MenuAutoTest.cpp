@@ -3,6 +3,7 @@
 #include "rollback/NetGame.h"
 
 #include "CmdArgs.h"
+#include "Determinism.h"
 #include "FileList.h"
 #include "GameValues.h"
 #include "GSGameplay.h"
@@ -12,6 +13,7 @@
 #endif
 #ifdef SMW_HAS_EDITORS
 #include "editors/EditorInput.h"
+#include "editors/EditorLauncher.h"
 #endif
 #include "MapList.h"
 #include "SimulationState.h"
@@ -27,9 +29,15 @@
 #include "menu/MatchSelectionMenu.h"
 #include "menu/ModeOptionsMenu.h"
 #include "menu/TeamSelectMenu.h"
+#include "menu/PlayerControlsMenu.h"
+#include "menu/PlayerControlsSelectMenu.h"
 
 #include "menu/OnlineLobbyMenu.h"
 #include "menu/OnlineMenu.h"
+
+#include "LoadLog.h"
+#include "Platform.h"
+#include "map.h"
 
 #include <SDL3_image/SDL_image.h>
 
@@ -39,6 +47,7 @@
 #include <random>
 #include <cassert>
 #include <sstream>
+#include <ctime>
 #include <deque>
 #include <set>
 
@@ -47,6 +56,36 @@ namespace perfstats {
 void reset();
 void report(const std::string& map, int mode);
 }
+
+namespace {
+// --at-maps: a map at random from the list (the busiest), seeded by the time: each run differs
+void pickListedMap(const std::string& mapsFile)
+{
+    static std::vector<std::string> names;
+    static std::mt19937 pick(static_cast<uint32_t>(std::time(nullptr)) ^ static_cast<uint32_t>(SDL_GetTicksNS()));
+    if (names.empty()) {
+        if (FILE* file = fopen(mapsFile.c_str(), "rb")) {
+            std::string text;
+            char buf[512];
+            size_t n = 0;
+            while ((n = fread(buf, 1, sizeof(buf), file)) > 0)
+                text.append(buf, n);
+            fclose(file);
+            std::istringstream lines(text);
+            std::string line;
+            while (std::getline(lines, line)) {
+                while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
+                    line.pop_back();
+                if (!line.empty())
+                    names.push_back(line);
+            }
+        }
+        printf("autotest: %d maps from %s\n", static_cast<int>(names.size()), mapsFile.c_str());
+    }
+    if (!names.empty())
+        maplist->findexact(names[pick() % names.size()].c_str(), false);
+}
+} // namespace
 
 // Opt-in --autotest harness (see cmd::AutoTestArgs): drives the menus without human input.
 // Returns a menu code to use instead of the current menu's own input, or MENU_CODE_NONE.
@@ -61,6 +100,7 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
     static int timer = 0;
     static int scenario = 0;
     static int lastMatchesDone = 0;
+    static int startedWith = -1;    // the matches done when this one was started (it's done when that grows)
 
     if (game_values.appstate != AppState::Menu)
         return MENU_CODE_NONE;
@@ -69,6 +109,102 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
 
     if (at.kind == Kind::Shots)
         return ShotsMenuUpdate();
+
+    //--at-rank-maps: the busiest maps (the memory test's list), then quit (here: everything is loaded)
+    if (!at.rankMapsFile.empty()) {
+        std::vector<std::pair<int, std::string>> ranked;
+        for (size_t k = 0; k < maplist->count(); k++) {
+            maplist->next(false);
+            try {
+                g_map->loadMap(maplist->currentFilename(), read_type_full);
+            } catch (...) {
+                continue;
+            }
+            ranked.emplace_back(g_map->busyScore(), maplist->currentShortmapname());
+        }
+        std::sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+        if (FILE* out = fopen(at.rankMapsFile.c_str(), "wb")) {
+            for (size_t k = 0; k < ranked.size() && k < 80; k++)
+                fprintf(out, "%s\n", ranked[k].second.c_str());
+            fclose(out);
+        }
+        for (size_t k = 0; k < ranked.size() && k < 15; k++)
+            printf("rank-maps: %4d %s\n", ranked[k].first, ranked[k].second.c_str());
+        return MENU_CODE_EXIT_APPLICATION;
+    }
+
+
+    //--at-match everything: one kind after another, each until it's done (the memory test)
+    if (at.everything) {
+        struct Stage {
+            Kind kind;
+            int matches;
+            int frames;
+            const char* name;
+            int speed = 10;    // ticks per drawn frame, the menus' and the matches' (1: normal speed, as played)
+        };
+        static const Stage stages[] = {
+            {Kind::History, 4, 900, "the history and the theater"},
+            {Kind::Editors, 4, 900, "the editors"},
+            {Kind::Single, 4, 1800, "matches at normal speed (the frame rate as played)", 1},
+            {Kind::Single, GAMEMODE_LAST, 700, "every mode, the busiest maps"},
+            {Kind::Screens, 22, 0, "every screen"},
+            {Kind::Minigame, 5, 900, "minigames"},
+            {Kind::Tournament, 2, 700, "a tournament"},
+            {Kind::Tour, 4, 900, "a tour"},
+            {Kind::World, 4, 900, "a world"},
+            {Kind::Single, 6, 700, "more matches, the busiest maps"},
+            {Kind::Menus, 0, 2400, "the menus"},
+        };
+        constexpr int STAGES = static_cast<int>(sizeof(stages) / sizeof(stages[0]));
+        static int stage = -1;
+        static int stageStart = 0;
+        //(a stage's matches done: its end, wherever the menus are: a tournament, a tour or a world
+        //goes on to its next game by itself, and never back to the main menu)
+        const bool stageDone = stage < 0 ||
+            (at.kind == Kind::Menus ? menuFrames - stageStart >= at.frames : g_autoTestMatchesDone >= at.matches);
+        if (stageDone) {
+            if (stage >= 0) {
+                const platform::StageStats st = platform::takeStageStats();
+                g_autoTestStageReport += std::format("{}. {}: {} done", stage + 1, stages[stage].name,
+                    stages[stage].kind == Kind::Menus ? at.frames : g_autoTestMatchesDone);
+                if (st.known) {
+                    g_autoTestStageReport += std::format(", lowest {:.1f} MB free, {:.0f} fps (worst {:.0f} ms, {} of {} frames slow)",
+                        st.lowestFreeMb, st.averageMs > 0 ? 1000.0 / st.averageMs : 0.0, st.worstMs, st.slowFrames, st.frames);
+                }
+                g_autoTestStageReport += "\n";
+                if (g_autoTestSlowestLoadMs > 0) {
+                    g_autoTestStageReport += std::format("   slowest load {:.1f} s ({})", g_autoTestSlowestLoadMs / 1000.0, g_autoTestSlowestLoadMap);
+                    if (st.known)
+                        g_autoTestStageReport += std::format("; images: {} decoded, {} from the cache", st.decoded, st.cached);
+                    g_autoTestStageReport += "\n";
+                }
+                g_autoTestSlowestLoadMs = 0;
+            }
+            else {
+                platform::takeStageStats();    //(the stages' count from the first)
+            }
+            if (++stage >= STAGES)
+                return MENU_CODE_EXIT_APPLICATION;
+            const Stage& next = stages[stage];
+            cmd::g_autotest.kind = next.kind;
+            cmd::g_autotest.matches = next.matches;
+            cmd::g_autotest.frames = next.frames;
+            cmd::g_autotest.speed = next.speed;
+            g_autoTestMatchesDone = 0;
+            phase = 0;
+            timer = 0;
+            stageStart = menuFrames;
+            if (!at.mapsFile.empty())
+                pickListedMap(at.mapsFile);
+            mCurrentMenu = mMainMenu.get();
+            mCurrentMenu->ResetMenu();
+            const std::string label = std::format("Memory test {}/{}: {}", stage + 1, STAGES, next.name);
+            printf("autotest: %s\n", label.c_str());
+            loadlog::mark(label.c_str());
+            platform::setMemoryHud(true, label);
+        }
+    }
 
     auto pressRandomKey = [&](bool allowCancel) {
         COutputControl& keys = game_values.playerInput.outputControls[0];
@@ -83,9 +219,120 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
         }
     };
 
+    //The everything test's own stages: every screen, the history and theater, the editors
+    if (at.kind == Kind::Screens) {
+        static const MenuCodeEnum screens[] = {
+            MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU, MENU_CODE_TO_TEAM_OPTIONS_MENU,
+            MENU_CODE_TO_POWERUP_SELECTION_MENU, MENU_CODE_TO_POWERUP_SETTINGS_MENU, MENU_CODE_TO_PROJECTILES_OPTIONS_MENU,
+            MENU_CODE_TO_PROJECTILES_LIMITS_MENU, MENU_CODE_TO_GRAPHICS_OPTIONS_MENU, MENU_CODE_TO_EYECANDY_OPTIONS_MENU,
+            MENU_CODE_TO_SOUND_OPTIONS_MENU, MENU_CODE_TO_ONLINE_OPTIONS_MENU, MENU_CODE_TO_SCREEN_SETTINGS,
+            MENU_CODE_TO_GAME_SETUP_MENU, MENU_CODE_TO_TEAM_SELECT_MENU, MENU_CODE_TO_MODE_SETTINGS_MENU,
+            MENU_CODE_TO_MAP_FILTERS, MENU_CODE_TO_MAP_BROWSER_THUMBNAILS, MENU_CODE_TO_MATCH_SELECTION_MENU,
+            MENU_CODE_TO_ONLINE_MENU, MENU_CODE_TO_SYSTEM_LINK_MENU, MENU_CODE_TO_HISTORY_MENU, MENU_CODE_TO_EDITORS_MENU,
+        };
+        constexpr int SCREENS = static_cast<int>(sizeof(screens) / sizeof(screens[0]));
+        static int frames = 0;
+        ++frames;
+        if (frames == 1) {
+            printf("autotest: screen %d\n", g_autoTestMatchesDone);
+            return screens[g_autoTestMatchesDone % SCREENS];
+        }
+        //(moved around in: up and down, not into anything)
+        if (frames < 70 && frames % 9 == 0) {
+            COutputControl& keys = game_values.playerInput.outputControls[0];
+            (rng() % 2 ? keys.menu_down : keys.menu_up).fPressed = true;
+        }
+        if (frames >= 80) {
+            frames = 0;
+            ++g_autoTestMatchesDone;
+            mCurrentMenu = mMainMenu.get();
+            mCurrentMenu->ResetMenu();
+        }
+        return MENU_CODE_NONE;
+    }
+    if (at.kind == Kind::History) {
+        //(the theater counts a replay done when it leaves it; one that won't play counts too)
+        static int frames = 0;
+        static int asked = -1;
+        if (asked >= 0 && asked == g_autoTestMatchesDone && game_values.appstate == AppState::Menu && frames > 40) {
+            ++g_autoTestMatchesDone;
+            printf("autotest: a replay didn't play\n");
+        }
+        if (asked >= 0 && asked != g_autoTestMatchesDone) {
+            asked = -1;
+            frames = 0;
+        }
+        ++frames;
+        if (frames == 1)
+            return MENU_CODE_TO_HISTORY_MENU;
+        if (frames < 40 && frames % 6 == 0 && rng() % 2)
+            game_values.playerInput.outputControls[0].menu_down.fPressed = true;
+        if (frames == 40) {
+            asked = g_autoTestMatchesDone;
+            return MENU_CODE_HISTORY_PLAY_REPLAY;
+        }
+        return MENU_CODE_NONE;
+    }
+#ifdef SMW_HAS_EDITORS
+    if (at.kind == Kind::Editors) {
+        //An editor session of random editing (its test driver), closed after the stage's frames; the
+        //editor runs in the call that opens it, so the frame after is its end
+        static bool driverSet = false;
+        if (!driverSet) {
+            driverSet = true;
+            editors::input::setTestDriver([](editors::Editor, int frame, int pointer) {
+                editors::input::TestInput t;
+                static std::mt19937 keys(4242);
+                if (pointer > 0)
+                    return t;
+                if (frame > cmd::g_autotest.frames) {
+                    editors::requestClose();
+                    return t;
+                }
+                if (frame % 3 != 0)
+                    return t;
+                switch (keys() % 14) {
+                    case 0: t.a = true; break;
+                    case 1: t.x = true; break;
+                    case 2: t.y = true; break;
+                    case 3: t.lb = true; break;
+                    case 4: t.rb = true; break;
+                    case 5: t.up = true; break;
+                    case 6: t.down = true; break;
+                    case 7: t.left = true; break;
+                    case 8: t.right = true; break;
+                    case 9: t.lt = true; break;
+                    case 10: t.rt = true; break;
+                    default:
+                        t.lx = static_cast<float>(static_cast<int>(keys() % 201) - 100) / 100.0f;
+                        t.ly = static_cast<float>(static_cast<int>(keys() % 201) - 100) / 100.0f;
+                        break;
+                }
+                return t;
+            }, "", 1);
+        }
+        static int frames = 0;
+        ++frames;
+        if (frames == 1)
+            return g_autoTestMatchesDone % 2 ? MENU_CODE_RUN_WORLD_EDITOR : MENU_CODE_RUN_LEVEL_EDITOR;
+        frames = 0;
+        ++g_autoTestMatchesDone;
+        mCurrentMenu = mMainMenu.get();
+        mCurrentMenu->ResetMenu();
+        return MENU_CODE_NONE;
+    }
+#endif
+
     if (at.kind == Kind::Menus) {
-        if (menuFrames >= at.frames)
+        if (!at.everything && menuFrames >= at.frames)
             return MENU_CODE_EXIT_APPLICATION;
+
+        //(not the controls' screens: a binding waits for a real button, and the run with it)
+        if (mCurrentMenu == mPlayerControlsMenu.get() || mCurrentMenu == mPlayerControlsSelectMenu.get()) {
+            mCurrentMenu = mMainMenu.get();
+            mCurrentMenu->ResetMenu();
+            return MENU_CODE_NONE;
+        }
 
         if (rng() % 3 == 0)
             pressRandomKey(mCurrentMenu != mMainMenu.get());
@@ -124,8 +371,16 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
             return MENU_CODE_NONE;
     }
 
-    if (g_autoTestMatchesDone >= at.matches)
+    if (g_autoTestMatchesDone >= at.matches && !at.everything) {
+        //The determinism test: its result; the Xbox shows it until a button is pressed (no console)
+        if (determinism::active()) {
+            determinism::finish();
+#ifdef SMW_XBOX
+            return MENU_CODE_NONE;
+#endif
+        }
         return MENU_CODE_EXIT_APPLICATION;
+    }
 
     if (lastMatchesDone != g_autoTestMatchesDone) {
         lastMatchesDone = g_autoTestMatchesDone;
@@ -196,13 +451,15 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
             SetControllingTeamForSettingsMenu(game_values.tournamentcontrolteam, false);
 
             phase = at.kind == Kind::Single ? 1 : 2;
+            startedWith = g_autoTestMatchesDone;
             return MENU_CODE_TO_GAME_SETUP_MENU;
         }
 
         case 1: {
             //Single game: pick mode, goal and map in the game settings menu, then start
             const int idx = at.start + scenario - 1;
-            const short mode = static_cast<short>((at.mode >= 0 ? at.mode : idx) % GAMEMODE_LAST);
+            const bool suite = determinism::active();
+            const short mode = static_cast<short>((suite ? determinism::modeOf(idx) : at.mode >= 0 ? at.mode : idx) % GAMEMODE_LAST);
 
             mGameSettingsMenu->GameModeChanged(mode);
             game_values.gamemode = gamemodes[mGameSettingsMenu->GetCurrentGameModeID()];
@@ -214,7 +471,11 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
             mGameSettingsMenu->miGoalField[mode]->setCurrentValue(game_values.gamemode->goal);
 
             //Select the requested map, or advance the map list to cycle through all maps
-            if (!at.map.empty()) {
+            if (suite) {
+                maplist->findexact(determinism::mapOf(idx).c_str(), false);
+            } else if (!at.mapsFile.empty()) {
+                pickListedMap(at.mapsFile);
+            } else if (!at.map.empty()) {
                 maplist->findexact(at.map.c_str(), false);
             } else {
                 for (int k = 0; k < 5; k++)
@@ -224,15 +485,21 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
 
             printf("autotest: match %d, mode %d, map %s, %d players\n", scenario, mode, maplist->currentShortmapname().c_str(), g_sim.score_cnt);
             perfstats::reset();
+            if (suite)
+                determinism::matchStarting(idx);
 
             phase = 2;
             timer = 0;
+            startedWith = g_autoTestMatchesDone;
             return MENU_CODE_START_GAME;
         }
 
         default: {
             if (oneShot) {
-                //Back in the menu after the match
+                //Back in the menu after the match (not before it: the fade into it is still the
+                //menus', and with --at-speed it takes many of their ticks)
+                if (g_autoTestMatchesDone == startedWith && ++timer < 6000)
+                    return MENU_CODE_NONE;
                 phase = 0;
                 timer = 0;
                 return MENU_CODE_NONE;

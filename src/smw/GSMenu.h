@@ -111,6 +111,7 @@ class MenuState : public GameState
         bool RunEditor(editors::Editor editor);
 #endif
         void Exit();
+        void DrawDeterminismReport();
         bool PollMenuEvents();
         // The mouse in the menus (UI_Menu::Pointer...): what it did since the last frame, done to the
         // current menu with the frame's input

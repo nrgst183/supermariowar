@@ -1,0 +1,3 @@
+--autotest
+--at-match menus
+--at-frames 4000

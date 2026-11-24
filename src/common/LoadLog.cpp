@@ -1,6 +1,7 @@
 #include "LoadLog.h"
 
 #include "path.h"
+#include "Platform.h"
 
 #include <SDL3/SDL.h>
 
@@ -104,7 +105,16 @@ void mark(const char* what)
         g_started = true;
         g_first = g_last = now;
     }
-    write(std::string(what) + "  " + ms(now - g_last) + "  (at " + ms(now - g_first) + ")");
+    std::string line = std::string(what) + "  " + ms(now - g_last) + "  (at " + ms(now - g_first) + ")";
+    //(the memory where it's known: the Xbox's, each phase in its log too)
+    if (const uint64_t free = platform::freeMemory()) {
+        char memory[48];
+        snprintf(memory, sizeof(memory), "  %.1f MB free, img %.1f", static_cast<double>(free) / (1024.0 * 1024.0),
+                 static_cast<double>(platform::imageBytes()) / (1024.0 * 1024.0));
+        line += memory;
+        platform::log("[load] " + line);
+    }
+    write(line);
     writeCounters();
     g_last = now;
 }

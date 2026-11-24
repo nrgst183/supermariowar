@@ -116,6 +116,20 @@ int main(int argc, char *argv[])
 }
 #endif
 
+// The session's own graphics freed (the Xbox, at a session's end: the game needs the memory; every
+// session loads them again). (worldeditor:: in the game: EmbeddedWorldEditor.cpp)
+void releaseSessionGraphics()
+{
+    sMapSurface = gfxSprite();
+    sMapThumbnail = gfxSprite();
+    for (gfxSprite& warp : spr_warps)
+        warp = gfxSprite();
+    spr_path = gfxSprite();
+    spr_dialog = gfxSprite();
+    menu_shade = gfxSprite();
+    spr_largedialog = gfxSprite();
+}
+
 void inner_main()
 {
     printf("-------------------------------------------------------------------------------\n");
@@ -289,7 +303,7 @@ void inner_main()
     rm->loadMenuGraphics();
     }    //(graphicsLoaded)
 
-    sMapSurface = gfxSprite::blank(768, 608);
+    sMapSurface = gfxSprite::blankScreenFormat(768, 608);    //(16 bits on the Xbox)
 
     worldlist->find(findstring);
     game_values.worldindex = worldlist->currentIndex();

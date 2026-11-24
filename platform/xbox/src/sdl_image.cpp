@@ -61,7 +61,9 @@ struct CacheHeader {
     Uint32 opaque;
 };
 
-std::atomic<Sint64> s_cacheUsed {-1};    // (bytes in the cache folder: counted at the first write)
+std::atomic<Sint64> s_cacheUsed {-1};
+std::atomic<int> s_testDecoded {0};    // (SDL_XboxTakeImageCounts)
+std::atomic<int> s_testCached {0};    // (bytes in the cache folder: counted at the first write)
 
 bool fromDisc(const char* file)
 {
@@ -162,6 +164,116 @@ bool saveCached(const char* file, long sourceSize, SDL_Surface* surface, bool op
 } // namespace
 
 
+namespace {
+// ---- Compact images (SDL_XboxCompactSurface's), kept on the cache drive as they are
+constexpr Uint32 COMPACT_MAGIC = 0x43574D53;    // "SMWC"
+constexpr Uint32 COMPACT_VERSION = 1;
+
+struct CompactHeader {
+    Uint32 magic;
+    Uint32 version;
+    Uint32 sourceSize;
+    Sint32 w;
+    Sint32 h;
+    Uint32 format;
+    Uint32 blend;
+    Uint32 alphaMod;
+};
+
+std::string compactFile(const char* key)
+{
+    std::string name = cacheFile(key);
+    name.replace(name.size() - 4, 4, ".c16");
+    return name;
+}
+
+long sourceSizeOf(const char* file)
+{
+    if (!fromDisc(file))
+        return fileSize(file);
+    const long size = SDL_XboxDiscFileSize(file);
+    return size > 0 ? size : fileSize(file);
+}
+} // namespace
+
+SDL_Surface* SDL_XboxLoadCompactImage(const char* file, const char* key)
+{
+    if (!file || !key)
+        return nullptr;
+    const long sourceSize = sourceSizeOf(file);
+    if (sourceSize <= 0)
+        return nullptr;
+    void* in = sdlx_open(compactFile(key).c_str(), false);
+    if (!in)
+        return nullptr;
+    CompactHeader header {};
+    SDL_Surface* surface = nullptr;
+    if (sdlx_read(in, &header, sizeof(header)) && header.magic == COMPACT_MAGIC && header.version == COMPACT_VERSION &&
+        header.sourceSize == static_cast<Uint32>(sourceSize) && header.w > 0 && header.h > 0 && header.w <= 8192 &&
+        header.h <= 8192 && header.format == SDL_PIXELFORMAT_ARGB1555) {
+        surface = SDL_CreateSurface(header.w, header.h, SDL_PIXELFORMAT_ARGB1555);
+        if (surface) {
+            const size_t row = static_cast<size_t>(header.w) * 2;
+            bool ok = true;
+            if (static_cast<size_t>(surface->pitch) == row) {
+                ok = sdlx_read(in, surface->pixels, row * header.h);
+            } else {
+                for (int y = 0; ok && y < header.h; y++)
+                    ok = sdlx_read(in, static_cast<Uint8*>(surface->pixels) + static_cast<size_t>(y) * surface->pitch, row);
+            }
+            if (!ok) {
+                SDL_DestroySurface(surface);
+                surface = nullptr;
+            } else {
+                surface->blend_mode = static_cast<SDL_BlendMode>(header.blend);
+                surface->alpha_mod = static_cast<Uint8>(header.alphaMod);
+                sdlx_surface_name(surface, file);
+                s_testCached++;
+            }
+        }
+    }
+    sdlx_close(in);
+    return surface;
+}
+
+void SDL_XboxSaveCompactImage(const char* file, const char* key, SDL_Surface* surface)
+{
+    if (!file || !key || !surface || surface->format != SDL_PIXELFORMAT_ARGB1555)
+        return;
+    const long sourceSize = sourceSizeOf(file);
+    if (sourceSize <= 0)
+        return;
+    const size_t row = static_cast<size_t>(surface->w) * 2;
+    const Uint64 bytes = sizeof(CompactHeader) + row * surface->h;
+    if (s_cacheUsed < 0)
+        s_cacheUsed = static_cast<Sint64>(sdlx_dir_bytes(cacheDir().c_str()));
+    if (static_cast<Uint64>(s_cacheUsed) + bytes > CACHE_BUDGET || !sdlx_make_dir(cacheDir().c_str()))
+        return;
+    const std::string path = compactFile(key);
+    void* out = sdlx_open(path.c_str(), true);
+    if (!out)
+        return;
+    const CompactHeader header {COMPACT_MAGIC, COMPACT_VERSION, static_cast<Uint32>(sourceSize), surface->w, surface->h,
+        static_cast<Uint32>(surface->format), static_cast<Uint32>(surface->blend_mode), surface->alpha_mod};
+    bool ok = sdlx_write(out, &header, sizeof(header));
+    for (int y = 0; ok && y < surface->h; y++)
+        ok = sdlx_write(out, static_cast<const Uint8*>(surface->pixels) + static_cast<size_t>(y) * surface->pitch, row);
+    sdlx_close(out);
+    if (ok)
+        s_cacheUsed += static_cast<Sint64>(bytes);
+    else
+        std::remove(path.c_str());
+}
+
+
+void SDL_XboxTakeImageCounts(int* decoded, int* cached)
+{
+    if (decoded)
+        *decoded = s_testDecoded.exchange(0);
+    if (cached)
+        *cached = s_testCached.exchange(0);
+}
+
 int IMG_Version(void)
 {
     return SDL_VERSIONNUM(SDL_IMAGE_MAJOR_VERSION, SDL_IMAGE_MINOR_VERSION, SDL_IMAGE_MICRO_VERSION);
@@ -191,8 +303,10 @@ SDL_Surface* IMG_Load(const char* file)
         t = sdlx_ticks_ns();
         if (SDL_Surface* cached = loadCached(file, sourceSize)) {
             stats.cacheHits++;
+            s_testCached++;
             stats.cacheReadNs += sdlx_ticks_ns() - t;
             stats.cacheReadBytes += static_cast<Uint64>(cached->w) * cached->h * 4;
+            sdlx_surface_name(cached, file);
             return cached;
         }
         stats.cacheReadNs += sdlx_ticks_ns() - t;
@@ -216,22 +330,23 @@ SDL_Surface* IMG_Load(const char* file)
     // Free the file data before allocating the surface (big backgrounds)
     std::vector<unsigned char>().swap(data);
 
-    SDL_Surface* surface = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
+    //(the decoded pixels become the surface's, made ARGB in place: a second copy of a big image (4 MB
+    //for a 1024x1024 one) was more than the 64 MB had free in a match's loading)
+    bool opaque = true;
+    Uint32* px = reinterpret_cast<Uint32*>(rgba);
+    const size_t count = static_cast<size_t>(w) * h;
+    for (size_t i = 0; i < count; i++) {
+        const unsigned char* p = rgba + i * 4;
+        const Uint32 argb = (static_cast<Uint32>(p[3]) << 24) | (static_cast<Uint32>(p[0]) << 16) | (static_cast<Uint32>(p[1]) << 8) | p[2];
+        opaque = opaque && p[3] == 255;
+        px[i] = argb;
+    }
+    SDL_Surface* surface = sdlx_adopt_pixels(w, h, rgba);
     if (!surface) {
         stbi_image_free(rgba);
         return nullptr;
     }
-
-    const unsigned char* src = rgba;
-    bool opaque = true;
-    for (int y = 0; y < h; y++) {
-        Uint32* dst = reinterpret_cast<Uint32*>(static_cast<Uint8*>(surface->pixels) + static_cast<size_t>(y) * surface->pitch);
-        for (int x = 0; x < w; x++, src += 4) {
-            dst[x] = (static_cast<Uint32>(src[3]) << 24) | (static_cast<Uint32>(src[0]) << 16) | (static_cast<Uint32>(src[1]) << 8) | src[2];
-            opaque = opaque && src[3] == 255;
-        }
-    }
-    stbi_image_free(rgba);
+    sdlx_surface_name(surface, file);
 
     // Opaque images don't need blending (as in SDL_image, where an image
     // without an alpha channel loads into a format without alpha). This also
@@ -241,6 +356,7 @@ SDL_Surface* IMG_Load(const char* file)
     if (opaque)
         surface->blend_mode = SDL_BLENDMODE_NONE;
     stats.decodes++;
+    s_testDecoded++;
     stats.decodeNs += sdlx_ticks_ns() - t;
 
     if (sourceSize > 0) {
@@ -260,6 +376,15 @@ bool IMG_SavePNG(SDL_Surface* surface, const char* file)
 {
     if (!surface || !surface->pixels || !file)
         return SDL_SetError("Invalid surface or file");
+    if (SDL_BYTESPERPIXEL(surface->format) == 2) {
+        //(the screen and the compact images: 16 bits a pixel)
+        SDL_Surface* wide = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_ARGB8888);
+        if (!wide)
+            return false;
+        const bool ok = IMG_SavePNG(wide, file);
+        SDL_DestroySurface(wide);
+        return ok;
+    }
 
     std::vector<unsigned char> rgba(static_cast<size_t>(surface->w) * surface->h * 4);
     unsigned char* dst = rgba.data();

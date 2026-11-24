@@ -640,8 +640,11 @@ bool checkMatchConfig(const MatchConfig& config, std::string& error, bool* needM
 void startConfiguredMatch(const MatchConfig& config)
 {
     loadlog::mark("match (lobby's): starting");
+    g_autoTestLoadStartNs = SDL_GetTicksNS();
     //The game mode
     game_values.matchtype = config.matchType;
+    //(64 MB on the Xbox: the menus' memory goes before the match's map, music and sprites load)
+    rm->freeMenuGraphicsForMatch(game_values.matchtype == MatchType::World);
     switch (config.gameMode) {
         case game_mode_pipe_minigame:
             game_values.gamemode = pipegamemode;
@@ -721,15 +724,17 @@ void startConfiguredMatch(const MatchConfig& config)
     g_map->predrawforeground(rm->spr_frontmap[0]);
     //(the second copy, the animated tiles' other buffer: the same pixels, copied, not drawn again;
     //set up as the drawing sets it: the back layer opaque, the front one blended)
-    if (gfx_copypixels(rm->spr_backmap[0].getSurface(), rm->spr_backmap[1].getSurface()))
-        SDL_SetSurfaceBlendMode(rm->spr_backmap[1].getSurface(), SDL_BLENDMODE_NONE);
-    else
-        g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
-    if (gfx_copypixels(rm->spr_frontmap[0].getSurface(), rm->spr_frontmap[1].getSurface())) {
-        SDL_SetSurfaceColorKey(rm->spr_frontmap[1].getSurface(), false, 0);
-        SDL_SetSurfaceBlendMode(rm->spr_frontmap[1].getSurface(), SDL_BLENDMODE_BLEND);
-    } else {
-        g_map->predrawforeground(rm->spr_frontmap[1]);
+    if (rm->useSecondMapLayers(g_map->hasAnimatedTiles())) {
+        if (gfx_copypixels(rm->spr_backmap[0].getSurface(), rm->spr_backmap[1].getSurface()))
+            SDL_SetSurfaceBlendMode(rm->spr_backmap[1].getSurface(), SDL_BLENDMODE_NONE);
+        else
+            g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
+        if (gfx_copypixels(rm->spr_frontmap[0].getSurface(), rm->spr_frontmap[1].getSurface())) {
+            SDL_SetSurfaceColorKey(rm->spr_frontmap[1].getSurface(), false, 0);
+            SDL_SetSurfaceBlendMode(rm->spr_frontmap[1].getSurface(), SDL_BLENDMODE_BLEND);
+        } else {
+            g_map->predrawforeground(rm->spr_frontmap[1]);
+        }
     }
     g_map->fitDrawAreas(rm->spr_frontmap[0]);    //(only where it shows)
     loadlog::mark("match (lobby's): the map's layers drawn");

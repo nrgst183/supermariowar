@@ -44,7 +44,8 @@ void CMap::computeDrawAreas()
 void CMap::fitDrawAreas(const gfxSprite& front)
 {
     SDL_Surface* surface = front.getSurface();
-    if (!surface || SDL_BYTESPERPIXEL(surface->format) != 4 || surface->w < MAPWIDTH * TILESIZE || surface->h < MAPHEIGHT * TILESIZE)
+    const int bpp = surface ? SDL_BYTESPERPIXEL(surface->format) : 0;
+    if (!surface || (bpp != 4 && bpp != 2) || surface->w < MAPWIDTH * TILESIZE || surface->h < MAPHEIGHT * TILESIZE)
         return;
     const SDL_PixelFormatDetails* details = SDL_GetPixelFormatDetails(surface->format);
     if (!details || !details->Amask)
@@ -58,10 +59,13 @@ void CMap::fitDrawAreas(const gfxSprite& front)
             const bool animated = mapdata[i][j][2].iID == TILESETANIMATED || mapdata[i][j][3].iID == TILESETANIMATED;
             bool shows = animated;
             for (int y = 0; y < TILESIZE && tiles && !shows; y++) {
-                const Uint32* row = reinterpret_cast<const Uint32*>(static_cast<const Uint8*>(surface->pixels) +
-                    static_cast<ptrdiff_t>(j * TILESIZE + y) * surface->pitch) + i * TILESIZE;
-                for (int x = 0; x < TILESIZE && !shows; x++)
-                    shows = (row[x] & details->Amask) != 0;
+                const Uint8* line = static_cast<const Uint8*>(surface->pixels) + static_cast<ptrdiff_t>(j * TILESIZE + y) * surface->pitch;
+                for (int x = 0; x < TILESIZE && !shows; x++) {
+                    //(the Xbox's front layer: 16 bits a pixel)
+                    const Uint32 pixel = bpp == 2 ? reinterpret_cast<const Uint16*>(line)[i * TILESIZE + x]
+                                                  : reinterpret_cast<const Uint32*>(line)[i * TILESIZE + x];
+                    shows = (pixel & details->Amask) != 0;
+                }
             }
             skip[i][j] = !(tiles && shows);
         }

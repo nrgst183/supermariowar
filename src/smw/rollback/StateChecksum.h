@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 // Checksum of the simulation state that two machines running the same match
 // can compare to detect a desync (and that the sync test also reports).
@@ -13,5 +15,14 @@
 namespace rollback {
 
 uint64_t peerChecksum();
+
+/// The parts of peerChecksum, a value each (a float as its bits): what a determinism test compares
+/// to say what differs first, not only when (src/smw/Determinism.h)
+struct StateField {
+    std::string name;
+    uint64_t value = 0;
+    bool isFloat = false;    // value: a float's bits
+};
+std::vector<StateField> stateFields();
 
 } // namespace rollback

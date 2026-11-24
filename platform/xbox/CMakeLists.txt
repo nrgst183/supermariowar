@@ -9,6 +9,7 @@ add_library(sdl3_xbox STATIC
     include/SDL3_mixer/SDL_mixer.h
     src/sdl_internal.h
     src/sdl_core.cpp
+    src/sdl_memory.cpp
     src/sdl_events.cpp
     src/sdl_image.cpp
     src/sdl_mixer.cpp

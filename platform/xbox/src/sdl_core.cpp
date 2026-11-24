@@ -36,6 +36,17 @@ SDL_InitFlags g_initialized = 0;
 } // namespace
 
 
+namespace {
+// The log's last lines, for the crash screen (no lock: a crash may come in the middle of a log)
+constexpr int k_log_lines = 12;
+constexpr int k_log_line_chars = 104;
+char g_log_tail[k_log_lines][k_log_line_chars];
+volatile LONG g_log_next = 0;
+
+char g_crash_context[128] = "Starting";
+Uint64 g_stage_lowest = ~0ull;    // (the lowest free memory since SDL_XboxTakeStageLowest)
+} // namespace
+
 void sdlx_log(const char* fmt, ...)
 {
     char buf[1024];
@@ -44,6 +55,161 @@ void sdlx_log(const char* fmt, ...)
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
     OutputDebugStringA(buf);
+
+    // A line each (a message's own new lines: spaces)
+    if (!buf[0])
+        return;
+    const LONG slot = (InterlockedIncrement(&g_log_next) - 1) % k_log_lines;
+    char* line = g_log_tail[slot];
+    int n = 0;
+    for (const char* c = buf; *c && n < k_log_line_chars - 1; c++) {
+        if (*c == '\n' && !c[1])
+            break;
+        line[n++] = (*c == '\n' || *c == '\r' || *c == '\t') ? ' ' : *c;
+    }
+    line[n] = 0;
+    sdlx_memory_sample();
+}
+
+int sdlx_log_tail(const char** lines, int count)
+{
+    const LONG next = g_log_next;
+    const int have = static_cast<int>(SDL_min(next, static_cast<LONG>(SDL_min(count, k_log_lines))));
+    for (int i = 0; i < have; i++)
+        lines[i] = g_log_tail[(next - have + i) % k_log_lines];
+    return have;
+}
+
+void SDL_XboxSetCrashContext(const char* context)
+{
+    snprintf(g_crash_context, sizeof(g_crash_context), "%s", context ? context : "");
+}
+
+const char* sdlx_crash_context()
+{
+    return g_crash_context;
+}
+
+void SDL_XboxLog(const char* line)
+{
+    sdlx_log("%s\n", line);
+}
+
+Uint64 g_sdlx_surface_bytes = 0;
+Uint64 g_sdlx_sound_bytes = 0;
+
+namespace {
+struct MemoryWatch {
+    Uint64 lowest = ~0ull;
+    Uint64 surfacesAtLowest = 0;
+    Uint64 surfacesPeak = 0;
+    char where[128] = "";
+    char logLine[104] = "";
+};
+MemoryWatch g_watch;
+} // namespace
+
+void sdlx_memory_sample()
+{
+    MEMORYSTATUS memory;
+    memory.dwLength = sizeof(memory);
+    GlobalMemoryStatus(&memory);
+    if (g_sdlx_surface_bytes > g_watch.surfacesPeak)
+        g_watch.surfacesPeak = g_sdlx_surface_bytes;
+    if (memory.dwAvailPhys < g_stage_lowest)
+        g_stage_lowest = memory.dwAvailPhys;
+    if (memory.dwAvailPhys < g_watch.lowest) {
+        g_watch.lowest = memory.dwAvailPhys;
+        g_watch.surfacesAtLowest = g_sdlx_surface_bytes;
+        snprintf(g_watch.where, sizeof(g_watch.where), "%s", g_crash_context);
+        const LONG next = g_log_next;
+        snprintf(g_watch.logLine, sizeof(g_watch.logLine), "%s", next > 0 ? g_log_tail[(next - 1) % k_log_lines] : "");
+    }
+}
+
+namespace {
+// The errors (a test's report): each kind once, with how many times
+struct ErrorKind {
+    char text[100];
+    int count;
+};
+ErrorKind g_errors[40];
+int g_error_kinds = 0;
+int g_error_total = 0;
+} // namespace
+
+void sdlx_note_error(const char* text)
+{
+    //(not errors: a question answered no)
+    if (strstr(text, "doesn't have a colorkey"))
+        return;
+    g_error_total++;
+    for (int i = 0; i < g_error_kinds; i++) {
+        if (strncmp(g_errors[i].text, text, sizeof(g_errors[i].text) - 1) == 0) {
+            g_errors[i].count++;
+            return;
+        }
+    }
+    if (g_error_kinds < 40) {
+        ErrorKind& kind = g_errors[g_error_kinds++];
+        snprintf(kind.text, sizeof(kind.text), "%s", text);
+        kind.count = 1;
+        sdlx_log("[error] %s\n", text);
+    }
+}
+
+int SDL_XboxErrorReport(char* text, int size)
+{
+    int n = snprintf(text, static_cast<size_t>(size), "Errors: %d (%d kinds)", g_error_total, g_error_kinds);
+    for (int i = 0; i < g_error_kinds && n > 0 && n < size; i++)
+        n += snprintf(text + n, static_cast<size_t>(size - n), "\n  %dx %s", g_errors[i].count, g_errors[i].text);
+    return n;
+}
+
+Uint64 SDL_XboxTakeStageLowest(void)
+{
+    sdlx_memory_sample();
+    const Uint64 lowest = g_stage_lowest;
+    g_stage_lowest = ~0ull;
+    return lowest;
+}
+
+Uint64 sdlx_memory_lowest()
+{
+    return g_watch.lowest;
+}
+
+int SDL_XboxMemoryReport(char* text, int size)
+{
+    sdlx_memory_sample();
+    MEMORYSTATUS memory;
+    memory.dwLength = sizeof(memory);
+    GlobalMemoryStatus(&memory);
+    const double mb = 1024.0 * 1024.0;
+    return snprintf(text, static_cast<size_t>(size),
+        "Lowest free: %.1f MB, while: %s\n"
+        "(the log then: %s)\n"
+        "Images then: %.1f MB (most ever: %.1f MB)\n"
+        "Now: %.1f MB free of %.0f; images %.1f MB, sounds %.1f MB",
+        static_cast<double>(g_watch.lowest) / mb, g_watch.where, g_watch.logLine,
+        static_cast<double>(g_watch.surfacesAtLowest) / mb, static_cast<double>(g_watch.surfacesPeak) / mb,
+        static_cast<double>(memory.dwAvailPhys) / mb, static_cast<double>(memory.dwTotalPhys) / mb,
+        static_cast<double>(g_sdlx_surface_bytes) / mb, static_cast<double>(g_sdlx_sound_bytes) / mb);
+}
+
+Uint64 SDL_XboxImageBytes(void)
+{
+    return g_sdlx_surface_bytes;
+}
+
+Uint64 SDL_XboxFreeMemory(Uint64* total)
+{
+    MEMORYSTATUS memory;
+    memory.dwLength = sizeof(memory);
+    GlobalMemoryStatus(&memory);
+    if (total)
+        *total = memory.dwTotalPhys;
+    return memory.dwAvailPhys;
 }
 
 
@@ -55,6 +221,28 @@ void sdlx_set_fpu_precision()
     const unsigned short wanted = static_cast<unsigned short>((cw & ~0x0300u) | 0x0200u);
     if (wanted != cw)
         __asm__ volatile("fldcw %0" : : "m"(wanted));
+}
+
+
+void SDL_XboxSettleFpu(unsigned short* x87Found, unsigned int* mxcsrFound)
+{
+    unsigned short cw = 0;
+    unsigned int mxcsr = 0;
+    __asm__ volatile("fnstcw %0" : "=m"(cw));
+    __asm__ volatile("stmxcsr %0" : "=m"(mxcsr));
+    if (x87Found)
+        *x87Found = cw;
+    if (mxcsrFound)
+        *mxcsrFound = mxcsr;
+    // x87: all exceptions masked (0x3F), 53-bit precision (bits 8-9: 10b), round to nearest (bits 10-11: 00)
+    const unsigned short wantedCw = 0x027F;
+    // SSE: all exceptions masked (0x1F80), round to nearest, no flush-to-zero (bit 15) or
+    // denormals-are-zero (bit 6); the sticky flags (bits 0-5) cleared
+    const unsigned int wantedMxcsr = 0x1F80;
+    if (cw != wantedCw)
+        __asm__ volatile("fldcw %0" : : "m"(wantedCw));
+    if ((mxcsr & ~0x3Fu) != wantedMxcsr)
+        __asm__ volatile("ldmxcsr %0" : : "m"(wantedMxcsr));
 }
 
 
@@ -93,6 +281,7 @@ bool SDL_SetError(const char* fmt, ...)
     va_list args;
     va_start(args, fmt);
     vsnprintf(g_error, sizeof(g_error), fmt, args);
+    sdlx_note_error(g_error);
     va_end(args);
     return false;
 }
@@ -430,11 +619,13 @@ SDL_XboxNetworkStatus SDL_XboxGetNetworkStatus(char* address, int size)
 
 bool SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags flags, const char* title, const char* message, SDL_Window* window)
 {
-    (void)flags;
     (void)window;
     // There's no message box on the Xbox: log it (visible in xbWatson / the
-    // debugger output on a devkit)
+    // debugger output on a devkit). An error is the game's last words (its
+    // main's catch): the crash screen, until a button, then the dashboard
     sdlx_log("[%s] %s\n", title ? title : "SDL", message ? message : "");
+    if (flags & SDL_MESSAGEBOX_ERROR)
+        sdlx_fatal(title ? title : "Error", message ? message : "");
     return true;
 }
 

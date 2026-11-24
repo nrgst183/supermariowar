@@ -29,6 +29,8 @@ add_executable(smw WIN32
 	GameplayTick.cpp
 	GSMenu.cpp
 	GSMenu.h
+	Determinism.cpp
+	Determinism.h
 	MenuAutoTest.cpp
 	MenuOnline.cpp
 	MenuOnlineSeries.cpp
@@ -114,13 +116,28 @@ target_link_libraries(smw toml11::toml11)
 
 if(XBOXOG)
 	target_sources(smw PRIVATE "${SDL3_XBOX_MAIN}")
+	# A test disc: the game starts the determinism test (src/smw/Determinism.h) with the arguments
+	# of tests/determinism/xbox_args.txt, comparing with the PC's checksums (reference.txt)
+	option(SMW_XBOX_DETERMINISM_TEST "Xbox: a disc that runs the determinism test instead of the game" OFF)
+	set(smw_xbox_deploy "data=${PROJECT_SOURCE_DIR}/data")
+	if(SMW_XBOX_DETERMINISM_TEST)
+		list(APPEND smw_xbox_deploy
+			"smw_args.txt=${PROJECT_SOURCE_DIR}/tests/determinism/xbox_args.txt"
+			"determinism=${PROJECT_SOURCE_DIR}/tests/determinism")
+	endif()
+	# A test disc: the game run with these arguments (an auto-play run, e.g. tests/xbox/memory_*.txt;
+	# it shows the memory report at its end)
+	set(SMW_XBOX_ARGS_FILE "" CACHE FILEPATH "Xbox: a disc that runs the game with these arguments (smw_args.txt on the disc)")
+	if(SMW_XBOX_ARGS_FILE)
+		list(APPEND smw_xbox_deploy "smw_args.txt=${SMW_XBOX_ARGS_FILE}" "xboxtest=${PROJECT_SOURCE_DIR}/tests/xbox")
+	endif()
 	rxdk_add_xbe(smw
 		TITLE_NAME "Super Mario War"
 		TITLE_ID 0x534D0001
 		STACK 1048576
 		ISO
 		ISO_NAME supermariowar
-		DEPLOY "data=${PROJECT_SOURCE_DIR}/data"
+		DEPLOY ${smw_xbox_deploy}
 	)
 endif()
 

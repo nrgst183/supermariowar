@@ -163,3 +163,10 @@ void LoadBackgroundPage(std::array<gfxSprite, 16>& sBackgrounds, short iPage)
         temp.drawStretch(srcRectBackground, sBackgrounds[iIndex].getSurface(), dstRectBackground);
     }
 }
+
+// The backgrounds' thumbnails freed (a session's end on the Xbox: made again when the page is opened)
+void editorReleaseBackgrounds()
+{
+    for (gfxSprite& thumbnail : sBackgrounds)
+        thumbnail = gfxSprite();
+}

@@ -1,0 +1,4 @@
+--autotest
+--at-match minigame
+--at-matches 3
+--at-frames 900

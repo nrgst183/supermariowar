@@ -6,6 +6,7 @@
 #include "rollback/Replay.h"
 
 #include "CmdArgs.h"
+#include "Determinism.h"
 #include "FileList.h"
 #include "Game.h"
 #include "GameMode.h"
@@ -24,6 +25,8 @@
 #include "path.h"
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
+#include "TilesetManager.h"
+#include "Platform.h"
 #include "Score.h"
 #include "SimulationState.h"
 #include "gamemodes/BonusHouse.h"
@@ -321,6 +324,12 @@ bool MenuState::init()
 
 void MenuState::onEnterState()
 {
+    platform::setCrashContext("The menus");
+    //(low memory: the matches' sprites go; the few the menus draw are loaded again when drawn)
+    if (platform::lowMemory()) {
+        mapPreviewWaitForLoads();
+        gfxSprite::unloadGroup(SpriteGroup::Game);
+    }
     iUnlockMinigameOptionIndex = 0;
 
     iTournamentAIStep = 0;
@@ -706,6 +715,13 @@ void MenuState::update()
                 menupanel::footer(menupanel::standardPrompts(mCurrentMenu->NudgesFocus(), "back"));
         }
         DrawOnlineSeriesNotice();
+        DrawDeterminismReport();
+    }
+    //(the determinism test's result, on the Xbox: a button quits)
+    if (determinism::finished()) {
+        for (const COutputControl& keys : game_values.playerInput.outputControls)
+            if (keys.menu_select.fPressed || keys.menu_cancel.fPressed)
+                Exit();
     }
 
     if (iDisplayError > DISPLAY_ERROR_NONE) {
@@ -986,10 +1002,15 @@ MenuCodeEnum MenuState::OptionsPageCode(int dir) const
 void MenuState::LaunchMatch()
 {
     loadlog::mark("match: the fade out ended");
+    g_autoTestLoadStartNs = SDL_GetTicksNS();
     SDL_HideCursor();    //(the menus' pointer: not in the match)
 #ifdef SMW_HAS_EDITORS
     editors::freeKeptGraphics();    //(an editor's graphics, kept in the menus: the match's memory)
 #endif
+    //(64 MB on the Xbox: the menus' memory goes before the match's map, music and sprites load)
+    rm->freeMenuGraphicsForMatch(game_values.matchtype == MatchType::World);
+    if (game_values.matchtype != MatchType::World)
+        mWorldMenu->miWorld->releaseSurfaces();
     if (game_values.matchtype == MatchType::QuickGame)
         mModeOptionsMenu->SetRandomGameModeSettings(game_values.gamemode->gamemode);
     else
@@ -1088,15 +1109,17 @@ void MenuState::LaunchMatch()
 
     //(the second copy, the animated tiles' other buffer: the same pixels, copied, not drawn again;
     //set up as the drawing sets it: the back layer opaque, the front one blended)
-    if (gfx_copypixels(rm->spr_backmap[0].getSurface(), rm->spr_backmap[1].getSurface()))
-        SDL_SetSurfaceBlendMode(rm->spr_backmap[1].getSurface(), SDL_BLENDMODE_NONE);
-    else
-        g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
-    if (gfx_copypixels(rm->spr_frontmap[0].getSurface(), rm->spr_frontmap[1].getSurface())) {
-        SDL_SetSurfaceColorKey(rm->spr_frontmap[1].getSurface(), false, 0);
-        SDL_SetSurfaceBlendMode(rm->spr_frontmap[1].getSurface(), SDL_BLENDMODE_BLEND);
-    } else {
-        g_map->predrawforeground(rm->spr_frontmap[1]);
+    if (rm->useSecondMapLayers(g_map->hasAnimatedTiles())) {
+        if (gfx_copypixels(rm->spr_backmap[0].getSurface(), rm->spr_backmap[1].getSurface()))
+            SDL_SetSurfaceBlendMode(rm->spr_backmap[1].getSurface(), SDL_BLENDMODE_NONE);
+        else
+            g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
+        if (gfx_copypixels(rm->spr_frontmap[0].getSurface(), rm->spr_frontmap[1].getSurface())) {
+            SDL_SetSurfaceColorKey(rm->spr_frontmap[1].getSurface(), false, 0);
+            SDL_SetSurfaceBlendMode(rm->spr_frontmap[1].getSurface(), SDL_BLENDMODE_BLEND);
+        } else {
+            g_map->predrawforeground(rm->spr_frontmap[1]);
+        }
     }
     g_map->fitDrawAreas(rm->spr_frontmap[0]);    //(only where it shows)
     loadlog::mark("match: the map's layers drawn");
@@ -1849,6 +1872,24 @@ bool MenuState::RunEditor(editors::Editor editor)
     return true;
 }
 #endif
+
+// The determinism test's result (Determinism.h), over the menu: the Xbox has no console to print it to
+void MenuState::DrawDeterminismReport()
+{
+    if (!determinism::finished())
+        return;
+    const std::vector<std::string>& lines = determinism::report();
+    const int h = 70 + static_cast<int>(lines.size()) * 22;
+    const int y = (App::screenHeight - h) / 2;
+    menupanel::box(30, y, 580, h);
+    int ly = y + 16;
+    for (size_t k = 0; k < lines.size(); k++) {
+        const bool verdict = k + 1 == lines.size();
+        (verdict || k == 0 ? rm->menu_font_large : rm->menu_font_small).drawCentered(320, ly, lines[k].c_str());
+        ly += 22;
+    }
+    rm->menu_font_small.drawCentered(320, y + h - 26, "Press A or B to quit");
+}
 
 void MenuState::Exit()
 {

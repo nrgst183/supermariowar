@@ -1,0 +1,4 @@
+--autotest
+--at-determinism 2
+--at-norender 1
+"--at-determinism-ref" "D:\determinism\reference.txt"

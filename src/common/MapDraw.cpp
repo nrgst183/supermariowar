@@ -16,6 +16,7 @@
 
 #include <SDL3_image/SDL_image.h>
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 using std::cout;
@@ -215,7 +216,13 @@ void CMap::SetupAnimatedTiles()
     if (iAnimatedTileCount > 0) {
         animatedFrontmapSurface = rm->spr_frontmap[g_iCurrentDrawIndex].getSurface();
         animatedBackmapSurface = rm->spr_backmap[g_iCurrentDrawIndex].getSurface();
-        animatedTilesSurface = gfxSprite::blank(1024, 1024);
+        //(as high as its cells need, four frames for each animated layer: a map's few animated tiles
+        //took a 4 MB sheet)
+        size_t cells = 0;
+        for (const AnimatedTile* tile : animatedtiles)
+            cells += 4 * ((tile->fBackgroundAnimated ? 1 : 0) + (tile->fForegroundAnimated ? 1 : 0) + (tile->pPlatform ? 1 : 0));
+        const int rows = static_cast<int>(std::min<size_t>(32, (cells + 31) / 32));
+        animatedTilesSurface = gfxSprite::blank(1024, std::max(1, rows) * 32);
 
         const Uint32 iClearColor = SDL_MapSurfaceRGBA(animatedTilesSurface.getSurface(), 0, 0, 0, 0);
 
@@ -294,6 +301,11 @@ void CMap::SetupAnimatedTiles()
             if (tile->pPlatform) {
                 for (short sTileAnimationFrame = 0; sTileAnimationFrame < 4; sTileAnimationFrame++) {
                     tile->rAnimationSrc[0][sTileAnimationFrame] = rDst;
+
+                    //A platform's picture is see-through where it's magenta (its color key, see
+                    //MovingPlatform): the cell starts magenta, so the frame's empty parts are copied
+                    //onto the platform as that, not as the strip's transparent black
+                    SDL_FillSurfaceRect(animatedTilesSurface.getSurface(), &rDst, SDL_MapSurfaceRGB(animatedTilesSurface.getSurface(), 255, 0, 255));
 
                     TilesetTile * tilesetTile = &tile->layers[0];
                     if (tilesetTile->iID == TILESETANIMATED) {

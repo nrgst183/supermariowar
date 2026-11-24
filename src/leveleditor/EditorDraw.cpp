@@ -580,3 +580,10 @@ void takescreenshot()
         blitdest = screen;
     }
 }
+
+// The map's kept picture freed (a session's end on the Xbox: drawn again when needed)
+void editorReleaseMapPicture()
+{
+    s_mapPicture = gfxSprite();
+    s_mapPictureKey = 0;
+}

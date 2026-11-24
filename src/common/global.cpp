@@ -146,5 +146,5 @@ void LoadCurrentMapBackground()
     const std::string path = mapBackgroundPath(*g_map);
     if (loadedMapBackground(path))
         return;
-    setLoadedMapBackground(path, ImageLoader(path).withoutColorKey().create());
+    setLoadedMapBackground(path, ImageLoader(path).withoutColorKey().compact().create());    //(16 bits on the Xbox)
 }

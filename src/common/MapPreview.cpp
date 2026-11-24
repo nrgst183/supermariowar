@@ -323,8 +323,10 @@ void CMap::redrawBackgroundFrame(int frame)
 {
     iBackgroundFrame = frame;
     //(both of the match's background layers: the animated tiles draw into one while the other shows)
-    for (gfxSprite& layer : rm->spr_backmap)
-        drawBackgroundLayers(rm->spr_background, layer, frame);
+    for (gfxSprite& layer : rm->spr_backmap) {
+        if (layer)    //(the second: not made for a map without animated tiles)
+            drawBackgroundLayers(rm->spr_background, layer, frame);
+    }
     if (animatedTilesSurface.getSurface()) {
         for (AnimatedTile* tile : animatedtiles) {
             if (tile->fBackgroundAnimated)

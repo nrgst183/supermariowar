@@ -870,6 +870,25 @@ void GameplayState::updateReplay()
         }
     }
 
+    //--at-match everything, its history stage: the speeds and seeks, then back to the history
+    if (cmd::g_autotest.enabled && cmd::g_autotest.everything && cmd::g_autotest.kind == cmd::AutoTestArgs::Kind::History) {
+        static int frames = 0;
+        static uint32_t rng = 777;
+        ++frames;
+        if (frames % 90 == 0)
+            th.speedChange = (frames / 90) % 3 == 0 ? -1 : 1;
+        if (frames % 140 == 0) {
+            rng = rng * 1664525u + 1013904223u;
+            seekTo(static_cast<int>((rng >> 8) % static_cast<uint32_t>(std::max(1, replay::playbackStatus().total))));
+        }
+        if (frames >= cmd::g_autotest.frames) {
+            frames = 0;
+            ++g_autoTestMatchesDone;
+            leaveReplay();
+            return;
+        }
+    }
+
     th.playPause = false;
     th.moment = 0;
     if (th.toastFrames > 0)

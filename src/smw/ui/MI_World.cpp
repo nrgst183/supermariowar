@@ -19,8 +19,6 @@
 MI_World::MI_World()
     : UI_Control(0, 0)
 {
-    map_sprites[0] = gfxSprite::blank(768, 608);
-    map_sprites[1] = gfxSprite::blank(768, 608);
 
     rectSrcSurface.x = 0;
     rectSrcSurface.y = 0;
@@ -31,6 +29,22 @@ MI_World::MI_World()
     rectDstSurface.y = 0;
     rectDstSurface.w = App::screenWidth;
     rectDstSurface.h = App::screenHeight;
+}
+
+void MI_World::ensureSurfaces()
+{
+    if (map_sprites[0])
+        return;
+    map_sprites[0] = gfxSprite::blankScreenFormat(768, 608);
+    map_sprites[1] = gfxSprite::blankScreenFormat(768, 608);
+    g_worldmap.DrawMapToSurface(-1, true, map_sprites[0].getSurface(), iMapDrawOffsetCol, iMapDrawOffsetRow, iAnimationFrame);
+    g_worldmap.DrawMapToSurface(-1, true, map_sprites[1].getSurface(), iMapDrawOffsetCol, iMapDrawOffsetRow, iAnimationFrame);
+}
+
+void MI_World::releaseSurfaces()
+{
+    map_sprites[0] = gfxSprite();
+    map_sprites[1] = gfxSprite();
 }
 
 void MI_World::Init()
@@ -64,6 +78,10 @@ void MI_World::Init()
     SetMapOffset();
     RepositionMapImage();
 
+    if (!map_sprites[0]) {
+        map_sprites[0] = gfxSprite::blankScreenFormat(768, 608);
+        map_sprites[1] = gfxSprite::blankScreenFormat(768, 608);
+    }
     g_worldmap.DrawMapToSurface(-1, true, map_sprites[0].getSurface(), iMapDrawOffsetCol, iMapDrawOffsetRow, iAnimationFrame);
     g_worldmap.DrawMapToSurface(-1, true, map_sprites[1].getSurface(), iMapDrawOffsetCol, iMapDrawOffsetRow, iAnimationFrame);
 
@@ -118,6 +136,7 @@ void MI_World::DisplayTeamControlAnnouncement()
 
 void MI_World::SetCurrentStageToCompleted(short iWinningTeam)
 {
+    ensureSurfaces();
     short iBonusAdd = 0;
     short iBonusMult = 1;
 
@@ -171,6 +190,7 @@ void MI_World::AdvanceTurn()
 
 void MI_World::Update()
 {
+    ensureSurfaces();
     bool fPlayerVehicleCollision = false;
     bool fPlayerMoveDone = g_worldmap.Update(&fPlayerVehicleCollision);
 
@@ -329,6 +349,7 @@ void MI_World::Update()
 
 void MI_World::UpdateMapSurface(short iCycleIndex)
 {
+    ensureSurfaces();
     if (iCycleIndex >= 0 && iCycleIndex <= 15)
         g_worldmap.DrawMapToSurface(iCycleIndex, iDrawFullRefresh > 0, map_sprites[1 - iCurrentSurfaceIndex].getSurface(), iNextMapDrawOffsetCol, iNextMapDrawOffsetRow, iAnimationFrame);
 }
@@ -386,6 +407,7 @@ void MI_World::RepositionMapImage()
 
 void MI_World::Draw()
 {
+    ensureSurfaces();
     if (!m_visible)
         return;
 
@@ -480,6 +502,7 @@ void MI_World::Draw()
 //Also, there is a problem if you put a key into a stage but someone exits before it is collected
 MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
 {
+    ensureSurfaces();
     //Don't allow any input while vehicles are moving
     if (g_worldmap.IsVehicleMoving())
         return MENU_CODE_NONE;
@@ -795,6 +818,7 @@ MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
 
 void MI_World::RestartDrawCycleIfNeeded()
 {
+    ensureSurfaces();
     iNextMapDrawOffsetCol = iMapDrawOffsetCol;
     iNextMapDrawOffsetRow = iMapDrawOffsetRow;
 
@@ -826,6 +850,7 @@ void MI_World::RestartDrawCycleIfNeeded()
 
 bool MI_World::UsePowerup(short iPlayer, short iTeam, short iIndex, bool fPopupIsUp)
 {
+    ensureSurfaces();
     const Vec2s iPlayerCurrentTile = g_worldmap.GetPlayerCurrentTile();
 
     short iPowerup = game_values.worldpowerups[iTeam][iIndex];

@@ -1,4 +1,5 @@
 #include "gfxFont.h"
+#include "Platform.h"
 
 #include "gfx.h"
 
@@ -71,7 +72,12 @@ gfxFont::gfxFont(const std::filesystem::path& path)
     if (!SDL_SetSurfaceColorKey(surf.get(), true, color_key))
         throw std::format("Couldn't set color key on font image: {}", SDL_GetError());
 
-    auto surf_opti = SdlSurfacePtr(SDL_ConvertSurface(surf.get(), screen->format));
+    //(32 bits for the color key's conversion, then compact: on the Xbox 16 bits, as the screen)
+    auto surf_opti = SdlSurfacePtr(SDL_ConvertSurface(surf.get(), SDL_PIXELFORMAT_ARGB8888));
+    if (surf_opti) {
+        if (SDL_Surface* small = platform::compactSurface(surf_opti.get()))
+            surf_opti.reset(small);
+    }
     if (!surf_opti)
         throw std::format("Couldn't convert {} to the display's pixel format: {}", path_str, SDL_GetError());
 

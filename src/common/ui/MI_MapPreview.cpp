@@ -78,7 +78,7 @@ int SDLCALL runPreviewJob(void* data)
     job.backgroundPath = mapBackgroundPath(*job.map);
     const gfxSprite* background = loadedMapBackground(job.backgroundPath);
     if (!background) {
-        job.backgroundImage = ImageLoader(job.backgroundPath).withoutColorKey().create();
+        job.backgroundImage = ImageLoader(job.backgroundPath).withoutColorKey().compact().create();
         background = &job.backgroundImage;
     }
     job.map->preDrawPreviewBackground(*background, job.background, false);
@@ -102,9 +102,9 @@ MI_MapPreview::MI_MapPreview(gfxSprite * nspr, short x, short y, short width, sh
     , iIndent(indent)
     , iSlideListOut(0)
 {
-    surfaceMapBackground = gfxSprite::blank(App::screenWidth/2, App::screenHeight/2);
-    surfaceMapBlockLayer = gfxSprite::blank(App::screenWidth/2, App::screenHeight/2);
-    surfaceMapForeground = gfxSprite::blank(App::screenWidth/2, App::screenHeight/2);
+    surfaceMapBackground = gfxSprite::blankScreenFormat(App::screenWidth/2, App::screenHeight/2);
+    surfaceMapBlockLayer = gfxSprite::blankScreenFormat(App::screenWidth/2, App::screenHeight/2);
+    surfaceMapForeground = gfxSprite::blankScreenFormat(App::screenWidth/2, App::screenHeight/2);
     LoadCurrentMap();
 
     rectDst.x = x + 16;
@@ -167,7 +167,7 @@ void MI_MapPreview::DrawContent()
     if (still) {
         if (m_layersStale || m_layersTop != game_values.toplayer || !m_layers.getSurface()) {
             if (!m_layers.getSurface())
-                m_layers = gfxSprite::blank(App::screenWidth / 2, App::screenHeight / 2);
+                m_layers = gfxSprite::blankScreenFormat(App::screenWidth / 2, App::screenHeight / 2);
             SDL_Surface* layers = m_layers.getSurface();
             surfaceMapBackground.draw(layers, Vec2i {0, 0});
             surfaceMapBlockLayer.draw(layers, Vec2i {0, 0});
@@ -245,9 +245,9 @@ void MI_MapPreview::StartBackgroundLoad(const std::string& path, const std::stri
     job->path = path;
     job->name = name;
     job->map = std::make_unique<CMap>();
-    job->background = gfxSprite::blank(App::screenWidth / 2, App::screenHeight / 2);
-    job->blocks = gfxSprite::blank(App::screenWidth / 2, App::screenHeight / 2);
-    job->foreground = gfxSprite::blank(App::screenWidth / 2, App::screenHeight / 2);
+    job->background = gfxSprite::blankScreenFormat(App::screenWidth / 2, App::screenHeight / 2);
+    job->blocks = gfxSprite::blankScreenFormat(App::screenWidth / 2, App::screenHeight / 2);
+    job->foreground = gfxSprite::blankScreenFormat(App::screenWidth / 2, App::screenHeight / 2);
     job->generation = mainMapGeneration();
     setMapPreviewWaiter(waitForPreviewJob);
     s_job = std::move(job);

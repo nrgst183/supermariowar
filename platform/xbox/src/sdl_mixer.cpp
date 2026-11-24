@@ -17,7 +17,6 @@
 
 extern "C" {
 #define STB_VORBIS_HEADER_ONLY
-#define STB_VORBIS_NO_STDIO
 #define STB_VORBIS_NO_PUSHDATA_API
 #include "stb_vorbis.c"
 }
@@ -25,6 +24,7 @@ extern "C" {
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <strings.h>
 #include <map>
 #include <string>
 #include <vector>
@@ -33,11 +33,19 @@ struct MIX_Audio {
     bool vorbis = false;
     // PCM: interleaved 16-bit samples
     std::vector<Sint16> pcm;
+    // 8-bit WAVs: their samples as they are (unsigned), half the memory of widening them (the
+    // sound effects: 64 MB)
+    std::vector<Uint8> pcm8;
+    ~MIX_Audio() { g_sdlx_sound_bytes -= pcm.size() * sizeof(Sint16) + pcm8.size(); }    //(counted: the memory watch)
+
+    int sample(size_t i) const { return pcm8.empty() ? pcm[i] : (static_cast<int>(pcm8[i]) - 128) << 8; }
     int channels = 2;
     int rate = 44100;
     size_t frames = 0;
-    // Vorbis: the whole compressed file
-    std::vector<unsigned char> ogg;
+    // Vorbis: streamed from this file (from `offset`), a little at a time: a match's music is 3-4 MB
+    // compressed, too much to keep in the 64 MB
+    std::string oggFile;
+    long oggOffset = 0;
 };
 
 struct MIX_Track {
@@ -144,6 +152,26 @@ void stopLocked(MIX_Track* track)
         g_pending_stops.push_back({track, track->generation});
 }
 
+// A Vorbis stream's decoder, reading its file (closed with the decoder)
+stb_vorbis* openVorbis(const MIX_Audio& audio, int* error)
+{
+    std::string path = audio.oggFile;
+    std::replace(path.begin(), path.end(), '/', '\\');
+    FILE* file = fopen(path.c_str(), "rb");
+    if (!file) {
+        *error = -1;
+        return nullptr;
+    }
+    //(reads in big blocks: the C library's own buffer is 512 bytes, a system call each)
+    setvbuf(file, nullptr, _IOFBF, 32 * 1024);
+    if (audio.oggOffset)
+        fseek(file, audio.oggOffset, SEEK_SET);
+    stb_vorbis* decoder = stb_vorbis_open_file(file, 1, error, nullptr);
+    if (!decoder)
+        fclose(file);
+    return decoder;
+}
+
 bool startLocked(MIX_Track* track, Sint64 loops)
 {
     closeDecoder(track);
@@ -159,7 +187,7 @@ bool startLocked(MIX_Track* track, Sint64 loops)
 
     if (audio->vorbis) {
         int error = 0;
-        track->decoder = stb_vorbis_open_memory(audio->ogg.data(), static_cast<int>(audio->ogg.size()), &error, nullptr);
+        track->decoder = openVorbis(*audio, &error);
         if (!track->decoder)
             return SDL_SetError("Couldn't decode Ogg Vorbis audio (error %d)", error);
         const stb_vorbis_info info = stb_vorbis_get_info(track->decoder);
@@ -232,10 +260,10 @@ void mixTrack(MIX_Track* track, int* out, int frames)
                 idx = 0;
             }
             if (audio->channels == 2) {
-                left = audio->pcm[idx * 2];
-                right = audio->pcm[idx * 2 + 1];
+                left = audio->sample(idx * 2);
+                right = audio->sample(idx * 2 + 1);
             } else {
-                left = right = audio->pcm[idx];
+                left = right = audio->sample(idx);
             }
         }
 
@@ -479,6 +507,63 @@ bool readSoundFile(const char* path, std::vector<unsigned char>& out)
     return true;
 }
 
+// The file a Vorbis stream reads: the cache drive's copy of a disc file (made now if there's none:
+// copied a block at a time, never all in memory) after its header, or the file itself
+void streamSource(const char* path, std::string& file, long& offset)
+{
+    file = path;
+    offset = 0;
+    if (!((path[0] == 'D' || path[0] == 'd') && path[1] == ':'))
+        return;
+    long size = SDL_XboxDiscFileSize(path);
+    if (size <= 0) {
+        void* in = sdlx_open(path, false);
+        size = in ? static_cast<long>(sdlx_size(in)) : 0;
+        sdlx_close(in);
+    }
+    if (size <= 0)
+        return;
+    const std::string cached = soundCacheFile(path);
+    if (void* in = sdlx_open(cached.c_str(), false)) {
+        Uint32 header[2] = {};
+        const bool ok = sdlx_read(in, header, sizeof(header)) && header[0] == SOUND_CACHE_MAGIC &&
+                        header[1] == static_cast<Uint32>(size) && sdlx_size(in) == static_cast<Sint64>(sizeof(header)) + size;
+        sdlx_close(in);
+        if (ok) {
+            file = cached;
+            offset = sizeof(header);
+            return;
+        }
+    }
+    const Uint64 bytes = sizeof(Uint32) * 2 + static_cast<Uint64>(size);
+    if (g_sound_cache_used < 0)
+        g_sound_cache_used = static_cast<Sint64>(sdlx_dir_bytes(soundCacheDir().c_str()));
+    if (static_cast<Uint64>(g_sound_cache_used) + bytes > SOUND_CACHE_BUDGET || !sdlx_make_dir(soundCacheDir().c_str()))
+        return;
+    void* in = sdlx_open(path, false);
+    void* out = in ? sdlx_open(cached.c_str(), true) : nullptr;
+    bool ok = in && out;
+    if (ok) {
+        const Uint32 header[2] = {SOUND_CACHE_MAGIC, static_cast<Uint32>(size)};
+        ok = sdlx_write(out, header, sizeof(header));
+        std::vector<unsigned char> block(256 * 1024);
+        for (long left = size; ok && left > 0;) {
+            const long n = left < static_cast<long>(block.size()) ? left : static_cast<long>(block.size());
+            ok = sdlx_read(in, block.data(), static_cast<Uint64>(n)) && sdlx_write(out, block.data(), static_cast<Uint64>(n));
+            left -= n;
+        }
+    }
+    sdlx_close(out);
+    sdlx_close(in);
+    if (ok) {
+        g_sound_cache_used += static_cast<Sint64>(bytes);
+        file = cached;
+        offset = sizeof(Uint32) * 2;
+    } else if (out) {
+        std::remove(cached.c_str());    //(the drive is full: not kept half written)
+    }
+}
+
 Uint32 le32(const unsigned char* p) { return p[0] | (p[1] << 8) | (p[2] << 16) | (static_cast<Uint32>(p[3]) << 24); }
 Uint16 le16(const unsigned char* p) { return static_cast<Uint16>(p[0] | (p[1] << 8)); }
 
@@ -513,14 +598,26 @@ bool parseWav(const std::vector<unsigned char>& data, MIX_Audio& audio, const ch
         return SDL_SetError("%s: unsupported WAV format (format %d, %d bit, %d channels)", path, format, bits, channels);
 
     const size_t count = bits == 16 ? samples_size / 2 : samples_size;
-    audio.pcm.resize(count);
-    if (bits == 16) {
+    if (bits == 16 && channels == 2) {
+        //(stereo sound effects as mono, both sides mixed: the original game's were mono, these are
+        //twice their memory for nothing heard; the game doesn't pan its sounds)
+        audio.pcm.resize(count / 2);
+        for (size_t i = 0; i < count / 2; i++)
+            audio.pcm[i] = static_cast<Sint16>((static_cast<int>(static_cast<Sint16>(le16(samples + i * 4))) +
+                                                static_cast<int>(static_cast<Sint16>(le16(samples + i * 4 + 2)))) / 2);
+        g_sdlx_sound_bytes += audio.pcm.size() * sizeof(Sint16);
+        audio.channels = 1;
+        audio.rate = rate;
+        audio.frames = audio.pcm.size();
+        return true;
+    } else if (bits == 16) {
+        audio.pcm.resize(count);
         for (size_t i = 0; i < count; i++)
             audio.pcm[i] = static_cast<Sint16>(le16(samples + i * 2));
     } else {
-        for (size_t i = 0; i < count; i++)
-            audio.pcm[i] = static_cast<Sint16>((static_cast<int>(samples[i]) - 128) << 8);
+        audio.pcm8.assign(samples, samples + count);
     }
+    g_sdlx_sound_bytes += audio.pcm.size() * sizeof(Sint16) + audio.pcm8.size();
     audio.channels = channels;
     audio.rate = rate;
     audio.frames = count / static_cast<size_t>(channels);
@@ -645,6 +742,26 @@ MIX_Audio* MIX_LoadAudio(MIX_Mixer* mixer, const char* path, bool predecode)
         return nullptr;
     }
 
+    //(Vorbis, music: streamed from its file, not read whole)
+    const size_t length = strlen(path);
+    if (length > 4 && strcasecmp(path + length - 4, ".ogg") == 0) {
+        auto* audio = new MIX_Audio();
+        audio->vorbis = true;
+        streamSource(path, audio->oggFile, audio->oggOffset);
+        int error = 0;
+        stb_vorbis* probe = openVorbis(*audio, &error);
+        if (!probe) {
+            delete audio;
+            SDL_SetError("%s: couldn't decode Ogg Vorbis (error %d)", path, error);
+            return nullptr;
+        }
+        const stb_vorbis_info info = stb_vorbis_get_info(probe);
+        stb_vorbis_close(probe);
+        audio->rate = static_cast<int>(info.sample_rate);
+        audio->channels = info.channels;
+        return audio;
+    }
+
     std::vector<unsigned char> data;
     if (!readSoundFile(path, data))
         return nullptr;
@@ -668,10 +785,11 @@ MIX_Audio* MIX_LoadAudio(MIX_Mixer* mixer, const char* path, bool predecode)
         }
         const stb_vorbis_info info = stb_vorbis_get_info(probe);
         stb_vorbis_close(probe);
+        //(an Ogg file not named .ogg: streamed from the file too)
         audio->vorbis = true;
         audio->rate = static_cast<int>(info.sample_rate);
         audio->channels = info.channels;
-        audio->ogg = std::move(data);
+        streamSource(path, audio->oggFile, audio->oggOffset);
     } else if (!parseWav(data, *audio, path)) {
         delete audio;
         return nullptr;

@@ -83,24 +83,28 @@ SDL_Surface* createScreenSurface()
 {
 #ifdef SMW_XBOX
     // On the Xbox, draw straight into memory the GPU displays: no copy of the
-    // frame when presenting
+    // frame when presenting. 16 bits a pixel, as the original game's screen
+    // (and its images, SDL_XboxCompactSurface): half the memory and the bytes
     int pitch = 0;
     if (void* pixels = SDL_XboxGetScreenPixels(GFX_SCREEN_W, GFX_SCREEN_H, &pitch)) {
-        if (SDL_Surface* surface = SDL_CreateSurfaceFrom(GFX_SCREEN_W, GFX_SCREEN_H, SDL_PIXELFORMAT_ARGB8888, pixels, pitch))
+        if (SDL_Surface* surface = SDL_CreateSurfaceFrom(GFX_SCREEN_W, GFX_SCREEN_H, SDL_PIXELFORMAT_ARGB1555, pixels, pitch))
             return surface;
     }
+    constexpr SDL_PixelFormat screenFormat = SDL_PIXELFORMAT_ARGB1555;
+#else
+    constexpr SDL_PixelFormat screenFormat = SDL_PIXELFORMAT_ARGB8888;
 #endif
-    SDL_Surface* surface = SDL_CreateSurface(GFX_SCREEN_W, GFX_SCREEN_H, SDL_PIXELFORMAT_ARGB8888);
+    SDL_Surface* surface = SDL_CreateSurface(GFX_SCREEN_W, GFX_SCREEN_H, screenFormat);
     if (!surface)
         throw_error("Couldn't create video buffer: {}", SDL_GetError());
 
     return surface;
 }
 
-SDL_Texture* createScreenTexture(SDL_Renderer* renderer)
+SDL_Texture* createScreenTexture(SDL_Renderer* renderer, SDL_PixelFormat format)
 {
     SDL_Texture* texture = SDL_CreateTexture(renderer,
-        SDL_PIXELFORMAT_ARGB8888,
+        format,
         SDL_TEXTUREACCESS_STREAMING,
         GFX_SCREEN_W, GFX_SCREEN_H);
     if (!texture)
@@ -127,7 +131,7 @@ bool GraphicsSDL::init(bool fullscreen)
     sdl_window = createWindow(fullscreen);
     sdl_renderer = createRenderer(sdl_window);
     sdl_screen_surface = createScreenSurface();
-    sdl_screen_texture = createScreenTexture(sdl_renderer);
+    sdl_screen_texture = createScreenTexture(sdl_renderer, sdl_screen_surface->format);
 
     printf("[gfx] Game window initialized (%dx%d, %dbpp)\n",
         sdl_screen_surface->w,

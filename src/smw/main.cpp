@@ -15,6 +15,7 @@
 
 #include "CmdArgs.h"
 #include "DebugProfile.h"
+#include "Determinism.h"
 #include "eyecandy.h"
 #include "FileList.h"
 #include "LoadLog.h"
@@ -26,6 +27,7 @@
 #include "map.h"
 #include "MapList.h"
 #include "path.h"
+#include "Platform.h"
 #include "player.h"
 #include "RandomNumberGenerator.h"
 #include "ui/SmwTheme.h"
@@ -268,7 +270,13 @@ void gameloop_frame()
     {
         // Fixed timestep: run the ticks that are due, then render once
         FPSLimiter& limiter = FPSLimiter::instance();
-        const int ticks = limiter.frameStart();
+        int ticks = limiter.frameStart();
+        //(--at-speed: a match's ticks several at a time, drawn once)
+        //(the everything test's menus too: its stages are mostly menus between matches)
+        if (cmd::g_autotest.enabled && cmd::g_autotest.speed > 1 && ticks > 0 &&
+            (GameStateManager::instance().currentState == &GameplayState::instance() ||
+             (cmd::g_autotest.everything && GameStateManager::instance().currentState == &MenuState::instance())))
+            ticks *= cmd::g_autotest.speed;
 
         // Rollback netplay (--net-*): starts once everything is loaded, then
         // handles the network every iteration
@@ -467,6 +475,9 @@ int main(int argc, char *argv[])
     }
     if (!cmd.data_root.empty())
         RootDataDirectory = cmd.data_root;
+    if (cmd.lowMemory)
+        platform::setLowMemory(true);
+    determinism::configure();
 
     try {
         main_game();
@@ -488,6 +499,20 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    //(an auto-play run's report: the stages (--at-match everything), the memory and the errors; in
+    //smw_test_report.txt in the settings folder, and shown (the Xbox: until a button, no console))
+    if (cmd::g_autotest.enabled && !determinism::active() && !g_autoTestStageReport.empty()) {
+        const std::string report = g_autoTestStageReport + platform::memoryReport() + "\n" + platform::errorReport();
+        const std::string file = writablePath("smw_test_report.txt");
+        if (FILE* out = fopen(file.c_str(), "wb")) {
+            fwrite(report.data(), 1, report.size(), out);
+            fclose(out);
+        }
+        platform::showReport("Auto-play done", "The test's report (also in " + file + ")", report);
+    }
+    //(the determinism test: 0 only if every checksum matched)
+    if (determinism::active())
+        return determinism::finished() && determinism::passed() ? 0 : 2;
     return 0;
 }
 
@@ -536,7 +561,9 @@ void main_game()
 
     create_gamemodes();
 
-    game_values.ReadConfig();
+    //(the determinism test: the default settings, the same on every machine)
+    if (!determinism::active())
+        game_values.ReadConfig();
     loadlog::mark("game values, modes, settings");
     if (cmd::g_autotest.enabled && cmd::g_autotest.prompts >= 0)
         game_values.buttonprompts = static_cast<short>(cmd::g_autotest.prompts);

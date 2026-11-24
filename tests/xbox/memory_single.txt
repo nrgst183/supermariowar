@@ -1,0 +1,5 @@
+--autotest
+--at-match single
+--at-matches 44
+--at-frames 600
+--at-players 4

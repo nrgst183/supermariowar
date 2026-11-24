@@ -7,7 +7,9 @@
 #include "input.h"
 #include "InputFrame.h"
 
+#include <cstdint>
 #include <memory>
+#include <string>
 
 namespace rollback { class SyncTest; class Snapshot; }
 
@@ -140,6 +142,12 @@ extern bool g_fAutoTest;
 extern bool g_fRecordTest;
 // Number of matches ended by the opt-in --autotest harness
 extern int g_autoTestMatchesDone;
+// --at-match everything: each stage's result, a line each (the test's report)
+extern std::string g_autoTestStageReport;
+// The test's match loads: when the one loading started (ns, 0: none), and the slowest so far (ms, its map)
+extern uint64_t g_autoTestLoadStartNs;
+extern double g_autoTestSlowestLoadMs;
+extern std::string g_autoTestSlowestLoadMap;
 
 // Defined in GSGameplay.cpp and separately in the world editor
 short LookupTeamID(short id);

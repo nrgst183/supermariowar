@@ -87,6 +87,9 @@ public:
     // A map is about to load: the tilesets it uses from now on stay loaded
     // (on the Xbox, older ones can be freed to stay in the memory budget)
     void beginMap();
+    // Frees every tileset's images (not their tile types; an edited one's are kept): they're loaded
+    // again when drawn. A match's start on the Xbox: the menus' previews' don't stay in its 64 MB
+    void unloadImages();
 
     size_t classicTilesetIndex() const {
         return m_classicTilesetIndex;
@@ -106,8 +109,8 @@ private:
     // The Xbox has 64 MB of RAM: tileset images (~4 MB in game, ~1 MB for a
     // menu preview) stay loaded up to this much, the least recently used ones
     // going first. The tilesets of the current map always stay (else drawing
-    // it would load them again and again).
-    static constexpr size_t MAX_LOADED_BYTES = 20u << 20;
+    // it would load them again and again): this is only what's kept of others.
+    static constexpr size_t MAX_LOADED_BYTES = 4u << 20;
     std::vector<size_t> m_recently_used;  // most recent last
     std::vector<unsigned> m_last_map;     // per tileset: the map it was last used in
     unsigned m_map = 0;

@@ -2,6 +2,8 @@
 #include "rollback/Snapshot.h"
 #include "GSGameplay.h"
 #include "CpuDriver.h"
+#include "Determinism.h"
+#include "Platform.h"
 
 #include "eyecandy.h"
 #include "GameMode.h"
@@ -46,6 +48,11 @@
 
 void GameplayState::simulateTick(const InputFrame& input)
 {
+    //(the FPUs as the simulation needs them, every tick: something else may have changed them since)
+    unsigned short x87 = 0;
+    unsigned int mxcsr = 0;
+    if (platform::settleFpu(&x87, &mxcsr))
+        determinism::noteFpu(x87, mxcsr);
     applyTickInput(input);
 
     if (game_values.screenfade == 0 && g_sim.countdownState <= COUNTDOWN_START_INDEX)

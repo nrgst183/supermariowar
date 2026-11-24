@@ -22,3 +22,21 @@ if(NOT NO_NETWORK)
 endif()
 target_link_libraries(smw-tests PRIVATE doctest CommonFiles SmwRollbackNet)
 doctest_discover_tests(smw-tests)
+
+# The determinism test (src/smw/Determinism.h): the game plays a fixed suite of CPU matches twice,
+# headless; the second must give the first's state checksums. On Windows (MSVC, where
+# tests/determinism/reference.txt was recorded) they must also be the reference's: the checksums the
+# Xbox's test disc compares with (-DSMW_XBOX_DETERMINISM_TEST=ON).
+if(TARGET smw)
+	set(smw_determinism_args --autotest --at-determinism 2 --at-norender 1 --datadir "${PROJECT_SOURCE_DIR}/data"
+		--at-determinism-out "${CMAKE_CURRENT_BINARY_DIR}/determinism_checksums.txt")
+	add_test(NAME determinism.repeatable COMMAND smw ${smw_determinism_args})
+	set_tests_properties(determinism.repeatable PROPERTIES
+		ENVIRONMENT "SDL_VIDEO_DRIVER=offscreen;SDL_AUDIO_DRIVER=dummy" TIMEOUT 600 LABELS determinism)
+	if(MSVC)
+		add_test(NAME determinism.reference COMMAND smw ${smw_determinism_args}
+			--at-determinism-ref "${PROJECT_SOURCE_DIR}/tests/determinism/reference.txt")
+		set_tests_properties(determinism.reference PROPERTIES
+			ENVIRONMENT "SDL_VIDEO_DRIVER=offscreen;SDL_AUDIO_DRIVER=dummy" TIMEOUT 600 LABELS determinism)
+	endif()
+endif()

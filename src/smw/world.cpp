@@ -250,6 +250,8 @@ void WorldMap::DrawTileToSurface(SDL_Surface* surface, short iCol, short iRow, s
 
     if (!tile.fAnimated && !fFullRefresh)
         return;
+    if (iTileSheet == 0)
+        rm->ensureFullWorldGraphics();    //(low memory: loaded only for World mode)
 
     SDL_Rect r = {iCol * iTileSize, iRow * iTileSize, iTileSize, iTileSize};
 

@@ -20,6 +20,12 @@ project(smw
 # standalone editors on the console.
 if(XBOXOG)
 	enable_language(C)
+	# -O2, not the toolchain's -O3: smaller code (the whole XBE stays in the 64 MB)
+	foreach (lang C CXX)
+		foreach (config RELEASE RELWITHDEBINFO MINSIZEREL)
+			string(REPLACE "-O3" "-O2" CMAKE_${lang}_FLAGS_${config} "${CMAKE_${lang}_FLAGS_${config}}")
+		endforeach()
+	endforeach()
 	set(BUILD_TESTS OFF CACHE BOOL "Build the unit tests" FORCE)
 	set(SMW_INSTALL_PORTABLE ON CACHE BOOL "Install to a single directory" FORCE)
 	# Float maths on SSE, like the PC builds: exact single precision, so the

@@ -85,6 +85,21 @@ int main(int argc, char *argv[])
 }
 #endif
 
+void editorReleaseBackgrounds();
+void editorReleaseMapPicture();
+
+// The session's own graphics freed (the Xbox, at a session's end: the game needs the memory; the
+// next session loads them again, its graphics not kept there). (leveleditor:: in the game: the
+// editor's files are compiled in that namespace, EmbeddedLevelEditor.cpp)
+void releaseSessionGraphics()
+{
+    editorReleaseBackgrounds();
+    editorReleaseMapPicture();
+    s_platform = gfxSprite();
+    s_platformpathbuttons = gfxSprite();
+    s_maphazardbuttons = gfxSprite();
+}
+
 void inner_main()
 {
     printf("-------------------------------------------------------------------------------\n");

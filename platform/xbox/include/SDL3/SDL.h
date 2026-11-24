@@ -129,6 +129,8 @@ typedef enum SDL_PixelFormat {
     SDL_PIXELFORMAT_XRGB8888 = 0x16161804u,
     SDL_PIXELFORMAT_ARGB8888 = 0x16362004u,
     SDL_PIXELFORMAT_ABGR8888 = 0x16762004u,
+    SDL_PIXELFORMAT_ARGB4444 = 0x15321002u,
+    SDL_PIXELFORMAT_ARGB1555 = 0x15331002u,
     SDL_PIXELFORMAT_RGBA32 = SDL_PIXELFORMAT_ABGR8888,
     SDL_PIXELFORMAT_BGRA32 = SDL_PIXELFORMAT_ARGB8888
 } SDL_PixelFormat;
@@ -843,6 +845,9 @@ typedef struct SDL_XboxLoadStats {
     Uint64 cacheWritesSkipped;            // over the budget, or the drive full
 } SDL_XboxLoadStats;
 void SDL_XboxTakeLoadStats(SDL_XboxLoadStats* images, SDL_XboxLoadStats* sounds);
+// The images decoded from their files and read from the cache drive since the last call (a test
+// stage's: the first loads, the cache filled, are the slow ones)
+void SDL_XboxTakeImageCounts(int* decoded, int* cached);
 
 // The size of a file on the disc (D:), or -1: the folder is listed once and its sizes kept, a
 // directory read instead of a DVD seek per file
@@ -855,6 +860,54 @@ long SDL_XboxDiscFileSize(const char* path);
 void SDL_XboxProfileAdd(int section, const char* name, bool top, Uint64 ns);
 void SDL_XboxProfileCount(int counter, const char* name, int value);
 bool SDL_XboxProfileOn(void);
+
+// The floating point units as the simulation needs them, the same every tick and as on the PC: the
+// x87 (the doubles) at 53-bit precision, rounding to nearest, exceptions masked; SSE (the floats)
+// without flush-to-zero or denormals-are-zero. Something else on the thread (the mixer, Direct3D)
+// may have changed them since: what they were is returned (the determinism test shows it).
+void SDL_XboxSettleFpu(unsigned short* x87Found, unsigned int* mxcsrFound);
+
+// What the game is doing (a line: "Match: <map>, <mode>"), for the crash screen: a crash (an
+// exception, or an error the game couldn't handle) shows the error on the screen with this, the
+// memory and the log's last lines, until a button; then the dashboard.
+void SDL_XboxSetCrashContext(const char* context);
+
+// A loaded image in half the memory, as the original game kept its images (16 bits a pixel, the
+// screen's format then): ARGB1555 if every pixel is opaque or fully see-through (a color key
+// becomes see-through); one with partly see-through pixels isn't made compact (NULL). Its blend
+// mode and alpha modulation are kept. Only images
+// that are drawn from, not drawn on or read: the blits read the 16-bit pixels, nothing else does.
+// Returns the new surface (the old one stays the caller's), or NULL (keep the old one).
+SDL_Surface* SDL_XboxCompactSurface(SDL_Surface* surface);
+// The compact images, kept on the cache drive as they are (16 bits, ready to draw): a reload is
+// half the bytes of the 32-bit cache's and nothing to convert. `file` is the image's file (its size
+// tells a changed one), `key` that and how it was loaded (color key, alpha). NULL: not cached.
+SDL_Surface* SDL_XboxLoadCompactImage(const char* file, const char* key);
+void SDL_XboxSaveCompactImage(const char* file, const char* key, SDL_Surface* surface);
+
+// The free memory (bytes), and the total
+Uint64 SDL_XboxFreeMemory(Uint64* total);
+// The bytes of all the surfaces' pixels (the images)
+Uint64 SDL_XboxImageBytes(void);
+// A line in the log (the debugger output; the crash screen shows the last lines)
+void SDL_XboxLog(const char* line);
+
+// The memory watch: the lowest free memory seen (sampled at each frame and log line), what the game
+// was doing then, and what the images and sounds take. Its text, in `text`
+int SDL_XboxMemoryReport(char* text, int size);
+// The lowest free memory (bytes) since the last call (a test stage's)
+Uint64 SDL_XboxTakeStageLowest(void);
+// The frames presented since the last call (a test stage's): how many, their average and worst
+// time (ms), and how many took over 20 ms
+void SDL_XboxTakeFrameStats(int* frames, double* averageMs, double* worstMs, int* slow);
+// The errors reported so far (SDL_SetError, the shim's and the game's): how many, and the kinds
+// with their counts, as text
+int SDL_XboxErrorReport(char* text, int size);
+// A line at the top of every frame: the free memory now and the lowest seen, the images' and
+// sounds', and `label` (what's being tested): the memory test's readout
+void SDL_XboxSetMemoryHud(bool on, const char* label);
+// A report on the screen (the crash screen's look, `heading` in green) until a button is pressed
+void SDL_XboxShowReport(const char* heading, const char* title, const char* text);
 
 // Game saves on the hard disk (U:), as the dashboard's memory screen shows
 // them: each one is a folder, named `name` (ASCII; at most 127 characters).

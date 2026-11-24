@@ -29,6 +29,26 @@ using std::endl;
 
 short g_iCurrentDrawIndex = 0;
 
+int CMap::busyScore() const
+{
+    bool tilesets[256] = {};
+    int distinct = 0;
+    for (int x = 0; x < MAPWIDTH; x++) {
+        for (int y = 0; y < MAPHEIGHT; y++) {
+            for (int l = 0; l < MAPLAYERS; l++) {
+                const int id = mapdata[x][y][l].iID;
+                if (id >= 0 && id < 256 && !tilesets[id]) {
+                    tilesets[id] = true;
+                    distinct++;
+                }
+            }
+        }
+    }
+    return 15 * static_cast<int>(platforms.size()) + 10 * static_cast<int>(maphazards.size()) +
+           3 * static_cast<int>(mapitems.size()) + static_cast<int>(animatedtiles.size()) + 20 * distinct +
+           2 * numwarpexits;
+}
+
 CMap::CMap()
     : warpexits()
     , tilebltrect()
@@ -599,7 +619,9 @@ void CMap::update()
         animatedFrontmapSurface = rm->spr_frontmap[g_iCurrentDrawIndex].getSurface();
         animatedBackmapSurface = rm->spr_backmap[g_iCurrentDrawIndex].getSurface();
 
-        g_iCurrentDrawIndex = 1 - g_iCurrentDrawIndex;
+        //(no second pair, a map without animated tiles: the one pair shows)
+        if (rm->spr_backmap[1] && rm->spr_frontmap[1])
+            g_iCurrentDrawIndex = 1 - g_iCurrentDrawIndex;
 
         if (++iTileAnimationFrame >= NUM_FRAMES_IN_TILE_ANIMATION)
             iTileAnimationFrame = 0;

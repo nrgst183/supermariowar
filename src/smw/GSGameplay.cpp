@@ -4,13 +4,17 @@
 
 #include "CmdArgs.h"
 #include "DebugProfile.h"
+#include "Determinism.h"
 #include "eyecandy.h"
 #include "FileList.h"
 #include "GameValues.h"
 #include "joystick.h"
 #include "GSMenu.h"
 #include "map.h"
+#include "MapList.h"
+#include "Platform.h"
 #include "ResourceManager.h"
+#include "TilesetManager.h"
 #include "SimulationState.h"
 #include "WorldTourStop.h"
 #include "NetOverlay.h"
@@ -113,6 +117,10 @@ int exitgametimer = 0;
 
 // Opt-in --autotest harness state
 int g_autoTestMatchesDone = 0;
+std::string g_autoTestStageReport;
+uint64_t g_autoTestLoadStartNs = 0;
+double g_autoTestSlowestLoadMs = 0;
+std::string g_autoTestSlowestLoadMap;
 static int autoTestFrames = 0;
 static int autoTestOverFrames = 0;
 
@@ -415,6 +423,22 @@ bool g_firstFrameLogged = true;    //(loadlog: the first frame of a match, timed
 
 void GameplayState::onEnterState()
 {
+    //(a crash report says what was played)
+    platform::setCrashContext(std::format("{}: {}, {}", replay::playing() ? "A replay" : "A match",
+        maplist ? maplist->currentShortmapname() : "", game_values.gamemode ? game_values.gamemode->GetModeName() : ""));
+    //(low memory: the menus' graphics went as the match was set up; the match's sprites are loaded now,
+    //not one by one as they're first drawn)
+    if (platform::lowMemory()) {
+        //(not the tilesets: the match's own are loaded by now; the previews' went at its setup)
+        mapPreviewWaitForLoads();
+        gfxSprite::unloadGroup(SpriteGroup::Menu);
+        if (game_values.matchtype != MatchType::World) {
+            gfxSprite::unloadGroup(SpriteGroup::World);
+            rm->freeFullWorldGraphics();
+        }
+        gfxSprite::loadGroup(SpriteGroup::Game);
+        gfxSprite::loadGroup(SpriteGroup::Shared);
+    }
     g_firstFrameLogged = false;
     g_sim.countdownState = 0;
     g_sim.countdownTimer = 0;
@@ -454,6 +478,11 @@ void GameplayState::onLeaveState()
         //--replay with --autotest: done
         if (!cmd::g_replay.empty() && cmd::g_autotest.enabled)
             game_values.appstate = AppState::Quit;
+        return;
+    }
+    //(the determinism test's matches aren't the player's: nothing kept of them)
+    if (determinism::active()) {
+        replay::cancelRecording();
         return;
     }
     const std::string replayFile = replay::finishRecording();
@@ -771,10 +800,26 @@ bool GameplayState::updateAutoTest()
     ++autoTestFrames;
     if (game_values.gamemode->gameover)
         ++autoTestOverFrames;
+    if (cmd::g_autotest.everything && cmd::g_autotest.kind == cmd::AutoTestArgs::Kind::Single) {
+        if (autoTestFrames == 240)
+            game_values.flags.pausegame = true;
+        if (autoTestFrames == 300)
+            game_values.flags.pausegame = false;
+    }
 
     const bool autoTestEnd = autoTestFrames >= cmd::g_autotest.frames || autoTestOverFrames >= 120;
     if (autoTestEnd || autoTestFrames % 250 == 0)
         printf("atsum: frame %d %08x\n", autoTestFrames, autoTestChecksum());
+    determinism::sample(g_autoTestMatchesDone, autoTestFrames, rollback::peerChecksum());
+    //(the determinism test run without drawing, fast: how far it is, on a plain screen, now and then)
+    if (determinism::active() && cmd::g_autotest.norender && autoTestFrames % 300 == 1 && screen) {
+        SDL_FillSurfaceRect(screen, nullptr, SDL_MapSurfaceRGB(screen, 0, 40, 104));
+        const std::string line = "Determinism test: match " + std::to_string(g_autoTestMatchesDone + 1) + " of " +
+                                 std::to_string(cmd::g_autotest.matches);
+        rm->menu_font_large.drawCentered(320, 220, line.c_str());
+        rm->menu_font_small.drawCentered(320, 250, "Running without drawing, as fast as it goes");
+        gfx_flipscreen();
+    }
     if (cmd::g_autotest.peersum > 0 && (autoTestEnd || autoTestFrames % cmd::g_autotest.peersum == 0))
         printf("peersum: frame %d %016llx\n", autoTestFrames, static_cast<unsigned long long>(rollback::peerChecksum()));
 
@@ -1006,6 +1051,14 @@ void GameplayState::render(float alpha)
             if (!g_firstFrameLogged) {
                 g_firstFrameLogged = true;
                 loadlog::mark("match: first frame drawn");
+                if (g_autoTestLoadStartNs) {
+                    const double ms = static_cast<double>(SDL_GetTicksNS() - g_autoTestLoadStartNs) / 1e6;
+                    g_autoTestLoadStartNs = 0;
+                    if (ms > g_autoTestSlowestLoadMs) {
+                        g_autoTestSlowestLoadMs = ms;
+                        g_autoTestSlowestLoadMap = maplist ? maplist->currentShortmapname() : "";
+                    }
+                }
             }
         }
     } firstFrame;

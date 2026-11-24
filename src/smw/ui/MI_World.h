@@ -60,7 +60,13 @@ private:
     short iItemCol[4];
     short iItemPage[4];
 
-    std::array<gfxSprite, 2> map_sprites;
+    std::array<gfxSprite, 2> map_sprites;    // (made when first needed: 3.7 MB, World mode's only)
+    void ensureSurfaces();
+public:
+    /// Frees the world map's surfaces (a match that isn't World mode's: its memory); they're made
+    /// again, and the map drawn on them, when the world is next shown
+    void releaseSurfaces();
+private:
     SDL_Rect rectSrcSurface;
     SDL_Rect rectDstSurface;
 

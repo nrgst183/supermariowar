@@ -5,6 +5,7 @@ add_library(CommonFiles STATIC
     DebugProfile.cpp
     DebugProfile.h
     LoadLog.cpp
+    Platform.cpp
     LoadLog.h
     eyecandy.h
     EyecandyStyles.h

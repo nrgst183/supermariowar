@@ -1,0 +1,4 @@
+--autotest
+--at-match tournament
+--at-matches 6
+--at-frames 900

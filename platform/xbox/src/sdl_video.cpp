@@ -35,6 +35,7 @@ struct SDL_Texture {
     SDL_Renderer* renderer = nullptr;
     int w = 0;
     int h = 0;
+    int bpp = 4;    // 4: X8R8G8B8; 2: the screen's ARGB1555 (shown as X1R5G5B5)
     int pitch = 0;
     Uint32* pixels = nullptr;
     // A whole-texture update only remembers the source (the game's screen
@@ -46,7 +47,8 @@ struct SDL_Texture {
 
 SdlxProfile g_sdlx_profile;
 bool g_sdlx_overlay = false;
-int g_sdlx_back_buffers = 0;    // (1: double buffering, 2: triple; the overlay shows it)
+int g_sdlx_back_buffers = 0;
+int g_sdlx_wanted_back_buffers = 1;    // (1: double buffering, 2: triple; the overlay shows it)
 
 namespace {
 constexpr int k_screen_w = 640;
@@ -54,6 +56,7 @@ constexpr int k_screen_h = 480;
 
 SDL_Window* g_window = nullptr;
 D3DTexture* g_frame_textures[2] = {nullptr, nullptr};
+D3DTexture* g_frame_textures16[2] = {nullptr, nullptr};    //(a 16-bit frame's: an editor's own screens)
 int g_frame_index = 0;
 
 // The game's screen surface, in memory the GPU reads as a texture (see
@@ -88,11 +91,13 @@ bool createDevice(SDL_Renderer* renderer)
     ZeroMemory(&pp, sizeof(pp));
     pp.BackBufferWidth = k_screen_w;
     pp.BackBufferHeight = k_screen_h;
-    pp.BackBufferFormat = D3DFMT_X8R8G8B8;
-    //(triple buffering: two back buffers. The GPU draws a finished frame into the free one at once,
-    //without waiting for the refresh that shows the one before, so the game starts the next frame
-    //right away: a frame that takes a little long is made up by the one queued, not shown late)
-    pp.BackBufferCount = 2;
+    //(16 bits a pixel, as the original game's screen (SDL 1.2's libSDLx, 16-bit): the front and back
+    //buffers in half the memory of the 64 MB; the frame is drawn into them dithered)
+    pp.BackBufferFormat = D3DFMT_R5G6B5;
+    //(double buffering: one back buffer, as a trial for the 64 MB: the 16-bit buffers cost little,
+    //but one fewer. Triple buffering (2) let a frame that took a little long be made up by the one
+    //queued instead of waiting for the next refresh)
+    pp.BackBufferCount = static_cast<UINT>(g_sdlx_wanted_back_buffers);
     pp.Windowed = FALSE;
     pp.EnableAutoDepthStencil = FALSE;
     pp.SwapEffect = D3DSWAPEFFECT_DISCARD;
@@ -110,6 +115,13 @@ bool createDevice(SDL_Renderer* renderer)
     if (FAILED(hr)) {
         // Retry without progressive scan
         pp.Flags &= ~D3DPRESENTFLAG_PROGRESSIVE;
+        hr = Direct3D_CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, NULL,
+            D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &renderer->device);
+    }
+    if (FAILED(hr)) {
+        // Retry in 32 bits
+        sdlx_log("[xbox] No 16-bit back buffers (0x%08x): 32-bit\n", static_cast<unsigned>(hr));
+        pp.BackBufferFormat = D3DFMT_X8R8G8B8;
         hr = Direct3D_CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, NULL,
             D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &renderer->device);
     }
@@ -135,13 +147,9 @@ bool createDevice(SDL_Renderer* renderer)
     D3DDevice_SetFlickerFilter(1);
     D3DDevice_SetSoftDisplayFilter(FALSE);
 
-    // The frame textures: linear (not swizzled), so the CPU can write them
-    // directly, and addressed in texels (0..640, 0..480)
-    for (D3DTexture*& texture : g_frame_textures) {
-        texture = D3DDevice_CreateTexture2(k_screen_w, k_screen_h, 1, 1, 0, D3DFMT_LIN_X8R8G8B8, D3DRTYPE_TEXTURE);
-        if (!texture)
-            return SDL_SetError("Couldn't create the frame texture");
-    }
+    // The frame textures (linear, not swizzled, so the CPU can write them directly; addressed in
+    // texels, 0..640, 0..480) are made when first needed: a game drawing straight into the screen's
+    // memory (SDL_XboxGetScreenPixels) never needs them, and they're 2.4 MB of the 64
 
     // Fixed pipeline state for drawing a textured, pre-transformed quad
     D3DDevice_SetVertexShader(k_quad_fvf);
@@ -149,6 +157,7 @@ bool createDevice(SDL_Renderer* renderer)
     D3DDevice_SetRenderState(D3DRS_LIGHTING, FALSE);
     D3DDevice_SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE);
     D3DDevice_SetRenderState(D3DRS_ALPHABLENDENABLE, FALSE);
+    D3DDevice_SetRenderState(D3DRS_DITHERENABLE, TRUE);    //(the 16-bit back buffer: less banding)
     D3DDevice_SetTextureStageState(0, D3DTSS_COLOROP, D3DTOP_SELECTARG1);
     D3DDevice_SetTextureStageState(0, D3DTSS_COLORARG1, D3DTA_TEXTURE);
     D3DDevice_SetTextureStageState(0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1);
@@ -208,7 +217,7 @@ DWORD presentTexture(const SDL_Texture* texture)
 
     // The game drew straight into the screen texture: no copy
     if (g_screen_pixels && src == g_screen_pixels && texture->w == k_screen_w && texture->h == k_screen_h) {
-        sdlx_overlay_draw(static_cast<Uint8*>(g_screen_pixels), g_screen_pitch);
+        sdlx_overlay_draw(static_cast<Uint8*>(g_screen_pixels), g_screen_pitch, 2);
         // The memory is cached (fast for the CPU's drawing, which also reads it
         // to blend), and the GPU doesn't see the CPU's caches: write them back
         __asm__ volatile("wbinvd" ::: "memory");
@@ -216,9 +225,15 @@ DWORD presentTexture(const SDL_Texture* texture)
         return D3DDevice_InsertFence();
     }
 
-    // Otherwise copy the frame into one of the frame textures (used in turns)
-    D3DTexture* frame = g_frame_textures[g_frame_index];
+    // Otherwise copy the frame into one of the frame textures (used in turns; in the frame's format)
+    const bool small = texture->bpp == 2;
+    D3DTexture*& slot = (small ? g_frame_textures16 : g_frame_textures)[g_frame_index];
+    if (!slot)
+        slot = D3DDevice_CreateTexture2(k_screen_w, k_screen_h, 1, 1, 0, small ? D3DFMT_LIN_X1R5G5B5 : D3DFMT_LIN_X8R8G8B8, D3DRTYPE_TEXTURE);
+    D3DTexture* frame = slot;
     g_frame_index ^= 1;
+    if (!frame)
+        return 0;
 
     // Waits if the GPU still draws from this texture (two frames ago)
     D3DLOCKED_RECT locked;
@@ -232,9 +247,9 @@ DWORD presentTexture(const SDL_Texture* texture)
             memcpy(dst, src, static_cast<size_t>(src_pitch) * h);
         } else {
             for (int y = 0; y < h; y++)
-                memcpy(dst + static_cast<size_t>(y) * locked.Pitch, src + static_cast<size_t>(y) * src_pitch, static_cast<size_t>(w) * 4);
+                memcpy(dst + static_cast<size_t>(y) * locked.Pitch, src + static_cast<size_t>(y) * src_pitch, static_cast<size_t>(w) * texture->bpp);
         }
-        sdlx_overlay_draw(dst, locked.Pitch);
+        sdlx_overlay_draw(dst, locked.Pitch, texture->bpp);
     }
     D3DTexture_UnlockRect(frame, 0);
 
@@ -412,12 +427,54 @@ bool SDL_RenderTexture(SDL_Renderer* renderer, SDL_Texture* texture, const SDL_F
     return true;
 }
 
+namespace {
+// The frames presented (a test stage's frame rate: SDL_XboxTakeFrameStats)
+struct FrameStats {
+    Uint64 last = 0;
+    int frames = 0;
+    double totalMs = 0;
+    double worstMs = 0;
+    int slow = 0;
+};
+FrameStats g_frame_stats;
+} // namespace
+
+void SDL_XboxTakeFrameStats(int* frames, double* averageMs, double* worstMs, int* slow)
+{
+    const FrameStats& s = g_frame_stats;
+    if (frames) *frames = s.frames;
+    if (averageMs) *averageMs = s.frames > 0 ? s.totalMs / s.frames : 0;
+    if (worstMs) *worstMs = s.worstMs;
+    if (slow) *slow = s.slow;
+    const Uint64 last = s.last;
+    g_frame_stats = FrameStats();
+    g_frame_stats.last = last;
+}
+
 bool SDL_RenderPresent(SDL_Renderer* renderer)
 {
     if (!renderer || !renderer->device)
         return SDL_SetError("Parameter 'renderer' is invalid");
 
+    {
+        const Uint64 now = sdlx_ticks_ns();
+        FrameStats& s = g_frame_stats;
+        if (s.last) {
+            const double ms = static_cast<double>(now - s.last) / 1e6;
+            //(a long pause, a loading screen's: not a frame)
+            if (ms < 1000.0) {
+                s.frames++;
+                s.totalMs += ms;
+                if (ms > s.worstMs)
+                    s.worstMs = ms;
+                if (ms > 20.0)
+                    s.slow++;
+            }
+        }
+        s.last = now;
+    }
     sdlx_overlay_frame();
+    sdlx_memory_sample();
 
     const Uint64 copy_start = sdlx_cycles();
     DWORD fence = 0;
@@ -465,8 +522,10 @@ void* SDL_XboxGetScreenPixels(int w, int h, int* pitch)
         return nullptr;
 
     if (!g_screen_pixels) {
-        // Linear textures need a pitch that's a multiple of 64 bytes
-        const int row = ((w * 4) + 63) & ~63;
+        // 16 bits a pixel (ARGB1555, shown as X1R5G5B5), as the original game's screen: half the
+        // memory and half the bytes every blit writes. Linear textures need a pitch that's a
+        // multiple of 64 bytes
+        const int row = ((w * 2) + 63) & ~63;
         // Physically contiguous (the GPU has no virtual memory), cached
         void* memory = XPhysicalAlloc(static_cast<SIZE_T>(row) * h, MAXULONG_PTR, 4096, PAGE_READWRITE);
         if (!memory) {
@@ -476,7 +535,7 @@ void* SDL_XboxGetScreenPixels(int w, int h, int* pitch)
         memset(memory, 0, static_cast<size_t>(row) * h);
 
         memset(&g_screen_texture, 0, sizeof(g_screen_texture));
-        XGSetTextureHeader(w, h, 1, 0, D3DFMT_LIN_X8R8G8B8, D3DPOOL_DEFAULT, &g_screen_texture, 0, row);
+        XGSetTextureHeader(w, h, 1, 0, D3DFMT_LIN_X1R5G5B5, D3DPOOL_DEFAULT, &g_screen_texture, 0, row);
         D3DResource_Register(reinterpret_cast<D3DResource*>(&g_screen_texture), memory);
 
         g_screen_pixels = memory;
@@ -498,7 +557,7 @@ SDL_Texture* SDL_CreateTexture(SDL_Renderer* renderer, SDL_PixelFormat format, S
         SDL_SetError("Parameter 'renderer' is invalid");
         return nullptr;
     }
-    if (format != SDL_PIXELFORMAT_ARGB8888 && format != SDL_PIXELFORMAT_XRGB8888) {
+    if (format != SDL_PIXELFORMAT_ARGB8888 && format != SDL_PIXELFORMAT_XRGB8888 && format != SDL_PIXELFORMAT_ARGB1555) {
         SDL_SetError("Unsupported texture format");
         return nullptr;
     }
@@ -506,8 +565,9 @@ SDL_Texture* SDL_CreateTexture(SDL_Renderer* renderer, SDL_PixelFormat format, S
     texture->renderer = renderer;
     texture->w = w;
     texture->h = h;
-    texture->pitch = w * 4;
-    texture->pixels = static_cast<Uint32*>(calloc(static_cast<size_t>(w) * h, 4));
+    texture->bpp = format == SDL_PIXELFORMAT_ARGB1555 ? 2 : 4;
+    texture->pitch = w * texture->bpp;
+    texture->pixels = static_cast<Uint32*>(sdlx_calloc(static_cast<size_t>(w) * h, static_cast<size_t>(texture->bpp)));
     if (!texture->pixels) {
         delete texture;
         SDL_SetError("Out of memory");
@@ -522,7 +582,7 @@ void SDL_DestroyTexture(SDL_Texture* texture)
         return;
     if (texture->renderer && texture->renderer->pending == texture)
         texture->renderer->pending = nullptr;
-    free(texture->pixels);
+    sdlx_free(texture->pixels);
     delete texture;
 }
 
@@ -542,7 +602,7 @@ bool SDL_UpdateTexture(SDL_Texture* texture, const SDL_Rect* rect, const void* p
         for (int y = 0; y < texture->h; y++) {
             memcpy(reinterpret_cast<Uint8*>(texture->pixels) + static_cast<size_t>(y) * texture->pitch,
                    static_cast<const Uint8*>(texture->source) + static_cast<size_t>(y) * texture->source_pitch,
-                   static_cast<size_t>(texture->w) * 4);
+                   static_cast<size_t>(texture->w) * texture->bpp);
         }
         texture->source = nullptr;
     }
@@ -554,9 +614,10 @@ bool SDL_UpdateTexture(SDL_Texture* texture, const SDL_Rect* rect, const void* p
         return true;
 
     for (int y = y0; y < y1; y++) {
-        memcpy(reinterpret_cast<Uint8*>(texture->pixels) + static_cast<size_t>(y) * texture->pitch + x0 * 4,
-               static_cast<const Uint8*>(pixels) + static_cast<size_t>(y - area.y) * pitch + (x0 - area.x) * 4,
-               static_cast<size_t>(x1 - x0) * 4);
+        const int bpp = texture->bpp;
+        memcpy(reinterpret_cast<Uint8*>(texture->pixels) + static_cast<size_t>(y) * texture->pitch + x0 * bpp,
+               static_cast<const Uint8*>(pixels) + static_cast<size_t>(y - area.y) * pitch + (x0 - area.x) * bpp,
+               static_cast<size_t>(x1 - x0) * bpp);
     }
     return true;
 }
@@ -576,4 +637,67 @@ SDL_Window* SDL_GetKeyboardFocus(void)
 bool SDL_CaptureMouse(bool)
 {
     return true;
+}
+
+
+/* ---- The crash screen ---------------------------------------------------- */
+
+namespace {
+// The crash screen or a report on the screen (the screen's memory, else a frame texture)
+void showScreen(const char* heading, Uint32 color, const char* title, const char* message)
+{
+    if (!g_renderer)
+        return;
+    Uint8* pixels = static_cast<Uint8*>(g_screen_pixels);
+    int pitch = g_screen_pitch;
+    int bpp = 2;
+    D3DTexture* texture = &g_screen_texture;
+    D3DLOCKED_RECT locked;
+    locked.pBits = nullptr;
+    if (!pixels) {
+        if (!g_frame_textures[0])
+            g_frame_textures[0] = D3DDevice_CreateTexture2(k_screen_w, k_screen_h, 1, 1, 0, D3DFMT_LIN_X8R8G8B8, D3DRTYPE_TEXTURE);
+        if (!g_frame_textures[0])
+            return;
+        texture = g_frame_textures[0];
+        D3DTexture_LockRect(texture, 0, &locked, NULL, 0);
+        pixels = static_cast<Uint8*>(locked.pBits);
+        pitch = locked.Pitch;
+        bpp = 4;
+    }
+    if (!pixels)
+        return;
+    sdlx_report_draw(pixels, pitch, bpp, heading, color, title, message);
+    if (locked.pBits)
+        D3DTexture_UnlockRect(texture, 0);
+    __asm__ volatile("wbinvd" ::: "memory");
+    drawQuad(texture);
+    D3DDevice_Swap(0);
+}
+} // namespace
+
+void SDL_XboxShowReport(const char* heading, const char* title, const char* text)
+{
+    sdlx_log("[report] %s: %s\n", title, text);
+    showScreen(heading, 0xFF50E050u, title, text);
+    sdlx_wait_for_button();
+}
+
+void sdlx_fatal(const char* title, const char* message)
+{
+    // One crash screen: another thread's crash meanwhile waits here
+    static volatile LONG s_crashed = 0;
+    if (InterlockedExchange(&s_crashed, 1)) {
+        for (;;)
+            Sleep(1000);
+    }
+    sdlx_log("[crash] %s: %s\n", title, message);
+    // Into the screen's memory if the game drew there, else a frame texture; the GPU may still read
+    // either (the frame before), which only matters for that frame
+    showScreen("The game crashed", 0xFFF05040u, title, message);
+
+    sdlx_wait_for_button();
+    SDL_XboxReturnToDashboard();
+    for (;;)
+        Sleep(1000);
 }

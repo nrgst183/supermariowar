@@ -38,13 +38,17 @@ void print_help(const char* title, const char* version)
     printf("  -h, --help              Prints this help\n");
     printf("      --datadir <DIR>     Sets the data directory to DIR (default: ./data)\n");
     printf("      --debug             Shows the debug console on Windows\n");
+    printf("      --low-memory        Loads graphics when needed and frees them when not, as on the\n"
+           "                          Xbox (64 MB): those paths, tried on a PC\n");
     printf("\nHeadless auto-play (debugging aid, CPU players, no device input):\n");
     printf("      --autotest          Enables auto-play; the options below only apply with it\n");
-    printf("      --at-match <KIND>   single (default), minigame, tournament, tour, world, menus or shots\n");
+    printf("      --at-match <KIND>   single (default), minigame, tournament, tour, world, menus, shots, or\n"
+           "                          everything (all of them in turn; the Xbox's memory test)\n");
     printf("      --at-mode <N>       Game mode index 0..21 (minigame: 0 pipe, 1 hammer boss,\n"
            "                          2 bomb boss, 3 fire boss, 4 boxes); default: cycle all\n");
     printf("      --at-map <NAME>     Map short name (e.g. 0smw); default: cycle the map list\n"
            "                          (tour, world: the file name of the tour or world, e.g. 0smw)\n");
+    printf("      --at-maps <FILE>    Each match's map at random from FILE's (a name a line; a new order each run)\n");
     printf("      --at-players <N>    Players 1..4 (default 4, 0 = cycle 2..4)\n");
     printf("      --at-frames <N>     Max frames per match (menus: total frames), default 3000\n");
     printf("      --at-matches <N>    Quit after N matches (tour/world: stages), default 1\n");
@@ -71,6 +75,10 @@ void print_help(const char* title, const char* version)
            "                          re-simulate them and check that the state is identical\n");
     printf("      --at-peersum <N>    Print the cross-machine state checksum (\"peersum:\" lines)\n"
            "                          every N frames, to compare runs of different builds\n");
+    printf("      --at-determinism <N> The determinism test: a fixed suite of CPU matches N times (2: each\n"
+           "                          run must match the first); exit code 0 if all checksums matched\n");
+    printf("      --at-determinism-ref <FILE> Compare its checksums with these (another build's)\n");
+    printf("      --at-determinism-out <FILE> Write its checksums here (a reference for other builds)\n");
     printf("      --at-shot-every <N> Save a PNG of the screen every N drawn frames of a\n"
            "                          match (needs rendering), into --at-shot-dir <DIR>\n");
     printf("      --at-shot-dir <DIR> Where --at-shot-every saves the screenshots\n");
@@ -117,6 +125,11 @@ Args parse_args(int argc, char* argv[])
             continue;
         }
 
+        if (arg == "--low-memory") {
+            result.lowMemory = true;
+            continue;
+        }
+
         if (arg == "--autotest") {
             at.enabled = true;
             continue;
@@ -134,6 +147,10 @@ Args parse_args(int argc, char* argv[])
                 else if (val == "tour") at.kind = AutoTestArgs::Kind::Tour;
                 else if (val == "world") at.kind = AutoTestArgs::Kind::World;
                 else if (val == "tournament") at.kind = AutoTestArgs::Kind::Tournament;
+                else if (val == "everything") {
+                    at.everything = true;
+                    at.kind = AutoTestArgs::Kind::Menus;
+                }
                 else if (val == "menus") at.kind = AutoTestArgs::Kind::Menus;
                 else if (val == "shots") at.kind = AutoTestArgs::Kind::Shots;
                 else {
@@ -143,8 +160,11 @@ Args parse_args(int argc, char* argv[])
             }
             else if (arg == "--at-mode") at.mode = atoi(val.c_str());
             else if (arg == "--at-map") at.map = val;
+            else if (arg == "--at-maps") at.mapsFile = val;
+            else if (arg == "--at-rank-maps") at.rankMapsFile = val;
             else if (arg == "--at-players") at.players = atoi(val.c_str());
             else if (arg == "--at-frames") at.frames = atoi(val.c_str());
+            else if (arg == "--at-speed") at.speed = atoi(val.c_str()) > 1 ? atoi(val.c_str()) : 1;
             else if (arg == "--at-matches") at.matches = atoi(val.c_str());
             else if (arg == "--at-start") at.start = atoi(val.c_str());
             else if (arg == "--at-seed") at.seed = atoi(val.c_str());
@@ -165,6 +185,9 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-humans") at.humans = atoi(val.c_str());
             else if (arg == "--at-synctest") at.synctest = atoi(val.c_str());
             else if (arg == "--at-peersum") at.peersum = atoi(val.c_str());
+            else if (arg == "--at-determinism") at.determinism = atoi(val.c_str());
+            else if (arg == "--at-determinism-ref") at.determinismRef = val;
+            else if (arg == "--at-determinism-out") at.determinismOut = val;
             else if (arg == "--at-norender") at.norender = atoi(val.c_str()) != 0;
             else if (arg == "--at-shot-every") at.shotEvery = atoi(val.c_str());
             else if (arg == "--at-shot-dir") at.shotDir = val;

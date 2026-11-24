@@ -150,6 +150,16 @@ const Uint8* glyph(char c)
     static const Uint8 k_equals[7] = {0, 0, 0x1F, 0, 0x1F, 0, 0};
     static const Uint8 k_comma[7] = {0, 0, 0, 0, 0x0C, 0x04, 0x08};
     static const Uint8 k_square[7] = {0, 0x1F, 0x1F, 0x1F, 0x1F, 0x1F, 0};
+    static const Uint8 k_bang[7] = {0x04, 0x04, 0x04, 0x04, 0x04, 0, 0x04};
+    static const Uint8 k_question[7] = {0x0E, 0x11, 0x01, 0x02, 0x04, 0, 0x04};
+    static const Uint8 k_apostrophe[7] = {0x04, 0x04, 0x08, 0, 0, 0, 0};
+    static const Uint8 k_quote[7] = {0x0A, 0x0A, 0, 0, 0, 0, 0};
+    static const Uint8 k_underscore[7] = {0, 0, 0, 0, 0, 0, 0x1F};
+    static const Uint8 k_open_square[7] = {0x0E, 0x08, 0x08, 0x08, 0x08, 0x08, 0x0E};
+    static const Uint8 k_close_square[7] = {0x0E, 0x02, 0x02, 0x02, 0x02, 0x02, 0x0E};
+    static const Uint8 k_star[7] = {0, 0x04, 0x15, 0x0E, 0x15, 0x04, 0};
+    static const Uint8 k_semicolon[7] = {0, 0x0C, 0x0C, 0, 0x0C, 0x04, 0x08};
+    static const Uint8 k_backslash[7] = {0, 0x10, 0x08, 0x04, 0x02, 0x01, 0};
     if (c >= '0' && c <= '9') return k_digits[c - '0'];
     if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
     if (c >= 'A' && c <= 'Z') return k_letters[c - 'A'];
@@ -167,6 +177,16 @@ const Uint8* glyph(char c)
         case '=': return k_equals;
         case ',': return k_comma;
         case '#': return k_square;
+        case '!': return k_bang;
+        case '?': return k_question;
+        case '\'': return k_apostrophe;
+        case '"': return k_quote;
+        case '_': return k_underscore;
+        case '[': return k_open_square;
+        case ']': return k_close_square;
+        case '*': return k_star;
+        case ';': return k_semicolon;
+        case '\\': return k_backslash;
         default: return nullptr;
     }
 }
@@ -174,24 +194,44 @@ const Uint8* glyph(char c)
 constexpr int k_char_w = 6;
 constexpr int k_line_h = 9;
 
+// The pixels drawn on: 4 bytes (X8R8G8B8) or 2 (the screen's ARGB1555); set by the drawing's caller
+int g_canvas_bpp = 4;
+
 struct Canvas {
     Uint8* pixels;
     int pitch;
 
     Uint32* row(int y) const { return reinterpret_cast<Uint32*>(pixels + static_cast<size_t>(y) * pitch); }
+    Uint16* row16(int y) const { return reinterpret_cast<Uint16*>(pixels + static_cast<size_t>(y) * pitch); }
+    static Uint16 to16(Uint32 c)
+    {
+        return static_cast<Uint16>(0x8000u | ((c >> 9) & 0x7C00u) | ((c >> 6) & 0x03E0u) | ((c >> 3) & 0x001Fu));
+    }
 
     void put(int x, int y, Uint32 color) const
     {
-        if (x >= 0 && x < k_screen_w && y >= 0 && y < k_screen_h)
-            row(y)[x] = color;
+        if (x >= 0 && x < k_screen_w && y >= 0 && y < k_screen_h) {
+            if (g_canvas_bpp == 2)
+                row16(y)[x] = to16(color);
+            else
+                row(y)[x] = color;
+        }
     }
 
     void fill(int x, int y, int w, int h, Uint32 color) const
     {
+        const Uint16 c16 = to16(color);
         for (int py = SDL_max(y, 0); py < SDL_min(y + h, k_screen_h); py++) {
-            Uint32* r = row(py);
-            for (int px = SDL_max(x, 0); px < SDL_min(x + w, k_screen_w); px++)
-                r[px] = color;
+            const int x0 = SDL_max(x, 0), x1 = SDL_min(x + w, k_screen_w);
+            if (g_canvas_bpp == 2) {
+                Uint16* r = row16(py);
+                for (int px = x0; px < x1; px++)
+                    r[px] = c16;
+            } else {
+                Uint32* r = row(py);
+                for (int px = x0; px < x1; px++)
+                    r[px] = color;
+            }
         }
     }
 
@@ -199,23 +239,30 @@ struct Canvas {
     void darken(int x, int y, int w, int h) const
     {
         for (int py = SDL_max(y, 0); py < SDL_min(y + h, k_screen_h); py++) {
-            Uint32* r = row(py);
-            for (int px = SDL_max(x, 0); px < SDL_min(x + w, k_screen_w); px++)
-                r[px] = 0xFF000000u | ((r[px] >> 2) & 0x003F3F3Fu);
+            const int x0 = SDL_max(x, 0), x1 = SDL_min(x + w, k_screen_w);
+            if (g_canvas_bpp == 2) {
+                Uint16* r = row16(py);
+                for (int px = x0; px < x1; px++)
+                    r[px] = static_cast<Uint16>(0x8000u | ((r[px] >> 2) & 0x1CE7u));
+            } else {
+                Uint32* r = row(py);
+                for (int px = x0; px < x1; px++)
+                    r[px] = 0xFF000000u | ((r[px] >> 2) & 0x003F3F3Fu);
+            }
         }
     }
 
-    // Returns where the text ends
-    int text(int x, int y, Uint32 color, const char* s) const
+    // Returns where the text ends (`scale`: each of the font's pixels that many wide and high)
+    int text(int x, int y, Uint32 color, const char* s, int scale = 1) const
     {
-        for (; *s; s++, x += k_char_w) {
+        for (; *s; s++, x += k_char_w * scale) {
             const Uint8* g = glyph(*s);
             if (!g)
                 continue;
             for (int gy = 0; gy < 7; gy++) {
                 for (int gx = 0; gx < 5; gx++) {
                     if (g[gy] & (0x10 >> gx))
-                        put(x + gx, y + gy, color);
+                        fill(x + gx * scale, y + gy * scale, scale, scale, color);
                 }
             }
         }
@@ -315,6 +362,34 @@ void closeWindow(Uint64 now_ns, Uint64 now_cycles)
     g.blit_worst = g.present_worst = 0;
     g.window_start_ns = now_ns;
     g.window_start_cycles = now_cycles;
+}
+// The crash screen's text: `s` in lines of up to `columns` (broken at spaces when it can, and at its
+// own new lines); returns the y below it. Stops at `bottom`.
+int wrappedText(const Canvas& c, int x, int y, Uint32 color, const char* s, int scale, int bottom)
+{
+    const int columns = (k_screen_w - 2 * x) / (k_char_w * scale);
+    char line[128];
+    while (*s && y + k_line_h * scale <= bottom) {
+        int n = 0, lastSpace = -1;
+        while (s[n] && s[n] != '\n' && n < columns && n < static_cast<int>(sizeof(line)) - 1) {
+            if (s[n] == ' ')
+                lastSpace = n;
+            n++;
+        }
+        int take = n;
+        if (s[n] && s[n] != '\n' && lastSpace > 0)
+            take = lastSpace;    //(the line is full: broken at its last space)
+        memcpy(line, s, static_cast<size_t>(take));
+        line[take] = 0;
+        c.text(x, y, color, line, scale);
+        y += k_line_h * scale;
+        s += take;
+        while (*s == ' ')
+            s++;
+        if (*s == '\n')
+            s++;
+    }
+    return y;
 }
 } // namespace
 
@@ -437,8 +512,50 @@ void sdlx_overlay_presented(Uint64 cycles)
     g.last_present_cycles = cycles;
 }
 
-void sdlx_overlay_draw(Uint8* pixels, int pitch)
+namespace {
+bool g_memory_hud = false;
+char g_memory_hud_label[96] = "";
+
+void drawMemoryHud(Uint8* pixels, int pitch)
 {
+    const Canvas c {pixels, pitch};
+    MEMORYSTATUS memory;
+    memory.dwLength = sizeof(memory);
+    GlobalMemoryStatus(&memory);
+    const double mb = 1024.0 * 1024.0;
+    const double freeMb = static_cast<double>(memory.dwAvailPhys) / mb;
+    const double lowMb = static_cast<double>(sdlx_memory_lowest()) / mb;
+    c.fill(0, 0, k_screen_w, 50, 0xFF101830u);    //(solid: a paused match keeps its picture, so a darkening would add up)
+    char line[128];
+    snprintf(line, sizeof(line), "FREE %.1f MB", freeMb);
+    int x = c.text(16, 12, freeMb < 4.0 ? k_red : freeMb < 8.0 ? k_yellow : k_green, line, 2);
+    snprintf(line, sizeof(line), "LOW %.1f", lowMb);
+    x = c.text(x + 14, 12, lowMb < 4.0 ? k_red : lowMb < 8.0 ? k_yellow : k_white, line, 2);
+    snprintf(line, sizeof(line), "IMG %.1f  SND %.1f", static_cast<double>(g_sdlx_surface_bytes) / mb,
+             static_cast<double>(g_sdlx_sound_bytes) / mb);
+    c.text(x + 14, 12, k_white, line, 2);
+    c.text(16, 29, k_gray, g_memory_hud_label);    //(below a TV's overscan)
+    //(the biggest images now: where the memory is)
+    static char biggest[4][64];
+    const int n = sdlx_biggest_surfaces(biggest, 4);
+    for (int i = 0; i < n; i++) {
+        biggest[i][24] = 0;    //(four side by side)
+        c.text(16 + i * 152, 39, k_dim + 0x00404040u, biggest[i]);
+    }
+}
+} // namespace
+
+void SDL_XboxSetMemoryHud(bool on, const char* label)
+{
+    g_memory_hud = on;
+    snprintf(g_memory_hud_label, sizeof(g_memory_hud_label), "%s", label ? label : "");
+}
+
+void sdlx_overlay_draw(Uint8* pixels, int pitch, int bpp)
+{
+    g_canvas_bpp = bpp;
+    if (g_memory_hud)
+        drawMemoryHud(pixels, pitch);
     if (!g_sdlx_overlay)
         return;
     const Uint64 start = sdlx_cycles();
@@ -581,4 +698,70 @@ void sdlx_overlay_draw(Uint8* pixels, int pitch)
     }
 
     g.overlay_cycles += sdlx_cycles() - start;
+}
+
+
+/* ---- The crash screen ---------------------------------------------------- */
+
+void sdlx_fatal_draw(Uint8* pixels, int pitch, int bpp, const char* title, const char* message)
+{
+    sdlx_report_draw(pixels, pitch, bpp, "The game crashed", k_red, title, message);
+}
+
+void sdlx_report_draw(Uint8* pixels, int pitch, int bpp, const char* heading, Uint32 color, const char* title, const char* message)
+{
+    g_canvas_bpp = bpp;
+    const Canvas c {pixels, pitch};
+    c.fill(0, 0, k_screen_w, k_screen_h, 0xFF101830u);
+
+    //(inside a TV's overscan)
+    const int x = 40;
+    int y = 32;
+    c.text(x, y, color, heading, 3);
+    y += k_line_h * 3 + 6;
+    c.text(x, y, k_yellow, title, 2);
+    y += k_line_h * 2 + 4;
+    //(a long report, the tests': the small font, and room for it)
+    const bool longText = strlen(message) > 240;
+    y = wrappedText(c, x, y, k_white, message, longText ? 1 : 2, longText ? 360 : 250) + 6;
+
+    c.text(x, y, k_gray, "Doing:", 2);
+    y = wrappedText(c, x + 7 * k_char_w * 2, y, k_white, sdlx_crash_context(), 2, y + k_line_h * 4);
+
+    MEMORYSTATUS memory;
+    memory.dwLength = sizeof(memory);
+    GlobalMemoryStatus(&memory);
+    const double free_mb = static_cast<double>(memory.dwAvailPhys) / (1024.0 * 1024.0);
+    const double total_mb = static_cast<double>(memory.dwTotalPhys) / (1024.0 * 1024.0);
+    c.text(x, y, k_gray, "Memory:", 2);
+    char amount[48];
+    snprintf(amount, sizeof(amount), "%.1f MB free of %.0f MB", free_mb, total_mb);
+    c.text(x + 8 * k_char_w * 2, y, free_mb < 4.0 ? k_red : k_white, amount, 2);
+    y += k_line_h * 2 + 6;
+
+    // The biggest images (where the memory is), then the log's last lines (what led up to it)
+    const int bottom = k_screen_h - 40 - k_line_h * 2;
+    static char biggest[10][64];
+    const int images = sdlx_biggest_surfaces(biggest, 10);
+    if (images > 0) {
+        c.text(x, y, k_gray, "The biggest images:");
+        y += k_line_h + 2;
+        for (int i = 0; i < images; i += 2, y += k_line_h) {
+            c.text(x, y, k_dim + 0x00404040u, biggest[i]);
+            if (i + 1 < images)
+                c.text(x + 290, y, k_dim + 0x00404040u, biggest[i + 1]);
+        }
+        y += 4;
+    }
+    const char* lines[12];
+    const int have = sdlx_log_tail(lines, 12);
+    const int fit = SDL_min(have, (bottom - y - k_line_h - 4) / k_line_h);
+    if (fit > 0) {
+        c.text(x, y, k_gray, "The log's last lines:");
+        y += k_line_h + 2;
+        for (int i = have - fit; i < have; i++, y += k_line_h)
+            c.text(x, y, k_dim + 0x00404040u, lines[i]);
+    }
+
+    c.text(x, k_screen_h - 36 - k_line_h * 2, k_green, "Press A or Start: back to the dashboard", 2);
 }

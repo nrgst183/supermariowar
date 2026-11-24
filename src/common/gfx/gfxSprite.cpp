@@ -1,5 +1,6 @@
 #include "gfxSprite.h"
 #include "LoadLog.h"
+#include "Platform.h"
 
 #include "gfx.h"
 
@@ -7,6 +8,8 @@
 
 #include <algorithm>
 #include <cassert>
+#include <mutex>
+#include <unordered_set>
 #include <cstdio>
 #include <filesystem>
 #include <format>
@@ -106,15 +109,11 @@ SdlSurfacePtr loadImage(
     }
 
     t = loadlog::nowNs();
-#ifdef SMW_XBOX
-    //(loaded in the screen's format already, and no key to turn into transparency: the conversion
-    //would only copy it, a second big allocation for an ingame tileset)
-    const bool convert = color_key || raw->format != screen->format;
-    auto img = !convert ? std::move(raw) : SdlSurfacePtr(SDL_ConvertSurface(raw.get(), screen->format));
-#else
-    const bool convert = true;
-    auto img = SdlSurfacePtr(SDL_ConvertSurface(raw.get(), screen->format));
-#endif
+    //(32 bits, the loading's rules work on those (an image is made compact after, ImageLoader::load;
+    //the Xbox's screen is 16). Loaded in 32 bits already, and no key to turn into transparency: the
+    //conversion would only copy it, a second big allocation for an ingame tileset)
+    const bool convert = color_key || raw->format != SDL_PIXELFORMAT_ARGB8888;
+    auto img = !convert ? std::move(raw) : SdlSurfacePtr(SDL_ConvertSurface(raw.get(), SDL_PIXELFORMAT_ARGB8888));
     if (img && convert)
         loadlog::count("images converted (their color key)", loadlog::nowNs() - t, static_cast<Uint64>(img->w) * img->h * 4);
     t = loadlog::nowNs();
@@ -161,6 +160,141 @@ gfxSprite::gfxSprite(SdlSurfacePtr image, std::optional<int> wrap)
     , m_wrap_x(wrap)
 {}
 
+
+/* ---- Groups: sprites freed and loaded again --------------------------------- */
+
+namespace {
+// The sprites in groups (the main thread's: a preview's worker loads tilesets, never in a group)
+std::unordered_set<gfxSprite*>& groupSprites()
+{
+    static auto* sprites = new std::unordered_set<gfxSprite*>;    //(never freed: sprites outlive it at exit)
+    return *sprites;
+}
+thread_local SpriteGroup t_loadingGroup = SpriteGroup::None;
+thread_local bool t_loadingDeferred = false;
+thread_local bool t_compactAll = false;    // (gfxSprite::CompactLoading)
+} // namespace
+
+gfxSprite::CompactLoading::CompactLoading()
+    : m_previous(t_compactAll)
+{
+    t_compactAll = true;
+}
+
+gfxSprite::CompactLoading::~CompactLoading()
+{
+    t_compactAll = m_previous;
+}
+
+gfxSprite::LoadingGroup::LoadingGroup(SpriteGroup group, bool deferred)
+    : m_previous(t_loadingGroup)
+    , m_previousDeferred(t_loadingDeferred)
+{
+    t_loadingGroup = group;
+    t_loadingDeferred = deferred;
+}
+
+gfxSprite::LoadingGroup::~LoadingGroup()
+{
+    t_loadingGroup = m_previous;
+    t_loadingDeferred = m_previousDeferred;
+}
+
+void gfxSprite::track()
+{
+    if (m_group != SpriteGroup::None && m_source)
+        groupSprites().insert(this);
+}
+
+void gfxSprite::untrack()
+{
+    if (m_group != SpriteGroup::None)
+        groupSprites().erase(this);
+}
+
+gfxSprite::gfxSprite(gfxSprite&& other) noexcept
+    : m_picture(std::move(other.m_picture))
+    , m_source(std::move(other.m_source))
+    , m_group(other.m_group)
+    , m_alphaSet(other.m_alphaSet)
+    , m_wrap_x(other.m_wrap_x)
+    , m_bakedAlpha(other.m_bakedAlpha)
+    , m_opaque(other.m_opaque)
+{
+    other.untrack();
+    other.m_group = SpriteGroup::None;
+    track();
+}
+
+gfxSprite& gfxSprite::operator=(gfxSprite&& other) noexcept
+{
+    if (this == &other)
+        return *this;
+    untrack();
+    other.untrack();
+    m_picture = std::move(other.m_picture);
+    m_source = std::move(other.m_source);
+    m_group = other.m_group;
+    m_alphaSet = other.m_alphaSet;
+    m_wrap_x = other.m_wrap_x;
+    m_bakedAlpha = other.m_bakedAlpha;
+    m_opaque = other.m_opaque;
+    other.m_group = SpriteGroup::None;
+    track();
+    return *this;
+}
+
+gfxSprite::~gfxSprite()
+{
+    untrack();
+}
+
+void gfxSprite::setGroup(SpriteGroup group)
+{
+    untrack();
+    m_group = group;
+    track();
+}
+
+void gfxSprite::keepLoaded()
+{
+    picture();
+    untrack();
+    m_source.reset();
+    m_group = SpriteGroup::None;
+}
+
+void gfxSprite::unloadGroup(SpriteGroup group)
+{
+    for (gfxSprite* sprite : groupSprites()) {
+        if (sprite->m_group == group)
+            sprite->m_picture.reset();
+    }
+}
+
+void gfxSprite::loadGroup(SpriteGroup group)
+{
+    for (gfxSprite* sprite : groupSprites()) {
+        if (sprite->m_group == group)
+            sprite->picture();
+    }
+}
+
+void gfxSprite::reload() const
+{
+    //(the map preview's worker draws sprites too: one load at a time, and not twice)
+    static std::mutex s_reloading;
+    const std::lock_guard<std::mutex> lock(s_reloading);
+    if (m_picture)
+        return;
+    const ImageLoader& from = *m_source;
+    m_picture = from.load(true);
+    SDL_BlendMode mode = SDL_BLENDMODE_BLEND;
+    m_opaque = m_picture && SDL_GetSurfaceBlendMode(m_picture.get(), &mode) && mode == SDL_BLENDMODE_NONE;
+    if (m_picture && m_alphaSet)
+        const_cast<gfxSprite*>(this)->setalpha(*m_alphaSet);
+}
+
 gfxSprite gfxSprite::blank(unsigned w, unsigned h, std::optional<int> wrap)
 {
     auto surf = SdlSurfacePtr(SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888));
@@ -170,6 +304,15 @@ gfxSprite gfxSprite::blank(unsigned w, unsigned h, std::optional<int> wrap)
     if (!SDL_SetSurfaceBlendMode(surf.get(), SDL_BLENDMODE_NONE))
         throw std::format("Couldn't set blend mode for blank surface: {}", SDL_GetError());
 
+    return gfxSprite(std::move(surf), std::move(wrap));
+}
+
+gfxSprite gfxSprite::blankScreenFormat(unsigned w, unsigned h, std::optional<int> wrap)
+{
+    auto surf = SdlSurfacePtr(SDL_CreateSurface(w, h, platform::screenFormat()));
+    if (!surf)
+        throw std::format("Couldn't create blank surface: {}", SDL_GetError());
+    SDL_SetSurfaceBlendMode(surf.get(), SDL_BLENDMODE_NONE);
     return gfxSprite(std::move(surf), std::move(wrap));
 }
 
@@ -185,25 +328,25 @@ void gfxSprite::draw(int x, int y, const SDL_Rect& srcRect) const
 
 void gfxSprite::blit(const SDL_Rect* srcRect, SDL_Surface* dst, Vec2i dstPos) const
 {
-    assert(m_picture);
+    assert(picture());
 
     SDL_Rect dstRect { dstPos.x, dstPos.y, 0, 0 };
-    blitSurface(m_picture.get(), srcRect, dst, &dstRect);
+    blitSurface(picture(), srcRect, dst, &dstRect);
 
     if (m_wrap_x) {
         if (dstRect.x + getWidth() >= *m_wrap_x) {
             dstRect = { dstPos.x - *m_wrap_x, dstPos.y, 0, 0 };  // NOTE: SDL2 modifies the dst rect
-            blitSurface(m_picture.get(), srcRect, dst, &dstRect);
+            blitSurface(picture(), srcRect, dst, &dstRect);
         } else if (dstRect.x < 0) {
             dstRect = { dstPos.x + *m_wrap_x, dstPos.y, 0, 0 };  // NOTE: SDL2 modifies the dst rect
-            blitSurface(m_picture.get(), srcRect, dst, &dstRect);
+            blitSurface(picture(), srcRect, dst, &dstRect);
         }
     }
 }
 
 void gfxSprite::draw(int x, int y, const SDL_Rect& srcRect, ClipEdge clipEdge, int clipTreshold) const
 {
-    assert(m_picture);
+    assert(picture());
 
     const SDL_Rect dstRect {x + x_shake, y + y_shake, srcRect.w, srcRect.h};
     SDL_Rect adjustedSrcRect = srcRect;
@@ -212,7 +355,7 @@ void gfxSprite::draw(int x, int y, const SDL_Rect& srcRect, ClipEdge clipEdge, i
     if (gfx_adjusthiddenrects(adjustedSrcRect, adjustedDstRect, clipEdge, clipTreshold))
         return;
 
-    blitSurface(m_picture.get(), &adjustedSrcRect, blitdest, &adjustedDstRect);
+    blitSurface(picture(), &adjustedSrcRect, blitdest, &adjustedDstRect);
 
     if (m_wrap_x) {
         if (x + srcRect.w >= *m_wrap_x) {
@@ -223,7 +366,7 @@ void gfxSprite::draw(int x, int y, const SDL_Rect& srcRect, ClipEdge clipEdge, i
             if (gfx_adjusthiddenrects(adjustedSrcRect, adjustedDstRect, clipEdge, clipTreshold))
                 return;
 
-            blitSurface(m_picture.get(), &adjustedSrcRect, blitdest, &adjustedDstRect);
+            blitSurface(picture(), &adjustedSrcRect, blitdest, &adjustedDstRect);
         } else if (x < 0) {
             adjustedSrcRect = srcRect;
             adjustedDstRect = dstRect;
@@ -232,23 +375,25 @@ void gfxSprite::draw(int x, int y, const SDL_Rect& srcRect, ClipEdge clipEdge, i
             if (gfx_adjusthiddenrects(adjustedSrcRect, adjustedDstRect, clipEdge, clipTreshold))
                 return;
 
-            blitSurface(m_picture.get(), &adjustedSrcRect, blitdest, &adjustedDstRect);
+            blitSurface(picture(), &adjustedSrcRect, blitdest, &adjustedDstRect);
         }
     }
 }
 
 void gfxSprite::drawStretch(const SDL_Rect& srcRect, SDL_Surface* dst, const SDL_Rect& dstRect) const
 {
-    assert(m_picture);
+    assert(picture());
 
-    if (!SDL_BlitSurfaceScaled(m_picture.get(), &srcRect, dst, &dstRect, SDL_SCALEMODE_PIXELART)) {
+    if (!SDL_BlitSurfaceScaled(picture(), &srcRect, dst, &dstRect, SDL_SCALEMODE_PIXELART)) {
         fprintf(stderr, "SDL_BlitScaled error: %s\n", SDL_GetError());
     }
 }
 
 void gfxSprite::setalpha(Uint8 alpha)
 {
-    assert(m_picture != nullptr);
+    m_alphaSet = alpha;
+    if (!picture())
+        return;
 
     //(its loading alpha is in its pixels: relative to that, it can only get more transparent)
     if (m_bakedAlpha < 255)
@@ -276,12 +421,46 @@ void gfxSprite::setWrap(short wrapsize)
     m_wrap_x = wrapsize;
 }
 
+SdlSurfacePtr ImageLoader::load(bool compact) const
+{
+    //(compact, in less memory where the platform has it (16 bits on the Xbox, as the original game's
+    //images), and kept on its cache drive as it's drawn: the next load reads that, half the bytes and
+    //nothing to convert)
+    const bool small = compact || m_compact;
+    const std::string file = m_path.string();
+    std::string key;
+    if (small) {
+        key = file + (m_color_key ? std::format("|k{:02x}{:02x}{:02x}", m_color_key->r, m_color_key->g, m_color_key->b) : "|-") +
+              (m_alpha ? std::format("|a{}", *m_alpha) : "|-") + (m_changingAlpha ? "|c" : "|-");
+        if (SDL_Surface* cached = platform::loadCompactImage(file, key))
+            return SdlSurfacePtr(cached);
+    }
+    SdlSurfacePtr picture = loadImage(m_path, m_color_key, m_alpha, !m_changingAlpha);
+    if (picture && small) {
+        if (SDL_Surface* compacted = platform::compactSurface(picture.get())) {
+            picture.reset(compacted);
+            platform::saveCompactImage(file, key, picture.get());
+        }
+    }
+    return picture;
+}
+
 gfxSprite ImageLoader::create() const
 {
-    gfxSprite sprite(loadImage(m_path, m_color_key, m_alpha, !m_changingAlpha), m_wrap_x);
+    gfxSprite sprite;
+    sprite.m_wrap_x = m_wrap_x;
     if (m_alpha && !m_changingAlpha && *m_alpha < 255)
         sprite.m_bakedAlpha = *m_alpha;
-    SDL_BlendMode mode = SDL_BLENDMODE_BLEND;
-    sprite.m_opaque = sprite.m_picture && SDL_GetSurfaceBlendMode(sprite.m_picture.get(), &mode) && mode == SDL_BLENDMODE_NONE;
+    if (t_loadingGroup != SpriteGroup::None) {
+        sprite.m_source = std::make_shared<const ImageLoader>(*this);
+        sprite.m_group = t_loadingGroup;
+    }
+    //(deferred: loaded when it's first used)
+    if (!(t_loadingDeferred && sprite.m_source)) {
+        sprite.m_picture = load(t_loadingGroup != SpriteGroup::None || t_compactAll);
+        SDL_BlendMode mode = SDL_BLENDMODE_BLEND;
+        sprite.m_opaque = sprite.m_picture && SDL_GetSurfaceBlendMode(sprite.m_picture.get(), &mode) && mode == SDL_BLENDMODE_NONE;
+    }
+    sprite.track();
     return sprite;
 }

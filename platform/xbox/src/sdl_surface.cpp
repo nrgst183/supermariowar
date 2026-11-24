@@ -1,13 +1,17 @@
 // Xbox SDL3 compatibility layer: software surfaces and blitting.
 //
 // The game draws everything on the CPU into a 640x480 ARGB8888 surface, like it
-// does on SDL's software renderer path. All surfaces here are 32-bit
-// (ARGB8888, or XRGB8888 where the alpha channel is ignored). The blending
+// does on SDL's software renderer path. Surfaces are 32-bit (ARGB8888, or
+// XRGB8888 where the alpha channel is ignored), except loaded images made
+// compact (SDL_XboxCompactSurface): 16-bit, ARGB1555 or ARGB4444, drawn from
+// only (a blit widens their rows to 32 bits as it reads them). The blending
 // rules follow SDL3: color key first, then the blend mode with the alpha
 // modulation.
 
 #include "sdl_internal.h"
 
+#include <atomic>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -16,12 +20,67 @@
 namespace {
 bool isSupportedFormat(SDL_PixelFormat format)
 {
-    return format == SDL_PIXELFORMAT_ARGB8888 || format == SDL_PIXELFORMAT_XRGB8888;
+    return format == SDL_PIXELFORMAT_ARGB8888 || format == SDL_PIXELFORMAT_XRGB8888 ||
+           format == SDL_PIXELFORMAT_ARGB1555 || format == SDL_PIXELFORMAT_ARGB4444;
 }
 
 bool hasAlpha(SDL_PixelFormat format)
 {
-    return format == SDL_PIXELFORMAT_ARGB8888;
+    return format != SDL_PIXELFORMAT_XRGB8888;
+}
+
+bool is16(SDL_PixelFormat format)
+{
+    return format == SDL_PIXELFORMAT_ARGB1555 || format == SDL_PIXELFORMAT_ARGB4444;
+}
+
+const SDL_PixelFormatDetails k_argb1555 = {
+    SDL_PIXELFORMAT_ARGB1555, 16, 2, {0, 0},
+    0x7C00u, 0x03E0u, 0x001Fu, 0x8000u,
+    5, 5, 5, 1,
+    10, 5, 0, 15,
+};
+
+const SDL_PixelFormatDetails k_argb4444 = {
+    SDL_PIXELFORMAT_ARGB4444, 16, 2, {0, 0},
+    0x0F00u, 0x00F0u, 0x000Fu, 0xF000u,
+    4, 4, 4, 4,
+    8, 4, 0, 12,
+};
+
+// 16-bit pixels widened to ARGB8888: each byte's part looked up (a channel's widening is shifts and
+// ORs of its bits, so the two bytes' parts OR together)
+struct Widen {
+    Uint32 lo[256];
+    Uint32 hi[256];
+};
+
+Uint32 widen1555(Uint32 v)
+{
+    const Uint32 r = (v >> 10) & 31, g = (v >> 5) & 31, b = v & 31;
+    return ((v & 0x8000u) ? 0xFF000000u : 0u) | (((r << 3) | (r >> 2)) << 16) | (((g << 3) | (g >> 2)) << 8) | ((b << 3) | (b >> 2));
+}
+
+Uint32 widen4444(Uint32 v)
+{
+    const Uint32 a = (v >> 12) & 15, r = (v >> 8) & 15, g = (v >> 4) & 15, b = v & 15;
+    return ((a * 17) << 24) | ((r * 17) << 16) | ((g * 17) << 8) | (b * 17);
+}
+
+const Widen& widenTable(SDL_PixelFormat format)
+{
+    static Widen t1555, t4444;
+    static bool made = false;
+    if (!made) {
+        for (Uint32 i = 0; i < 256; i++) {
+            t1555.lo[i] = widen1555(i);
+            t1555.hi[i] = widen1555(i << 8);
+            t4444.lo[i] = widen4444(i);
+            t4444.hi[i] = widen4444(i << 8);
+        }
+        made = true;
+    }
+    return format == SDL_PIXELFORMAT_ARGB1555 ? t1555 : t4444;
 }
 
 const SDL_PixelFormatDetails k_argb8888 = {
@@ -88,6 +147,75 @@ inline const Uint32* rowPtr(const SDL_Surface* surface, int y)
 {
     return reinterpret_cast<const Uint32*>(static_cast<const Uint8*>(surface->pixels) + static_cast<size_t>(y) * surface->pitch);
 }
+
+inline Uint16 pack1555(Uint32 p)
+{
+    return static_cast<Uint16>(((p >> 24) >= 128 ? 0x8000u : 0u) | ((p >> 9) & 0x7C00u) | ((p >> 6) & 0x03E0u) | ((p >> 3) & 0x001Fu));
+}
+
+// A 16-bit target's rows: widened to ARGB8888 for a blit to work on, packed back after
+struct TargetRow {
+    SDL_Surface* surface;
+    const Widen* table;
+    Uint32 buffer[1024];
+    Uint16* row = nullptr;
+    int n = 0;
+
+    explicit TargetRow(SDL_Surface* s) : surface(s), table(&widenTable(s->format)) {}
+
+    Uint32* begin(int y, int x, int count)
+    {
+        n = count > 1024 ? 1024 : count;
+        row = reinterpret_cast<Uint16*>(static_cast<Uint8*>(surface->pixels) + static_cast<size_t>(y) * surface->pitch) + x;
+        for (int i = 0; i < n; i++)
+            buffer[i] = table->lo[row[i] & 0xFF] | table->hi[row[i] >> 8];
+        return buffer;
+    }
+    void end()
+    {
+        for (int i = 0; i < n; i++)
+            row[i] = pack1555(buffer[i]);
+    }
+};
+
+// A source's pixels as ARGB8888: a 32-bit surface's own, a 16-bit one's widened into a buffer
+struct SourceRows {
+    const SDL_Surface* surface;
+    bool wide;
+    const Widen* table = nullptr;
+    Uint32 local[1024];
+    Uint32* buffer = local;
+    Uint32* heap = nullptr;
+
+    explicit SourceRows(const SDL_Surface* s)
+        : surface(s)
+        , wide(is16(s->format))
+    {
+        if (wide) {
+            table = &widenTable(s->format);
+            if (s->w > 1024) {
+                heap = static_cast<Uint32*>(malloc(static_cast<size_t>(s->w) * 4));
+                buffer = heap ? heap : local;
+            }
+        }
+    }
+    ~SourceRows() { free(heap); }
+    SourceRows(const SourceRows&) = delete;
+    SourceRows& operator=(const SourceRows&) = delete;
+
+    // Row y's pixels from x on (n of them); [0] is pixel x
+    const Uint32* row(int y, int x, int n)
+    {
+        if (!wide)
+            return rowPtr(surface, y) + x;
+        if (heap == nullptr && n > 1024)
+            n = 1024;
+        const Uint16* s = reinterpret_cast<const Uint16*>(static_cast<const Uint8*>(surface->pixels) + static_cast<size_t>(y) * surface->pitch) + x;
+        for (int i = 0; i < n; i++)
+            buffer[i] = table->lo[s[i] & 0xFF] | table->hi[s[i] >> 8];
+        return buffer;
+    }
+};
 
 // a: 0..256
 inline Uint32 blendRgb(Uint32 s, Uint32 d, Uint32 a)
@@ -185,7 +313,7 @@ SDL_Surface* allocSurface(int width, int height, SDL_PixelFormat format)
     surface->format = format;
     surface->w = width;
     surface->h = height;
-    surface->pitch = width * 4;
+    surface->pitch = width * (is16(format) ? 2 : 4);
     surface->refcount = 1;
     surface->has_colorkey = false;
     surface->colorkey = 0;
@@ -204,6 +332,8 @@ const SDL_PixelFormatDetails* SDL_GetPixelFormatDetails(SDL_PixelFormat format)
     switch (format) {
         case SDL_PIXELFORMAT_ARGB8888: return &k_argb8888;
         case SDL_PIXELFORMAT_XRGB8888: return &k_xrgb8888;
+        case SDL_PIXELFORMAT_ARGB1555: return &k_argb1555;
+        case SDL_PIXELFORMAT_ARGB4444: return &k_argb4444;
         default:
             SDL_SetError("Unsupported pixel format 0x%08x", static_cast<unsigned>(format));
             return nullptr;
@@ -240,6 +370,10 @@ void SDL_GetRGBA(Uint32 pixel, const SDL_PixelFormatDetails* format, const SDL_P
 
 /* ---- Surfaces ------------------------------------------------------------ */
 
+namespace {
+void trackSurface(SDL_Surface* surface);
+} // namespace
+
 SDL_Surface* SDL_CreateSurface(int width, int height, SDL_PixelFormat format)
 {
     if (width < 0 || height < 0) {
@@ -256,12 +390,123 @@ SDL_Surface* SDL_CreateSurface(int width, int height, SDL_PixelFormat format)
         return nullptr;
 
     const size_t size = static_cast<size_t>(surface->pitch) * height;
-    surface->pixels = calloc(1, size ? size : 4);
+    surface->pixels = sdlx_calloc(1, size ? size : 4);
     if (!surface->pixels) {
         free(surface);
         SDL_SetError("Out of memory (%dx%d surface)", width, height);
         return nullptr;
     }
+    g_sdlx_surface_bytes += size;
+    trackSurface(surface);
+    return surface;
+}
+
+namespace {
+// The live surfaces with pixels of their own (a fixed table: listed on the crash screen, which
+// mustn't allocate)
+struct LiveSurface {
+    SDL_Surface* surface;
+    Uint32 bytes;
+    char name[48];
+};
+constexpr int k_live = 4096;
+LiveSurface g_live[k_live];
+int g_live_count = 0;
+std::atomic_flag g_live_lock = ATOMIC_FLAG_INIT;    //(the map preview's worker makes surfaces too)
+
+struct LiveLock {
+    LiveLock() { while (g_live_lock.test_and_set(std::memory_order_acquire)) {} }
+    ~LiveLock() { g_live_lock.clear(std::memory_order_release); }
+};
+
+void trackSurface(SDL_Surface* surface)
+{
+    LiveLock lock;
+    if (g_live_count >= k_live)
+        return;
+    LiveSurface& live = g_live[g_live_count++];
+    live.surface = surface;
+    live.bytes = static_cast<Uint32>(surface->pitch) * static_cast<Uint32>(surface->h);
+    snprintf(live.name, sizeof(live.name), "blank %dx%d", surface->w, surface->h);
+}
+
+void untrackSurface(SDL_Surface* surface)
+{
+    LiveLock lock;
+    for (int i = 0; i < g_live_count; i++) {
+        if (g_live[i].surface == surface) {
+            g_live[i] = g_live[--g_live_count];
+            return;
+        }
+    }
+}
+
+const char* nameOf(const SDL_Surface* surface)
+{
+    for (int i = 0; i < g_live_count; i++) {
+        if (g_live[i].surface == surface)
+            return g_live[i].name;
+    }
+    return nullptr;
+}
+} // namespace
+
+void sdlx_surface_name(SDL_Surface* surface, const char* name)
+{
+    if (!surface || !name)
+        return;
+    //(a file's last two parts: "menu/menu_shade.png")
+    const char* start = name;
+    int slashes = 0;
+    for (const char* c = name + strlen(name); c > name; c--) {
+        if (c[-1] == '/' || c[-1] == '\\') {
+            if (++slashes == 2) {
+                start = c;
+                break;
+            }
+        }
+    }
+    LiveLock lock;
+    for (int i = 0; i < g_live_count; i++) {
+        if (g_live[i].surface == surface) {
+            snprintf(g_live[i].name, sizeof(g_live[i].name), "%s", start);
+            return;
+        }
+    }
+}
+
+int sdlx_biggest_surfaces(char (*lines)[64], int count)
+{
+    //(no lock: the crash screen may come while it's held; a list a little off is fine there)
+    int have = 0;
+    Uint32 below = 0xFFFFFFFFu;
+    const LiveSurface* lastPicked = nullptr;
+    for (int n = 0; n < count; n++) {
+        const LiveSurface* best = nullptr;
+        for (int i = 0; i < g_live_count; i++) {
+            const LiveSurface& live = g_live[i];
+            if (live.bytes > below || (live.bytes == below && &live <= lastPicked))
+                continue;
+            if (!best || live.bytes > best->bytes)
+                best = &live;
+        }
+        if (!best)
+            break;
+        snprintf(lines[have++], 64, "%4uK %s", static_cast<unsigned>(best->bytes / 1024), best->name);
+        below = best->bytes;
+        lastPicked = best;
+    }
+    return have;
+}
+
+SDL_Surface* sdlx_adopt_pixels(int w, int h, void* pixels)
+{
+    SDL_Surface* surface = allocSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
+    if (!surface)
+        return nullptr;
+    surface->pixels = pixels;
+    g_sdlx_surface_bytes += static_cast<Uint64>(surface->pitch) * h;
+    trackSurface(surface);
     return surface;
 }
 
@@ -286,8 +531,11 @@ void SDL_DestroySurface(SDL_Surface* surface)
         return;
     if (--surface->refcount > 0)
         return;
-    if (!(surface->flags & SDL_SURFACE_PREALLOCATED))
-        free(surface->pixels);
+    if (!(surface->flags & SDL_SURFACE_PREALLOCATED)) {
+        g_sdlx_surface_bytes -= static_cast<Uint64>(surface->pitch) * surface->h;
+        untrackSurface(surface);
+        sdlx_free(surface->pixels);
+    }
     free(surface);
 }
 
@@ -297,12 +545,28 @@ SDL_Surface* SDL_ConvertSurface(SDL_Surface* surface, SDL_PixelFormat format)
         return nullptr;
 
     SDL_Surface* out = SDL_CreateSurface(surface->w, surface->h, format);
+    if (out) {
+        char name[48] = "";
+        {
+            LiveLock lock;
+            if (const char* from = nameOf(surface))
+                snprintf(name, sizeof(name), "%s", from);
+        }
+        if (name[0] && strncmp(name, "blank", 5) != 0)
+            sdlx_surface_name(out, name);
+    }
     if (!out)
         return nullptr;
 
+    if (is16(format)) {
+        SDL_DestroySurface(out);
+        SDL_SetError("Can't convert to a 16-bit format (SDL_XboxCompactSurface does)");
+        return nullptr;
+    }
     const bool srcAlpha = hasAlpha(surface->format);
+    SourceRows rows(surface);
     for (int y = 0; y < surface->h; y++) {
-        const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(surface), y);
+        const Uint32* s = rows.row(y, 0, surface->w);
         Uint32* d = rowPtr(out, y);
         if (srcAlpha) {
             memcpy(d, s, static_cast<size_t>(surface->w) * 4);
@@ -342,10 +606,20 @@ SDL_Surface* SDL_DuplicateSurface(SDL_Surface* surface)
     if (!checkSurface(surface, "surface"))
         return nullptr;
     SDL_Surface* out = SDL_CreateSurface(surface->w, surface->h, surface->format);
+    if (out) {
+        char name[48] = "";
+        {
+            LiveLock lock;
+            if (const char* from = nameOf(surface))
+                snprintf(name, sizeof(name), "%s", from);
+        }
+        if (name[0] && strncmp(name, "blank", 5) != 0)
+            sdlx_surface_name(out, name);
+    }
     if (!out)
         return nullptr;
     for (int y = 0; y < surface->h; y++)
-        memcpy(rowPtr(out, y), rowPtr(static_cast<const SDL_Surface*>(surface), y), static_cast<size_t>(surface->w) * 4);
+        memcpy(rowPtr(out, y), rowPtr(static_cast<const SDL_Surface*>(surface), y), static_cast<size_t>(surface->w) * SDL_BYTESPERPIXEL(surface->format));
     out->has_colorkey = surface->has_colorkey;
     out->colorkey = surface->colorkey;
     out->alpha_mod = surface->alpha_mod;
@@ -490,6 +764,8 @@ bool SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color)
     ProfileScope profile(g_sdlx_profile.fill);
     if (!checkSurface(dst, "dst"))
         return false;
+    if (dst->format == SDL_PIXELFORMAT_ARGB4444)
+        return SDL_SetError("Can't fill an ARGB4444 surface");
 
     const SDL_Rect& clip = dst->clip_rect;
     int x0 = clip.x, y0 = clip.y, x1 = clip.x + clip.w, y1 = clip.y + clip.h;
@@ -501,6 +777,22 @@ bool SDL_FillSurfaceRect(SDL_Surface* dst, const SDL_Rect* rect, Uint32 color)
     }
     if (x1 <= x0 || y1 <= y0)
         return true;
+
+    if (is16(dst->format)) {
+        const Uint16 c = pack1555(dst->format == SDL_PIXELFORMAT_ARGB1555 ? color : color | 0xFF000000u);
+        const Uint32 pair = static_cast<Uint32>(c) | (static_cast<Uint32>(c) << 16);
+        for (int y = y0; y < y1; y++) {
+            Uint16* d = reinterpret_cast<Uint16*>(static_cast<Uint8*>(dst->pixels) + static_cast<size_t>(y) * dst->pitch) + x0;
+            Uint16* const end = d + (x1 - x0);
+            if (d < end && (reinterpret_cast<uintptr_t>(d) & 2))
+                *d++ = c;
+            for (; end - d >= 2; d += 2)
+                *reinterpret_cast<Uint32*>(d) = pair;
+            if (d < end)
+                *d = c;
+        }
+        return true;
+    }
 
     // 16 bytes (4 pixels) per store with SSE (moves keep the bits; SSE1 has
     // no integer stores, so the color goes through a float register)
@@ -532,13 +824,98 @@ bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst
         return true;
     g_sdlx_profile.blit_pixels = g_sdlx_profile.blit_pixels + static_cast<Uint32>(area.w * area.h);
 
+    if (dst->format == SDL_PIXELFORMAT_ARGB4444)
+        return SDL_SetError("Can't draw on an ARGB4444 surface");
     const PixelOp op = makePixelOp(src, dst);
+    SourceRows rows(src);
+
+    if (is16(dst->format)) {
+        //A 16-bit target (the Xbox's screen and map layers, ARGB1555, as the original game drew):
+        //the common cases first, without widening anything
+        auto dstRow = [&](int y) {
+            return reinterpret_cast<Uint16*>(static_cast<Uint8*>(dst->pixels) + static_cast<size_t>(area.dy + y) * dst->pitch) + area.dx;
+        };
+        const bool src1555 = src->format == SDL_PIXELFORMAT_ARGB1555;
+        auto srcRow16 = [&](int y) {
+            return reinterpret_cast<const Uint16*>(static_cast<const Uint8*>(src->pixels) + static_cast<size_t>(area.sy + y) * src->pitch) + area.sx;
+        };
+        // 16 bits onto 16: a copy is the rows' bytes; a sprite (opaque or see-through) a bit test
+        if (src1555 && !op.colorkey && op.alpha_mod == 255) {
+            if (!op.blend) {
+                for (int y = 0; y < area.h; y++)
+                    memcpy(dstRow(y), srcRow16(y), static_cast<size_t>(area.w) * 2);
+            } else {
+                for (int y = 0; y < area.h; y++) {
+                    const Uint16* s = srcRow16(y);
+                    Uint16* d = dstRow(y);
+                    for (int x = 0; x < area.w; x++) {
+                        const Uint16 p = s[x];
+                        if (p & 0x8000u)
+                            d[x] = p;
+                    }
+                }
+            }
+            return true;
+        }
+        // 32 bits onto 16: packed; only partly see-through pixels blended (with the target's pixel)
+        const Widen& wd = widenTable(dst->format);
+        if (!src1555 && !is16(src->format) && op.alpha_mod == 255 && (!op.colorkey || !op.blend)) {
+            for (int y = 0; y < area.h; y++) {
+                const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(src), area.sy + y) + area.sx;
+                Uint16* d = dstRow(y);
+                if (!op.blend && !op.colorkey) {
+                    for (int x = 0; x < area.w; x++)
+                        d[x] = pack1555(op.src_alpha ? s[x] : s[x] | 0xFF000000u);
+                } else if (!op.blend) {
+                    //(a color key only)
+                    for (int x = 0; x < area.w; x++) {
+                        if ((s[x] & RGB_MASK) != op.key)
+                            d[x] = pack1555(s[x] | 0xFF000000u);
+                    }
+                } else {
+                    for (int x = 0; x < area.w; x++) {
+                        const Uint32 p = s[x];
+                        const Uint32 a = op.src_alpha ? p >> 24 : 255;
+                        if (a == 255) {
+                            d[x] = pack1555(p | 0xFF000000u);
+                        } else if (a != 0) {
+                            Uint32 wide = wd.lo[d[x] & 0xFF] | wd.hi[d[x] >> 8];
+                            op.apply(p, &wide);
+                            d[x] = pack1555(wide);
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        // The rest (an alpha modulation, a fade): each row widened, the pixel rules, packed back
+        TargetRow target(dst);
+        const bool copy = !op.blend && !op.colorkey;
+        for (int y = 0; y < area.h; y++) {
+            const Uint32* s = rows.row(area.sy + y, area.sx, area.w);
+            Uint16* d16 = reinterpret_cast<Uint16*>(static_cast<Uint8*>(dst->pixels) + static_cast<size_t>(area.dy + y) * dst->pitch) + area.dx;
+            if (copy) {
+                //(a copy needs no widening of what it covers)
+                for (int x = 0; x < area.w; x++)
+                    d16[x] = pack1555(op.src_alpha ? s[x] : s[x] | 0xFF000000u);
+                continue;
+            }
+            for (int x0 = 0; x0 < area.w; x0 += 1024) {
+                const int n = area.w - x0 < 1024 ? area.w - x0 : 1024;
+                Uint32* d = target.begin(area.dy + y, area.dx + x0, n);
+                for (int x = 0; x < n; x++)
+                    op.apply(s[x0 + x], d + x);
+                target.end();
+            }
+        }
+        return true;
+    }
 
     // Plain copy
     if (!op.blend && !op.colorkey && (op.src_alpha || !op.dst_alpha)) {
         for (int y = 0; y < area.h; y++) {
-            memcpy(rowPtr(dst, area.dy + y) + area.dx,
-                   rowPtr(static_cast<const SDL_Surface*>(src), area.sy + y) + area.sx,
+            memcpy(rowPtr(dst, area.dy + y) + area.dx, rows.row(area.sy + y, area.sx, area.w),
                    static_cast<size_t>(area.w) * 4);
         }
         return true;
@@ -547,7 +924,7 @@ bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst
     // Color key only: copy what isn't the key
     if (!op.blend && op.colorkey && op.src_alpha) {
         for (int y = 0; y < area.h; y++) {
-            const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(src), area.sy + y) + area.sx;
+            const Uint32* s = rows.row(area.sy + y, area.sx, area.w);
             Uint32* d = rowPtr(dst, area.dy + y) + area.dx;
             for (int x = 0; x < area.w; x++) {
                 const Uint32 p = s[x];
@@ -570,7 +947,7 @@ bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst
         for (Uint32 i = 0; i < 256; i++)
             dstAlpha[i] = static_cast<Uint8>(sa + div255(i * (255 - sa)));
         for (int y = 0; y < area.h; y++) {
-            const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(src), area.sy + y) + area.sx;
+            const Uint32* s = rows.row(area.sy + y, area.sx, area.w);
             Uint32* d = rowPtr(dst, area.dy + y) + area.dx;
             for (int x = 0; x < area.w; x++) {
                 const Uint32 p = s[x];
@@ -590,7 +967,7 @@ bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst
     // alpha modulation
     if (op.blend && op.src_alpha && !op.colorkey && op.alpha_mod == 255) {
         for (int y = 0; y < area.h; y++) {
-            const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(src), area.sy + y) + area.sx;
+            const Uint32* s = rows.row(area.sy + y, area.sx, area.w);
             Uint32* d = rowPtr(dst, area.dy + y) + area.dx;
             for (int x = 0; x < area.w; x++) {
                 const Uint32 p = s[x];
@@ -605,7 +982,7 @@ bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst
     }
 
     for (int y = 0; y < area.h; y++) {
-        const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(src), area.sy + y) + area.sx;
+        const Uint32* s = rows.row(area.sy + y, area.sx, area.w);
         Uint32* d = rowPtr(dst, area.dy + y) + area.dx;
         for (int x = 0; x < area.w; x++)
             op.apply(s[x], d + x);
@@ -646,7 +1023,10 @@ bool SDL_BlitSurfaceScaled(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surfac
     ProfileScope profile(g_sdlx_profile.blit);
     g_sdlx_profile.blits = g_sdlx_profile.blits + 1;
 
+    if (dst->format == SDL_PIXELFORMAT_ARGB4444)
+        return SDL_SetError("Can't draw on an ARGB4444 surface");
     const PixelOp op = makePixelOp(src, dst);
+    SourceRows rows(src);
 
     const SDL_Rect& clip = dst->clip_rect;
     const int dx0 = SDL_max(dr.x, clip.x), dy0 = SDL_max(dr.y, clip.y);
@@ -661,9 +1041,21 @@ bool SDL_BlitSurfaceScaled(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surfac
     for (int y = dy0; y < dy1; y++) {
         int sy = sr.y + static_cast<int>(((static_cast<Uint32>(y - dr.y) * stepY) + (stepY >> 1)) >> 16);
         if (sy >= sr.y + sr.h) sy = sr.y + sr.h - 1;
-        const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(src), sy);
-        Uint32* d = rowPtr(dst, y);
+        const Uint32* s = rows.row(sy, sr.x, sr.w) - sr.x;
         Uint32 fx = static_cast<Uint32>(dx0 - dr.x) * stepX + (stepX >> 1);
+        if (is16(dst->format)) {
+            const Widen& wd = widenTable(dst->format);
+            Uint16* d = reinterpret_cast<Uint16*>(static_cast<Uint8*>(dst->pixels) + static_cast<size_t>(y) * dst->pitch);
+            for (int x = dx0; x < dx1; x++, fx += stepX) {
+                int sx = sr.x + static_cast<int>(fx >> 16);
+                if (sx >= sr.x + sr.w) sx = sr.x + sr.w - 1;
+                Uint32 wide = wd.lo[d[x] & 0xFF] | wd.hi[d[x] >> 8];
+                op.apply(s[sx], &wide);
+                d[x] = pack1555(wide);
+            }
+            continue;
+        }
+        Uint32* d = rowPtr(dst, y);
         for (int x = dx0; x < dx1; x++, fx += stepX) {
             int sx = sr.x + static_cast<int>(fx >> 16);
             if (sx >= sr.x + sr.w) sx = sr.x + sr.w - 1;
@@ -671,6 +1063,74 @@ bool SDL_BlitSurfaceScaled(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surfac
         }
     }
     return true;
+}
+
+SDL_Surface* SDL_XboxCompactSurface(SDL_Surface* surface)
+{
+    if (!checkSurface(surface, "surface") || is16(surface->format))
+        return nullptr;
+    const bool alpha = hasAlpha(surface->format);
+    const bool keyed = surface->has_colorkey;
+    const Uint32 key = surface->colorkey & RGB_MASK;
+    const bool opaqueAll = surface->blend_mode == SDL_BLENDMODE_NONE && !keyed;
+
+    // Partly see-through pixels need ARGB4444; otherwise ARGB1555 (5 bits a color)
+    bool partial = false;
+    if (alpha && !opaqueAll) {
+        for (int y = 0; y < surface->h && !partial; y++) {
+            const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(surface), y);
+            for (int x = 0; x < surface->w; x++) {
+                const Uint32 a = s[x] >> 24;
+                if (a != 0 && a != 255 && !(keyed && (s[x] & RGB_MASK) == key)) {
+                    partial = true;
+                    break;
+                }
+            }
+        }
+    }
+    //(partly see-through pixels: kept in 32 bits; 4 bits a color was too few: their sheets showed
+    //off colors. Most images are opaque, or see-through or not: those are the memory)
+    if (partial)
+        return nullptr;
+    const SDL_PixelFormat format = SDL_PIXELFORMAT_ARGB1555;
+    SDL_Surface* out = SDL_CreateSurface(surface->w, surface->h, format);
+    if (!out)
+        return nullptr;
+    {
+        char name[48] = "";
+        {
+            LiveLock lock;
+            if (const char* from = nameOf(surface))
+                snprintf(name, sizeof(name), "%s", from);
+        }
+        if (name[0])
+            sdlx_surface_name(out, name);
+    }
+    for (int y = 0; y < surface->h; y++) {
+        const Uint32* s = rowPtr(static_cast<const SDL_Surface*>(surface), y);
+        Uint16* d = reinterpret_cast<Uint16*>(static_cast<Uint8*>(out->pixels) + static_cast<size_t>(y) * out->pitch);
+        for (int x = 0; x < surface->w; x++) {
+            Uint32 p = s[x];
+            Uint32 a = (alpha && !opaqueAll) ? (p >> 24) : 255;
+            if (keyed && (p & RGB_MASK) == key)
+                a = 0;
+            if (partial) {
+                //(rounded to 4 bits: +8 then the top nibble, kept in range)
+                const Uint32 a4 = (a * 15 + 127) / 255;
+                const Uint32 r4 = (((p >> 16) & 0xFF) * 15 + 127) / 255;
+                const Uint32 g4 = (((p >> 8) & 0xFF) * 15 + 127) / 255;
+                const Uint32 b4 = ((p & 0xFF) * 15 + 127) / 255;
+                d[x] = static_cast<Uint16>(a4 == 0 ? 0 : (a4 << 12) | (r4 << 8) | (g4 << 4) | b4);
+            } else if (a == 0) {
+                d[x] = 0;
+            } else {
+                d[x] = static_cast<Uint16>(0x8000u | ((p >> 9) & 0x7C00u) | ((p >> 6) & 0x03E0u) | ((p >> 3) & 0x001Fu));
+            }
+        }
+    }
+    out->alpha_mod = surface->alpha_mod;
+    out->blend_mode = opaqueAll ? SDL_BLENDMODE_NONE : SDL_BLENDMODE_BLEND;
+    return out;
 }
 
 bool SDL_GetRectIntersection(const SDL_Rect* a, const SDL_Rect* b, SDL_Rect* result)

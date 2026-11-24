@@ -89,7 +89,7 @@ template <typename Larger>
 gfxSprite loadImageOrDownscale(const std::filesystem::path& path, Larger larger)
 {
     try {
-        return ImageLoader(path).create();
+        return ImageLoader(path).compact().create();
     } catch (const std::string& err) {
         printf("\nwarning: %s -> falling back to downscaled image\n", err.c_str());
 
@@ -169,7 +169,7 @@ const gfxSprite& CTileset::sprite(DrawSize size) const
             break;
     }
     if (!m_sprite_large)
-        m_sprite_large = ImageLoader(m_tileset_dir / "large.png").create();
+        m_sprite_large = ImageLoader(m_tileset_dir / "large.png").compact().create();
     return m_sprite_large;
 }
 
@@ -376,6 +376,15 @@ CTileset* CTilesetManager::tileset(size_t index)
     return nullptr;
 }
 
+
+void CTilesetManager::unloadImages()
+{
+    mapPreviewWaitForLoads();
+    for (CTileset& tileset : m_tilesets) {
+        if (!tileset.isModified())
+            tileset.unload();
+    }
+}
 
 void CTilesetManager::beginMap()
 {

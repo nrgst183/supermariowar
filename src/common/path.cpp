@@ -86,9 +86,10 @@ std::string homeCopyDir(const std::string& relDir)
 
 std::string mapThumbnailPath(const std::string& mapFile)
 {
-    //(in a folder of their own, named for the tilesets' thumbnail images: the ones made before
-    //those lost the pink left over from the color key are made again)
-    constexpr const char* folder = "maps/cache/thumbnails2/";
+    //(in a folder of their own, named for the thumbnail images they're drawn from: the ones made
+    //before those lost the pink left over from the color key, the tilesets' then the hazards', are
+    //made again)
+    constexpr const char* folder = "maps/cache/thumbnails3/";
     const std::string name = GetNameFromFileName(mapFile) + ".png";
     static const std::string dir = [folder] {
 #ifdef SMW_XBOX

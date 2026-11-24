@@ -276,10 +276,15 @@ void MI_MatchHistory::drawDetails(short y) const
     //The map's thumbnail on the left, in the lobby's frame (the map browser's picture of it)
     loadThumbnail(e);
     theme::statusBar(x, y + 10, 166, 126);
-    if (m_thumbnail)
+    if (m_thumbnail) {
         m_thumbnail.draw(x + 3, y + 13);
-    else
+    } else if (!m_thumbnailToMake.empty()) {
+        //(being made: the map read and drawn, in a moment; the spinner the games list waits with)
+        theme::spinner(x + 83, y + 56, static_cast<int>(SDL_GetTicks() / 16));
+        rm->menu_font_small.drawCentered(x + 83, y + 92, "Drawing the map...");
+    } else {
         rm->menu_font_small.drawCentered(x + 83, y + 69, "No picture");
+    }
 
     //Right of it the heading: the mode's icon and the map, large; under it the rest, small
     const short ax = static_cast<short>(x + 178);

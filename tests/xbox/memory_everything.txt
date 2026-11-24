@@ -1,0 +1,5 @@
+--autotest
+--at-match everything
+--at-players 4
+--at-speed 10
+"--at-maps" "D:\xboxtest\heavy_maps.txt"

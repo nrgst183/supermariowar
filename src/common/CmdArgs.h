@@ -8,14 +8,22 @@ namespace cmd {
 /// Options of the opt-in headless auto-play harness (a debugging aid).
 /// Everything is off unless `--autotest` is given.
 struct AutoTestArgs {
-    enum class Kind { Single, Minigame, Tour, World, Menus, Shots, Tournament };
+    enum class Kind { Single, Minigame, Tour, World, Menus, Shots, Tournament, Screens, History, Editors };
+
+    bool everything = false;  // --at-match everything: menus, every mode, minigames, a tournament, a tour
+                              // and a world, one after the other (the stage's kind in `kind`)
 
     bool enabled = false;
     Kind kind = Kind::Single;
     int mode = -1;           // game mode index (0..21, or 0..2 for minigames); -1 = cycle through all
     std::string map;         // exact map name; empty = cycle through the map list
+    std::string rankMapsFile;    // --at-rank-maps FILE: every map loaded and scored (CMap::busyScore), the busiest
+                                 // written to FILE (a name a line: an --at-maps list), then quit
+    std::string mapsFile;    // --at-maps FILE: each match's map picked at random from these (a name a line),
+                             // a different order every run (the memory test's busiest maps)
     int players = 4;         // number of players (1..4); 0 = cycle 2, 3, 4
-    int frames = 3000;       // max frames per match (Menus: total menu frames)
+    int frames = 3000;
+    int speed = 1;           // --at-speed N: a match's ticks N at a time, drawn once (faster runs that still draw)       // max frames per match (Menus: total menu frames)
     int matches = 1;         // quit after this many matches (Tour/World: stages)
     int start = 0;           // index of the first match in the mode/map cycle
     int seed = 0;            // RNG seed for reproducible runs; 0 = time based
@@ -31,6 +39,9 @@ struct AutoTestArgs {
     int humans = 0;          // the first N players are humans, with seeded random input (not from devices)
     int synctest = 0;        // rollback sync test distance in ticks; 0 = off
     int peersum = 0;         // print the cross-machine state checksum every N frames; 0 = off
+    int determinism = 0;     // --at-determinism N: the determinism test's suite, N times (src/smw/Determinism.h)
+    std::string determinismRef;  // --at-determinism-ref FILE: the checksums to compare with (another build's)
+    std::string determinismOut;  // --at-determinism-out FILE: where to write this run's
     int colors = -1;         // --at-colors N: the "Overlay Colors" option (0 night, 1 pipe, 2 castle, 3 SMB3)
     int prompts = -1;        // --at-prompts N: the "Button prompts" option (0 auto, 1 Xbox, 2 original Xbox)
     bool pad = false;
@@ -84,6 +95,7 @@ struct Args {
     bool success = false;
     bool show_help = false;
     bool debug = false;
+    bool lowMemory = false;    // --low-memory: the Xbox's way with memory (platform::lowMemory), here too
     std::string data_root;
 };
 Args parse_args(int argc, char* argv[]);

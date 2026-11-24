@@ -7,6 +7,7 @@
 #include "map.h"
 #include "MapList.h"
 #include "ResourceManager.h"
+#include "Platform.h"
 #include "WorldTourStop.h"
 #include "world.h"
 #include "world/WorldMapIO.h"
@@ -20,8 +21,8 @@
 
 extern CGameValues game_values;
 
-namespace leveleditor { void inner_main(); }
-namespace worldeditor { void inner_main(); }
+namespace leveleditor { void inner_main(); void releaseSessionGraphics(); }
+namespace worldeditor { void inner_main(); void releaseSessionGraphics(); }
 
 namespace editors {
 namespace {
@@ -141,10 +142,19 @@ bool run(Editor editor)
 {
     const char* name = editor == Editor::Level ? "level" : "world";
     printf("editors: starting the %s editor\n", name);
+    platform::setCrashContext(editor == Editor::Level ? "The map editor" : "The world editor");
     g_running = true;
     g_closeRequested = false;
     g_closeFrames = 0;
 
+    //(low memory: the editor loads graphics of its own; the game's menus', matches' and worlds' go
+    //first, and come back as the menus draw them)
+    if (platform::lowMemory()) {
+        rm->freeMenuGraphicsForMatch(false);
+        gfxSprite::unloadGroup(SpriteGroup::Game);
+    }
+    //(the editor's images: 16 bits on the Xbox, as the game's; only drawn from)
+    const gfxSprite::CompactLoading compactImages;
     const GameObjects game = take();
     g_savedMapFiles.clear();
     g_savedWorldFiles.clear();
@@ -215,6 +225,16 @@ bool run(Editor editor)
     gfx_settitle(TITLESTRING);
 
     printf("editors: back from the %s editor%s\n", name, quit ? " (the window was closed)" : "");
+    platform::setCrashContext("The menus");
+    //(low memory: not kept for the next session: the menus' graphics need the memory; nor the
+    //editor's own)
+    if (platform::lowMemory()) {
+        freeKeptGraphics();
+        if (editor == Editor::Level)
+            leveleditor::releaseSessionGraphics();
+        else
+            worldeditor::releaseSessionGraphics();
+    }
     return !quit;
 }
 

@@ -1,9 +1,11 @@
 #include "sfx.h"
 
 #include <array>
+#include <cstdio>
 #include <cstdlib>
 
 #include "Resimulation.h"
+#include "Platform.h"
 
 #include <SDL3/SDL.h>
 
@@ -346,11 +348,17 @@ void sfxSound::onTrackFinished(void*, MIX_Track* rawptr)
 
 
 sfxMusic::sfxMusic(const fs::path& path)
-    : m_audio(s_audiosys->openAudio(path))
-{}
+{
+    //(music that can't be loaded: none, not the game's end)
+    try {
+        m_audio = s_audiosys->openAudio(path);
+    } catch (const std::string& error) {
+        platform::log(error);
+    }
+}
 
 void sfxMusic::play(bool fPlayonce, bool fResume) {
-    if (sim::isResimulating())
+    if (sim::isResimulating() || !m_audio)
         return;
 
     s_audiosys->playAsMusic(m_audio, fPlayonce ? 0 : -1);

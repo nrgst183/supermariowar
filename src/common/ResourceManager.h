@@ -23,6 +23,18 @@ public:
     void loadMenuGraphics();
     void loadGameGraphics();
     void loadWorldGraphics();
+    // The world's full-size tile images (~5 MB): on the Xbox, loaded only when a world is drawn at
+    // full size (World mode), and freed when a match of another kind starts. Elsewhere, always loaded.
+    void ensureSpotlightOverlay();
+    /// The map's second pair of layers (the animated tiles draw into one pair while the other
+    /// shows): on the Xbox, made only for a map with animated tiles, else freed (2.4 MB of the 64).
+    /// Returns whether there is one.
+    bool useSecondMapLayers(bool animated);
+    /// A match is about to load (its map, music and sprites): on the Xbox, the menus' sprites and
+    /// (unless it's World mode's) World mode's are freed first, for the 64 MB
+    void freeMenuGraphicsForMatch(bool worldMatch);
+    void ensureFullWorldGraphics();
+    void freeFullWorldGraphics();
     void loadStartGraphics();
 
     bool LoadGameSounds();
