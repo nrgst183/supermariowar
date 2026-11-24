@@ -20,12 +20,18 @@ public:
 
     //Draws every frame
     void Draw() override;
+    std::array<MI_Image*, 2> ModifyArrows() const override {
+        return fModifying ? std::array<MI_Image*, 2> {miModifyImageLeft.get(), miModifyImageRight.get()} : std::array<MI_Image*, 2> {};
+    }
 
     //Sends player input to control on every frame
     MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
     Box FocusBox() const override {
         //(the field's pipe, not the preview under it: its sprite has 8 empty pixels at each end)
         return {static_cast<short>(m_pos.x + 8), m_pos.y, static_cast<short>(iWidth - 16), 32};
+    }
+    Box ValueBox() const override {
+        return {static_cast<short>(m_pos.x + iIndent - 12), m_pos.y, static_cast<short>(iWidth - iIndent + 4), 32};
     }
     bool CanNudge() const override { return !fDisable; }
     MenuCodeEnum Nudge(int dir) override;

@@ -96,6 +96,7 @@ public:
 public:
     void Update() override;  //! Updates animations or other events every frame
     void Draw() override;  //! Draws every frame
+    std::array<MI_Image*, 2> ModifyArrows() const override;
     void Refresh() override;
     MenuCodeEnum Modify(bool modify) override;  //! Called when user selects this control to change it's value
     MenuCodeEnum SendInput(CPlayerInput* playerInput) override;  //! Sends player input to control on every frame
@@ -105,6 +106,11 @@ public:
     Box FocusBox() const override {
         //(the pipe: its sprite has 8 empty pixels at each end)
         return {static_cast<short>(m_pos.x + 8), m_pos.y, static_cast<short>(m_width - 16), 32};
+    }
+    Box ValueBox() const override {
+        //(from the joint after its name, where the left arrow is, to the pipe's end, the right one's)
+        const short left = m_indent > 0 ? static_cast<short>(m_indent - 12) : 8;
+        return {static_cast<short>(m_pos.x + left), m_pos.y, static_cast<short>(m_width - 8 - left), 32};
     }
     //(its arrows along, by as much)
     void SetPosition(short x, short y) override;

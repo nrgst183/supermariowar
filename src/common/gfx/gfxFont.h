@@ -13,6 +13,9 @@ public:
     explicit gfxFont() = default;
     explicit gfxFont(const std::filesystem::path& path);
 
+    /// While true, no text is drawn (the menus find which pixels of a control are its text this way)
+    static bool s_hidden;
+
     void draw(int x, int y, std::string_view text,
         int dst_min_x = std::numeric_limits<int>::min(),
         int dst_max_x = std::numeric_limits<int>::max()) const;

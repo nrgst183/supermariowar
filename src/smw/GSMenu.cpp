@@ -36,6 +36,7 @@
 #include "gamemodes/MiniPipe.h"
 #include "ui/MI_BonusWheel.h"
 #include "ui/MI_MapBrowser.h"
+#include "ui/MI_Image.h"
 #include "ui/MI_MapField.h"
 #include "ui/MI_MapFilterScroll.h"
 #include "ui/MI_SelectField.h"
@@ -82,13 +83,17 @@
 #include "menu/options/SoundOptionsMenu.h"
 #include "menu/options/TeamOptionsMenu.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <functional>
 #include <format>
 #include <string>
 #include <cstdlib> // atoi()
 #include <random>
 #include <cassert>
 #include <sstream>
+#include <vector>
 
 // std::uniue_ptr requires that the special member function have access
 // to the complete types.
@@ -121,11 +126,7 @@ void drawMenuHints(const UI_Menu& menu)
         left = {change, {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "done"}};
     } else {
         left = {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"}};
-        //(a value field changes with left and right: A on it isn't needed)
-        if (menu.NudgesFocus())
-            left.push_back(change);
-        else
-            left.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"});
+        left.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"});
     }
     if (menu.Paged())
         left.push_back({{Pad::LB, Pad::RB}, {"PgUp", "PgDn"}, "page"});
@@ -200,10 +201,215 @@ SDL_Color mix(SDL_Color a, SDL_Color b, float t)
     return {m(a.r, b.r), m(a.g, b.g), m(a.b, b.b), 255};
 }
 
+// The pixels around a shape (`mask`, w x h): how far each one is from it, 1 to `width` (0: in it,
+// or farther); the steps alternate 8 and 4 neighbors, so that the corners come out round
+std::vector<Uint8> ringAround(const std::vector<Uint8>& mask, int w, int h, int width)
+{
+    std::vector<Uint8> dist(mask.size(), 0);
+    std::vector<Uint8> grown = mask;
+    for (Uint8 step = 1; step <= width; step++) {
+        const bool diagonal = (step & 1) != 0;
+        std::vector<Uint8> next = grown;
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                if (grown[static_cast<size_t>(y) * w + x])
+                    continue;
+                bool near = false;
+                for (int dy = -1; dy <= 1 && !near; dy++) {
+                    for (int dx = -1; dx <= 1 && !near; dx++) {
+                        if ((dx == 0 && dy == 0) || (!diagonal && dx != 0 && dy != 0))
+                            continue;
+                        const int nx = x + dx, ny = y + dy;
+                        near = nx >= 0 && ny >= 0 && nx < w && ny < h && grown[static_cast<size_t>(ny) * w + nx];
+                    }
+                }
+                if (near) {
+                    next[static_cast<size_t>(y) * w + x] = 1;
+                    dist[static_cast<size_t>(y) * w + x] = step;
+                }
+            }
+        }
+        grown = std::move(next);
+    }
+    return dist;
+}
+
+// While a value is being changed (after A), on the value's part of the control (ValueBox: between
+// its arrows), the row's own frame staying as it is: the value is pressed in, recessed into the
+// pipe: darker, a shadow along its top and left inside edges, light along the bottom and right
+// (the pixels there made darker or lighter, so that it works on any field's color); the arrows
+// are drawn again over it all, at its sides. The darkened part: the control drawn alone on a
+// scratch surface (kept while the same control is changed: each frame only blits it and shades
+// the edges).
+void drawChangingFocus(const UI_Control& control, const UI_Control::Box& v, float wave)
+{
+    SDL_Surface* const screen = blitdest;
+    if (!screen || v.w <= 8 || v.h <= 8)
+        return;
+    const int bpp = SDL_BYTESPERPIXEL(screen->format);
+    if (bpp != 2 && bpp != 4)
+        return;
+    static SDL_Surface* scratch = nullptr;
+    if (!scratch || scratch->w != screen->w || scratch->h != screen->h || scratch->format != screen->format) {
+        if (scratch)
+            SDL_DestroySurface(scratch);
+        scratch = SDL_CreateSurface(screen->w, screen->h, screen->format);
+        if (!scratch)
+            return;
+    }
+    const SDL_PixelFormatDetails* format = SDL_GetPixelFormatDetails(screen->format);
+    const Uint32 key = SDL_MapRGB(format, nullptr, 255, 0, 255);    //(nothing draws the see-through magenta)
+
+    auto pixel = [bpp](SDL_Surface* s, int x, int y) -> Uint8* {
+        return static_cast<Uint8*>(s->pixels) + static_cast<ptrdiff_t>(y) * s->pitch + x * bpp;
+    };
+    auto read = [&](SDL_Surface* s, int x, int y) -> Uint32 {
+        const Uint8* p = pixel(s, x, y);
+        return bpp == 4 ? *reinterpret_cast<const Uint32*>(p) : *reinterpret_cast<const Uint16*>(p);
+    };
+    auto write = [&](SDL_Surface* s, int x, int y, Uint32 value) {
+        Uint8* p = pixel(s, x, y);
+        if (bpp == 4)
+            *reinterpret_cast<Uint32*>(p) = value;
+        else
+            *reinterpret_cast<Uint16*>(p) = static_cast<Uint16>(value);
+    };
+
+    constexpr int EDGE = 3;    // the shaded edges' width
+    const std::array<MI_Image*, 2> arrows = control.ModifyArrows();
+
+    struct FramePixel {
+        short x, y;
+        signed char shade;    // -100..100: darker (shadow) or lighter (light), in percent
+    };
+    //The value part's light and frame: made again for another control (or if it moved)
+    struct Cache {
+        const UI_Control* control = nullptr;
+        UI_Control::Box box;
+        SDL_PixelFormat format = SDL_PIXELFORMAT_UNKNOWN;
+        SDL_Rect r {};
+        SDL_Surface* shadow = nullptr;    // black where the control is, in the value part; see-through elsewhere
+        std::vector<FramePixel> frame;
+    };
+    static Cache cache;
+    static Uint64 lastMs = 0;
+    const Uint64 nowMs = SDL_GetTicks();
+    const bool stale = nowMs - lastMs > 250;    //(after a pause: another screen, maybe another control at that address)
+    lastMs = nowMs;
+    if (stale || cache.control != &control || cache.box.x != v.x || cache.box.y != v.y || cache.box.w != v.w || cache.box.h != v.h
+        || cache.format != screen->format || !cache.shadow) {
+        cache.control = &control;
+        cache.box = v;
+        cache.format = screen->format;
+        const int x0 = std::max(0, static_cast<int>(v.x)), y0 = std::max(0, static_cast<int>(v.y));
+        cache.r = {x0, y0, std::min(screen->w, v.x + v.w) - x0, std::min(screen->h, v.y + v.h) - y0};
+        const SDL_Rect& r = cache.r;
+        if (r.w <= 8 || r.h <= 8)
+            return;
+
+        //The control without its arrows, only its value part
+        for (MI_Image* arrow : arrows)
+            if (arrow)
+                arrow->setVisible(false);
+        //(twice: as it is, then without its text, which stays out of the shadow: it keeps its colors)
+        auto drawAlone = [&](bool text) {
+            SDL_FillSurfaceRect(scratch, &r, key);
+            SDL_SetSurfaceClipRect(scratch, &r);
+            SDL_Surface* const saved = blitdest;
+            blitdest = scratch;
+            gfxFont::s_hidden = !text;
+            const_cast<UI_Control&>(control).Draw();
+            gfxFont::s_hidden = false;
+            blitdest = saved;
+            SDL_SetSurfaceClipRect(scratch, nullptr);
+            std::vector<Uint32> pixels(static_cast<size_t>(r.w) * r.h);
+            if (SDL_MUSTLOCK(scratch))
+                SDL_LockSurface(scratch);
+            for (int y = 0; y < r.h; y++)
+                for (int x = 0; x < r.w; x++)
+                    pixels[static_cast<size_t>(y) * r.w + x] = read(scratch, r.x + x, r.y + y);
+            SDL_UnlockSurface(scratch);
+            return pixels;
+        };
+        const std::vector<Uint32> withText = drawAlone(true);
+        const std::vector<Uint32> noText = drawAlone(false);
+        for (MI_Image* arrow : arrows)
+            if (arrow)
+                arrow->setVisible(true);
+
+        if (cache.shadow)
+            SDL_DestroySurface(cache.shadow);
+        cache.shadow = SDL_CreateSurface(r.w, r.h, screen->format);
+        if (!cache.shadow)
+            return;
+        const Uint32 black = SDL_MapRGB(format, nullptr, 0, 0, 0);
+        if (SDL_MUSTLOCK(cache.shadow))
+            SDL_LockSurface(cache.shadow);
+        for (int y = 0; y < r.h; y++) {
+            for (int x = 0; x < r.w; x++) {
+                const size_t i = static_cast<size_t>(y) * r.w + x;
+                write(cache.shadow, x, y, noText[i] != key && noText[i] == withText[i] ? black : key);
+            }
+        }
+        SDL_UnlockSurface(cache.shadow);
+        SDL_SetSurfaceColorKey(cache.shadow, true, key);
+        SDL_SetSurfaceBlendMode(cache.shadow, SDL_BLENDMODE_BLEND);
+
+        //The edges: EDGE pixels just inside the value part, its corners round; shadow on the sides
+        //nearest the top and the left, light on the others, strongest at the very edge
+        std::vector<Uint8> inner(static_cast<size_t>(r.w) * r.h, 0);
+        for (int y = EDGE + 1; y < r.h - EDGE - 1; y++) {
+            const int in = roundInset(y - EDGE - 1, r.h - 2 * EDGE - 2);
+            for (int x = EDGE + 1 + in; x < r.w - EDGE - 1 - in; x++)
+                inner[static_cast<size_t>(y) * r.w + x] = 1;
+        }
+        const std::vector<Uint8> dist = ringAround(inner, r.w, r.h, EDGE);
+        static constexpr signed char SHADOW[EDGE + 1] = {0, -42, -60, -74};
+        static constexpr signed char LIGHT[EDGE + 1] = {0, 14, 34, 56};
+        cache.frame.clear();
+        for (int y = 0; y < r.h; y++) {
+            for (int x = 0; x < r.w; x++) {
+                const Uint8 d = dist[static_cast<size_t>(y) * r.w + x];
+                if (!d)
+                    continue;
+                const int top = y, bottom = r.h - 1 - y, left = x, right = r.w - 1 - x;
+                const bool shaded = std::min(top, left) <= std::min(bottom, right);
+                const signed char shade = shaded ? SHADOW[d] : LIGHT[d];
+                if (shade != 0)
+                    cache.frame.push_back({static_cast<short>(r.x + x), static_cast<short>(r.y + y), shade});
+            }
+        }
+    }
+
+    (void)wave;
+    //The value, pressed in: darker
+    SDL_SetSurfaceAlphaMod(cache.shadow, 40);
+    SDL_Rect to = cache.r;
+    SDL_BlitSurface(cache.shadow, nullptr, screen, &to);
+
+    //Its edges: shadow at the top and left, light at the bottom and right
+    if (SDL_MUSTLOCK(screen))
+        SDL_LockSurface(screen);
+    for (const FramePixel& p : cache.frame) {
+        Uint8 cr, cg, cb;
+        SDL_GetRGB(read(screen, p.x, p.y), format, nullptr, &cr, &cg, &cb);
+        const SDL_Color to = p.shade < 0 ? SDL_Color {0, 0, 0, 255} : SDL_Color {255, 255, 255, 255};
+        const SDL_Color c = mix({cr, cg, cb, 255}, to, static_cast<float>(p.shade < 0 ? -p.shade : p.shade) / 100.0f);
+        write(screen, p.x, p.y, SDL_MapRGB(format, nullptr, c.r, c.g, c.b));
+    }
+    SDL_UnlockSurface(screen);
+
+    //The arrows over it all, at its sides
+    for (MI_Image* arrow : arrows)
+        if (arrow)
+            arrow->Draw();
+}
+
 // The frame around the focused control: a light band between two dark edges (so that it shows on
 // the green and gray buttons and on any backdrop), its corners round like the buttons' ends. It
-// breathes slowly from white to a pale gold; while its value is being changed, it is gold. With a
-// controller, a gold pointer bobs at its left, at the item the buttons work on.
+// breathes slowly from white to a pale silver blue; with a controller, a silver pointer bobs at its
+// left, at the item the buttons work on. Gold is only for a value being changed (after A: see
+// drawChangingFocus), so that the two never look alike.
 void drawMenuFocus(const UI_Control& control, bool modifying)
 {
     const UI_Control::Box b = control.FocusBox();
@@ -212,22 +418,25 @@ void drawMenuFocus(const UI_Control& control, bool modifying)
     const Uint64 ms = SDL_GetTicks();
     const float wave = 0.5f + 0.5f * std::sin(static_cast<float>(ms % 1400) * (6.2831853f / 1400.0f));
     const SDL_Color dark {16, 24, 48, 255};
-    const SDL_Color gold {248, 192, 32, 255};
-    const SDL_Color light = modifying ? gold : mix({252, 252, 252, 255}, {255, 226, 120, 255}, wave * 0.7f);
+    const SDL_Color silver {208, 216, 232, 255};
+    const SDL_Color light = mix({252, 252, 252, 255}, {176, 204, 240, 255}, wave * 0.6f);
 
     //(2 pixels each, dark, light, dark: no 1-pixel line to flicker on an interlaced TV)
     roundRing(b.x - 6, b.y - 6, b.w + 12, b.h + 12, 6, dark);
     roundRing(b.x - 4, b.y - 4, b.w + 8, b.h + 8, 2, light);
+    //(its value being changed: that part of it, in gold)
+    if (modifying)
+        drawChangingFocus(control, control.ValueBox(), wave);
 
-    if (prompts::lastDevice() != prompts::Device::Controller || modifying)
+    if (prompts::lastDevice() != prompts::Device::Controller)
         return;
-    //(the pointer: a gold arrowhead, a few pixels to and fro)
+    //(the pointer: a silver arrowhead, a few pixels to and fro)
     const int bob = static_cast<int>(wave * 3.0f + 0.5f);
     const int px = b.x - 6 - 2 - 12 - bob;
     const int py = b.y + b.h / 2 - 9;
     if (px < 2)
         return;
-    //(lit from above, as the game's coins: a light edge on top, orange underneath)
+    //(lit from above: a white edge on top, a darker steel underneath)
     prompts::art(px, py, {
         "dd    ",
         "dhd   ",
@@ -238,7 +447,7 @@ void drawMenuFocus(const UI_Control& control, bool modifying)
         "dgod  ",
         "dod   ",
         "dd    ",
-    }, {{'d', dark}, {'g', gold}, {'h', {255, 240, 160, 255}}, {'o', {224, 120, 16, 255}}}, 2);
+    }, {{'d', dark}, {'g', silver}, {'h', {255, 255, 255, 255}}, {'o', {120, 136, 168, 255}}}, 2);
 }
 } // namespace
 
@@ -730,7 +939,7 @@ void MenuState::update()
             if (mCurrentMenu == mMainMenu.get())
                 menupanel::footer(menupanel::standardPrompts(false, nullptr), mMainMenu->focusHint());
             else
-                menupanel::footer(menupanel::standardPrompts(mCurrentMenu->NudgesFocus(), "back"));
+                menupanel::footer(menupanel::standardPrompts(mCurrentMenu->IsModifying(), "back"));
         }
         DrawOnlineSeriesNotice();
         DrawDeterminismReport();

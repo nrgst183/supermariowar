@@ -41,11 +41,16 @@ void MI_SettingsHelp::Draw()
         if (row == focus)
             help = text;
     }
-    //(up/down and select go without saying here: the help line needs the room)
+    //(up/down go without saying here: the help line needs the room; A selects a field, left/right
+    //change it, A again is done)
     using prompts::Pad;
     using prompts::menuKey;
-    menupanel::footer({{{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
-                       {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}}, help);
+    if (m_menu.IsModifying())
+        menupanel::footer({{{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
+                           {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "done"}}, help);
+    else
+        menupanel::footer({{{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"},
+                           {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}}, help);
 }
 
 

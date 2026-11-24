@@ -1760,7 +1760,8 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
     if (at.shotsRole == "menutour" && step == 1) {
         struct Screen { MenuCodeEnum code; const char* name; };
         static const Screen SCREENS[] = {{MENU_CODE_TO_OPTIONS_MENU, "t01_options"},
-            {MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU, "t02_gameplay"}, {MENU_CODE_NONE, "t02b_gameplay_down"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU, "t02_gameplay"}, {MENU_CODE_NONE, "t02b_gameplay_down"},
+            {MENU_CODE_NONE, "!t02c_gameplay_changing"}, {MENU_CODE_NONE, "!"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
             {MENU_CODE_TO_TEAM_OPTIONS_MENU, "t03_team"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
             {MENU_CODE_TO_POWERUP_SELECTION_MENU, "t04_item_selection"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
             {MENU_CODE_TO_POWERUP_SETTINGS_MENU, "t05_item_settings"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
@@ -1776,7 +1777,8 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             {MENU_CODE_TO_SYSTEM_LINK_MENU, "t15_join"}, {MENU_CODE_TO_MAIN_MENU, ""},
             {MENU_CODE_TO_LOCAL_LOBBY, "t16_lobby"}, {MENU_CODE_ONLINE_OPTIONS, "t17_lobby_options"},
             {MENU_CODE_ONLINE_OPTIONS_BACK, ""}, {MENU_CODE_ONLINE_MATCH_SETTINGS, "t18_match_type"},
-            {MENU_CODE_MATCH_SELECTION_START, "t19_game_settings"}, {MENU_CODE_NONE, "t19b_map_field"}, {MENU_CODE_TO_MODE_SETTINGS_MENU, "t20_mode_settings"},
+            {MENU_CODE_MATCH_SELECTION_START, "t19_game_settings"}, {MENU_CODE_NONE, "t19b_map_field"},
+            {MENU_CODE_NONE, "!t19c_map_changing"}, {MENU_CODE_NONE, "!"}, {MENU_CODE_TO_MODE_SETTINGS_MENU, "t20_mode_settings"},
             {MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS, ""}, {MENU_CODE_TO_MAP_BROWSER_THUMBNAILS, "t21_map_thumbnails"}};
         constexpr int HOLD = 20;
         const int index = (t - 1) / HOLD;
@@ -1788,11 +1790,15 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         }
         if (frame == 0 && SCREENS[index].code != MENU_CODE_NONE)
             return SCREENS[index].code;
-        //(no menu code: down three rows on the same screen)
-        if (SCREENS[index].code == MENU_CODE_NONE && frame < 6 && frame % 2 == 0)
+        //(no menu code: down three rows on the same screen; a name with a "!": A on the field, to change it)
+        const bool pressA = SCREENS[index].name[0] == '!';
+        if (pressA && frame == 0)
+            game_values.playerInput.outputControls[0].menu_select.fPressed = true;
+        if (SCREENS[index].code == MENU_CODE_NONE && !pressA && frame < 6 && frame % 2 == 0)
             game_values.playerInput.outputControls[0].menu_down.fPressed = true;
-        if (frame == HOLD - 2 && SCREENS[index].name[0])
-            shot(SCREENS[index].name);
+        const char* name = SCREENS[index].name + (pressA ? 1 : 0);
+        if (frame == HOLD - 2 && name[0])
+            shot(name);
         return MENU_CODE_NONE;
     }
 
@@ -2239,6 +2245,22 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                 if (t < 10)
                     return MENU_CODE_NONE;
                 std::string why;
+                //(a joiner lacks the map, and won't download it: Start takes the host back to the lobby,
+                //which says who; then the shot, and the end)
+                if (lobby && lobby->peerLacksMap(1)) {
+                    if (t == 20) {
+                        lobby->canStart(why);
+                        printf("shots: can't start: %s\n", why.c_str());
+                        return MENU_CODE_START_GAME;
+                    }
+                    if (t == 80)
+                        shot("09_host_lobby_joiner_lacks_map");
+                    if (t == 90) {
+                        step = 1000;
+                        t = 0;
+                    }
+                    return MENU_CODE_NONE;
+                }
                 if (lobby && lobby->canStart(why)) {
                     next();
                     return MENU_CODE_START_GAME;

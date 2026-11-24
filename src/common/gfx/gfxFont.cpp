@@ -136,8 +136,12 @@ void gfxFont::drawScrolling(int x, int y, int width, std::string_view text, bool
     SDL_SetSurfaceClipRect(blitdest, &previous);
 }
 
+bool gfxFont::s_hidden = false;
+
 void gfxFont::draw(int x, int y, std::string_view text, int dst_min_x, int dst_max_x) const
 {
+    if (s_hidden)
+        return;
     for (const char ch : text) {
         if (dst_max_x < x)
             break;

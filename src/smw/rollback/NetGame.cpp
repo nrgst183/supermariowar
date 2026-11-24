@@ -491,7 +491,7 @@ void NetGame::updateSkins(uint32_t nowMs)
         }
     }
 
-    m_lobby->setSkinDownloads(game_values.skindownloads);
+    m_lobby->setSkinDownloads(cmd::g_net.skinDownloads >= 0 ? cmd::g_net.skinDownloads != 0 : game_values.skindownloads);
 
     const auto valid = [](short id) { return id >= 0 && id < static_cast<short>(skinlist->count()); };
     //(two at least, as builds with at most two players on a machine announce; more if more play here)

@@ -56,6 +56,7 @@ public:
     using MI_SelectField<short>::MI_SelectField;
     void Update() override;
     void Draw() override;
+    std::array<MI_Image*, 2> ModifyArrows() const override { return {}; }    //(its knob shows the way)
 
 private:
     float m_knob = -1.0f;    // where the knob is drawn, 0 (left) to 1 (right): it slides to the value

@@ -99,6 +99,15 @@ void MI_SelectField<T>::Draw()
 
 
 template<typename T>
+std::array<MI_Image*, 2> MI_SelectField<T>::ModifyArrows() const
+{
+    if (!fModifying)
+        return {nullptr, nullptr};
+    return {m_wraps || m_index > 0 ? miModifyImageLeft.get() : nullptr,
+        m_wraps || (m_index + 1) < m_items.size() ? miModifyImageRight.get() : nullptr};
+}
+
+template<typename T>
 MenuCodeEnum MI_SelectField<T>::Modify(bool modify)
 {
     if (fDisable)

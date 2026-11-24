@@ -243,27 +243,10 @@ MenuCodeEnum UI_Menu::SendInput(CPlayerInput* playerInput)
     return MENU_CODE_NONE;
 }
 
-bool UI_Menu::NudgesFocus() const
-{
-    if (!m_currentFocus || !m_currentFocus->CanNudge())
-        return false;
-    //(a field with a real control beside it keeps left/right for moving, both ways)
-    auto shortcutOrNothing = [&](const UI_Control* side) {
-        return !side || (cancelCode != MENU_CODE_NONE && side->PressCode() == cancelCode);
-    };
-    return shortcutOrNothing(m_currentFocus->neighbor(MenuNavDirection::Left)) &&
-           shortcutOrNothing(m_currentFocus->neighbor(MenuNavDirection::Right));
-}
-
 MenuCodeEnum UI_Menu::MoveNextControl(MenuNavDirection iDirection)
 {
     if (!m_currentFocus)
         return MENU_CODE_NONE;
-
-    //Left/right on a value field with nothing beside it: its next/previous value at once (no select,
-    //change, select)
-    if ((iDirection == MenuNavDirection::Left || iDirection == MenuNavDirection::Right) && NudgesFocus())
-        return m_currentFocus->Nudge(iDirection == MenuNavDirection::Left ? -1 : 1);
 
     UI_Control* neighbor = m_currentFocus->neighbor(iDirection);
 

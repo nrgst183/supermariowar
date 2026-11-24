@@ -329,8 +329,11 @@ UI_SystemLinkMenu::UI_SystemLinkMenu()
             row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "host"});
         } else if (m_joinAddress && m_currentFocus == m_joinAddress) {
             row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "type an address"});
-        } else if (m_runAhead && m_currentFocus == m_runAhead) {
+        } else if (m_runAhead && m_currentFocus == m_runAhead && IsModifying()) {
             row.push_back({{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"});
+            row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "done"});
+        } else if (m_runAhead && m_currentFocus == m_runAhead) {
+            row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"});
         } else {
             row.push_back(choose);
         }

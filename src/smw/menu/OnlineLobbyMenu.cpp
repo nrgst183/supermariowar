@@ -491,8 +491,10 @@ void UI_OnlineLobbyMenu::Sync()
         row = miTeam->prompts();
     else if (m_page == Page::Team)
         row = {across, select, cancel("leave")};
+    else if (IsModifying())
+        row = {change, {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "done"}};
     else
-        row = {choose, change, select, cancel("back")};
+        row = {choose, select, cancel("back")};
     miScene->SetPrompts(std::move(row));
 }
 

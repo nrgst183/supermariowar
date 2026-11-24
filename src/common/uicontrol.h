@@ -6,6 +6,7 @@
 #include <array>
 
 class CPlayerInput;
+class MI_Image;
 class UI_Menu;
 
 
@@ -61,6 +62,16 @@ public:
     virtual Box FocusBox() const {
         return {};
     }
+    /// The part of FocusBox that shows its value (a field's: right of its name, between its arrows),
+    /// marked while the value is being changed
+    virtual Box ValueBox() const {
+        return FocusBox();
+    }
+    /// While its value is being changed: its left and right arrows, those it shows now (null: none);
+    /// the menu draws them again over the control, outlined (see UI_Menu::drawFocus)
+    virtual std::array<MI_Image*, 2> ModifyArrows() const {
+        return {nullptr, nullptr};
+    }
     /// A click at x, y on the control when it does something of its own there (true, and the code
     /// to handle); false: the menu's usual click (as A)
     virtual bool PointerPress(short /*x*/, short /*y*/, MenuCodeEnum& /*code*/) {
@@ -71,9 +82,9 @@ public:
         return b.w > 0 && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
     }
 
-    /// Left/right on the control while it's only focused, when the menu has nothing that way: a value
-    /// field takes the next/previous value at once (no select, change, select). Whether it does that,
-    /// and doing it (dir -1/1): the code its change returns
+    /// A click on a value field, or the mouse wheel over it: its next/previous value at once (on a
+    /// controller or the keys: A, left/right, A). Whether it does that, and doing it (dir -1/1): the
+    /// code its change returns
     virtual bool CanNudge() const {
         return false;
     }

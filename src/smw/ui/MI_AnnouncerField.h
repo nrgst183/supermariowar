@@ -23,6 +23,9 @@ public:
 
     //Draws every frame
     void Draw() override;
+    std::array<MI_Image*, 2> ModifyArrows() const override {
+        return fModifying ? std::array<MI_Image*, 2> {miModifyImageLeft.get(), miModifyImageRight.get()} : std::array<MI_Image*, 2> {};
+    }
 
     //Sends player input to control on every frame
     MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
