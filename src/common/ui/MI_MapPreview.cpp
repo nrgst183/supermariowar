@@ -263,6 +263,12 @@ void MI_MapPreview::LoadCurrentMapInBackground()
     if (s_job) {
         //(one at a time: this one when it's done, unless another comes before. The one loading is
         //out of date: it stops at its next step, and isn't shown)
+        //(back to the one loading, still whole: it shows, nothing after it)
+        if (s_job->owner == this && s_job->path == path && !s_job->stale) {
+            m_pendingPath.clear();
+            m_pendingName.clear();
+            return;
+        }
         if (s_job->owner == this && s_job->path != path)
             s_job->stale = true;
         m_pendingPath = path;
