@@ -164,7 +164,6 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miJailModeTagFreeField->add("On", true);
     miJailModeTagFreeField->setOutputPtr(&game_values.gamemodemenusettings.jail.tagfree);
     miJailModeTagFreeField->setCurrentValue(game_values.gamemodemenusettings.jail.tagfree ? 1 : 0);
-    miJailModeTagFreeField->setAutoAdvance(true);
 
     miJailModeJailKeyField = new MI_SliderField(&rm->spr_selectfield, &rm->menu_slider_bar, 120, 280, "Jail Key", 400, 150, 384);
     addNumbers(miJailModeJailKeyField, 0, 100, 5, 10, 50);
@@ -183,7 +182,6 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miCoinModePenaltyField->add("On", true);
     miCoinModePenaltyField->setOutputPtr(&game_values.gamemodemenusettings.coins.penalty);
     miCoinModePenaltyField->setCurrentValue(game_values.gamemodemenusettings.coins.penalty ? 1 : 0);
-    miCoinModePenaltyField->setAutoAdvance(true);
 
     miCoinModeQuantityField = new MI_SelectField<short>(&rm->spr_selectfield, 120, 220, "Quantity", 400, 150);
     addNumbers(miCoinModeQuantityField, 1, 10, 1, 1, 10);
@@ -307,14 +305,12 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miFlagModeTouchReturnField->add("On", true);
     miFlagModeTouchReturnField->setOutputPtr(&game_values.gamemodemenusettings.flag.touchreturn);
     miFlagModeTouchReturnField->setCurrentValue(game_values.gamemodemenusettings.flag.touchreturn ? 1 : 0);
-    miFlagModeTouchReturnField->setAutoAdvance(true);
 
     miFlagModePointMoveField = new MI_SelectField<bool>(&rm->spr_selectfield, 120, 200, "Point Move", 400, 180);
     miFlagModePointMoveField->add("Off", false);
     miFlagModePointMoveField->add("On", true);
     miFlagModePointMoveField->setOutputPtr(&game_values.gamemodemenusettings.flag.pointmove);
     miFlagModePointMoveField->setCurrentValue(game_values.gamemodemenusettings.flag.pointmove ? 1 : 0);
-    miFlagModePointMoveField->setAutoAdvance(true);
 
     miFlagModeAutoReturnField = new MI_SelectField<short>(&rm->spr_selectfield, 120, 240, "Auto Return", 400, 180);
     miFlagModeAutoReturnField->add("None", 0);
@@ -338,14 +334,12 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miFlagModeHomeScoreField->add("On", true);
     miFlagModeHomeScoreField->setOutputPtr(&game_values.gamemodemenusettings.flag.homescore);
     miFlagModeHomeScoreField->setCurrentValue(game_values.gamemodemenusettings.flag.homescore ? 1 : 0);
-    miFlagModeHomeScoreField->setAutoAdvance(true);
 
     miFlagModeCenterFlagField = new MI_SelectField<bool>(&rm->spr_selectfield, 120, 320, "Center Flag", 400, 180);
     miFlagModeCenterFlagField->add("Off", false);
     miFlagModeCenterFlagField->add("On", true);
     miFlagModeCenterFlagField->setOutputPtr(&game_values.gamemodemenusettings.flag.centerflag);
     miFlagModeCenterFlagField->setCurrentValue(game_values.gamemodemenusettings.flag.centerflag ? 1 : 0);
-    miFlagModeCenterFlagField->setAutoAdvance(true);
 
     finishModeMenu(mModeSettingsMenu[7], "Capture The Flag Rules", {
         miFlagModeSpeedField, miFlagModeTouchReturnField, miFlagModePointMoveField,
@@ -361,14 +355,12 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miChickenModeShowTargetField->add("On", true);
     miChickenModeShowTargetField->setOutputPtr(&game_values.gamemodemenusettings.chicken.usetarget);
     miChickenModeShowTargetField->setCurrentValue(game_values.gamemodemenusettings.chicken.usetarget ? 1 : 0);
-    miChickenModeShowTargetField->setAutoAdvance(true);
 
     miChickenModeGlideField = new MI_SelectField<bool>(&rm->spr_selectfield, 120, 240, "Chicken Glide", 400, 180);
     miChickenModeGlideField->add("Off", false);
     miChickenModeGlideField->add("On", true);
     miChickenModeGlideField->setOutputPtr(&game_values.gamemodemenusettings.chicken.glide);
     miChickenModeGlideField->setCurrentValue(game_values.gamemodemenusettings.chicken.glide ? 1 : 0);
-    miChickenModeGlideField->setAutoAdvance(true);
 
     finishModeMenu(mModeSettingsMenu[8], "Chicken Rules", {miChickenModeShowTargetField, miChickenModeGlideField});
 
@@ -381,7 +373,6 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miTagModeTagOnTouchField->add("On", true);
     miTagModeTagOnTouchField->setOutputPtr(&game_values.gamemodemenusettings.tag.tagontouch);
     miTagModeTagOnTouchField->setCurrentValue(game_values.gamemodemenusettings.tag.tagontouch ? 1 : 0);
-    miTagModeTagOnTouchField->setAutoAdvance(true);
 
     finishModeMenu(mModeSettingsMenu[9], "Tag Rules", {miTagModeTagOnTouchField});
 
@@ -476,21 +467,18 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miDominationModeLoseOnDeathField->add("On", true);
     miDominationModeLoseOnDeathField->setOutputPtr(&game_values.gamemodemenusettings.domination.loseondeath);
     miDominationModeLoseOnDeathField->setCurrentValue(game_values.gamemodemenusettings.domination.loseondeath ? 1 : 0);
-    miDominationModeLoseOnDeathField->setAutoAdvance(true);
 
     miDominationModeRelocateOnDeathField = new MI_SelectField<bool>(&rm->spr_selectfield, 120, 280, "Move Bases", 400, 180);
     miDominationModeRelocateOnDeathField->add("Off", false);
     miDominationModeRelocateOnDeathField->add("On", true);
     miDominationModeRelocateOnDeathField->setOutputPtr(&game_values.gamemodemenusettings.domination.relocateondeath);
     miDominationModeRelocateOnDeathField->setCurrentValue(game_values.gamemodemenusettings.domination.relocateondeath ? 1 : 0);
-    miDominationModeRelocateOnDeathField->setAutoAdvance(true);
 
     miDominationModeStealOnDeathField = new MI_SelectField<bool>(&rm->spr_selectfield, 120, 320, "Steal Bases", 400, 180);
     miDominationModeStealOnDeathField->add("Off", false);
     miDominationModeStealOnDeathField->add("On", true);
     miDominationModeStealOnDeathField->setOutputPtr(&game_values.gamemodemenusettings.domination.stealondeath);
     miDominationModeStealOnDeathField->setCurrentValue(game_values.gamemodemenusettings.domination.stealondeath ? 1 : 0);
-    miDominationModeStealOnDeathField->setAutoAdvance(true);
 
     finishModeMenu(mModeSettingsMenu[11], "Domination Rules", {miDominationModeQuantityField, miDominationModeRelocateFrequencyField,
         miDominationModeLoseOnDeathField, miDominationModeRelocateOnDeathField, miDominationModeStealOnDeathField});
@@ -638,7 +626,6 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miSurvivalModeShieldField->add("On", true);
     miSurvivalModeShieldField->setOutputPtr(&game_values.gamemodemenusettings.survival.shield);
     miSurvivalModeShieldField->setCurrentValue(game_values.gamemodemenusettings.survival.shield ? 1 : 0);
-    miSurvivalModeShieldField->setAutoAdvance(true);
 
     finishModeMenu(mModeSettingsMenu[16], "Survival Rules", {miSurvivalModeEnemySlider[0], miSurvivalModeEnemySlider[1], miSurvivalModeEnemySlider[2], miSurvivalModeDensityField, miSurvivalModeSpeedField, miSurvivalModeShieldField});
 
@@ -670,7 +657,6 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miGreedModeOwnCoins->add("No", false);
     miGreedModeOwnCoins->setOutputPtr(&game_values.gamemodemenusettings.greed.owncoins);
     miGreedModeOwnCoins->setCurrentValue(game_values.gamemodemenusettings.greed.owncoins);
-    miGreedModeOwnCoins->setAutoAdvance(true);
 
     miGreedModeMultiplier = new MI_SelectField<short>(&rm->spr_selectfield, 120, 240, "Multipler", 400, 150);
     miGreedModeMultiplier->add("0.5", 1, false);
@@ -828,7 +814,6 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     miShyGuyTagModeTagOnSuicideField->add("On", true);
     miShyGuyTagModeTagOnSuicideField->setOutputPtr(&game_values.gamemodemenusettings.shyguytag.tagonsuicide);
     miShyGuyTagModeTagOnSuicideField->setCurrentValue(game_values.gamemodemenusettings.shyguytag.tagonsuicide ? 1 : 0);
-    miShyGuyTagModeTagOnSuicideField->setAutoAdvance(true);
 
     miShyGuyTagModeTagOnStompField = new MI_SelectField<short>(&rm->spr_selectfield, 120, 220, "Tag Transfer", 400, 180);
     miShyGuyTagModeTagOnStompField->add("Touch Only", 0);

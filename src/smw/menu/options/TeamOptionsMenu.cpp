@@ -26,7 +26,6 @@ UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     miTeamColorsField->add("Team", true);
     miTeamColorsField->setOutputPtr(&game_values.teamcolors);
     miTeamColorsField->setCurrentValue(game_values.teamcolors ? 1 : 0);
-    miTeamColorsField->setAutoAdvance(true);
     page.add(miTeamColorsField, "Team colors or each player's own");
 
     miCpuSkinsField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "CPU Skins", SettingsPage::ROW_W, SettingsPage::LABEL_W);
@@ -34,7 +33,6 @@ UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     miCpuSkinsField->add("Random", true);
     miCpuSkinsField->setOutputPtr(&game_values.randomcpuskins);
     miCpuSkinsField->setCurrentValue(game_values.randomcpuskins ? 1 : 0);
-    miCpuSkinsField->setAutoAdvance(true);
     page.add(miCpuSkinsField, "Random skins for CPUs, or their slot's");
 
     miTournamentControlField = new MI_SelectField<TournamentControlStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Tournament Control", SettingsPage::ROW_W, SettingsPage::LABEL_W);

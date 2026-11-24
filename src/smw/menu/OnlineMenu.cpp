@@ -55,7 +55,6 @@ UI_OnlineMenu::UI_OnlineMenu()
     game_values.runahead = std::clamp<short>(game_values.runahead, -1, 3);
     miRunAheadField->setOutputPtr(&game_values.runahead);
     miRunAheadField->setCurrentValue(game_values.runahead);
-    miRunAheadField->setAutoAdvance(true);
 
     //What is downloaded from the others when this machine lacks it: their skins (else a ? block in their
     //place), the host's map (else this machine can't play on it)
@@ -84,14 +83,12 @@ UI_OnlineMenu::UI_OnlineMenu()
     miPingBarsField->add("On", true);
     miPingBarsField->setOutputPtr(&game_values.showpingbars);
     miPingBarsField->setCurrentValue(game_values.showpingbars ? 1 : 0);
-    miPingBarsField->setAutoAdvance(true);
 
     miNetStatsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 362, "Net Stats", 512, 150);
     miNetStatsField->add("Off", false);
     miNetStatsField->add("On", true);
     miNetStatsField->setOutputPtr(&game_values.shownetstats);
     miNetStatsField->setCurrentValue(game_values.shownetstats ? 1 : 0);
-    miNetStatsField->setAutoAdvance(true);
 
 
     // Join by address (from the games list: a game that isn't on this network), in the middle of the

@@ -37,7 +37,6 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miWinningCrownField->add("On", true);
     miWinningCrownField->setOutputPtr(&game_values.showwinningcrown);
     miWinningCrownField->setCurrentValue(game_values.showwinningcrown ? 1 : 0);
-    miWinningCrownField->setAutoAdvance(true);
     page.add(miWinningCrownField, "Crowns the player in the lead");
 
     miDeadTeamNoticeField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Dead Team Notice", SettingsPage::ROW_W, SettingsPage::LABEL_W);
@@ -45,7 +44,6 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miDeadTeamNoticeField->add("On", true);
     miDeadTeamNoticeField->setOutputPtr(&game_values.deadteamnotice);
     miDeadTeamNoticeField->setCurrentValue(game_values.deadteamnotice ? 1 : 0);
-    miDeadTeamNoticeField->setAutoAdvance(true);
     page.add(miDeadTeamNoticeField, "Tell everyone when a team is out");
 
     miStartCountDownField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Start Countdown", SettingsPage::ROW_W, SettingsPage::LABEL_W);
@@ -53,7 +51,6 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miStartCountDownField->add("On", true);
     miStartCountDownField->setOutputPtr(&game_values.startgamecountdown);
     miStartCountDownField->setCurrentValue(game_values.startgamecountdown ? 1 : 0);
-    miStartCountDownField->setAutoAdvance(true);
     page.add(miStartCountDownField, "Count down 3, 2, 1 before a match");
 
     miStartModeDisplayField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Show Mode", SettingsPage::ROW_W, SettingsPage::LABEL_W);
@@ -61,7 +58,6 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miStartModeDisplayField->add("On", true);
     miStartModeDisplayField->setOutputPtr(&game_values.startmodedisplay);
     miStartModeDisplayField->setCurrentValue(game_values.startmodedisplay ? 1 : 0);
-    miStartModeDisplayField->setAutoAdvance(true);
     page.add(miStartModeDisplayField, "Show the mode's name at the start");
 
     miScoreStyleField = new MI_SelectField<ScoreboardStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Score Location", SettingsPage::ROW_W, SettingsPage::LABEL_W);
@@ -77,7 +73,6 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miCrunchField->add("On", true);
     miCrunchField->setOutputPtr(&game_values.screencrunch);
     miCrunchField->setCurrentValue(game_values.screencrunch ? 1 : 0);
-    miCrunchField->setAutoAdvance(true);
     page.add(miCrunchField, "Shake the screen when a player dies");
 
     page.finish(*this, "Eye Candy Options", MENU_CODE_BACK_TO_OPTIONS_MENU);

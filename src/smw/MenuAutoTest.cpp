@@ -1761,7 +1761,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         struct Screen { MenuCodeEnum code; const char* name; };
         static const Screen SCREENS[] = {{MENU_CODE_TO_OPTIONS_MENU, "t01_options"},
             {MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU, "t02_gameplay"}, {MENU_CODE_NONE, "t02b_gameplay_down"},
-            {MENU_CODE_NONE, "!t02c_gameplay_changing"}, {MENU_CODE_NONE, "!"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_NONE, "!t02c_gameplay_changing"}, {MENU_CODE_NONE, ">t02d_gameplay_changed"}, {MENU_CODE_NONE, "!"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
             {MENU_CODE_TO_TEAM_OPTIONS_MENU, "t03_team"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
             {MENU_CODE_TO_POWERUP_SELECTION_MENU, "t04_item_selection"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
             {MENU_CODE_TO_POWERUP_SETTINGS_MENU, "t05_item_settings"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
@@ -1769,7 +1769,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             {MENU_CODE_TO_PROJECTILES_LIMITS_MENU, "t07_weapon_limits"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
             {MENU_CODE_TO_GRAPHICS_OPTIONS_MENU, "t08_graphics"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
             {MENU_CODE_TO_EYECANDY_OPTIONS_MENU, "t09_eyecandy"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
-            {MENU_CODE_TO_SOUND_OPTIONS_MENU, "t10_sound"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
+            {MENU_CODE_TO_SOUND_OPTIONS_MENU, "t10_sound"}, {MENU_CODE_NONE, "!t10b_sound_changing"}, {MENU_CODE_NONE, "!"}, {MENU_CODE_TO_OPTIONS_MENU, ""},
             {MENU_CODE_TO_ONLINE_OPTIONS_MENU, "t11_online_options"}, {MENU_CODE_TO_MAIN_MENU, ""},
             {MENU_CODE_TO_CONTROLS_MENU, "t12_controls"}, {MENU_CODE_TO_MAIN_MENU, ""},
             {MENU_CODE_TO_HISTORY_MENU, "t13_history"}, {MENU_CODE_TO_MAIN_MENU, ""},
@@ -1790,13 +1790,17 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         }
         if (frame == 0 && SCREENS[index].code != MENU_CODE_NONE)
             return SCREENS[index].code;
-        //(no menu code: down three rows on the same screen; a name with a "!": A on the field, to change it)
+        //(no menu code: down three rows on the same screen; a name with a "!": A on the field, to change
+        //it; with a ">": right, its next value)
         const bool pressA = SCREENS[index].name[0] == '!';
+        const bool pressRight = SCREENS[index].name[0] == '>';
         if (pressA && frame == 0)
             game_values.playerInput.outputControls[0].menu_select.fPressed = true;
-        if (SCREENS[index].code == MENU_CODE_NONE && !pressA && frame < 6 && frame % 2 == 0)
+        if (pressRight && frame == 0)
+            game_values.playerInput.outputControls[0].menu_right.fPressed = true;
+        if (SCREENS[index].code == MENU_CODE_NONE && !pressA && !pressRight && frame < 6 && frame % 2 == 0)
             game_values.playerInput.outputControls[0].menu_down.fPressed = true;
-        const char* name = SCREENS[index].name + (pressA ? 1 : 0);
+        const char* name = SCREENS[index].name + (pressA || pressRight ? 1 : 0);
         if (frame == HOLD - 2 && name[0])
             shot(name);
         return MENU_CODE_NONE;

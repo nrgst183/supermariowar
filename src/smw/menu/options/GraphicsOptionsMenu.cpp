@@ -39,7 +39,6 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miFullscreenField->add("Fullscreen", true);
     miFullscreenField->setOutputPtr(&game_values.fullscreen);
     miFullscreenField->setCurrentValue(game_values.fullscreen ? 1 : 0);
-    miFullscreenField->setAutoAdvance(true);
     miFullscreenField->setItemChangedCode(MENU_CODE_TOGGLE_FULLSCREEN);
     page.add(miFullscreenField, "Play in a window or full screen");
 #endif
@@ -52,7 +51,6 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miFrameRateField->add("62.5 FPS", static_cast<short>(FrameRateMode::TickRate));
     miFrameRateField->setOutputPtr(&game_values.framelimiter);
     miFrameRateField->setCurrentValue(game_values.framelimiter);
-    miFrameRateField->setAutoAdvance(true);
     page.add(miFrameRateField, "Frames drawn per second (game: 62.5)");
 
     miSmoothMotionField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Smooth Motion", SettingsPage::ROW_W, SettingsPage::LABEL_W);
@@ -60,7 +58,6 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miSmoothMotionField->add("On", true);
     miSmoothMotionField->setOutputPtr(&game_values.smoothmotion);
     miSmoothMotionField->setCurrentValue(game_values.smoothmotion ? 1 : 0);
-    miSmoothMotionField->setAutoAdvance(true);
     page.add(miSmoothMotionField, "Smoother motion above 62.5 FPS");
 
     miMenuGraphicsPackField = new MI_PacksField(&rm->spr_selectfield, page.x(), page.rowY(), "Menu Graphics", SettingsPage::ROW_W, SettingsPage::LABEL_W, menugraphicspacklist, MENU_CODE_MENU_GRAPHICS_PACK_CHANGED);
@@ -75,7 +72,6 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miTopLayerField->add("Foreground", true);
     miTopLayerField->setOutputPtr(&game_values.toplayer);
     miTopLayerField->setCurrentValue(game_values.toplayer ? 1 : 0);
-    miTopLayerField->setAutoAdvance(true);
     page.add(miTopLayerField, "Top layer in front of or behind players");
 
     //A TV crops the picture's edges (overscan): the picture smaller, so that nothing is lost
@@ -116,7 +112,6 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miNetStatsField->add("On", true);
     miNetStatsField->setOutputPtr(&game_values.shownetstats);
     miNetStatsField->setCurrentValue(game_values.shownetstats ? 1 : 0);
-    miNetStatsField->setAutoAdvance(true);
     page.add(miNetStatsField, "Connection stats online (or press F3)");
 #endif
 

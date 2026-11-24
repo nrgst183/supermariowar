@@ -81,7 +81,6 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miKeepPowerupField->add("Keep Always", true);
     miKeepPowerupField->setOutputPtr(&game_values.keeppowerup);
     miKeepPowerupField->setCurrentValue(game_values.keeppowerup ? 1 : 0);
-    miKeepPowerupField->setAutoAdvance(true);
     page.add(miKeepPowerupField, "How long the wheel's item is kept");
 
     miStoredPowerupResetButton = new MI_StoredPowerupResetButton(&rm->spr_selectfield, page.x(), page.rowY(), "Reset Stored Items", SettingsPage::ROW_W);

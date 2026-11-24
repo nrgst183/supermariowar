@@ -64,7 +64,6 @@ MI_FrenzyModeOptions::MI_FrenzyModeOptions(short x, short y, short width, short 
     miStoredShellsField->add("On", true);
     miStoredShellsField->setOutputPtr(&game_values.gamemodemenusettings.frenzy.storedshells);
     miStoredShellsField->setCurrentValue(game_values.gamemodemenusettings.frenzy.storedshells ? 1 : 0);
-    miStoredShellsField->setAutoAdvance(true);
 
     short iPowerupMap[] = {8, 5, 11, 17, 19, 21, 23, 24, 25, 20, 9, 16, 10, 22, 12, 13, 14, 15, 27};
     for (short iPowerup = 0; iPowerup < NUMFRENZYCARDS; iPowerup++) {

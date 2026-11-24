@@ -89,7 +89,6 @@ UI_ProjectileOptionsMenu::UI_ProjectileOptionsMenu()
     miHammerOneKillField->add("Multiple Kills", false);
     miHammerOneKillField->setOutputPtr(&game_values.hammerpower);
     miHammerOneKillField->setCurrentValue(game_values.hammerpower);
-    miHammerOneKillField->setAutoAdvance(true);
 
     miShellLifeField = new MI_SelectField<short>(&rm->spr_selectfield, 20, 306, "Life", 284, 120);
     miShellLifeField->add("Unlimited", 0);

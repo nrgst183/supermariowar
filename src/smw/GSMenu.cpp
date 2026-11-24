@@ -289,6 +289,7 @@ void drawChangingFocus(const UI_Control& control, const UI_Control::Box& v, floa
         SDL_PixelFormat format = SDL_PIXELFORMAT_UNKNOWN;
         SDL_Rect r {};
         SDL_Surface* shadow = nullptr;    // black where the control is, in the value part; see-through elsewhere
+        Uint32 drawn = 0;                 // a sum of what the screen showed there (its text changes: made again)
         std::vector<FramePixel> frame;
     };
     static Cache cache;
@@ -296,16 +297,43 @@ void drawChangingFocus(const UI_Control& control, const UI_Control::Box& v, floa
     const Uint64 nowMs = SDL_GetTicks();
     const bool stale = nowMs - lastMs > 250;    //(after a pause: another screen, maybe another control at that address)
     lastMs = nowMs;
+    const int x0 = std::max(0, static_cast<int>(v.x)), y0 = std::max(0, static_cast<int>(v.y));
+    const SDL_Rect area {x0, y0, std::min(screen->w, v.x + v.w) - x0, std::min(screen->h, v.y + v.h) - y0};
+    if (area.w <= 8 || area.h <= 8)
+        return;
+    //(what the control drew there this frame, but its arrows, which move: another value, the text
+    //scrolling, is another shape to keep out of the shadow)
+    Uint32 drawn = 2166136261u;
+    {
+        std::array<SDL_Rect, 2> skip {};
+        for (size_t i = 0; i < arrows.size(); i++) {
+            if (arrows[i]) {
+                short ax, ay, aw, ah;
+                arrows[i]->GetPositionAndSize(ax, ay, aw, ah);
+                skip[i] = {ax, ay, aw, ah};
+            }
+        }
+        if (SDL_MUSTLOCK(screen))
+            SDL_LockSurface(screen);
+        for (int y = area.y; y < area.y + area.h; y++) {
+            for (int x = area.x; x < area.x + area.w; x++) {
+                bool arrow = false;
+                for (const SDL_Rect& s : skip)
+                    arrow = arrow || (x >= s.x && x < s.x + s.w && y >= s.y && y < s.y + s.h);
+                if (!arrow)
+                    drawn = (drawn ^ read(screen, x, y)) * 16777619u;
+            }
+        }
+        SDL_UnlockSurface(screen);
+    }
     if (stale || cache.control != &control || cache.box.x != v.x || cache.box.y != v.y || cache.box.w != v.w || cache.box.h != v.h
-        || cache.format != screen->format || !cache.shadow) {
+        || cache.format != screen->format || !cache.shadow || cache.drawn != drawn) {
         cache.control = &control;
         cache.box = v;
         cache.format = screen->format;
-        const int x0 = std::max(0, static_cast<int>(v.x)), y0 = std::max(0, static_cast<int>(v.y));
-        cache.r = {x0, y0, std::min(screen->w, v.x + v.w) - x0, std::min(screen->h, v.y + v.h) - y0};
+        cache.drawn = drawn;
+        cache.r = area;
         const SDL_Rect& r = cache.r;
-        if (r.w <= 8 || r.h <= 8)
-            return;
 
         //The control without its arrows, only its value part
         for (MI_Image* arrow : arrows)
@@ -421,9 +449,11 @@ void drawMenuFocus(const UI_Control& control, bool modifying)
     const SDL_Color silver {208, 216, 232, 255};
     const SDL_Color light = mix({252, 252, 252, 255}, {176, 204, 240, 255}, wave * 0.6f);
 
-    //(2 pixels each, dark, light, dark: no 1-pixel line to flicker on an interlaced TV)
-    roundRing(b.x - 6, b.y - 6, b.w + 12, b.h + 12, 6, dark);
-    roundRing(b.x - 4, b.y - 4, b.w + 8, b.h + 8, 2, light);
+    //(2 pixels each, dark, light, dark: no 1-pixel line to flicker on an interlaced TV; 2 more at the
+    //sides: a lit pipe's ends reach 8 past its box, the frame goes round them)
+    constexpr int LIP = 2;
+    roundRing(b.x - 6 - LIP, b.y - 6, b.w + 12 + 2 * LIP, b.h + 12, 6, dark);
+    roundRing(b.x - 4 - LIP, b.y - 4, b.w + 8 + 2 * LIP, b.h + 8, 2, light);
     //(its value being changed: that part of it, in gold)
     if (modifying)
         drawChangingFocus(control, control.ValueBox(), wave);
@@ -432,7 +462,7 @@ void drawMenuFocus(const UI_Control& control, bool modifying)
         return;
     //(the pointer: a silver arrowhead, a few pixels to and fro)
     const int bob = static_cast<int>(wave * 3.0f + 0.5f);
-    const int px = b.x - 6 - 2 - 12 - bob;
+    const int px = b.x - 6 - LIP - 2 - 12 - bob;
     const int py = b.y + b.h / 2 - 9;
     if (px < 2)
         return;
