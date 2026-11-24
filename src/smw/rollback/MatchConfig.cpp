@@ -361,6 +361,47 @@ void loadMatchSkin(int slot, short color)
     rm->spr_player[slot] = rm->LoadFullSkin(static_cast<short>(0), color);
 }
 
+void lobbyMapCheck(std::string& ref, uint64_t& hash)
+{
+    ref.clear();
+    hash = 0;
+    if (!maplist || maplist->isEmpty() || game_values.matchtype != MatchType::SingleGame)
+        return;
+    const std::string& file = maplist->currentFilename();
+    const std::string root = convertPath("");
+    ref = !root.empty() && file.rfind(root, 0) == 0 ? file.substr(root.size()) : "@" + maplist->currentShortmapname();
+    //(read again only when another map is chosen, or the file changed: saved in the editor)
+    static std::string s_file;
+    static std::filesystem::file_time_type s_time;
+    static uint64_t s_hash = 0;
+    std::error_code ec;
+    const auto time = std::filesystem::last_write_time(file, ec);
+    if (file != s_file || time != s_time) {
+        s_file = file;
+        s_time = time;
+        s_hash = fileHash(file);
+    }
+    hash = s_hash;
+}
+
+bool haveMap(const std::string& ref, uint64_t hash)
+{
+    if (hash == 0)
+        return true;
+    std::string path;
+    if (!ref.empty() && ref[0] == '@')
+        path = maplist ? maplist->fileOfShortName(ref.substr(1)) : std::string();
+    else if (!ref.empty())
+        path = convertPath(ref);
+    if (!path.empty() && fileHash(path) == hash)
+        return true;
+    for (const std::string& dir : mapDownloadDirs()) {
+        if (!findMapByHash(dir, hash).empty())
+            return true;
+    }
+    return false;
+}
+
 std::string matchMapPath(const MatchConfig& config)
 {
     return mapPathFor(config);

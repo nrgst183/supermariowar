@@ -71,6 +71,7 @@ struct NetArgs {
     int port = 0;              // --net-port: the local UDP port of a joiner (0: any)
     std::string name;          // --net-name: nickname in the lobby
     std::string skin;          // --net-skin NAME[,NAME2]: skin of our player(s) (testing: skins are otherwise chosen in the menus)
+    int mapDownloads = -1;     // --net-map-downloads 0/1: overrides the setting (testing: a peer that won't download the map)
     int slowMap = 1;           // --net-slow-map N: the host sends one map chunk per N frames (testing: to catch the transfer in screenshots)
     int delay = -1;            // --net-delay: input delay in ticks (-1: automatic)
     int checksumInterval = 60; // --net-checksum N: compare (and print) state checksums every N frames

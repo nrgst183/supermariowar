@@ -95,6 +95,7 @@ private:
     void changeTeam(int slot, int direction);
     void changeSkin(int localIndex, int direction, bool random);
     const gfxSprite* skinFrame(int slot, const Info& info, int frame);
+    bool skinUnknown(int slot, const Info& info) const;
     // The CPUs the host's player 1 sets the skins (and teams) of, after its own (A goes on to them, as
     // in the original game): a local game's, in slot order (none online: each machine shows its own)
     std::vector<int> pickableCpus() const;

@@ -174,6 +174,8 @@ public:
     short		buttonprompts = 2;      // the controller glyphs in the theater and the editors: 0 auto, 1 Xbox, 2 original Xbox (the default)
     bool		teamcolors;
     bool		randomcpuskins = true;  // the computer players: a skin each picked at random, not the one in their slot
+    bool		skindownloads = true;   // online: the skins of the others that this machine lacks are downloaded (off: a ? block in their place)
+    bool		mapdownloads = true;    // online: a map of the host's that this machine lacks is downloaded (off: it can't play on it)
     bool		sound;
     bool		startgamecountdown;
     bool		startmodedisplay;

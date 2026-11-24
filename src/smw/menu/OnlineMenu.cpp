@@ -31,8 +31,8 @@ UI_OnlineMenu::UI_OnlineMenu()
     AddNonControl(miTitle);
 
     // Settings: you, and hosting
-    miYouPanel = new MI_MenuPanel(36, 42, 568, 120, "You", "Your nickname and run-ahead");
-    miHostPanel = new MI_MenuPanel(36, 166, 568, 84, "Hosting", "The port friends join on");
+    miYouPanel = new MI_MenuPanel(36, 42, 568, 156, "You", "Your nickname, run-ahead and downloads");
+    miHostPanel = new MI_MenuPanel(36, 202, 568, 84, "Hosting", "The port friends join on");
     miHostPanel->SetNoteSource([]() -> std::string {
         const std::string address = rollback::NetGame::lanAddress();
         if (address.empty())
@@ -57,23 +57,36 @@ UI_OnlineMenu::UI_OnlineMenu()
     miRunAheadField->setCurrentValue(game_values.runahead);
     miRunAheadField->setAutoAdvance(true);
 
-    miPortField = new MI_TextField(&rm->spr_selectfield, 64, 202, "Port", 512, 150);
+    //What is downloaded from the others when this machine lacks it: their skins (else a ? block in their
+    //place), the host's map (else this machine can't play on it)
+    miDownloadsField = new MI_SelectField<short>(&rm->spr_selectfield, 64, 150, "Downloads", 512, 150);
+    miDownloadsField->add("Skins and Maps", 3);
+    miDownloadsField->add("Skins Only", 2);
+    miDownloadsField->add("Maps Only", 1);
+    miDownloadsField->add("Off", 0);
+    miDownloadsField->setCurrentValue(downloadsValue());
+    miDownloadsField->setOnChanged([](short value) {
+        game_values.skindownloads = (value & 2) != 0;
+        game_values.mapdownloads = (value & 1) != 0;
+    });
+
+    miPortField = new MI_TextField(&rm->spr_selectfield, 64, 238, "Port", 512, 150);
     miPortField->SetData(game_values.onlineport, MAX_PORT_CHARS);
     miPortField->SetDisallowedChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ !@#$%^&*()-_=+`~[]{}\\|;:'\",<>./?");
 
     // In the matches (and online replays): the others' connection on their score panels, and the
     // connection's numbers (F3 in a match toggles them too)
-    miMatchPanel = new MI_MenuPanel(36, 254, 568, 120, "In online matches", "What the screen shows");
+    miMatchPanel = new MI_MenuPanel(36, 290, 568, 120, "In online matches", "What the screen shows");
     AddNonControl(miMatchPanel);
 
-    miPingBarsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 290, "Ping Bars", 512, 150);
+    miPingBarsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 326, "Ping Bars", 512, 150);
     miPingBarsField->add("Off", false);
     miPingBarsField->add("On", true);
     miPingBarsField->setOutputPtr(&game_values.showpingbars);
     miPingBarsField->setCurrentValue(game_values.showpingbars ? 1 : 0);
     miPingBarsField->setAutoAdvance(true);
 
-    miNetStatsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 326, "Net Stats", 512, 150);
+    miNetStatsField = new MI_SelectField<bool>(&rm->spr_selectfield, 64, 362, "Net Stats", 512, 150);
     miNetStatsField->add("Off", false);
     miNetStatsField->add("On", true);
     miNetStatsField->setOutputPtr(&game_values.shownetstats);
@@ -107,8 +120,9 @@ UI_OnlineMenu::UI_OnlineMenu()
 
     //(round from the last to the first; B, or the footer's "back": back)
     AddControl(miNameField, miNetStatsField, miRunAheadField, nullptr, nullptr);
-    AddControl(miRunAheadField, miNameField, miPortField, nullptr, nullptr);
-    AddControl(miPortField, miRunAheadField, miPingBarsField, nullptr, nullptr);
+    AddControl(miRunAheadField, miNameField, miDownloadsField, nullptr, nullptr);
+    AddControl(miDownloadsField, miRunAheadField, miPortField, nullptr, nullptr);
+    AddControl(miPortField, miDownloadsField, miPingBarsField, nullptr, nullptr);
     AddControl(miPingBarsField, miPortField, miNetStatsField, nullptr, nullptr);
     AddControl(miNetStatsField, miPingBarsField, miNameField, nullptr, nullptr);
 
@@ -121,12 +135,17 @@ UI_OnlineMenu::UI_OnlineMenu()
     ShowMode(Mode::Join);
 }
 
+short UI_OnlineMenu::downloadsValue()
+{
+    return static_cast<short>((game_values.skindownloads ? 2 : 0) | (game_values.mapdownloads ? 1 : 0));
+}
+
 void UI_OnlineMenu::ShowMode(Mode mode)
 {
     m_mode = mode;
     const bool settings = mode == Mode::Settings;
     miTitle->SetText(settings ? "Online Options" : "Join by Address");
-    for (UI_Control* control : std::initializer_list<UI_Control*> {miYouPanel, miHostPanel, miNameField, miRunAheadField, miPortField, miMatchPanel,
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miYouPanel, miHostPanel, miNameField, miRunAheadField, miDownloadsField, miPortField, miMatchPanel,
              miPingBarsField, miNetStatsField})
         control->setVisible(settings);
     for (UI_Control* control : std::initializer_list<UI_Control*> {miJoinPanel, miAddressField, miJoinButton})
@@ -134,7 +153,7 @@ void UI_OnlineMenu::ShowMode(Mode mode)
     setInitialFocus(settings ? static_cast<UI_Control*>(miNameField) : static_cast<UI_Control*>(miAddressField));
     SetCancelCode(settings ? MENU_CODE_BACK_TO_OPTIONS_MENU : MENU_CODE_TO_SYSTEM_LINK_MENU);
     //(what went wrong: under the panels, the settings' or the join panel)
-    miMessage->SetPosition(320, settings ? 382 : 282);
+    miMessage->SetPosition(320, settings ? 414 : 282);
 }
 
 void UI_OnlineMenu::Open(Mode mode)
@@ -143,6 +162,7 @@ void UI_OnlineMenu::Open(Mode mode)
     miPortField->Refresh();
     miAddressField->Refresh();
     miRunAheadField->setCurrentValue(game_values.runahead);
+    miDownloadsField->setCurrentValue(downloadsValue());
     miPingBarsField->setCurrentValue(game_values.showpingbars ? 1 : 0);
     miNetStatsField->setCurrentValue(game_values.shownetstats ? 1 : 0);
     ShowMode(mode);

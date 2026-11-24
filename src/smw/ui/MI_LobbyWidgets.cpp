@@ -58,6 +58,7 @@ struct MI_OnlineTeamSelect::Info {
     bool mine = false;
     bool ready = false;
     bool downloadingSkin = false;
+    bool lacksMap = false;    // its machine doesn't have the lobby's map and won't download it
     int team = 0;
     int color = 0;
     int pingMs = -1;
@@ -443,6 +444,7 @@ bool MI_OnlineTeamSelect::gather(int s, Info& info) const
         info.ready = info.cpu;
     }
     info.downloadingSkin = info.human && lobby->slotSkinDownloading(s);
+    info.lacksMap = info.human && lobby->peerLacksMap(slot.peer);
 
     switch (slot.kind) {
         case rollback::SlotKind::Empty:
@@ -473,6 +475,12 @@ bool MI_OnlineTeamSelect::gather(int s, Info& info) const
 
 // The sprite of the player in a slot, as it will be in the match (the skin of its owner, the default one
 // while it is downloaded and for computer players); frame 0 stands, 1 runs
+bool MI_OnlineTeamSelect::skinUnknown(int slot, const Info& info) const
+{
+    const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+    return info.human && !info.mine && lobby && lobby->slotSkinPath(slot).empty();
+}
+
 const gfxSprite* MI_OnlineTeamSelect::skinFrame(int slot, const Info& info, int frame)
 {
     if (!info.human && !info.cpu)
@@ -544,7 +552,10 @@ void MI_OnlineTeamSelect::Draw()
                 continue;
             const bool setting = s == m_cpuEdit;    //(the CPU player 1 sets now: it moves, as one not ready)
             const int sx = team * 96 + 48 + m_pos.x, sy = row * 36 + 52 + m_pos.y;
-            if (const gfxSprite* sprite = skinFrame(s, info[s], info[s].ready && !setting ? 0 : frame))
+            //(its skin not here yet: the game's spinning ? block where it will stand)
+            if (skinUnknown(s, info[s]))
+                rm->spr_powerupblock.draw(sx, sy, {((m_tick / 10) & 3) * 32, 0, 32, 32});
+            else if (const gfxSprite* sprite = skinFrame(s, info[s], info[s].ready && !setting ? 0 : frame))
                 sprite->draw(sx, sy, {0, 0, 32, 32});
             rm->spr_menu_boxed_numbers.draw(team * 96 + 44 + m_pos.x, row * 36 + 72 + m_pos.y, {s * 16, info[s].color * 16, 16, 16});
             ++row;
@@ -588,6 +599,8 @@ void MI_OnlineTeamSelect::Draw()
         const bool showPing = i.human && !i.mine && lobby->slot(s).localIndex == 0;
         if (i.downloadingSkin)
             line = "skin...";
+        if (i.lacksMap)
+            line = "No map!";
         if (showPing) {
             rm->menu_font_small.drawChopCentered(cardX + 54, CARD_Y + 73, 88, line);
             theme::signal(cardX + 98, CARD_Y + 70, i.pingMs);

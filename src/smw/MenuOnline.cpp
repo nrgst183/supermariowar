@@ -708,7 +708,9 @@ void MenuState::SyncOnlineSettingsView()
         const float fraction = static_cast<float>(transfer.bytesDone) / static_cast<float>(transfer.bytesTotal);
         menu.SetMapOverlay(true, mapName, fraction, std::format("{} {}%", transfer.sending ? "Uploading" : "Downloading", static_cast<int>(fraction * 100.0f)));
     } else {
-        menu.SetMapOverlay(true, mapName.empty() ? "No map selected yet" : mapName + "\nnot here yet", -1.0f, {});
+        //(map downloads off: it won't come)
+        const char* why = rollback::NetGame::mapDownloadsOn() ? "\nnot here yet" : "\nnot here: map downloads are off";
+        menu.SetMapOverlay(true, mapName.empty() ? "No map selected yet" : mapName + why, -1.0f, {});
     }
 }
 

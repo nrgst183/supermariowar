@@ -418,6 +418,11 @@ void UI_OnlineLobbyMenu::Sync()
             const bool ready = lobby->peer(local).ready;
             status = ready ? "Waiting for the host to start the match" : "Pick your character and team, then get ready";
             tone = ready ? Tone::Good : Tone::Info;
+            //(the host's map isn't here and won't come: say so, the match can't start on it)
+            if (lobby->peerLacksMap(local)) {
+                status = "You don't have this map, and your map downloads are turned off";
+                tone = Tone::Warn;
+            }
         }
     }
     //The host alone in the lobby: whether friends can reach it (the router's port, UPnP)

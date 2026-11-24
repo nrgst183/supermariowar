@@ -111,12 +111,15 @@
 //
 // PROTOCOL (reliable unless marked; strings are u8 length + bytes):
 //   PEER_INFO     joiner -> host: str name, u8 local players, u8 ready, u8 round
-//                 (the last match id it knows: a ready flag counts for one round)
+//                 (the last match id it knows: a ready flag counts for one round),
+//                 u64 the map it lacks (the lobby's map's hash when it doesn't have it and its
+//                 map downloads are off; 0: none)
 //   SLOT_REQUEST  joiner -> host: u8 slot, u8 team, u8 color
 //   LOBBY_STATE   host -> all: u8 round, u8 input delay, u8 delay is auto,
 //                 str mode, str map, u8 peer mask,
 //                 per present peer: str name, u8 local players, u8 ready,
-//                 4 x slot: u8 kind, i8 peer, u8 local index, u8 team, u8 color
+//                 4 x slot: u8 kind, i8 peer, u8 local index, u8 team, u8 color,
+//                 u8 the peers that lack the map (bit p)
 //   PEER_LEFT     host -> all: u8 peer, str reason (everyone drops that peer)
 //   PING          (unreliable) every 250 ms in the lobby, to every peer: u32 send time
 //   PONG          (unreliable) u32 the echoed send time
@@ -128,7 +131,8 @@
 //                 the receiver.
 //   CONFIG        host -> all: u8 match id, u16 size, the match config (MatchConfig.h)
 //   CONFIG_ACK    u8 match id, u8 status (0 ok, 1 refused, 2 the map is
-//                 missing here: send it), str reason
+//                 missing here: send it, 3 the map is missing and map
+//                 downloads are off here), str reason
 //   MAP_BEGIN     host -> peer: u8 match id, u32 size, u64 hash, str map name
 //   MAP_CHUNK     host -> peer: u8 match id, u32 offset, u16 size, the bytes
 //                 (at most MAP_CHUNK_BYTES; a few per frame so that the
@@ -143,7 +147,8 @@
 //                 the lobby is closed (the host is gone).
 //   LOBBY_EXTRA   host -> all, after every LOBBY_STATE (display only): i16 game mode id (-1: unknown,
 //                 -2: a tournament, tour or world), i16 goal, str goal name ("Kills", "Points"...),
-//                 u8 everyone may change the settings (the host chooses; see settingsEveryone())
+//                 u8 everyone may change the settings (the host chooses; see settingsEveryone()),
+//                 str the map's reference, u64 its hash (MatchConfig's: for everyone to check they have it)
 //   SETTINGS_REQUEST  joiner -> host: u8 what (1 mode, 2 goal, 3 map), i16 number (mode id, goal), str text
 //                 (the map's name). Honored only while the host lets everyone change the settings and
 //                 the lobby is idle; the host applies it through its menus (a LobbyGameEvent::SettingsRequest)
@@ -214,6 +219,8 @@ struct LobbyPeer {
     int localPlayers = 1;
     bool ready = false;
     int pingMs = -1;    // round trip between this machine and the peer (-1: unknown, or ourselves)
+    bool lacksMap = false;    // joiners: it doesn't have the lobby's map and won't download it (see peerLacksMap)
+    uint64_t lackedMap = 0;   // host: the map it said it lacks (0: none)
 };
 
 enum class SlotKind : uint8_t { Empty, Human, Cpu };
@@ -338,6 +345,18 @@ public:
     void setLocalPlayers(int count);
     // The skins of our local players (the first of each is announced to the peers)
     void setLocalSkins(const std::vector<LocalSkinFile>& skins) { m_skins.setLocal(skins); }
+    // The lobby's map, for everyone to check that they have it (MatchConfig's mapRef and mapHash; hash
+    // 0: nothing to check). The host sets it; the joiners get it in LOBBY_EXTRA.
+    void setMapCheck(const std::string& ref, uint64_t hash);
+    const std::string& mapRef() const { return m_mapRef; }
+    uint64_t mapHash() const { return m_mapHash; }
+    // Joiners: the lobby's map (its hash) when we don't have it and won't download it, else 0 (told to the
+    // host, which tells everyone)
+    void setLackedMap(uint64_t hash);
+    // Whether a peer doesn't have the lobby's map and won't download it (its map downloads are off)
+    bool peerLacksMap(int peer) const;
+    // Whether the others' skins we lack are downloaded (off: a "?" in their place)
+    void setSkinDownloads(bool on) { m_skins.setDownloads(on); }
     void setReady(bool ready);
     void setSlotTeam(int slot, int team);
     void setSlotColor(int slot, int color);
@@ -389,7 +408,7 @@ public:
     void sendMap(int peer, uint8_t matchId, std::shared_ptr<const std::vector<uint8_t>> file, uint64_t hash, const std::string& name);
     void cancelMapTransfers();
 
-    enum : uint8_t { ACK_OK = 0, ACK_REFUSED = 1, ACK_NEED_MAP = 2 };
+    enum : uint8_t { ACK_OK = 0, ACK_REFUSED = 1, ACK_NEED_MAP = 2, ACK_NO_MAP = 3 };    //(3: the map is missing, its downloads are off)
 
     // Map transfer pacing: chunks per peer per 16 ms
     static constexpr int MAP_CHUNKS_PER_FRAME = 4;
@@ -467,6 +486,9 @@ private:
     bool m_dirty = false;
     uint32_t m_lastStateMs = 0;
     bool m_peerInfoDirty = false;
+    std::string m_mapRef;
+    uint64_t m_mapHash = 0;
+    uint64_t m_lackedMap = 0;
     uint8_t m_round = 0;
     std::array<bool, net::MAX_PEERS> m_readyFlag {};      // host: as the joiners sent them
     std::array<uint8_t, net::MAX_PEERS> m_readyRound {};  // host: in which round

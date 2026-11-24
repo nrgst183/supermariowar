@@ -67,6 +67,21 @@ public:
     void setCurrentFilename(const std::string& filename) {
         (*outercurrent).second.filename = filename;
     }
+    /// The file of the battle map whose short name (currentShortmapname's) is `name`, any case, without
+    /// changing the current map; "" if there is none
+    std::string fileOfShortName(const std::string& name) const {
+        auto lower = [](std::string s) {
+            for (char& c : s)
+                c = static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
+            return s;
+        };
+        const std::string wanted = lower(name);
+        for (const auto& [key, node] : maps) {
+            if (lower(key) == wanted)
+                return node.filename;
+        }
+        return {};
+    }
     const std::string& currentShortmapname() const {
         return (*outercurrent).first;
     }

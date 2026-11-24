@@ -84,6 +84,9 @@ public:
     void update(uint32_t nowMs, uint8_t connectedMask);
     // A peer is gone (or reconnects as another one)
     void dropPeer(int peer);
+    // Whether the skins we lack are downloaded (off: their players are drawn without them; the
+    // downloads going on stop). Turned on: what is missing is asked for.
+    void setDownloads(bool on);
 
     // The file of the skin of a peer's local player, "" while it isn't here (yet)
     std::string pathOf(int peer, int localIndex) const;
@@ -130,6 +133,7 @@ private:
     std::array<Download, net::MAX_PEERS> m_download {};
     std::vector<Upload> m_uploads;
     uint8_t m_infoSentMask = 0;
+    bool m_downloads = true;
     uint32_t m_lastChunkMs = 0;
     uint32_t m_revision = 0;
     mutable bool m_scanned = false;

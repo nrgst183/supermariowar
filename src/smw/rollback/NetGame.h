@@ -246,7 +246,11 @@ private:
     void beginMatch();
     void applyLobbySlots(std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot);
     void updateMatchInfo(uint32_t nowMs);
-    void updateSkins();
+    void updateSkins(uint32_t nowMs);
+    void updateMapCheck();
+public:
+    static bool mapDownloadsOn();
+private:
     std::string peerName(int peer) const;
     void printStats(bool final);
     bool matchEndRequested() const;
@@ -292,6 +296,10 @@ private:
     std::deque<SettingRequest> m_settingRequests;
     bool m_skinsAnnounced = false;   // our skins were handed to the lobby
     uint64_t m_skinKey = 0;          // the skin ids they were made from (and how many)
+    uint64_t m_skinSeenKey = 0;      // the skin ids now (sent once they settle: flipping through them)
+    uint32_t m_skinSeenMs = 0;       // when they last changed
+    uint32_t m_skinSentMs = 0;       // when ours were last sent
+    std::string m_mapCheckKey;       // the lobby's map and our map downloads setting, when last checked
     uint32_t m_skinRevision = 0;     // of the lobby: when it changes, a running match reloads the sprites
     std::string m_closeAfterMatch;   // the host closed the lobby during the match
     std::string m_abortText;         // why the running match is being aborted

@@ -182,6 +182,7 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
     options.skinSearchDirs = skinSearchDirs();
     options.skinDownloadDirs = skinDownloadDirs();
     m_skinsAnnounced = false;
+    m_mapCheckKey.clear();
     m_skinRevision = 0;
     m_lobby = std::make_unique<NetLobby>(*transport, options, monotonicMs());
     m_transport = std::move(transport);
@@ -444,7 +445,8 @@ void NetGame::pump()
             m_closeMs = now;
         }
     } else {
-        updateSkins();
+        updateSkins(now);
+        updateMapCheck();
         //Joiner: a config that arrived while the previous match was still ending
         //(or while the world map still has ticks to run before it)
         if (m_pendingConfig && !inMatch() && !(m_world.active() && m_world.pending() > 0))
@@ -466,7 +468,7 @@ void NetGame::pump()
 }
 
 // Skins are cosmetic: announces ours, and when a skin arrives during a match, the sprites are reloaded
-void NetGame::updateSkins()
+void NetGame::updateSkins(uint32_t nowMs)
 {
     if (!skinlist || skinlist->count() == 0)
         return;
@@ -489,14 +491,26 @@ void NetGame::updateSkins()
         }
     }
 
+    m_lobby->setSkinDownloads(game_values.skindownloads);
+
     const auto valid = [](short id) { return id >= 0 && id < static_cast<short>(skinlist->count()); };
     //(two at least, as builds with at most two players on a machine announce; more if more play here)
     const int announced = std::max(2, m_lobby->peer(std::max(0, m_lobby->localPeer())).localPlayers);
     uint64_t key = static_cast<uint64_t>(announced);
     for (int i = 0; i < MAX_LOCAL_PLAYERS; i++)
         key = (key << 16) | static_cast<uint16_t>(game_values.skinids[i]);
-    if (!m_skinsAnnounced || key != m_skinKey) {
+    //(flipping through the skins: the peers get where it stopped, and while it goes on, the skin now
+    //a few times a second, not every skin passed by)
+    constexpr uint32_t SKIN_SETTLE_MS = 150;
+    constexpr uint32_t SKIN_EVERY_MS = 300;
+    if (key != m_skinSeenKey) {
+        m_skinSeenKey = key;
+        m_skinSeenMs = nowMs;
+    }
+    const bool due = nowMs - m_skinSeenMs >= SKIN_SETTLE_MS || nowMs - m_skinSentMs >= SKIN_EVERY_MS;
+    if (!m_skinsAnnounced || (key != m_skinKey && due)) {
         m_skinsAnnounced = true;
+        m_skinSentMs = nowMs;
         m_skinKey = key;
         std::vector<LocalSkinFile> skins;
         for (int i = 0; i < announced; i++) {
@@ -546,6 +560,7 @@ void NetGame::updateMatchInfo(uint32_t nowMs)
         m_lastInfoMs = nowMs;
         m_lobby->setMatchInfo(m_editActivity == 1 ? "Map editor" : "World editor", m_editDocument);
         m_lobby->setMatchDetail(m_editActivity == 1 ? MODE_ID_MAP_EDITOR : MODE_ID_WORLD_EDITOR, m_editRunning ? 1 : 0, "");
+        m_lobby->setMapCheck("", 0);
         return;
     }
     if (!game_values.gamemode)
@@ -554,11 +569,35 @@ void NetGame::updateMatchInfo(uint32_t nowMs)
     if (isSeriesMatchType(game_values.matchtype) && !m_series.active) {
         m_lobby->setMatchInfo(seriesMatchName(), seriesFileName());
         m_lobby->setMatchDetail(-2, 0, "");
+        m_lobby->setMapCheck("", 0);
         return;
     }
     const bool minigame = game_values.matchtype == MatchType::MiniGame;
     m_lobby->setMatchInfo(game_values.gamemode->GetModeName(), minigame ? "(minigame)" : maplist->currentShortmapname());
     m_lobby->setMatchDetail(game_values.gamemode->getgamemode(), game_values.gamemode->goal, game_values.gamemode->GetGoalName());
+    std::string mapRef;
+    uint64_t mapHash = 0;
+    lobbyMapCheck(mapRef, mapHash);
+    m_lobby->setMapCheck(mapRef, mapHash);
+}
+
+// Whether a map we lack is downloaded (the setting, or --net-map-downloads)
+bool NetGame::mapDownloadsOn()
+{
+    return cmd::g_net.mapDownloads >= 0 ? cmd::g_net.mapDownloads != 0 : game_values.mapdownloads;
+}
+
+// Joiner: whether we have the lobby's map, when we won't download it (the others see it on our card)
+void NetGame::updateMapCheck()
+{
+    if (isHost())
+        return;
+    const std::string key = m_lobby->mapRef() + "|" + std::to_string(m_lobby->mapHash()) + (mapDownloadsOn() ? "|1" : "|0");
+    if (key == m_mapCheckKey)
+        return;
+    m_mapCheckKey = key;
+    const uint64_t hash = m_lobby->mapHash();
+    m_lobby->setLackedMap(!mapDownloadsOn() && !haveMap(m_lobby->mapRef(), hash) ? hash : 0);
 }
 
 void NetGame::handle(const LobbyGameEvent& event, uint32_t nowMs)
@@ -659,6 +698,9 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
                 break;
             if (status == NetLobby::ACK_OK) {
                 m_ackedMask |= static_cast<uint8_t>(1u << peer);
+            } else if (status == NetLobby::ACK_NO_MAP) {
+                printf("netplay: peer %d lacks the map, its map downloads are off\n", peer);
+                abortStart(peer, peerName(peer) + " doesn't have this map and has map downloads turned off");
             } else if (status == NetLobby::ACK_NEED_MAP) {
                 if (!m_mapFile) {
                     std::ifstream file(matchMapPath(m_config), std::ios::binary);
@@ -891,6 +933,12 @@ void NetGame::processConfig()
     std::string error;
     bool needMap = false;
     if (!checkMatchConfig(m_config, error, &needMap)) {
+        if (needMap && !mapDownloadsOn()) {
+            printf("netplay: match %d: %s, and map downloads are off\n", m_matchId, error.c_str());
+            m_lobby->sendConfigAck(m_matchId, NetLobby::ACK_NO_MAP, error);
+            returnToLobby("You don't have this map, and your map downloads are turned off");
+            return;
+        }
         if (needMap) {
             printf("netplay: match %d: %s, asking the host for it\n", m_matchId, error.c_str());
             m_waitingForMap = true;

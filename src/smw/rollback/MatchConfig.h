@@ -88,6 +88,12 @@ void prepareSeriesStateForMatch(int gameMode);
 // found by its hash in mapDownloadDirs())
 bool checkMatchConfig(const MatchConfig& config, std::string& error, bool* needMap = nullptr);
 
+// The lobby's map, for the joiners to check that they have it: the map of the host's menus, as a match
+// config refers to it (mapRef, mapHash); hash 0: nothing to check (a minigame's map, a series)
+void lobbyMapCheck(std::string& ref, uint64_t& hash);
+// Whether this machine has that map (the map list's choice isn't changed)
+bool haveMap(const std::string& ref, uint64_t hash);
+
 // The map file of a match here ("" or a file with other contents if it's missing)
 std::string matchMapPath(const MatchConfig& config);
 // Where downloaded maps are saved and looked for: maps/net/ in the data

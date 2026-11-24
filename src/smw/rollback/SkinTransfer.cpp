@@ -333,8 +333,28 @@ void SkinExchange::onInfo(int peer, ByteReader& r)
     requestMissing(peer);
 }
 
+void SkinExchange::setDownloads(bool on)
+{
+    if (on == m_downloads)
+        return;
+    m_downloads = on;
+    for (int p = 0; p < net::MAX_PEERS; p++) {
+        if (p == m_localPeer)
+            continue;
+        if (on) {
+            requestMissing(p);
+        } else {
+            m_remote[static_cast<size_t>(p)].requested.fill(false);
+            m_download[static_cast<size_t>(p)] = Download();
+        }
+    }
+    m_revision++;
+}
+
 void SkinExchange::requestMissing(int peer)
 {
+    if (!m_downloads)
+        return;
     Remote& remote = m_remote[static_cast<size_t>(peer)];
     for (size_t i = 0; i < SKIN_PLAYERS; i++) {
         const SkinRef& ref = remote.skin[i];

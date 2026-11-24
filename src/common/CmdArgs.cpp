@@ -91,6 +91,7 @@ void print_help(const char* title, const char* version)
     printf("      --net-name <NAME>   Nickname in the lobby (default \"Player N\")\n");
     printf("      --net-skin <NAME[,NAME2]> Skin of the local player(s) in the lobby (testing)\n");
     printf("      --net-port <PORT>   Local UDP port of a joiner (default: any)\n");
+    printf("      --net-map-downloads <0|1>  Whether a missing map is downloaded (overrides the setting)\n");
     printf("      --net-slow-map <N>  Send one map chunk per N frames (to look at the transfer)\n");
     printf("      --net-delay <N>     Input delay in ticks (default: automatic, from the ping)\n");
     printf("      --net-checksum <N>  Compare state checksums every N frames (\"netsum:\" lines)\n");
@@ -226,6 +227,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--net-port") net.port = atoi(val.c_str());
             else if (arg == "--net-name") net.name = val;
             else if (arg == "--net-skin") net.skin = val;
+            else if (arg == "--net-map-downloads") net.mapDownloads = atoi(val.c_str());
             else if (arg == "--net-slow-map") net.slowMap = (std::max)(1, atoi(val.c_str()));
             else if (arg == "--net-delay") net.delay = atoi(val.c_str());
             else if (arg == "--net-checksum") net.checksumInterval = atoi(val.c_str());

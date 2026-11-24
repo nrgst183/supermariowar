@@ -494,6 +494,34 @@ void NetLobby::setMatchInfo(const std::string& mode, const std::string& map)
     }
 }
 
+void NetLobby::setMapCheck(const std::string& ref, uint64_t hash)
+{
+    if (ref != m_mapRef || hash != m_mapHash) {
+        m_mapRef = ref;
+        m_mapHash = hash;
+        markDirty();    //(the peers' lacking it is about this map now: LOBBY_STATE says)
+    }
+}
+
+void NetLobby::setLackedMap(uint64_t hash)
+{
+    if (hash == m_lackedMap)
+        return;
+    m_lackedMap = hash;
+    m_peerInfoDirty = true;
+}
+
+bool NetLobby::peerLacksMap(int peer) const
+{
+    if (peer < 0 || peer >= net::MAX_PEERS || !m_peers[static_cast<size_t>(peer)].present)
+        return false;
+    if (peer == localPeer())
+        return m_lackedMap != 0 && m_lackedMap == m_mapHash;
+    //(the host: what it said it lacks is still the lobby's map; the others: what the host says)
+    const LobbyPeer& p = m_peers[static_cast<size_t>(peer)];
+    return isHost() ? p.lackedMap != 0 && p.lackedMap == m_mapHash : p.lacksMap;
+}
+
 void NetLobby::setMatchDetail(int modeId, int goal, const std::string& goalName)
 {
     if (modeId != m_modeId || goal != m_goal || goalName != m_goalName) {
@@ -603,6 +631,14 @@ bool NetLobby::everyoneReady(std::string& why) const
 
 bool NetLobby::canStart(std::string& why) const
 {
+    //(first: the host chooses another map, nobody needs to get ready for it)
+    for (int p = 0; p < net::MAX_PEERS; p++) {
+        if (peerLacksMap(p)) {
+            const std::string& name = m_peers[static_cast<size_t>(p)].name;
+            why = (name.empty() ? defaultName(p) : name) + " doesn't have this map and has map downloads turned off";
+            return false;
+        }
+    }
     if (!everyoneReady(why))
         return false;
     int players = 0;
@@ -712,6 +748,7 @@ void NetLobby::sendPeerInfo()
     w.u8(static_cast<uint8_t>(m_options.localPlayers));
     w.u8(self.ready ? 1 : 0);
     w.u8(m_round);
+    w.u64(m_lackedMap);
     sendTo(0, w);
     m_peerInfoDirty = false;
 }
@@ -740,6 +777,10 @@ void NetLobby::sendLobbyState()
         w.u8(s.team);
         w.u8(s.color);
     }
+    uint8_t lacking = 0;
+    for (int p = 0; p < net::MAX_PEERS; p++)
+        lacking |= static_cast<uint8_t>((peerLacksMap(p) ? 1u : 0u) << p);
+    w.u8(lacking);
     sendToAll(w);
 
     ByteWriter extra(m_buffer.data(), m_buffer.size());
@@ -748,6 +789,8 @@ void NetLobby::sendLobbyState()
     extra.i16(static_cast<int16_t>(m_goal));
     extra.str(m_goalName);
     extra.u8(m_settingsEveryone ? 1 : 0);
+    extra.str(m_mapRef);
+    extra.u64(m_mapHash);
     sendToAll(extra);
     m_dirty = false;
 }
@@ -893,6 +936,8 @@ void NetLobby::onPeerInfo(int peer, ByteReader& r)
     LobbyPeer& p = m_peers[static_cast<size_t>(peer)];
     if (!r.ok() || !p.present)
         return;
+    const uint64_t lacked = r.u64();    //(last: a build without it doesn't send it)
+    p.lackedMap = r.ok() ? lacked : 0;
     m_readyFlag[static_cast<size_t>(peer)] = ready;
     m_readyRound[static_cast<size_t>(peer)] = round;
 
@@ -956,6 +1001,8 @@ void NetLobby::onLobbyState(ByteReader& r)
     }
     if (!r.ok())
         return;
+    const uint8_t lackingByte = r.u8();
+    const uint8_t lacking = r.ok() ? lackingByte : 0;
 
     //A new joiner learns which round it is (at a match start, NetGame sets it)
     if (m_phase == Phase::Lobby && static_cast<int8_t>(round - m_round) > 0) {
@@ -977,6 +1024,7 @@ void NetLobby::onLobbyState(ByteReader& r)
             theirs.ready = mine.ready;
             theirs.present = true;
         }
+        theirs.lacksMap = ((lacking >> p) & 1) != 0;
         theirs.pingMs = mine.pingMs;
         mine = std::move(theirs);
     }
@@ -1185,6 +1233,12 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
                     m_modeId = modeId;
                     m_goal = goal;
                     m_goalName = std::move(goalName);
+                    std::string mapRef = r.str();
+                    const uint64_t mapHash = r.u64();
+                    if (r.ok()) {
+                        m_mapRef = std::move(mapRef);
+                        m_mapHash = mapHash;
+                    }
                 }
             }
             break;

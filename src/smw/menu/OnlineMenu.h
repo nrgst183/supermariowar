@@ -42,6 +42,8 @@ public:
 
 private:
     void ShowMode(Mode mode);
+    // The downloads field's value: skins (2) and maps (1), from the settings
+    static short downloadsValue();
 
     Mode m_mode = Mode::Join;
     MI_HeaderText* miTitle;
@@ -50,6 +52,7 @@ private:
     MI_MenuPanel* miHostPanel;
     MI_TextField* miNameField;
     MI_SelectField<short>* miRunAheadField;
+    MI_SelectField<short>* miDownloadsField;
     MI_TextField* miPortField;
     MI_MenuPanel* miMatchPanel;
     MI_SelectField<bool>* miPingBarsField;
