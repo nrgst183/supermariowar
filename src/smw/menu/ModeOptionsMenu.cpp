@@ -27,8 +27,7 @@ void addNumbers(Field* field, short from, short to, short step, short goodFrom, 
 // The bar at the top of the screen, with the menu's title
 void addTitleBar(UI_Menu& menu, const char* title)
 {
-    menu.AddNonControl(new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0));
-    menu.AddNonControl(new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0));
+    menu.AddNonControl(UI_Menu::newTitleBarBack());   //(the theme's bar, as on the other menus)
     menu.AddNonControl(new MI_HeaderText(title, 320, 5));
 }
 

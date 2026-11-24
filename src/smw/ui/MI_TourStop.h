@@ -35,8 +35,6 @@ private:
     std::array<std::unique_ptr<MI_Image>, 10> miBonusIcon;
     std::array<std::unique_ptr<MI_Image>, 10> miBonusBackground;
 
-    std::unique_ptr<MI_Image> miTourStopLeftHeaderBar;
-    std::unique_ptr<MI_Image> miTourStopMenuRightHeaderBar;
     std::unique_ptr<MI_Text> miTourStopMenuHeaderText;
 
     bool fIsWorld = false;

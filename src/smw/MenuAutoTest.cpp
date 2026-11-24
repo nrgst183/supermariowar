@@ -1481,8 +1481,13 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
     if (at.shotsRole == "controls" && step == 1) {
         if (t == 1)
             return MENU_CODE_TO_CONTROLS_MENU;
-        if (t == 20) {
+        if (t == 20)
             shot("c1_controls_menu");
+        //(then player 1's: the keys and the device)
+        if (t == 24)
+            game_values.playerInput.outputControls[0].menu_select.fPressed = true;
+        if (t == 44) {
+            shot("c2_player_controls");
             step = 1000;
             t = 0;
         }

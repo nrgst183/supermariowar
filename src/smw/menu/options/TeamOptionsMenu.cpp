@@ -19,7 +19,7 @@ UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     miTeamKillsField->add("On", TeamCollisionStyle::On);
     miTeamKillsField->setOutputPtr(&game_values.teamcollision);
     miTeamKillsField->setCurrentValue(game_values.teamcollision);
-    page.add(miTeamKillsField, "Teammates pass through, bounce off or can hurt each other");
+    page.add(miTeamKillsField, "Teammates pass through, bounce or hurt");
 
     miTeamColorsField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Colors", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miTeamColorsField->add("Individual", false);
@@ -27,7 +27,7 @@ UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     miTeamColorsField->setOutputPtr(&game_values.teamcolors);
     miTeamColorsField->setCurrentValue(game_values.teamcolors ? 1 : 0);
     miTeamColorsField->setAutoAdvance(true);
-    page.add(miTeamColorsField, "Players wear their team's color, or their own");
+    page.add(miTeamColorsField, "Team colors or each player's own");
 
     miCpuSkinsField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "CPU Skins", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miCpuSkinsField->add("Their Slot's", false);
@@ -35,7 +35,7 @@ UI_TeamOptionsMenu::UI_TeamOptionsMenu()
     miCpuSkinsField->setOutputPtr(&game_values.randomcpuskins);
     miCpuSkinsField->setCurrentValue(game_values.randomcpuskins ? 1 : 0);
     miCpuSkinsField->setAutoAdvance(true);
-    page.add(miCpuSkinsField, "Computer players get a random skin each, or their slot's own");
+    page.add(miCpuSkinsField, "Random skins for CPUs, or their slot's");
 
     miTournamentControlField = new MI_SelectField<TournamentControlStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Tournament Control", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miTournamentControlField->add("All", TournamentControlStyle::All);

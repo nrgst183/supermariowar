@@ -37,7 +37,7 @@ UI_GameplayOptionsMenu::UI_GameplayOptionsMenu()
     miRespawnField->add("10.0 Seconds", 20);
     miRespawnField->setOutputPtr(&game_values.respawn);
     miRespawnField->setCurrentValue(game_values.respawn);
-    page.add(miRespawnField, "How long a player waits to come back after dying");
+    page.add(miRespawnField, "How long until a player respawns");
 
     miShieldStyleField = new MI_SelectField<ShieldStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Shield Style", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miShieldStyleField->add("No Shield", ShieldStyle::NoShield);
@@ -77,7 +77,7 @@ UI_GameplayOptionsMenu::UI_GameplayOptionsMenu()
     miBoundsTimeField->add("10 Seconds", 10);
     miBoundsTimeField->setOutputPtr(&game_values.outofboundstime);
     miBoundsTimeField->setCurrentValue(game_values.outofboundstime);
-    page.add(miBoundsTimeField, "How long a player can stay above the top of the screen");
+    page.add(miBoundsTimeField, "Time allowed above the screen");
 
     miSuicideTimeField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Suicide Time", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miSuicideTimeField->add("Off", 0);
@@ -99,7 +99,7 @@ UI_GameplayOptionsMenu::UI_GameplayOptionsMenu()
     miWarpLockStyleField->add("All Warps", WarpLockStyle::AllWarps);
     miWarpLockStyleField->setOutputPtr(&game_values.warplockstyle);
     miWarpLockStyleField->setCurrentValue(game_values.warplockstyle);
-    page.add(miWarpLockStyleField, "Which pipes lock for a moment after someone uses one");
+    page.add(miWarpLockStyleField, "Which pipes lock briefly after use");
 
     miWarpLockTimeField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Warp Lock Time", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miWarpLockTimeField->add("Off", 0);
@@ -135,14 +135,14 @@ UI_GameplayOptionsMenu::UI_GameplayOptionsMenu()
     miPointSpeedField->add("Very Fast", 5);
     miPointSpeedField->setOutputPtr(&game_values.pointspeed);
     miPointSpeedField->setCurrentValue(game_values.pointspeed);
-    page.add(miPointSpeedField, "How fast points rise in modes like Tag and Chicken");
+    page.add(miPointSpeedField, "How fast points rise in Tag or Chicken");
 
     miSecretsField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Secrets", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miSecretsField->add("Off", false);
     miSecretsField->add("On", true);
     miSecretsField->setOutputPtr(&game_values.secretsenabled);
     miSecretsField->setCurrentValue(game_values.secretsenabled ? 1 : 0);
-    page.add(miSecretsField, "Allow hidden unlockables to turn up in matches");
+    page.add(miSecretsField, "Let hidden unlockables turn up");
 
     page.finish(*this, "Gameplay Options", MENU_CODE_BACK_TO_OPTIONS_MENU);
 };

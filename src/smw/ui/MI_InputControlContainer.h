@@ -82,7 +82,6 @@ class MI_InputControlContainer : public UI_Control
 
         std::unique_ptr<UI_Menu> mInputMenu;
 
-        MI_Image * miImage[2];
         MI_Text * miText;
         MI_SelectField<SDL_JoystickID>* miDeviceSelectField;
         MI_Button * miInputTypeButton;

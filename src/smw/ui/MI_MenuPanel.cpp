@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <initializer_list>
 #include <utility>
 #include <utility>
@@ -241,10 +242,33 @@ void footer(const std::vector<prompts::Prompt>& row, const std::string& label, i
     const int room = promptsLeft - (row.empty() ? 0 : 20) - x;
     if (room <= 0)
         return;
-    if (rm->menu_font_large.getWidth(label) <= room)
+    const gfxFont& small = rm->menu_font_small;
+    if (rm->menu_font_large.getWidth(label) <= room) {
         rm->menu_font_large.draw(x, 455, label);
-    else
-        rm->menu_font_small.drawScrolling(x, 459, room, label);
+        return;
+    }
+    if (small.getWidth(label) <= room) {
+        small.draw(x, 459, label);
+        return;
+    }
+    //(too long for a line: two of the small font, split at the space that evens them out most; a
+    //label moving along cut a word in two for a moment each time round)
+    size_t split = std::string::npos;
+    int best = room;
+    for (size_t k = label.find(' '); k != std::string::npos; k = label.find(' ', k + 1)) {
+        const int w1 = small.getWidth(std::string_view(label).substr(0, k));
+        const int w2 = small.getWidth(std::string_view(label).substr(k + 1));
+        if (w1 <= room && w2 <= room && std::abs(w1 - w2) < best) {
+            best = std::abs(w1 - w2);
+            split = k;
+        }
+    }
+    if (split != std::string::npos) {
+        small.draw(x, 450, std::string_view(label).substr(0, split));
+        small.draw(x, 462, std::string_view(label).substr(split + 1));
+    } else {
+        small.drawScrolling(x, 459, room, label);
+    }
 }
 } // namespace menupanel
 

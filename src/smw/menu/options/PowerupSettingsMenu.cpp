@@ -22,7 +22,7 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miStoredPowerupDelayField->add("Very Fast", 6);
     miStoredPowerupDelayField->setOutputPtr(&game_values.storedpowerupdelay);
     miStoredPowerupDelayField->setCurrentValue(game_values.storedpowerupdelay);
-    page.add(miStoredPowerupDelayField, "How quickly a stored item comes out when used");
+    page.add(miStoredPowerupDelayField, "How fast a stored item comes out");
 
     miItemRespawnField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Item Spawn", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miItemRespawnField->add("Off", 0);
@@ -40,7 +40,7 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miItemRespawnField->add("60 Seconds", 3720);
     miItemRespawnField->setOutputPtr(&game_values.itemrespawntime);
     miItemRespawnField->setCurrentValue(game_values.itemrespawntime);
-    page.add(miItemRespawnField, "How often items appear at a map's item spots");
+    page.add(miItemRespawnField, "How often items appear at item spots");
 
     miHiddenBlockRespawnField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Hidden Block Hide", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miHiddenBlockRespawnField->add("Off", 0);
@@ -58,7 +58,7 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miHiddenBlockRespawnField->add("60 Seconds", 3720);
     miHiddenBlockRespawnField->setOutputPtr(&game_values.hiddenblockrespawn);
     miHiddenBlockRespawnField->setCurrentValue(game_values.hiddenblockrespawn);
-    page.add(miHiddenBlockRespawnField, "How long until a hit hidden block hides again");
+    page.add(miHiddenBlockRespawnField, "Until a hit hidden block hides again");
 
     miSwapStyleField = new MI_SelectField<MysteryMushroomSwapStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Swap Style", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miSwapStyleField->add("Walk", MysteryMushroomSwapStyle::Walk);
@@ -66,7 +66,7 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miSwapStyleField->add("Instant", MysteryMushroomSwapStyle::Instant);
     miSwapStyleField->setOutputPtr(&game_values.swapstyle);
     miSwapStyleField->setCurrentValue(game_values.swapstyle);
-    page.add(miSwapStyleField, "How players trade places with the Mystery Mushroom");
+    page.add(miSwapStyleField, "How the Mystery Mushroom swaps players");
 
     miBonusWheelField = new MI_SelectField<BonusWheelStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Bonus Wheel", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miBonusWheelField->add("Off", BonusWheelStyle::Off);
@@ -82,7 +82,7 @@ UI_PowerupSettingsMenu::UI_PowerupSettingsMenu()
     miKeepPowerupField->setOutputPtr(&game_values.keeppowerup);
     miKeepPowerupField->setCurrentValue(game_values.keeppowerup ? 1 : 0);
     miKeepPowerupField->setAutoAdvance(true);
-    page.add(miKeepPowerupField, "Keep the wheel's item until the next spin, or for good");
+    page.add(miKeepPowerupField, "How long the wheel's item is kept");
 
     miStoredPowerupResetButton = new MI_StoredPowerupResetButton(&rm->spr_selectfield, page.x(), page.rowY(), "Reset Stored Items", SettingsPage::ROW_W);
     miStoredPowerupResetButton->SetCode(MENU_CODE_RESET_STORED_POWERUPS);

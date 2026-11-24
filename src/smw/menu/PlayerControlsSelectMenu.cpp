@@ -36,7 +36,7 @@ UI_PlayerControlsSelectMenu::UI_PlayerControlsSelectMenu()
     miButtonPromptsField->add("Auto", 0);
     miButtonPromptsField->setOutputPtr(&game_values.buttonprompts);
     miButtonPromptsField->setCurrentValue(game_values.buttonprompts);
-    page.add(miButtonPromptsField, "Button icons to show (Auto matches your controller)");
+    page.add(miButtonPromptsField, "Button icons (Auto matches your pad)");
 
     page.finish(*this, "Player Controls", MENU_CODE_TO_MAIN_MENU);
 }

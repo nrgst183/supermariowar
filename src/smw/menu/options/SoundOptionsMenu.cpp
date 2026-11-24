@@ -56,7 +56,7 @@ UI_SoundOptionsMenu::UI_SoundOptionsMenu()
     miPlayNextMusicField->setOutputPtr(&game_values.playnextmusic);
     miPlayNextMusicField->setCurrentValue(game_values.playnextmusic ? 1 : 0);
     miPlayNextMusicField->setAutoAdvance(true);
-    page.add(miPlayNextMusicField, "Play the map's next song when one ends, or repeat it");
+    page.add(miPlayNextMusicField, "Next song when one ends, or repeat it");
 
     miAnnouncerField = new MI_AnnouncerField(&rm->spr_selectfield, page.x(), page.rowY(), "Announcer", SettingsPage::ROW_W, SettingsPage::LABEL_W, announcerlist);
     page.add(miAnnouncerField, "The voice that calls out the action");

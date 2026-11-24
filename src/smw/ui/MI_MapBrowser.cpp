@@ -8,10 +8,18 @@
 #include "MapList.h"
 #include "path.h"
 #include "ResourceManager.h"
+#include "uimenu.h"
+#include "ui/InputPrompts.h"
+#include "ui/MI_MenuPanel.h"
 
 #include <SDL3_image/SDL_image.h>
 
+#include <string>
+
 namespace {
+// The grid's rows: between the title bar and the footer, as on the other menus
+constexpr short TOP = 42;
+constexpr short ROW_H = 134;
 } // namespace
 
 MI_MapBrowser::MI_MapBrowser()
@@ -48,7 +56,7 @@ void MI_MapBrowser::Draw()
     SDL_Rect rDst = {0, 0, 160, 120};
 
     for (short iRow = 0; iRow < 3; iRow++) {
-        rDst.y = iRow * 150 + 30;
+        rDst.y = iRow * ROW_H + TOP;
 
         for (short iCol = 0; iCol < 3; iCol++) {
             if (iSelectedCol != iCol || iSelectedRow != iRow) {
@@ -64,13 +72,13 @@ void MI_MapBrowser::Draw()
                         rm->menu_map_filter.draw(rDst.x, rDst.y, {iFilterTagAnimationFrame, 24, 24, 24});
                 }
 
-                rm->menu_font_large.drawChopRight(rDst.x, rDst.y + 120, 165, mapNames[iRow * 3 + iCol].c_str());
+                rm->menu_font_small.drawChopRight(rDst.x, rDst.y + 122, 165, mapNames[iRow * 3 + iCol].c_str());
             }
         }
     }
 
     //Draw the selected map
-    rDst.y = iSelectedRow * 150 + 30;
+    rDst.y = iSelectedRow * ROW_H + TOP;
     rDst.x = iSelectedCol * 200 + 40;
 
     rm->menu_dialog.draw(rDst.x - 16, rDst.y - 16, {0, 0, 176, 148});
@@ -85,7 +93,23 @@ void MI_MapBrowser::Draw()
             rm->menu_map_filter.draw(rDst.x, rDst.y, {iFilterTagAnimationFrame, 24, 24, 24});
     }
 
-    rm->menu_font_large.drawScrolling(rDst.x, rDst.y + 120, 165, mapNames[iSelectedRow * 3 + iSelectedCol].c_str());
+    rm->menu_font_small.drawScrolling(rDst.x, rDst.y + 122, 165, mapNames[iSelectedRow * 3 + iSelectedCol].c_str());
+
+    //The title bar, as every menu's: what picking a map does here, and the page (over the top row's
+    //frame, which comes up to it)
+    UI_Menu::drawTitleBarBack();
+    rm->menu_font_large.drawCentered(320, 5, iType == 0 ? "Maps in this Filter" : "Choose a Map");
+    if (iMapCount > 0) {
+        const int pages = (iMapCount + 8) / 9;
+        rm->menu_font_small.drawRightJustified(620, 10, "Page " + std::to_string(iPage + 1) + " / " + std::to_string(pages));
+    }
+
+    //What the buttons do, in the footer (drawn last: the selected map's frame comes down to it)
+    using prompts::Pad;
+    using prompts::menuKey;
+    menupanel::footer({{{Pad::A}, {menuKey(prompts::MENU_SELECT)}, iType == 0 ? "add / remove" : "choose"},
+                       {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}},
+        iType == 0 ? "Tag the maps that go in the filter" : std::string());
 }
 
 MenuCodeEnum MI_MapBrowser::Modify(bool modify)

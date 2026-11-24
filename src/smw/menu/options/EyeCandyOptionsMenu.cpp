@@ -19,7 +19,7 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miSpawnStyleField->add("Swirl", SpawnStyle::Swirl);
     miSpawnStyleField->setOutputPtr(&game_values.spawnstyle);
     miSpawnStyleField->setCurrentValue(game_values.spawnstyle);
-    page.add(miSpawnStyleField, "How players appear at the start and after dying");
+    page.add(miSpawnStyleField, "How players appear when they spawn");
 
     miAwardStyleField = new MI_SelectField<AwardStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Award Style", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miAwardStyleField->add("None", AwardStyle::None);
@@ -54,7 +54,7 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miStartCountDownField->setOutputPtr(&game_values.startgamecountdown);
     miStartCountDownField->setCurrentValue(game_values.startgamecountdown ? 1 : 0);
     miStartCountDownField->setAutoAdvance(true);
-    page.add(miStartCountDownField, "Count down 3, 2, 1 before a match starts");
+    page.add(miStartCountDownField, "Count down 3, 2, 1 before a match");
 
     miStartModeDisplayField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Show Mode", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miStartModeDisplayField->add("Off", false);
@@ -62,7 +62,7 @@ UI_EyeCandyOptionsMenu::UI_EyeCandyOptionsMenu()
     miStartModeDisplayField->setOutputPtr(&game_values.startmodedisplay);
     miStartModeDisplayField->setCurrentValue(game_values.startmodedisplay ? 1 : 0);
     miStartModeDisplayField->setAutoAdvance(true);
-    page.add(miStartModeDisplayField, "Show the game mode's name as a match starts");
+    page.add(miStartModeDisplayField, "Show the mode's name at the start");
 
     miScoreStyleField = new MI_SelectField<ScoreboardStyle>(&rm->spr_selectfield, page.x(), page.rowY(), "Score Location", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miScoreStyleField->add("Top", ScoreboardStyle::Top);

@@ -9,6 +9,7 @@
 #include "gamemodes/MiniPipe.h"
 #include "ui/MI_Button.h"
 #include "ui/MI_Image.h"
+#include "uimenu.h"
 #include "ui/MI_ImageSelectField.h"
 #include "ui/MI_MapField.h"
 #include "ui/MI_SelectField.h"
@@ -61,8 +62,6 @@ MI_TourStop::MI_TourStop(short x, short y, bool fWorld)
     miGoalField->Disable(true);
     miPointsField->Disable(true);
 
-    miTourStopLeftHeaderBar = std::make_unique<MI_Image>(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0);
-    miTourStopMenuRightHeaderBar = std::make_unique<MI_Image>(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0);
     miTourStopMenuHeaderText = std::make_unique<MI_HeaderText>("Tour Stop", 320, 5);
 }
 
@@ -87,8 +86,6 @@ void MI_TourStop::Update()
         miBonusField->Update();
     }
 
-    miTourStopLeftHeaderBar->Update();
-    miTourStopMenuRightHeaderBar->Update();
     miTourStopMenuHeaderText->Update();
 }
 
@@ -115,8 +112,7 @@ void MI_TourStop::Draw()
         }
     }
 
-    miTourStopLeftHeaderBar->Draw();
-    miTourStopMenuRightHeaderBar->Draw();
+    UI_Menu::drawTitleBarBack();   //(the theme's bar, as on the menus)
     miTourStopMenuHeaderText->Draw();
 }
 

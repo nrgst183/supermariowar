@@ -53,7 +53,7 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miFrameRateField->setOutputPtr(&game_values.framelimiter);
     miFrameRateField->setCurrentValue(game_values.framelimiter);
     miFrameRateField->setAutoAdvance(true);
-    page.add(miFrameRateField, "Screen redraws per second (game logic runs at 62.5)");
+    page.add(miFrameRateField, "Frames drawn per second (game: 62.5)");
 
     miSmoothMotionField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Smooth Motion", SettingsPage::ROW_W, SettingsPage::LABEL_W);
     miSmoothMotionField->add("Off", false);
@@ -61,7 +61,7 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miSmoothMotionField->setOutputPtr(&game_values.smoothmotion);
     miSmoothMotionField->setCurrentValue(game_values.smoothmotion ? 1 : 0);
     miSmoothMotionField->setAutoAdvance(true);
-    page.add(miSmoothMotionField, "Smooths motion on screens faster than 62.5 FPS");
+    page.add(miSmoothMotionField, "Smoother motion above 62.5 FPS");
 
     miMenuGraphicsPackField = new MI_PacksField(&rm->spr_selectfield, page.x(), page.rowY(), "Menu Graphics", SettingsPage::ROW_W, SettingsPage::LABEL_W, menugraphicspacklist, MENU_CODE_MENU_GRAPHICS_PACK_CHANGED);
     page.add(miMenuGraphicsPackField, "The look of the menus");
@@ -76,7 +76,7 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miTopLayerField->setOutputPtr(&game_values.toplayer);
     miTopLayerField->setCurrentValue(game_values.toplayer ? 1 : 0);
     miTopLayerField->setAutoAdvance(true);
-    page.add(miTopLayerField, "Draw the map's top layer in front of or behind players");
+    page.add(miTopLayerField, "Top layer in front of or behind players");
 
     //A TV crops the picture's edges (overscan): the picture smaller, so that nothing is lost
     miScreenSizeField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Picture Size", SettingsPage::ROW_W, SettingsPage::LABEL_W);
@@ -86,7 +86,7 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miScreenSizeField->setOutputPtr(&game_values.screensize);
     miScreenSizeField->setCurrentValue(game_values.screensize);
     miScreenSizeField->setItemChangedCode(MENU_CODE_SCREEN_SIZE_CHANGED);
-    page.add(miScreenSizeField, "Smaller if your TV cuts off the edges of the picture");
+    page.add(miScreenSizeField, "Smaller if your TV cuts off the edges");
 
     //The colors of the theater's and the editors' panels
     miOverlayColorsField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Overlay Colors", SettingsPage::ROW_W, SettingsPage::LABEL_W);
@@ -96,7 +96,7 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miOverlayColorsField->add("SMB3", 3);
     miOverlayColorsField->setOutputPtr(&game_values.overlaycolors);
     miOverlayColorsField->setCurrentValue(game_values.overlaycolors);
-    page.add(miOverlayColorsField, "Panel colors in the theater and the editors");
+    page.add(miOverlayColorsField, "Panel colors in the theater and editors");
 
 #ifdef SMW_ONLINE_OPTIONS
     miPingBarsField = nullptr;
@@ -108,7 +108,7 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miPingBarsField->add("On", true);
     miPingBarsField->setOutputPtr(&game_values.showpingbars);
     miPingBarsField->setCurrentValue(game_values.showpingbars ? 1 : 0);
-    page.add(miPingBarsField, "Shows online players' connection on their score panel");
+    page.add(miPingBarsField, "Connection bars on online score panels");
 
     //Online matches only (F3 in a match toggles it too)
     miNetStatsField = new MI_SelectField<bool>(&rm->spr_selectfield, page.x(), page.rowY(), "Network Stats", SettingsPage::ROW_W, SettingsPage::LABEL_W);
@@ -117,7 +117,7 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miNetStatsField->setOutputPtr(&game_values.shownetstats);
     miNetStatsField->setCurrentValue(game_values.shownetstats ? 1 : 0);
     miNetStatsField->setAutoAdvance(true);
-    page.add(miNetStatsField, "Shows connection stats in online matches (or press F3)");
+    page.add(miNetStatsField, "Connection stats online (or press F3)");
 #endif
 
     page.finish(*this, "Graphics Options", MENU_CODE_BACK_TO_OPTIONS_MENU);

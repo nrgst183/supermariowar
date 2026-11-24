@@ -26,8 +26,7 @@ UI_OnlineMenu::UI_OnlineMenu()
     SetHints(false);    //(its own prompts, at the bottom)
 
     // The title bar: the page's name
-    AddNonControl(new MI_Image(&rm->menu_plain_field, 0, 0, 0, 0, 320, 32, 1, 1, 0));
-    AddNonControl(new MI_Image(&rm->menu_plain_field, 320, 0, 192, 0, 320, 32, 1, 1, 0));
+    AddNonControl(newTitleBarBack());
     miTitle = new MI_HeaderText("Online Options", 320, 5);
     AddNonControl(miTitle);
 
