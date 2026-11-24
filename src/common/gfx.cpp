@@ -70,7 +70,10 @@ gfxSprite createSkinSurface(
                 for (size_t outFrame = 0; outFrame < outFrameCount; outFrame++)
                     row[outFrame * 32 + dstX] = argb(sheet.replacementFor(team, static_cast<PlayerPalette>(outFrame)));
             } else {
-                const Uint32 pixel = argb(pixelColor);
+                //(a near miss of the see-through magenta is that magenta: some skins' frames are a
+                //step or two off, SlipIce's squished one (255, 0, 253), and showed as a pink patch)
+                const bool nearMagenta = pixelColor.r >= 250 && pixelColor.g <= 5 && pixelColor.b >= 250;
+                const Uint32 pixel = argb(nearMagenta ? colors::MAGENTA : pixelColor);
                 for (size_t outFrame = 0; outFrame < outFrameCount; outFrame++)
                     row[outFrame * 32 + dstX] = pixel;
             }

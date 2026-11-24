@@ -417,6 +417,9 @@ bool fromJson(const std::string& line, Entry& e)
     return true;
 }
 
+// (the map of the match recorded last, for saveMatchThumbnail)
+std::string s_thumbnailMap;
+
 void recordMatchEnd(const std::string& replayFile, bool online)
 {
     if (replay::playing())
@@ -427,6 +430,23 @@ void recordMatchEnd(const std::string& replayFile, bool online)
     ensureSettingsDir();
     append(textFile(), toText(e));
     append(jsonFile(), toJson(e) + "\n");
+    if (g_map && !e.map.empty())
+        s_thumbnailMap = g_map->loadedFile();
+}
+
+void saveMatchThumbnail()
+{
+    const std::string file = std::move(s_thumbnailMap);
+    s_thumbnailMap.clear();
+    if (file.empty() || !g_map || g_map->loadedFile() != file)
+        return;
+    const std::string thumbnail = mapThumbnailPath(file);
+    if (FileExists(thumbnail))
+        return;
+    try {
+        g_map->saveThumbnail(thumbnail, false);    //(if it can't be saved, the history makes it)
+    } catch (...) {
+    }
 }
 
 std::vector<Entry> load(size_t max)

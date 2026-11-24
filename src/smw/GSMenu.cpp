@@ -26,6 +26,7 @@
 #include "RandomNumberGenerator.h"
 #include "ResourceManager.h"
 #include "TilesetManager.h"
+#include "MatchHistory.h"
 #include "Platform.h"
 #include "Score.h"
 #include "SimulationState.h"

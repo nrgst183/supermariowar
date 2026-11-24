@@ -47,6 +47,11 @@ struct Entry {
 // once per match, when the gameplay state is left; nothing during a replay.
 void recordMatchEnd(const std::string& replayFile, bool online);
 
+// The map of the match recorded last: its thumbnail saved, if there is none yet, for the history's
+// details (which otherwise draws it there, a pause on the screen). The menus call it as they come
+// back from the match, its map still g_map and the match's sprites gone
+void saveMatchThumbnail();
+
 // The entries of match_history.jsonl, newest first (at most `max`)
 std::vector<Entry> load(size_t max = 1000);
 
