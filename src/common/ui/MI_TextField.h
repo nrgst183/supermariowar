@@ -60,6 +60,9 @@ public:
         //(the pipe: its sprite has 8 empty pixels at each end)
         return {static_cast<short>(m_pos.x + 8), m_pos.y, static_cast<short>(iWidth - 16), 32};
     }
+    Box ValueBox() const override {
+        return {static_cast<short>(m_pos.x + iIndent - 12), m_pos.y, static_cast<short>(iWidth - iIndent + 4), 32};
+    }
 
     void Refresh() override;
 

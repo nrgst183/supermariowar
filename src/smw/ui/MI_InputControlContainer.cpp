@@ -539,3 +539,8 @@ void MI_InputControlContainer::UpdateDeviceKeys(SDL_JoystickID lDevice)
 
     SetVisibleInputFields();
 }
+
+bool MI_InputControlContainer::ChangingValue() const
+{
+    return mInputMenu && mInputMenu->ChangingValue();
+}

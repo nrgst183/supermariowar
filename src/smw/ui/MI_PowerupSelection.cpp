@@ -360,3 +360,8 @@ void MI_PowerupSelection::AdjustDisplayArrows()
     else
         miDownArrow->setVisible(false);
 }
+
+bool MI_PowerupSelection::ChangingValue() const
+{
+    return mMenu && mMenu->ChangingValue();
+}

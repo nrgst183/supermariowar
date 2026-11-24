@@ -123,7 +123,7 @@ void drawMenuHints(const UI_Menu& menu)
 
     std::vector<Prompt> left;
     const Prompt change {{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"};
-    if (menu.IsModifying()) {
+    if (menu.ChangingValue()) {
         left = {change, {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "done"}};
     } else {
         left = {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"}};
@@ -994,7 +994,7 @@ void MenuState::update()
             if (mCurrentMenu == mMainMenu.get())
                 menupanel::footer(menupanel::standardPrompts(false, nullptr), mMainMenu->focusHint());
             else
-                menupanel::footer(menupanel::standardPrompts(mCurrentMenu->IsModifying(), "back"));
+                menupanel::footer(menupanel::standardPrompts(mCurrentMenu->ChangingValue(), "back"));
         }
         DrawOnlineSeriesNotice();
         DrawDeterminismReport();

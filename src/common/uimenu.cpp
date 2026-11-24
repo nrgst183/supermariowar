@@ -169,6 +169,11 @@ void UI_Menu::Draw()
     eyeCandy.draw();
 }
 
+bool UI_Menu::ChangingValue() const
+{
+    return fModifyingItem && m_currentFocus && m_currentFocus->ChangingValue();
+}
+
 MenuCodeEnum UI_Menu::SendInput(CPlayerInput* playerInput)
 {
     countHeld(*playerInput);

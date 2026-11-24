@@ -11,8 +11,17 @@ public:
 
     //Draws every frame
     void Draw() override;
+    void SetPosition(short x, short y) override;
+    //(its pipe starts 38 to the right, after the item's picture; the sprite's 8 empty pixels)
+    Box FocusBox() const override {
+        return {static_cast<short>(m_pos.x + 46), m_pos.y, static_cast<short>(m_width - 54), 32};
+    }
+    Box ValueBox() const override {
+        return {static_cast<short>(m_pos.x + 46), m_pos.y, static_cast<short>(m_width - 54), 32};
+    }
 
 protected:
+    void PlaceArrows();    // its own arrows: in it, not where a slider puts them
     gfxSprite* m_sprPowerup = nullptr;
     short m_powerupIndex = 0;
     short m_halfWidth = 0;

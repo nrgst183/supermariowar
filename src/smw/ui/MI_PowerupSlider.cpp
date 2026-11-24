@@ -10,6 +10,17 @@ MI_PowerupSlider::MI_PowerupSlider(gfxSprite* nspr, gfxSprite* nsprSlider, gfxSp
     , m_powerupIndex(powerupIndex)
     , m_halfWidth((width - 38) / 2)
 {
+    PlaceArrows();
+}
+
+void MI_PowerupSlider::SetPosition(short x, short y)
+{
+    MI_SliderField::SetPosition(x, y);
+    PlaceArrows();    //(its own: the slider's would put the left one outside it)
+}
+
+void MI_PowerupSlider::PlaceArrows()
+{
     miModifyImageLeft->SetPosition(m_pos.x + 25, m_pos.y + 4);
     miModifyImageRight->SetPosition(m_pos.x + m_width - 12, m_pos.y + 4);
 }

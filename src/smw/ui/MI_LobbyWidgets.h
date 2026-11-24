@@ -81,6 +81,10 @@ public:
     /// Whether there is anything to pick in the box: its own players, or CPUs whose skins it sets (a local
     /// game's host with only CPUs sets theirs; none: the box is ready by itself)
     bool hasPicks() const { return hasOwnPlayers() || !pickableCpus().empty(); }
+    /// Whether player 1 sets the CPUs' skins here (the host of a game on this machine, with CPUs)
+    bool hasCpuPicks() const { return !pickableCpus().empty(); }
+    /// Back up into the box from the buttons: player 1 sets the CPUs' skins (not ready while it does)
+    void EditCpuSkins();
     /// Called when the focus should go to the buttons under the box
     void SetLeaveDown(std::function<void()> leave) { m_leaveDown = std::move(leave); }
     /// What the local players can do now, for the hint line

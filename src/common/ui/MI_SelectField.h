@@ -127,6 +127,18 @@ protected:
 
     bool m_autoAdvance = false;
     bool m_wraps = true;
+    //A value change's animation: the new value slides in from that side, that side's arrow kicks out
+    //and springs back (frames left of it, and which way: -1 left, 1 right)
+    static constexpr int SLIDE_FRAMES = 8;
+    int m_slideFrames = 0;
+    int m_slideDir = 0;
+    int m_kickApplied = 0;    // how far the arrow is moved out now (SetPosition moves it along)
+    void startSlide(int dir);
+    //(how far along: 1 at the start, 0 done; eased out)
+    float slideLeft() const {
+        const float t = static_cast<float>(m_slideFrames) / static_cast<float>(SLIDE_FRAMES);
+        return t * t;
+    }
     bool m_fastScroll = false;
     short m_adjustmentY = 0;
     short m_width = 0;

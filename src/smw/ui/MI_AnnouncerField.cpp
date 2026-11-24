@@ -38,13 +38,13 @@ MenuCodeEnum MI_AnnouncerField::Modify(bool modify)
 MenuCodeEnum MI_AnnouncerField::SendInput(CPlayerInput* playerInput)
 {
     for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
-        if (playerInput->outputControls[iPlayer].menu_right.fPressed || playerInput->outputControls[iPlayer].menu_down.fPressed) {
+        if (playerInput->outputControls[iPlayer].menu_right.fPressed) {
             list->next();
             UpdateName();
             return MENU_CODE_NONE;
         }
 
-        if (playerInput->outputControls[iPlayer].menu_left.fPressed || playerInput->outputControls[iPlayer].menu_up.fPressed) {
+        if (playerInput->outputControls[iPlayer].menu_left.fPressed) {
             list->prev();
             UpdateName();
             return MENU_CODE_NONE;
@@ -90,7 +90,8 @@ void MI_AnnouncerField::Draw()
     spr->draw(m_pos.x + iIndent - 16, m_pos.y, {0, (fSelected ? 96 : 64), 32, 32});
     spr->draw(m_pos.x + iIndent + 16, m_pos.y, {528 - iWidth + iIndent, (fSelected ? 32 : 0), iWidth - iIndent - 16, 32});
 
-    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, iIndent - 8, szName.c_str(), fSelected);
+    //(the name: while being changed, it stops before the left arrow, scrolling if it is longer)
+    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, fModifying ? iIndent - 42 : iIndent - 8, szName.c_str(), fSelected);
     rm->menu_font_large.drawScrolling(m_pos.x + iIndent + 8, m_pos.y + 5, iWidth - iIndent - 24, szFieldName.c_str(), fSelected);
 
     miModifyImageLeft->Draw();

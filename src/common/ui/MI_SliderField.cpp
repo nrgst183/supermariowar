@@ -25,6 +25,7 @@ MI_SliderField::MI_SliderField(gfxSprite * nspr, gfxSprite * nsprSlider, short x
 {
     m_indent2 = indent2;
     m_sprSlider = nsprSlider;
+    allowWrap(false);    //(from the top, right doesn't jump to the bottom)
 
     SetPosition(x, y);
 }
@@ -103,7 +104,8 @@ void MI_SliderField::Draw()
     m_spr->draw(m_pos.x + m_indent - 16, m_pos.y, {0, (fSelected ? 96 : 64), 32, 32});
     m_spr->draw(m_pos.x + m_indent + 16, m_pos.y, {528 - m_width + m_indent, (fSelected ? 32 : 0) + m_adjustmentY, m_width - m_indent - 16, 32});
 
-    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, m_indent - 8, m_name.c_str(), fSelected);
+    //(the name: while being changed, it stops before the left arrow, scrolling if it is longer)
+    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, fModifying ? m_indent - 42 : m_indent - 8, m_name.c_str(), fSelected);
 
     if (!m_items.empty()) {
         rm->menu_font_large.drawScrolling(m_pos.x + m_indent2 + 16, m_pos.y + 5, m_width - m_indent2 - 24, currentItem().name.c_str(), fSelected);
@@ -123,6 +125,10 @@ void MI_SliderField::Draw()
 
 MenuCodeEnum MI_SliderField::SendInput(CPlayerInput * playerInput)
 {
+    //(locked while being changed: it stops being changed)
+    if (fDisable)
+        return Modify(false);
+
     for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
         if (playerInput->outputControls[iPlayer].menu_scrollfast.fPressed) {
             if (m_index == 0)

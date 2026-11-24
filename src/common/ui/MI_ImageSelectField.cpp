@@ -30,7 +30,8 @@ void MI_ImageSelectField::Draw()
     body->draw(m_pos.x + m_indent - 16, m_pos.y, {0, (fSelected ? 96 : 64), 32, 32});
     body->draw(m_pos.x + m_indent + 16, m_pos.y, {528 - m_width + m_indent, (fSelected ? 32 : 0), m_width - m_indent - 16, 32});
 
-    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, m_indent - 8, m_name.c_str(), fSelected);
+    //(the name: while being changed, it stops before the left arrow, scrolling if it is longer)
+    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, fModifying ? m_indent - 42 : m_indent - 8, m_name.c_str(), fSelected);
 
     if (!m_items.empty()) {
         rm->menu_font_large.drawScrolling(m_pos.x + m_indent + iImageWidth + 10, m_pos.y + 5, m_width - m_indent - 24, currentItem().name.c_str(), fSelected);

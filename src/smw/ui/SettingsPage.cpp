@@ -45,7 +45,7 @@ void MI_SettingsHelp::Draw()
     //change it, A again is done)
     using prompts::Pad;
     using prompts::menuKey;
-    if (m_menu.IsModifying())
+    if (m_menu.ChangingValue())
         menupanel::footer({{{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
                            {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "done"}}, help);
     else

@@ -53,10 +53,37 @@ MI_SelectField<T>::MI_SelectField(const MI_SelectField<T>& other)
 
 
 template<typename T>
+void MI_SelectField<T>::startSlide(int dir)
+{
+    //(an arrow still out from the change before: back in place first)
+    if (m_kickApplied != 0) {
+        MI_Image* arrow = m_slideDir < 0 ? miModifyImageLeft.get() : miModifyImageRight.get();
+        short ax, ay, aw, ah;
+        arrow->GetPositionAndSize(ax, ay, aw, ah);
+        arrow->SetPosition(static_cast<short>(ax - m_kickApplied * m_slideDir), ay);
+        m_kickApplied = 0;
+    }
+    m_slideDir = dir;
+    m_slideFrames = SLIDE_FRAMES;
+}
+
+template<typename T>
 void MI_SelectField<T>::Update()
 {
     miModifyImageRight->Update();
     miModifyImageLeft->Update();
+
+    if (m_slideFrames > 0)
+        --m_slideFrames;
+    //(the arrow on the side of the change: out a few pixels, back as the value settles)
+    const int kick = m_slideFrames > 0 ? static_cast<int>(4.0f * slideLeft() + 0.5f) : 0;
+    if (kick != m_kickApplied) {
+        MI_Image* arrow = m_slideDir < 0 ? miModifyImageLeft.get() : miModifyImageRight.get();
+        short ax, ay, aw, ah;
+        arrow->GetPositionAndSize(ax, ay, aw, ah);
+        arrow->SetPosition(static_cast<short>(ax + (kick - m_kickApplied) * m_slideDir), ay);
+        m_kickApplied = kick;
+    }
 }
 
 
@@ -81,11 +108,18 @@ void MI_SelectField<T>::Draw()
     }
 
     if (m_indent> 0)
-        rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, m_indent - 8, m_name.c_str(), fSelected);
+        rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, fModifying ? m_indent - 42 : m_indent - 8, m_name.c_str(), fSelected);    //(while changed: up to the left arrow)
 
     if (!m_items.empty()) {
         const short indent = (m_indent > 0) ? m_indent : 8;
-        rm->menu_font_large.drawScrolling(m_pos.x + indent + 8, m_pos.y + 5, m_width - indent - 24, currentItem().name.c_str(), fSelected);
+        const int vx = m_pos.x + indent + 8, room = m_width - indent - 24;
+        if (m_slideFrames > 0) {
+            //(just changed: it slides in from the side it came from, within its place)
+            const int off = static_cast<int>(16.0f * slideLeft() + 0.5f) * m_slideDir;
+            rm->menu_font_large.draw(vx + off, m_pos.y + 5, currentItem().name, vx, vx + room);
+        } else {
+            rm->menu_font_large.drawScrolling(vx, m_pos.y + 5, room, currentItem().name.c_str(), fSelected);
+        }
     }
 
     const bool drawLeft = m_index > 0;
@@ -110,8 +144,13 @@ std::array<MI_Image*, 2> MI_SelectField<T>::ModifyArrows() const
 template<typename T>
 MenuCodeEnum MI_SelectField<T>::Modify(bool modify)
 {
-    if (fDisable)
+    if (fDisable) {
+        //(locked while being changed: out of it, its arrows gone)
+        miModifyImageLeft->setVisible(false);
+        miModifyImageRight->setVisible(false);
+        fModifying = false;
         return MENU_CODE_UNSELECT_ITEM;
+    }
 
     if (m_autoAdvance && modify) {
         moveNext();
@@ -162,12 +201,16 @@ MenuCodeEnum MI_SelectField<T>::Nudge(int dir)
 template<typename T>
 MenuCodeEnum MI_SelectField<T>::SendInput(CPlayerInput * playerInput)
 {
+    //(locked while being changed, e.g. the host locked it: it stops being changed)
+    if (fDisable)
+        return Modify(false);
+
     for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
         short iNumMoves = 1;
         if (m_fastScroll && playerInput->outputControls[iPlayer].menu_scrollfast.fDown)
             iNumMoves = 10;
 
-        if (playerInput->outputControls[iPlayer].menu_right.fPressed || playerInput->outputControls[iPlayer].menu_down.fPressed) {
+        if (playerInput->outputControls[iPlayer].menu_right.fPressed) {
             bool fMoved = false;
 
             for (short iMove = 0; iMove < iNumMoves; iMove++)
@@ -177,7 +220,7 @@ MenuCodeEnum MI_SelectField<T>::SendInput(CPlayerInput * playerInput)
                 return mcItemChangedCode;
         }
 
-        if (playerInput->outputControls[iPlayer].menu_left.fPressed || playerInput->outputControls[iPlayer].menu_up.fPressed) {
+        if (playerInput->outputControls[iPlayer].menu_left.fPressed) {
             bool fMoved = false;
 
             for (short iMove = 0; iMove < iNumMoves; iMove++)
@@ -351,6 +394,7 @@ bool MI_SelectField<T>::moveNext()
         return false;
 
     // stop when detecting a restart or a loop
+    const size_t start = m_index;
     const size_t stop_idx = m_wraps ? m_index : 0;
 
     while (true) {
@@ -359,10 +403,12 @@ bool MI_SelectField<T>::moveNext()
             break;
         if (!currentItem().hidden) {
             updateOutput();
+            startSlide(1);
             return true;
         }
     }
 
+    m_index = start;    //(nowhere to go: it stays, not at the other end)
     return false;
 }
 
@@ -374,6 +420,7 @@ bool MI_SelectField<T>::movePrev()
         return false;
 
     // stop when detecting a restart or a loop
+    const size_t start = m_index;
     const size_t stop_idx = m_wraps ? m_index : (m_items.size() - 1);
 
     while (true) {
@@ -382,10 +429,12 @@ bool MI_SelectField<T>::movePrev()
             break;
         if (!currentItem().hidden) {
             updateOutput();
+            startSlide(-1);
             return true;
         }
     }
 
+    m_index = start;    //(nowhere to go: it stays, not at the other end)
     return false;
 }
 

@@ -27,7 +27,8 @@ void beginFrame();
 bool footerDrawn();
 /// Whether (x,y) is on the last footer's B prompt (its "back", "leave"...): a click there is a B press
 bool footerBackAt(short x, short y);
-/// The usual prompts: up/down chooses, A selects (left/right changes, for settings), B goes back
+/// The usual prompts: up/down chooses, A selects, B goes back; while a value is being changed
+/// (`change`): left/right change it, A is done
 std::vector<prompts::Prompt> standardPrompts(bool change, const char* back = "back");
 /// A question's box (every yes/no dialog: the menus', the pause screen's, the editors'): a panel in
 /// the middle of the screen, where the original's dialog was (its lines at y 195 and 220, its

@@ -20,8 +20,11 @@
 #include "gamemodes/MiniPipe.h"
 #include "ui/InputPrompts.h"
 #include "ui/MenuPad.h"
+#include "ui/MI_Button.h"
 #include "ui/MI_MapField.h"
+#include "ui/MI_PacksField.h"
 #include "ui/MI_SelectField.h"
+#include "ui/MI_TextField.h"
 
 #include "menu/GameSettingsMenu.h"
 #include "menu/MainMenu.h"
@@ -1754,6 +1757,144 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         step = 1000;
         t = 0;
         return MENU_CODE_QUICK_GAME_START;
+    }
+
+    //--at-role anim: the menus' motion, frame by frame: the focus frame gliding down a row, a value
+    //sliding in after right (gameplay options)
+    if (at.shotsRole == "anim" && step == 1) {
+        COutputControl& keys = game_values.playerInput.outputControls[0];
+        char name[32];
+        switch (t) {
+            case 1: return MENU_CODE_TO_OPTIONS_MENU;
+            case 12: return MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU;
+            case 40: keys.menu_down.fPressed = true; break;
+            case 70: keys.menu_select.fPressed = true; break;
+            case 90: keys.menu_right.fPressed = true; break;
+            case 130:
+                step = 1000;
+                t = 0;
+                return MENU_CODE_NONE;
+        }
+        if ((t > 40 && t <= 46) || (t > 90 && t <= 96)) {
+            snprintf(name, sizeof(name), "a%03d", t);
+            shot(name);
+        }
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role ctlaudit: on each menu, every control in turn (down until it comes round): a shot of it
+    //focused, after A (being changed; not on buttons and text fields), after right, then A again;
+    //"audit:" lines give each shot's control box (scripts crop the shots to it)
+    if (at.shotsRole == "ctlaudit" && step == 1) {
+        struct Target {
+            const char* name;
+            std::vector<MenuCodeEnum> codes;    // returned one after another to get there
+            int modeMenu;                        // or a game mode's options menu (-1: none; GAMEMODE_LAST: the bosses')
+        };
+        static const std::vector<Target> TARGETS = {
+            {"gameplay", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU}, -1},
+            {"team", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_TEAM_OPTIONS_MENU}, -1},
+            {"itemsel", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_POWERUP_SELECTION_MENU}, -1},
+            {"itemset", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_POWERUP_SETTINGS_MENU}, -1},
+            {"weapons", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_PROJECTILES_OPTIONS_MENU}, -1},
+            {"weaplim", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_PROJECTILES_LIMITS_MENU}, -1},
+            {"graphics", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_GRAPHICS_OPTIONS_MENU}, -1},
+            {"eyecandy", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_EYECANDY_OPTIONS_MENU}, -1},
+            {"sound", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_SOUND_OPTIONS_MENU}, -1},
+            {"online", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_ONLINE_OPTIONS_MENU}, -1},
+            {"options", {MENU_CODE_TO_MAIN_MENU, MENU_CODE_TO_OPTIONS_MENU}, -1},
+            {"main", {MENU_CODE_TO_MAIN_MENU}, -1},
+            {"mode00", {}, 0}, {"mode01", {}, 1}, {"mode02", {}, 2}, {"mode03", {}, 3}, {"mode04", {}, 4},
+            {"mode05", {}, 5}, {"mode06", {}, 6}, {"mode07", {}, 7}, {"mode08", {}, 8}, {"mode09", {}, 9},
+            {"mode10", {}, 10}, {"mode11", {}, 11}, {"mode12", {}, 12}, {"mode13", {}, 13}, {"mode14", {}, 14},
+            {"mode15", {}, 15}, {"mode16", {}, 16}, {"mode17", {}, 17}, {"mode18", {}, 18}, {"mode19", {}, 19},
+            {"mode20", {}, 20}, {"mode21", {}, 21}, {"bosses", {}, GAMEMODE_LAST},
+            {"lobby", {MENU_CODE_TO_MAIN_MENU, MENU_CODE_TO_LOCAL_LOBBY}, -1},
+            {"lobbyopts", {MENU_CODE_ONLINE_OPTIONS}, -1},
+            {"settings", {MENU_CODE_ONLINE_OPTIONS_BACK, MENU_CODE_ONLINE_MATCH_SETTINGS, MENU_CODE_MATCH_SELECTION_START}, -1},
+        };
+        static size_t target = 0;
+        static int phase = 0;    // 0: getting there, 1: walking
+        static int phaseT = 0;
+        static int row = 0;
+        static UI_Menu* menu = nullptr;
+        static std::vector<const UI_Control*> seen;
+        COutputControl& keys = game_values.playerInput.outputControls[0];
+        if (target >= TARGETS.size()) {
+            step = 1000;
+            t = 0;
+            return MENU_CODE_NONE;
+        }
+        const Target& tg = TARGETS[target];
+        ++phaseT;
+        if (phase == 0) {
+            //(a code every 12 frames, or the mode's menu at once; then the walk)
+            const int k = (phaseT - 1) / 12;
+            if (tg.modeMenu >= 0 && phaseT == 1) {
+                if (tg.modeMenu > GAMEMODE_LAST)
+                    return MENU_CODE_NONE;
+                mCurrentMenu = tg.modeMenu < GAMEMODE_LAST ? mModeOptionsMenu->GetOptionsMenu(static_cast<short>(tg.modeMenu)) : mModeOptionsMenu->GetBossOptionsMenu();
+                mCurrentMenu->ResetMenu();
+            } else if (tg.modeMenu < 0 && (phaseT - 1) % 12 == 0 && k < static_cast<int>(tg.codes.size())) {
+                return tg.codes[static_cast<size_t>(k)];
+            }
+            const int ready = tg.modeMenu >= 0 ? 12 : static_cast<int>(tg.codes.size()) * 12 + 12;
+            if (phaseT >= ready) {
+                phase = 1;
+                phaseT = 0;
+                row = 0;
+                menu = mCurrentMenu;
+                seen.clear();
+            }
+            return MENU_CODE_NONE;
+        }
+        //The walk: 16 frames a control
+        const int f = phaseT - 1;
+        UI_Control* focus = menu ? menu->currentFocus() : nullptr;
+        const bool button = dynamic_cast<MI_Button*>(focus) != nullptr;
+        const bool text = dynamic_cast<MI_TextField*>(focus) != nullptr;
+        //(not the graphics packs: they would change the look of the rest)
+        const bool pack = dynamic_cast<MI_PacksField*>(focus) != nullptr;
+        char name[64];
+        auto shotHere = [&](char which) {
+            snprintf(name, sizeof(name), "%s_%02d%c", tg.name, row, which);
+            const UI_Control::Box b = focus ? focus->FocusBox() : UI_Control::Box {};
+            printf("audit: %s box %d %d %d %d\n", name, b.x, b.y, b.w, b.h);
+            shot(name);
+        };
+        if (f == 0) {
+            if (!focus || std::find(seen.begin(), seen.end(), focus) != seen.end() || row >= 24) {
+                target++;
+                phase = 0;
+                phaseT = 0;
+                return MENU_CODE_NONE;
+            }
+            seen.push_back(focus);
+        }
+        if (f == 3)
+            shotHere('a');
+        if (!button && !text && !pack) {
+            if (f == 4)
+                keys.menu_select.fPressed = true;
+            if (f == 7)
+                shotHere('b');
+            if (f == 8)
+                keys.menu_right.fPressed = true;
+            if (f == 11)
+                shotHere('c');
+            if (f == 12 && menu->IsModifying())
+                keys.menu_select.fPressed = true;
+        }
+        //(A took it elsewhere: back to the menu)
+        if (f == 13 && mCurrentMenu != menu)
+            mCurrentMenu = menu;
+        if (f == 14)
+            keys.menu_down.fPressed = true;
+        if (f == 15) {
+            phaseT = 0;
+            row++;
+        }
+        return MENU_CODE_NONE;
     }
 
     //--at-role menutour: a screenshot of each menu screen in turn (for looking over the menus)

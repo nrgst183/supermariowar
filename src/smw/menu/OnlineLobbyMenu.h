@@ -37,6 +37,8 @@ public:
     void Open(bool fresh = true);
     /// Updates the screen from the state of the lobby; call every frame while shown, before SendInput()
     void Sync();
+    /// As a menu's; up from the buttons into the team box (ready, as A left it): the CPUs' skins
+    MenuCodeEnum SendInput(CPlayerInput* playerInput) override;
 
     /// After the player edited a field of the options page: sends the change to the lobby
     void ApplyChanges();

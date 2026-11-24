@@ -18,6 +18,7 @@ public:
     ~MI_FrenzyModeOptions() override;
 
     MenuCodeEnum Modify(bool modify) override;
+    bool ChangingValue() const override;    //(its own menu's)
     MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
 
     void Update() override;

@@ -33,6 +33,7 @@ public:
     void Update() override;
     void Draw() override;
     MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
+    bool ChangingValue() const override { return false; }    //(it moves its own way, no value field)
     MenuCodeEnum Modify(bool modify) override;
 
     void Add(std::string name, short icon);

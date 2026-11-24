@@ -21,6 +21,14 @@ class MI_InputControlField : public UI_Control
         void SetKey(SDL_Keycode * iSetKey, SDL_Keycode key, SDL_JoystickID device);
 
         MenuCodeEnum Modify(bool modify) override;
+        Box FocusBox() const override {
+            //(the pipe, as a select field's: its sprite has 8 empty pixels at each end)
+            return {static_cast<short>(m_pos.x + 8), m_pos.y, static_cast<short>(iWidth - 16), 32};
+        }
+        Box ValueBox() const override {
+            return {static_cast<short>(m_pos.x + iIndent - 12), m_pos.y, static_cast<short>(iWidth - iIndent + 4), 32};
+        }
+        bool ChangingValue() const override { return false; }    //(waiting for a key: no left/right to change)
 
     void SetDevice(SDL_JoystickID device) {
         iDevice = device;
@@ -66,6 +74,7 @@ class MI_InputControlContainer : public UI_Control
 
         MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
         MenuCodeEnum Modify(bool modify) override;
+        bool ChangingValue() const override;    //(its own menu's)
 
         void SetPlayer(short iPlayerID);
 

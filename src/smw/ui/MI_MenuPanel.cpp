@@ -172,9 +172,11 @@ std::vector<prompts::Prompt> standardPrompts(bool change, const char* back)
 {
     using prompts::Pad;
     using prompts::menuKey;
-    std::vector<prompts::Prompt> row = {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"}};
+    //(a value being changed: only how to change it, and be done)
     if (change)
-        row.push_back({{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"});
+        return {{{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
+            {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "done"}};
+    std::vector<prompts::Prompt> row = {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"}};
     row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"});
     if (back)
         row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, back});

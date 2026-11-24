@@ -459,7 +459,7 @@ void UI_OnlineLobbyMenu::Sync()
         else if (m_currentFocus == miWhoCanJoin && !host)
             hint = "The host chooses who can join";
         else if (m_currentFocus == miWhoCanJoin)
-            hint = net.access() == rollback::LobbyAccess::Nobody ? "Off: a game on this console only. Left/Right turns it on"
+            hint = net.access() == rollback::LobbyAccess::Nobody ? "Off: a game on this console only. Select it to turn it on"
                  : net.access() == rollback::LobbyAccess::Internet ? "Net: anyone over the Internet can join this lobby now"
                                                                    : "On: others on the network can join this lobby now";
     } else if (m_dialog == Dialog::None && !joining) {
@@ -489,9 +489,11 @@ void UI_OnlineLobbyMenu::Sync()
         row = {across, select, cancel("no")};
     else if (m_page == Page::Team && m_currentFocus == miTeam)
         row = miTeam->prompts();
+    else if (m_page == Page::Team && miTeam->hasCpuPicks())
+        row = {across, {{Pad::Up}, {menuKey(prompts::MENU_UP)}, "CPU skins"}, select, cancel("leave")};
     else if (m_page == Page::Team)
         row = {across, select, cancel("leave")};
-    else if (IsModifying())
+    else if (ChangingValue())
         row = {change, {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "done"}};
     else
         row = {choose, select, cancel("back")};
@@ -615,4 +617,14 @@ void UI_OnlineLobbyMenu::CloseDialog()
     SetCancelCode(m_page == Page::Team ? MENU_CODE_ONLINE_LEAVE : MENU_CODE_ONLINE_OPTIONS_BACK);
 
     RestoreCurrent();
+}
+
+MenuCodeEnum UI_OnlineLobbyMenu::SendInput(CPlayerInput* playerInput)
+{
+    const UI_Control* before = m_currentFocus;
+    const MenuCodeEnum code = UI_Menu::SendInput(playerInput);
+    //(A on player 1's own skin made it ready and went down; back up: the CPUs' skins, one after another)
+    if (m_page == Page::Team && m_dialog == Dialog::None && m_currentFocus == miTeam && before && before != miTeam)
+        miTeam->EditCpuSkins();
+    return code;
 }

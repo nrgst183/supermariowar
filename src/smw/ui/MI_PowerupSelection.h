@@ -20,6 +20,7 @@ public:
     MI_PowerupSelection(short x, short y, short width, short numlines);
 
     MenuCodeEnum Modify(bool modify) override;
+    bool ChangingValue() const override;    //(its own menu's)
     MenuCodeEnum SendInput(CPlayerInput* playerInput) override;
 
     void Update() override;

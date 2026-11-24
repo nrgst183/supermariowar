@@ -160,6 +160,12 @@ public:
     bool IsModifying() const {
         return fModifying;
     }
+    /// While the menu has it in "modify": whether a value of it is being changed now (left/right
+    /// change it, A is done); a control with a menu of its own inside (the powerup sliders, a player's
+    /// controls) is "modified" all along, and only changes a value when its own menu does
+    virtual bool ChangingValue() const {
+        return fModifying;
+    }
 
     void SetControllingTeam(short teamid) {
         iControllingTeam = teamid;

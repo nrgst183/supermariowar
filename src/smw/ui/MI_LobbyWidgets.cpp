@@ -222,7 +222,7 @@ std::vector<prompts::Prompt> MI_OnlineTeamSelect::prompts() const
     //(A: ready, or on to the CPUs' skins, the next one, or, the last, ready; B: back one while setting them)
     const std::vector<int> cpus = pickableCpus();
     const char* a = "ready";
-    if (m_cpuEdit < 0 && !cpus.empty())
+    if (m_cpuEdit < 0 && !cpus.empty() && !hasOwnPlayers())
         a = "CPU skins";
     else if (m_cpuEdit >= 0)
         a = m_cpuEdit == cpus.back() ? "ready" : "next CPU";
@@ -265,6 +265,16 @@ void MI_OnlineTeamSelect::changeTeam(int slot, int direction)
     lobby->setSlotColor(slot, team);
     m_overrideTeam[slot] = team;
     m_overrideFrames[slot] = 60;
+}
+
+void MI_OnlineTeamSelect::EditCpuSkins()
+{
+    const std::vector<int> cpus = pickableCpus();
+    if (cpus.empty())
+        return;
+    Lock(false);
+    m_cpuEdit = cpus.front();
+    m_holdFrames[0] = 0;
 }
 
 std::vector<int> MI_OnlineTeamSelect::pickableCpus() const
@@ -361,8 +371,9 @@ MenuCodeEnum MI_OnlineTeamSelect::SendInput(CPlayerInput* playerInput)
         const int slot = mySlot(p);
         const bool isLocked = locked();
 
-        //Player 1's A with CPUs in the game: on to their skins (the original game's way), then ready
-        if (p == 0 && !isLocked && keys.menu_select.fPressed && !cpus.empty() && (slot >= 0 || !hasOwnPlayers())) {
+        //Player 1's A: ready, down to the buttons (up again from there: the CPUs' skins); with no players
+        //of its own, only CPUs, A goes on to their skins at once
+        if (p == 0 && !isLocked && keys.menu_select.fPressed && !cpus.empty() && !hasOwnPlayers()) {
             m_cpuEdit = cpus.front();
             m_holdFrames[0] = 0;
             return MENU_CODE_NONE;

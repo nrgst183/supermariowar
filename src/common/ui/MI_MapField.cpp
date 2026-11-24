@@ -63,14 +63,14 @@ MenuCodeEnum MI_MapField::SendInput(CPlayerInput * playerInput)
     const SDL_Keycode iPressedKey = playerInput->iPressedKey;
 
     for (int iPlayer = 0; iPlayer < 4; iPlayer++) {
-        if (playerInput->outputControls[iPlayer].menu_right.fPressed || playerInput->outputControls[iPlayer].menu_down.fPressed) {
+        if (playerInput->outputControls[iPlayer].menu_right.fPressed) {
             if (MoveNext(playerInput->outputControls[iPlayer].menu_scrollfast.fDown))
                 return MENU_CODE_MAP_CHANGED;
 
             return MENU_CODE_NONE;
         }
 
-        if (playerInput->outputControls[iPlayer].menu_left.fPressed || playerInput->outputControls[iPlayer].menu_up.fPressed) {
+        if (playerInput->outputControls[iPlayer].menu_left.fPressed) {
             if (MovePrev(playerInput->outputControls[iPlayer].menu_scrollfast.fDown))
                 return MENU_CODE_MAP_CHANGED;
 
@@ -201,7 +201,8 @@ void MI_MapField::Draw()
     body->draw(m_pos.x + iIndent - 16, m_pos.y, {0, (fSelected ? 96 : 64), 32, 32});
     body->draw(m_pos.x + iIndent + 16, m_pos.y, {528 - iWidth + iIndent, (fSelected ? 32 : 0), iWidth - iIndent - 16, 32});
 
-    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, iIndent - 8, szName.c_str(), fSelected);
+    //(the name: while being changed, it stops before the left arrow, scrolling if it is longer)
+    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, fModifying ? iIndent - 42 : iIndent - 8, szName.c_str(), fSelected);
     rm->menu_font_large.drawScrolling(m_pos.x + iIndent + 8, m_pos.y + 5, iWidth - iIndent - 24, szMapName, fSelected);
 
     MI_MapPreview::Draw();

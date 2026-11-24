@@ -63,7 +63,7 @@ public:
 
     void ResetMenu();
 
-    MenuCodeEnum SendInput(CPlayerInput* playerInput);
+    virtual MenuCodeEnum SendInput(CPlayerInput* playerInput);
     void Update();
     void Draw();
 
@@ -101,6 +101,8 @@ public:
     bool IsModifying() const {
         return fModifyingItem;
     }
+    /// A value is being changed (the prompts: left/right change, A done): see UI_Control::ChangingValue
+    bool ChangingValue() const;
 
     void Refresh();
 

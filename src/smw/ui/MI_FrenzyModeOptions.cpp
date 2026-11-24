@@ -281,3 +281,8 @@ void MI_FrenzyModeOptions::Refresh()
 {
     mMenu->Refresh();
 }
+
+bool MI_FrenzyModeOptions::ChangingValue() const
+{
+    return mMenu && mMenu->ChangingValue();
+}
