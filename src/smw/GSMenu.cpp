@@ -93,6 +93,7 @@
 #include <random>
 #include <cassert>
 #include <sstream>
+#include <unordered_set>
 #include <vector>
 
 // std::uniue_ptr requires that the special member function have access
@@ -370,13 +371,37 @@ void drawChangingFocus(const UI_Control& control, const UI_Control::Box& v, floa
         cache.shadow = SDL_CreateSurface(r.w, r.h, screen->format);
         if (!cache.shadow)
             return;
+        //(only the pipe goes into the shadow: the pixels of the fields' pipe art's colors; what a
+        //field draws on it, a slider's track and marks, keeps its colors as the text does)
+        static std::unordered_set<Uint32> pipeColors;
+        static SDL_PixelFormat pipeFormat = SDL_PIXELFORMAT_UNKNOWN;
+        if (pipeFormat != screen->format) {
+            pipeFormat = screen->format;
+            pipeColors.clear();
+            for (const gfxSprite* art : {&rm->spr_selectfield, &rm->spr_selectfielddisabled}) {
+                SDL_Surface* surface = art->getSurface();
+                if (!surface)
+                    continue;
+                if (SDL_MUSTLOCK(surface))
+                    SDL_LockSurface(surface);
+                for (int y = 0; y < surface->h; y++) {
+                    for (int x = 0; x < surface->w; x++) {
+                        const RGB c = getRgb(surface, x, y);
+                        if (!(c.r == 255 && c.g == 0 && c.b == 255))
+                            pipeColors.insert(SDL_MapRGB(format, nullptr, c.r, c.g, c.b));
+                    }
+                }
+                SDL_UnlockSurface(surface);
+            }
+        }
         const Uint32 black = SDL_MapRGB(format, nullptr, 0, 0, 0);
         if (SDL_MUSTLOCK(cache.shadow))
             SDL_LockSurface(cache.shadow);
         for (int y = 0; y < r.h; y++) {
             for (int x = 0; x < r.w; x++) {
                 const size_t i = static_cast<size_t>(y) * r.w + x;
-                write(cache.shadow, x, y, noText[i] != key && noText[i] == withText[i] ? black : key);
+                const bool pipe = noText[i] != key && noText[i] == withText[i] && pipeColors.count(noText[i]) != 0;
+                write(cache.shadow, x, y, pipe ? black : key);
             }
         }
         SDL_UnlockSurface(cache.shadow);
