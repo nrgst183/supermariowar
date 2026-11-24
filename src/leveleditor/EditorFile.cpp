@@ -12,9 +12,20 @@ void convertAll()
 }
 #endif
 
+// (loadmapfile's file, read by loadcurrentmap instead of the list's current map)
+std::string g_loadMapFrom;
+
+// A map file's contents into the editor (the list's current map stays: saving writes that one)
+void loadmapfile(const std::string& file)
+{
+    g_loadMapFrom = file;
+    loadcurrentmap();
+    g_loadMapFrom.clear();
+}
+
 void loadcurrentmap()
 {
-    g_map->loadMap(maplist->currentFilename(), read_type_full);
+    g_map->loadMap(g_loadMapFrom.empty() ? maplist->currentFilename() : g_loadMapFrom, read_type_full);
 
     if (g_map->iNumRaceGoals == 0) {
         for (short iGoal = 0; iGoal < MAXRACEGOALS; iGoal++) {

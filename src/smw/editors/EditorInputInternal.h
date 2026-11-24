@@ -42,6 +42,7 @@ struct Action {
 };
 
 inline const std::vector<Action> LEVEL_ACTIONS = {
+    {"Play this map", SDLK_F5, false, false, "File"},
     {"Tiles", SDLK_T, false, false, "Modes"}, {"Blocks", SDLK_I}, {"Map items", SDLK_O}, {"Warps", SDLK_W},
     {"Move", SDLK_M}, {"Tile types", SDLK_L}, {"Platforms", SDLK_P}, {"Hazards", SDLK_H},
     {"Animated tiles", SDLK_A}, {"Race goals", SDLK_J}, {"? block contents", SDLK_K}, {"No player starts", SDLK_X},

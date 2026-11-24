@@ -167,6 +167,7 @@ void draw_platform(short iPlatform, bool fDrawTileTypes);
 void SetPlatformToDefaults(short iPlatform);
 
 void loadcurrentmap();
+void loadmapfile(const std::string& file);
 int savecurrentmap();
 int findcurrentstring();
 int newmap();

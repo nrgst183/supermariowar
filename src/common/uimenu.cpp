@@ -267,7 +267,13 @@ MenuCodeEnum UI_Menu::MoveNextControl(MenuNavDirection iDirection)
 
     UI_Control* neighbor = m_currentFocus->neighbor(iDirection);
 
-    while (neighbor && !neighbor->IsVisible()) {
+    //(past the hidden ones, and the disabled ones: an option that can't be changed now, a button that
+    //can't be pressed. A round of them all, back where it started: no move)
+    for (size_t steps = 0; neighbor && (!neighbor->IsVisible() || neighbor->IsDisabled()); steps++) {
+        if (neighbor == m_currentFocus || steps > controls.size()) {
+            neighbor = nullptr;
+            break;
+        }
         neighbor = neighbor->neighbor(iDirection);
     }
 

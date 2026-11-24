@@ -358,6 +358,14 @@ void MenuState::onEnterState()
         return;
     }
 
+#ifdef SMW_HAS_EDITORS
+    //Back from playing the map being edited: the editor again (its match changed nothing)
+    if (!mTestPlay.map.empty()) {
+        EndTestPlay();
+        return;
+    }
+#endif
+
     rollback::NetGame& onlineNet = rollback::NetGame::instance();
     if (onlineNet.active() && onlineNet.lobby() && !cmd::g_net.enabled() && !onlineNet.seriesActive()) {
         //Back from an online match: the lobby again (a tournament, tour or world goes on below)
@@ -554,6 +562,15 @@ void MenuState::onEnterState()
 
 void MenuState::update()
 {
+#ifdef SMW_HAS_EDITORS
+    //(back from playing the map: the editor opens on it again)
+    if (mTestPlay.reopenEditor) {
+        mTestPlay.reopenEditor = false;
+        RunEditor(editors::Editor::Level);
+        return;
+    }
+#endif
+
     //Reset the keys that were down the last frame
     game_values.playerInput.ClearPressedKeys(1);
 
@@ -1077,6 +1094,13 @@ void MenuState::LaunchMatch()
             sShortMapName = stripPathAndExtension(szMapName);
 
             printf("  State: GS_START_GAME, Match type: MatchType::QuickGame\n");
+#ifdef SMW_HAS_EDITORS
+        } else if (!mTestPlay.map.empty()) {
+            //The map the editor closed to play (its scratch file)
+            g_map->loadMap(mTestPlay.map, read_type_full);
+            sShortMapName = stripPathAndExtension(mTestPlay.map);
+            printf("testplay: playing %08x (tiles %08x types %08x blocks %08x)\n", g_map->tilesHash(), g_map->tilesHash(1), g_map->tilesHash(2), g_map->tilesHash(3));
+#endif
         } else {
             g_map->loadMap(maplist->currentFilename(), read_type_full);
             sShortMapName = maplist->currentShortmapname();
@@ -1140,6 +1164,12 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
     if (MENU_CODE_EXIT_APPLICATION == code) {
         Exit();
         return false;
+    } else if (MENU_CODE_MAIN_MENU_BACK == code) {
+        //B on the main menu: to its Exit; there, B again quits
+        if (!mMainMenu->focusExit()) {
+            Exit();
+            return false;
+        }
     } else if (MENU_CODE_TO_LOCAL_LOBBY == code) {
         //The main menu's Start: the lobby (of a local game, until others are let in)
         mLocalSetup.valid = false;
@@ -1870,7 +1900,69 @@ bool MenuState::RunEditor(editors::Editor editor)
     game_values.playerInput.ResetKeys();
     //(a controller's buttons held as the editor closed aren't presses in the menus)
     menupad::resync();
+    //"Play this map": its match now, the editor again after it
+    if (const std::string play = editors::takeTestPlayRequest(); !play.empty() && editor == editors::Editor::Level)
+        StartTestPlay(play);
     return true;
+}
+
+// Player 1 alone on the map, in frag mode without a goal: the match lasts until they leave it. What
+// that changes of the settings is kept here and put back after it (EndTestPlay), and nothing of it
+// is written to the settings file (StartGame)
+void MenuState::StartTestPlay(const std::string& file)
+{
+    TestPlay& t = mTestPlay;
+    for (int k = 0; k < 4; k++) {
+        t.playercontrol[k] = game_values.playercontrol[k];
+        t.teamcounts[k] = game_values.teamcounts[k];
+        for (int s = 0; s < 3; s++)
+            t.teamids[k][s] = game_values.teamids[k][s];
+    }
+    t.scoreCount = g_sim.score_cnt;
+    t.matchtype = game_values.matchtype;
+    t.gamemode = game_values.gamemode;
+    CGameMode* frag = gamemodes[game_mode_frag];
+    t.fragGoal = frag->goal;
+
+    for (int k = 0; k < 4; k++) {
+        game_values.playercontrol[k] = k == 0 ? 1 : 0;
+        game_values.teamcounts[k] = k == 0 ? 1 : 0;
+        for (int s = 0; s < 3; s++)
+            game_values.teamids[k][s] = 0;
+    }
+    g_sim.score_cnt = 1;
+    game_values.matchtype = MatchType::SingleGame;
+    game_values.gamemode = frag;
+    frag->goal = -1;    //(unlimited)
+
+    t.map = file;
+    editors::setTestPlaying(true);
+    mCurrentMenu = mEditorsMenu.get();
+    printf("editors: playing %s\n", file.c_str());
+    StartGame();
+}
+
+// Back from the test play: the settings as they were, and the editor opens on the map again
+void MenuState::EndTestPlay()
+{
+    TestPlay& t = mTestPlay;
+    for (int k = 0; k < 4; k++) {
+        game_values.playercontrol[k] = t.playercontrol[k];
+        game_values.teamcounts[k] = t.teamcounts[k];
+        for (int s = 0; s < 3; s++)
+            game_values.teamids[k][s] = t.teamids[k][s];
+    }
+    g_sim.score_cnt = t.scoreCount;
+    game_values.matchtype = t.matchtype;
+    gamemodes[game_mode_frag]->goal = t.fragGoal;
+    if (t.gamemode)
+        game_values.gamemode = t.gamemode;
+
+    editors::setTestPlaying(false);
+    editors::setTestPlayReturn(t.map);
+    t.map.clear();
+    t.reopenEditor = true;
+    mCurrentMenu = mEditorsMenu.get();
 }
 #endif
 

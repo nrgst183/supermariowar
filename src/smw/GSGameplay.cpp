@@ -485,6 +485,13 @@ void GameplayState::onLeaveState()
         replay::cancelRecording();
         return;
     }
+#ifdef SMW_HAS_EDITORS
+    //(the editor's map, tried out: not a match of the history's)
+    if (editors::testPlaying()) {
+        replay::cancelRecording();
+        return;
+    }
+#endif
     const std::string replayFile = replay::finishRecording();
     history::recordMatchEnd(replayFile, matchOnline);
 }
@@ -807,6 +814,10 @@ bool GameplayState::updateAutoTest()
             game_values.flags.pausegame = false;
     }
 
+    //(--at-role testplay: the editor's map being played, on the screen)
+    if (cmd::g_autotest.kind == cmd::AutoTestArgs::Kind::Shots && cmd::g_autotest.shotsRole == "testplay" && autoTestFrames == 90 &&
+            !cmd::g_autotest.norender)
+        gfx_save_screenshot(cmd::g_autotest.shotsDir + "/p2_playing.png");
     const bool autoTestEnd = autoTestFrames >= cmd::g_autotest.frames || autoTestOverFrames >= 120;
     if (autoTestEnd || autoTestFrames % 250 == 0)
         printf("atsum: frame %d %08x\n", autoTestFrames, autoTestChecksum());

@@ -17,6 +17,7 @@ enum class LobbyAccess : uint8_t;
 #include <string>
 #include <vector>
 
+class CGameMode;
 class UI_Menu;
 
 class UI_BonusWheelMenu;
@@ -109,6 +110,22 @@ class MenuState : public GameState
         void StartGame();
         #ifdef SMW_HAS_EDITORS
         bool RunEditor(editors::Editor editor);
+        // Playing the map the level editor closed for (EditorLauncher.h): its match, then the
+        // editor again with the settings it changed put back
+        void StartTestPlay(const std::string& file);
+        void EndTestPlay();
+        struct TestPlay {
+            std::string map;            // the map file it plays ("": none runs)
+            bool reopenEditor = false;  // back from it: the editor opens in the next update
+            short playercontrol[4] = {};
+            short teamids[4][3] = {};
+            short teamcounts[4] = {};
+            short scoreCount = 0;
+            MatchType matchtype = MatchType::SingleGame;
+            CGameMode* gamemode = nullptr;
+            short fragGoal = 0;
+        };
+        TestPlay mTestPlay;
 #endif
         void Exit();
         void DrawDeterminismReport();

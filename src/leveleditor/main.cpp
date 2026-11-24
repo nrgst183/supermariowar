@@ -285,6 +285,13 @@ void inner_main()
 
     maplist->find(findstring);
     loadcurrentmap();
+#ifdef SMW_EMBEDDED_EDITOR
+    //(back from playing it: its edits, from the scratch file, still under the map's own name)
+    if (const std::string played = editors::takeTestPlayReturn(); !played.empty() && FileExists(played)) {
+        loadmapfile(played);
+        printf("testplay: reopened %08x (tiles %08x types %08x blocks %08x)\n", g_map->tilesHash(), g_map->tilesHash(1), g_map->tilesHash(2), g_map->tilesHash(3));
+    }
+#endif
         findstring.clear();  //clear out the find string so that pressing "f" will give you the find dialog
 
     printf("\n---------------- ready, steady, go! ----------------\n");

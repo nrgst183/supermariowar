@@ -90,6 +90,10 @@ public:
     virtual void Disable(bool disable) {
         fDisable = disable;
     }
+    /// (the menus' up/down/left/right go past it: there's nothing to do on it)
+    bool IsDisabled() const {
+        return fDisable;
+    }
 
     /// The control can't be changed by this player (the online match settings, when only the host may):
     /// inert like a disabled control, and drawn with the disabled look of the select fields

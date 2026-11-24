@@ -309,6 +309,22 @@ void UI_OnlineLobbyMenu::Sync()
     if (m_pendingCpus == 0 && !miCpuPlayers->IsModifying())
         miCpuPlayers->setCurrentValue(static_cast<short>(cpus));
 
+    //The four places: my players and the CPUs only offered as many as there's room for beside the
+    //others (the fields' own values, so the limits follow at once)
+    {
+        int others = 0;
+        for (int s = 0; s < 4; s++) {
+            const rollback::LobbySlot& slot = lobby->slot(s);
+            others += slot.kind == rollback::SlotKind::Human && slot.peer != local;
+        }
+        const int mine = miLocalPlayers->currentValue();
+        const int wantedCpus = miCpuPlayers->currentValue();
+        for (short n = 0; n <= 4; n++)
+            miCpuPlayers->hideItem(n, n > 0 && n > 4 - others - mine);
+        for (short n = 1; n <= rollback::MAX_LOCAL_PLAYERS; n++)
+            miLocalPlayers->hideItem(n, n > 4 - others - wantedCpus);
+    }
+
     const int delay = lobby->inputDelay();
     const bool automatic = lobby->inputDelayIsAuto();
     if (m_pendingDelay > 0)

@@ -29,6 +29,43 @@ using std::endl;
 
 short g_iCurrentDrawIndex = 0;
 
+uint32_t CMap::tilesHash(int part) const
+{
+    //(FNV-1a over the fields, not the structs' bytes: their padding isn't the map's)
+    uint32_t h = 2166136261u;
+    auto mix = [&h](int v) {
+        h = (h ^ static_cast<uint32_t>(v & 0xffff)) * 16777619u;
+    };
+    for (short x = 0; x < MAPWIDTH; x++) {
+        for (short y = 0; y < MAPHEIGHT; y++) {
+            if (part == 0 || part == 1) {
+                for (short layer = 0; layer < MAPLAYERS; layer++) {
+                    const TilesetTile& tile = mapdata[x][y][layer];
+                    mix(tile.iID);
+                    mix(tile.iCol);
+                    mix(tile.iRow);
+                }
+            }
+            if (part == 0 || part == 2)
+                mix(static_cast<int>(mapdatatop[x][y]));
+            if (part == 0 || part == 3) {
+                //(the settings a map file keeps: a ? or view block's, a switch block's state; the other
+                //blocks' are whatever the last map left, unused)
+                const MapBlock& block = objectdata[x][y];
+                mix(block.iType);
+                if (block.iType == 1 || block.iType == 15) {
+                    for (short setting : block.iSettings)
+                        mix(setting);
+                } else if (block.iType >= 11 && block.iType <= 14) {
+                    mix(block.iSettings[0]);
+                }
+                mix(block.fHidden ? 1 : 0);
+            }
+        }
+    }
+    return h;
+}
+
 int CMap::busyScore() const
 {
     bool tilesets[256] = {};

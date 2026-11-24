@@ -87,12 +87,20 @@ UI_MainMenu::UI_MainMenu()
 
     setInitialFocus(miMainStartButton);
 #ifndef __EMSCRIPTEN__
-    SetCancelCode(MENU_CODE_EXIT_APPLICATION);
+    SetCancelCode(MENU_CODE_MAIN_MENU_BACK);    //(to Exit first: focusExit)
 #endif
 
     AddNonControl(miSMWTitle);
     AddNonControl(miSMWVersion);
 };
+
+bool UI_MainMenu::focusExit()
+{
+    if (!miExitButton || currentFocus() == miExitButton)
+        return false;
+    Focus(miExitButton);
+    return true;
+}
 
 const char* UI_MainMenu::focusHint() const
 {

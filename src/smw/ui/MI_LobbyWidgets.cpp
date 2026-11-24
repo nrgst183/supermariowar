@@ -73,6 +73,7 @@ MI_OnlineTeamSelect::MI_OnlineTeamSelect(short x, short y)
 void MI_OnlineTeamSelect::Reset()
 {
     m_hostLocked = false;
+    m_cpuEdit = -1;
     for (int i = 0; i < 4; i++)
         m_overrideFrames[i] = m_holdFrames[i] = 0;
 }
@@ -201,6 +202,8 @@ std::string MI_OnlineTeamSelect::hint() const
         return {};
     if (locked())
         return lobby->isHost() ? "Select Continue to choose the match, Cancel to unready" : "Waiting for the host. Cancel to unready";
+    if (m_cpuEdit >= 0)
+        return "Player 1 picks CPU " + std::to_string(m_cpuEdit + 1) + "'s skin and team";
     return "Up/Down: skin  Left/Right: team  Select: ready";
 }
 
@@ -213,11 +216,18 @@ std::vector<prompts::Prompt> MI_OnlineTeamSelect::prompts() const
         return {};
     if (locked())
         return {{{Pad::Down}, {menuKey(prompts::MENU_DOWN)}, "the buttons"}, {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "not ready"}};
+    //(A: ready, or on to the CPUs' skins, the next one, or, the last, ready; B: back one while setting them)
+    const std::vector<int> cpus = pickableCpus();
+    const char* a = "ready";
+    if (m_cpuEdit < 0 && !cpus.empty())
+        a = "CPU skins";
+    else if (m_cpuEdit >= 0)
+        a = m_cpuEdit == cpus.back() ? "ready" : "next CPU";
     std::vector<prompts::Prompt> row = {
         {{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "skin"},
         {{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "team"},
-        {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "ready"},
-        {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "leave"},
+        {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, a},
+        {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, m_cpuEdit >= 0 ? "back" : "leave"},
     };
     //(the random skin: on a controller, where the row has room)
     if (prompts::lastDevice() == prompts::Device::Controller)
@@ -252,6 +262,31 @@ void MI_OnlineTeamSelect::changeTeam(int slot, int direction)
     m_overrideFrames[slot] = 60;
 }
 
+std::vector<int> MI_OnlineTeamSelect::pickableCpus() const
+{
+    std::vector<int> cpus;
+    const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+    if (!lobby || !lobby->isHost() || rollback::NetGame::instance().access() != rollback::LobbyAccess::Nobody)
+        return cpus;
+    for (int s = 0; s < 4; s++) {
+        if (lobby->slot(s).kind == rollback::SlotKind::Cpu)
+            cpus.push_back(s);
+    }
+    return cpus;
+}
+
+void MI_OnlineTeamSelect::changeCpuSkin(int slot, int direction, bool random)
+{
+    if (!skinlist || skinlist->count() == 0)
+        return;
+    const int count = static_cast<int>(skinlist->count());
+    short id = rollback::cpuSkin(slot);
+    if (id < 0)
+        id = game_values.skinids[slot & 3];
+    id = static_cast<short>(random ? (id + 1 + RANDOM_INT(count - 1)) % count : (id + direction + count) % count);
+    rollback::pickCpuSkin(slot, id);
+}
+
 void MI_OnlineTeamSelect::changeSkin(int localIndex, int direction, bool random)
 {
     if (!skinlist || skinlist->count() == 0 || localIndex < 0 || localIndex >= 4)
@@ -275,10 +310,58 @@ MenuCodeEnum MI_OnlineTeamSelect::SendInput(CPlayerInput* playerInput)
         return MENU_CODE_NONE;
     }
 
+    //Player 1 setting a CPU's skin and team (after its own, A: the next one; B: back one)
+    const std::vector<int> cpus = pickableCpus();
+    if (m_cpuEdit >= 0 && (locked() || std::find(cpus.begin(), cpus.end(), m_cpuEdit) == cpus.end()))
+        m_cpuEdit = -1;
+    if (m_cpuEdit >= 0) {
+        const COutputControl& keys = playerInput->outputControls[0];
+        const auto at = std::find(cpus.begin(), cpus.end(), m_cpuEdit);
+        if (keys.menu_left.fPressed)
+            changeTeam(m_cpuEdit, -1);
+        if (keys.menu_right.fPressed)
+            changeTeam(m_cpuEdit, 1);
+        if (keys.menu_up.fPressed) {
+            changeCpuSkin(m_cpuEdit, -1, keys.menu_down.fDown);
+            m_holdFrames[0] = 0;
+        } else if (keys.menu_down.fPressed) {
+            changeCpuSkin(m_cpuEdit, 1, keys.menu_up.fDown);
+            m_holdFrames[0] = 0;
+        } else if (keys.menu_up.fDown != keys.menu_down.fDown) {
+            if (++m_holdFrames[0] > 40 && (m_holdFrames[0] % 5) == 0)
+                changeCpuSkin(m_cpuEdit, keys.menu_up.fDown ? -1 : 1, false);
+        } else {
+            m_holdFrames[0] = 0;
+        }
+        if (keys.menu_random.fPressed)
+            changeCpuSkin(m_cpuEdit, 1, true);
+        if (keys.menu_select.fPressed) {
+            if (at + 1 != cpus.end()) {
+                m_cpuEdit = *(at + 1);
+            } else {
+                //(the last one: everyone set, ready)
+                m_cpuEdit = -1;
+                Lock(true);
+                if (m_leaveDown)
+                    m_leaveDown();
+            }
+        } else if (keys.menu_cancel.fPressed) {
+            m_cpuEdit = at != cpus.begin() ? *(at - 1) : -1;    //(the first: back to player 1's own)
+        }
+        return MENU_CODE_NONE;
+    }
+
     for (int p = 0; p < 4; p++) {
         const COutputControl& keys = playerInput->outputControls[p];
         const int slot = mySlot(p);
         const bool isLocked = locked();
+
+        //Player 1's A with CPUs in the game: on to their skins (the original game's way), then ready
+        if (p == 0 && !isLocked && keys.menu_select.fPressed && !cpus.empty() && (slot >= 0 || !hasOwnPlayers())) {
+            m_cpuEdit = cpus.front();
+            m_holdFrames[0] = 0;
+            return MENU_CODE_NONE;
+        }
 
         if (slot >= 0 && !isLocked) {
             if (keys.menu_left.fPressed)
@@ -394,9 +477,12 @@ const gfxSprite* MI_OnlineTeamSelect::skinFrame(int slot, const Info& info, int 
     //(the skin the match will load: rollback::loadMatchSkin, the default one for computer players)
     std::string path = lobby->slotSkinPath(slot);
     //(a computer player: its random skin, as the match will load it)
-    if (path.empty() && info.cpu) {
-        const short cpu = rollback::cpuSkin(slot);
-        if (cpu >= 0)
+    if (path.empty() && info.cpu && skinlist && skinlist->count() > 0) {
+        //(its picked or random skin; random skins off and none picked: its slot's, as the match has it)
+        short cpu = rollback::cpuSkin(slot);
+        if (cpu < 0)
+            cpu = game_values.skinids[slot & 3];
+        if (cpu >= 0 && static_cast<size_t>(cpu) < skinlist->count())
             path = skinlist->at(static_cast<size_t>(cpu)).path.string();
     }
     if (path.empty())
@@ -441,9 +527,18 @@ void MI_OnlineTeamSelect::Draw()
         for (int s = 0; s < 4; s++) {
             if (!have[s] || info[s].team != team)
                 continue;
-            if (const gfxSprite* sprite = skinFrame(s, info[s], info[s].ready ? 0 : frame))
-                sprite->draw(team * 96 + 48 + m_pos.x, row * 36 + 52 + m_pos.y, {0, 0, 32, 32});
+            const bool setting = s == m_cpuEdit;    //(the CPU player 1 sets now: it moves, as one not ready)
+            const int sx = team * 96 + 48 + m_pos.x, sy = row * 36 + 52 + m_pos.y;
+            if (const gfxSprite* sprite = skinFrame(s, info[s], info[s].ready && !setting ? 0 : frame))
+                sprite->draw(sx, sy, {0, 0, 32, 32});
             rm->spr_menu_boxed_numbers.draw(team * 96 + 44 + m_pos.x, row * 36 + 72 + m_pos.y, {s * 16, info[s].color * 16, 16, 16});
+            if (setting) {
+                //Who sets it: a "P1" tag over it, bobbing
+                const int bob = (m_tick / 10) & 1;
+                prompts::fill(sx + 18, sy - 6 - bob, 22, 14, BLACK);
+                prompts::fill(sx + 19, sy - 5 - bob, 20, 12, {248, 200, 40, 255});
+                rm->menu_font_small.drawCentered(sx + 29, sy - 5 - bob, "P1");
+            }
             ++row;
         }
     }
@@ -457,7 +552,7 @@ void MI_OnlineTeamSelect::Draw()
             continue;
         const Info& i = info[s];
         const int cardX = s * 160 + 16;
-        if (i.mine) {
+        if (i.mine || s == m_cpuEdit) {    //(and the CPU player 1 sets now)
             prompts::fill(cardX - 4, CARD_Y - 4, 136, 104, BLACK);
             prompts::fill(cardX - 2, CARD_Y - 2, 132, 100, {248, 200, 40, 255});
         }
@@ -481,7 +576,7 @@ void MI_OnlineTeamSelect::Draw()
             }
         }
 
-        std::string line = i.cpu ? std::string() : i.role;    //(a computer player's card says CPU already)
+        std::string line = s == m_cpuEdit ? "P1 picks" : i.cpu ? std::string() : i.role;    //(a computer player's card says CPU already)
         const bool showPing = i.human && !i.mine && lobby->slot(s).localIndex == 0;
         if (i.downloadingSkin)
             line = "skin...";

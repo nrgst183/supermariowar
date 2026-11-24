@@ -688,9 +688,23 @@ bool parseWav(const std::vector<unsigned char>& data, MIX_Audio& audio, const ch
         return SDL_SetError("%s: unsupported WAV format (format %d, %d bit, %d channels)", path, format, bits, channels);
 
     const size_t count = bits == 16 ? samples_size / 2 : samples_size;
+    //(a stereo sound whose two sides are the same, within a step or two of its loudest: stored
+    //stereo, heard mono. Many are, the announcers' among them)
+    bool sameSides = false;
     if (bits == 16 && channels == 2) {
-        //(stereo sound effects as mono, both sides mixed: the original game's were mono, these are
-        //twice their memory for nothing heard; the game doesn't pan its sounds)
+        int peak = 1, difference = 0;
+        for (size_t i = 0; i + 1 < count; i += 2) {
+            const int l = static_cast<Sint16>(le16(samples + i * 2));
+            const int r = static_cast<Sint16>(le16(samples + i * 2 + 2));
+            const int d = l > r ? l - r : r - l;
+            peak = SDL_max(peak, SDL_max(l < 0 ? -l : l, r < 0 ? -r : r));
+            difference = SDL_max(difference, d);
+        }
+        sameSides = difference * 50 <= peak;
+    }
+    if (bits == 16 && channels == 2 && sameSides) {
+        //(as mono, both sides mixed: half the memory, nothing lost. The really stereo ones stay
+        //stereo, below)
         audio.pcm.resize(count / 2);
         for (size_t i = 0; i < count / 2; i++)
             audio.pcm[i] = static_cast<Sint16>((static_cast<int>(static_cast<Sint16>(le16(samples + i * 4))) +

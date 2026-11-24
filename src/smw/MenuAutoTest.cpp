@@ -1144,6 +1144,55 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         }
     }
 
+    //--at-role testplay: "Play this map" with a controller only: a tile painted in the air, the tools
+    //(Start) and their first entry (A); the match (its screenshot, GameplayState::updateAutoTest) ends at
+    //--at-frames; the editor opens again on the map, the tile still there; then out
+    if (at.shotsRole == "testplay") {
+        using editors::input::TestInput;
+        static int sessions = 0;
+        auto tap = [](int f, int from) { return f >= from && f < from + 2; };
+        auto script = [tap](editors::Editor, int f, int) {
+            if (f == 0)
+                ++sessions;
+            TestInput t;
+            if (sessions == 1) {
+                //The ground's tile taken (X), then painted in the air (A)
+                if (f < 6) { t.px = 16; t.py = 464; }
+                t.x = f >= 2 && f < 4;
+                if (f >= 6 && f < 30) { t.px = 304; t.py = 208; }
+                t.a = f >= 12 && f < 18;
+                if (f == 24) t.shot = "p0_painted";
+                //The window (Start), its play button (in the title strip, left of the window's own)
+                t.start = tap(f, 30);
+                if (f >= 36 && f < 60) { t.px = 560; t.py = 26; }
+                if (f == 42) t.shot = "p1_tools";
+                t.a = t.a || tap(f, 48);
+            } else {
+                if (f == 20) t.shot = "p3_back_in_editor";
+                t.back = tap(f, 40) || tap(f, 55) || tap(f, 70);
+                if (f >= 80) { t.px = 282; t.py = 266; }
+                t.a = tap(f, 84);
+                if (f > 100 && f % 40 == 0) t.back = true;
+                if (f > 100 && f % 40 == 20) t.a = true;
+            }
+            return t;
+        };
+        if (step == 1) {
+            if (t == 1) {
+                editors::input::setTestDriver(script, at.shotsDir);
+                return MENU_CODE_RUN_LEVEL_EDITOR;
+            }
+            //(the match and the editor again run inside here's updates' gaps: done once the second closed)
+            if (sessions >= 2 && t > 20) {
+                editors::input::setTestDriver(nullptr, {});
+                printf("shots: test play done, %d editor sessions\n", sessions);
+                step = 1000;
+                t = 0;
+            }
+            return MENU_CODE_NONE;
+        }
+    }
+
     //--at-role edopen: the editor opened as a player does, with the menus' buttons (main menu: down to
     //Editors, A; Maps, A; Start, A); a screenshot from inside it, then out
     if (at.shotsRole == "edopen" && step == 1) {

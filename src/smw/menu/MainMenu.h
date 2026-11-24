@@ -15,6 +15,10 @@ public:
     /// What the focused button does, for the footer ("Go!" says nothing by itself)
     const char* focusHint() const;
 
+    /// B on the main menu: the focus to Exit (true), or, already there, false: the game quits. A
+    /// stray B doesn't close the game
+    bool focusExit();
+
 private:
     MI_Image* miSMWTitle;
     MI_Image* miSMWVersion;

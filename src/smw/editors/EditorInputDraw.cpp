@@ -128,6 +128,7 @@ const Art ART_PICK = {"......##", ".....#ww", "....#ww#", "...#ww#.", "..#bw#.."
 const Art ART_EYE = {"........", "..####..", ".#wwww#.", "#ww##ww#", "#ww##ww#", ".#wwww#.", "..####..", "........"};
 const Art ART_SWAP = {"..#.....", ".##.....", "#######.", ".##.....", "..#..#..", ".....##.", "#######.", ".....#.."};
 const Art ART_CLOSE = {"........", ".##..##.", "..####..", "...##...", "..####..", ".##..##.", "........", "........"};
+const Art ART_PLAY = {".#......", ".##.....", ".#w#....", ".#ww#...", ".#ww#...", ".#w#....", ".##.....", ".#......"};
 const Art ART_GROUND = {"gggggggg", "gGgGgGgg", "bbbbbbbb", "bdbbbdbb", "bbbbbbbb", "bbbdbbbd", "bbbbbbbb", "dbbbbdbb"};
 const Art ART_SPRING = {"..####..", ".#gggg#.", "..#..#..", ".#.##.#.", "..#..#..", ".#.##.#.", "..#..#..", ".######."};
 const Art ART_TYPES = {"########", "#ww#cccc", "#ww#cccc", "########", "#rr#ssss", "#rr#ssss", "########", "........"};
@@ -824,10 +825,15 @@ void drawWindow()
     theme::font().draw(win.x + 32, win.y + 12, level ? "Level Editor" : "World Editor");
     if (level) {
         std::string name = sh::mapName();
-        const int room = win.w - 150 - theme::font().getWidth("Level Editor");
+        const int room = win.w - 180 - theme::font().getWidth("Level Editor");
         while (!name.empty() && theme::font().getWidth(name) > room)
             name.pop_back();
-        theme::font().drawRightJustified(win.x + win.w - 62, win.y + 12, name);
+        theme::font().drawRightJustified(win.x + win.w - 90, win.y + 12, name);
+        //Play this map: the editor closes and the game plays it, then opens it here again (F5)
+        const SDL_Rect play {win.x + win.w - 84, win.y + 8, 24, 22};
+        theme::block(play.x, play.y, play.w, play.h, hovered(play) ? theme::Tone::Gold : theme::Tone::Green);
+        drawArt(play.x + 5, play.y + 3, ART_PLAY);
+        addWidget(play, [] { runKey(SDLK_F5); }, "Play this map: run around on it, then come back here (F5)", ZONE_TITLE);
     }
     {
         const SDL_Rect swap {win.x + win.w - 56, win.y + 8, 24, 22};

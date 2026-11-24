@@ -15,6 +15,8 @@
 //   - the tilesets are the game's: tile type changes apply right away
 //   - game controllers work in them (EditorInput.h)
 // Maps and worlds saved in an editor show up in the game's lists afterwards.
+#include <string>
+
 class CResourceManager;
 
 namespace editors {
@@ -34,5 +36,19 @@ bool run(Editor editor);
 
 // Closes the running editor (as its own quit; nothing if none runs): a lobby's session that ended
 void requestClose();
+
+// Playing the map being edited ("Play this map", the level editor's F5): the editor closes, saving
+// its map to its scratch file as it always does, and asks for it to be played; the menus start a
+// match on it (player 1 alone, until they leave it), then open the editor again on it, the edits
+// still under the map's own name.
+// (the editor) the scratch file to play, as it closes; (the menus) taken once
+void requestTestPlay(const std::string& file);
+std::string takeTestPlayRequest();
+// (the menus) a test play runs: its match goes in no history and changes no settings
+void setTestPlaying(bool playing);
+bool testPlaying();
+// (the menus, back from it) the file the editor opens with, taken once by the editor as it starts
+void setTestPlayReturn(const std::string& file);
+std::string takeTestPlayReturn();
 
 } // namespace editors

@@ -95,7 +95,10 @@ void MenuState::StartGame()
 
     game_values.appstate = AppState::StartGame;
 
-    game_values.WriteConfig();
+#ifdef SMW_HAS_EDITORS
+    if (!editors::testPlaying())    //(a test play's players and mode aren't the settings)
+#endif
+        game_values.WriteConfig();
 
     //Load skins for players
     printf("Loading player skins...\n");

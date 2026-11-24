@@ -258,6 +258,16 @@ int editor_edit()
                             return SAVE;
                         }
 
+#ifdef SMW_EMBEDDED_EDITOR
+                    //Play this map: the editor closes (saving it to its scratch file, as always) and the
+                    //game plays it, then opens it here again (EditorLauncher.h). Not while editing together
+                    if (key == SDLK_F5 && editors::coedit::state() == editors::coedit::State::Off) {
+                        editors::requestTestPlay(writablePath(convertPath("maps/ZZleveleditor.map")));
+                        printf("testplay: edited %08x (tiles %08x types %08x blocks %08x)\n", g_map->tilesHash(), g_map->tilesHash(1), g_map->tilesHash(2), g_map->tilesHash(3));    //(the match's and the editor's after it: the same)
+                        return EDITOR_QUIT;
+                    }
+#endif
+
                     if (key == SDLK_F ) {
                             if (CheckKey(keystate, SDLK_LSHIFT) || CheckKey(keystate, SDLK_RSHIFT) || findstring.empty())
                                 return FIND;

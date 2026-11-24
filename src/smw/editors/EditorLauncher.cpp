@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <string>
+#include <utility>
 #include <vector>
 
 extern CGameValues game_values;
@@ -123,6 +124,42 @@ void freeKeptGraphics()
 {
     delete g_keptGraphics;
     g_keptGraphics = nullptr;
+}
+
+namespace {
+std::string g_testPlayRequest;
+std::string g_testPlayReturn;
+bool g_testPlaying = false;
+} // namespace
+
+void requestTestPlay(const std::string& file)
+{
+    g_testPlayRequest = file;
+}
+
+std::string takeTestPlayRequest()
+{
+    return std::exchange(g_testPlayRequest, std::string());
+}
+
+void setTestPlaying(bool playing)
+{
+    g_testPlaying = playing;
+}
+
+bool testPlaying()
+{
+    return g_testPlaying;
+}
+
+void setTestPlayReturn(const std::string& file)
+{
+    g_testPlayReturn = file;
+}
+
+std::string takeTestPlayReturn()
+{
+    return std::exchange(g_testPlayReturn, std::string());
 }
 
 void requestClose()

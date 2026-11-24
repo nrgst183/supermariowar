@@ -231,6 +231,8 @@ class CMap
         // The file of the latest loadMap()
         const std::string& loadedFile() const { return szLoadedFile; }
         void saveMap(const std::string& file);
+        // A hash of the tiles, their types and the blocks (tests: the same map after a save and load)
+        uint32_t tilesHash(int part = 0) const;    // part: 0 all, 1 tiles, 2 types, 3 blocks
 
         gfxSprite createThumbnailSurface(bool fUseClassicPack);
         void saveThumbnail(const std::string &file, bool fUseClassicPack);

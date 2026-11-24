@@ -266,6 +266,7 @@ std::array<std::string, INPUT_MAX_PLAYERS> g_skinOverride;
 // the simulation's, the same on every machine)
 std::array<short, INPUT_MAX_PLAYERS> g_cpuSkins {-1, -1, -1, -1};
 std::array<bool, INPUT_MAX_PLAYERS> g_wasCpu {};
+std::array<bool, INPUT_MAX_PLAYERS> g_cpuPicked {};    // the CPU's skin picked in the lobby (pickCpuSkin)
 uint32_t g_skinRandom = 0;
 
 uint32_t skinRandom()
@@ -281,17 +282,23 @@ uint32_t skinRandom()
 
 short cpuSkin(int slot)
 {
-    //(the setting off: the slot's own skin, as a human's)
-    if (!game_values.randomcpuskins || slot < 0 || slot >= INPUT_MAX_PLAYERS || !skinlist || skinlist->count() == 0)
+    if (slot < 0 || slot >= INPUT_MAX_PLAYERS || !skinlist || skinlist->count() == 0)
         return -1;
     const size_t s = static_cast<size_t>(slot);
     const NetLobby* lobby = NetGame::instance().lobby();
     const bool cpu = lobby ? lobby->slot(slot).kind == SlotKind::Cpu : game_values.playercontrol[slot] == 2;
     if (!cpu) {
         g_wasCpu[s] = false;
+        g_cpuPicked[s] = false;
         return -1;
     }
     const short count = static_cast<short>(skinlist->count());
+    //(one picked in the lobby: its own)
+    if (g_cpuPicked[s] && g_cpuSkins[s] >= 0 && g_cpuSkins[s] < count)
+        return g_cpuSkins[s];
+    //(the setting off: the slot's own skin, as a human's)
+    if (!game_values.randomcpuskins)
+        return -1;
     if (!g_wasCpu[s] || g_cpuSkins[s] < 0 || g_cpuSkins[s] >= count) {
         g_wasCpu[s] = true;
         //(not another CPU's, when there are skins enough)
@@ -307,6 +314,16 @@ short cpuSkin(int slot)
         g_cpuSkins[s] = pick;
     }
     return g_cpuSkins[s];
+}
+
+void pickCpuSkin(int slot, short skin)
+{
+    if (slot < 0 || slot >= INPUT_MAX_PLAYERS || skin < 0)
+        return;
+    const size_t s = static_cast<size_t>(slot);
+    g_cpuSkins[s] = skin;
+    g_wasCpu[s] = true;
+    g_cpuPicked[s] = true;
 }
 
 short matchSkinId(int slot)
