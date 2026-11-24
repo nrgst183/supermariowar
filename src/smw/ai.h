@@ -22,6 +22,8 @@ extern int stuck[4];
 enum ItemUse { ItemFeather, ItemLeaf, ItemPWings, ItemStatue, ItemKinds };
 extern int itemUses[ItemKinds][4];   // times the CPU used these items
 void count(ItemUse kind, int player);
+extern int flyThinks[4];     // turns flying (the P-Wings)
+extern int airThinks[4];     // turns in the air
 extern int reversals[4];     // turns that reversed the direction         // turns pushing left/right without moving
 extern int navTried[3];     // path moves: jump, drop, walk
 extern int navReached[3];
@@ -104,6 +106,10 @@ public:
     void SetPlayer(CPlayer * player) {
         pPlayer = player;
     }
+
+    // The P-Wings' flight lasts while jump is held: the jump the game lets go of for a CPU coming
+    // down (CPlayer::move) stays held for this one while it flies (its dives come down)
+    bool keepsFlying() const { return improved(); }
 
     virtual void Think(COutputControl * playerKeys);
 

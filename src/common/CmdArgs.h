@@ -46,6 +46,7 @@ struct AutoTestArgs {
     int prompts = -1;        // --at-prompts N: the "Button prompts" option (0 auto, 1 Xbox, 2 original Xbox)
     bool pad = false;
     bool perf = false;
+    int powerup = -1;        // --at-powerup N: every player (re)spawns with powerup N (3 feather, 8 P-Wings...: AI comparisons)
     int itemRespawn = -1;    // --at-item-respawn N: ticks before a ? block gives an item again (the option)       // --at-perf 1: each match's cost per tick and per frame (perf: lines)        // --at-pad 1: the prompts as for a controller (as if one had been used last)
     int replaySeeks = 0;     // --replay: jump to a random tick every N frames (tests the theater's seeking)
     bool norender = false;   // skip drawing and presenting (much faster under valgrind or sanitizers)

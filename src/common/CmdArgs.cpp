@@ -57,6 +57,7 @@ void print_help(const char* title, const char* version)
     printf("      --at-cpu-level <N>  CPU difficulty 0-4 (default: the configured one)\n");
     printf("      --at-ai-old <MASK>  Players whose bit is set use the original CPU logic (AI comparisons)\n");
     printf("      --at-ai-bench 1     Print kills, deaths and score per player at the end of each match\n");
+    printf("      --at-powerup <N>    Every player (re)spawns with powerup N (3 feather, 7 leaf, 8 P-Wings)\n");
     printf("      --at-realtime <N>   Run at normal speed and print the measured tick and render\n"
            "                          rates, with frame rate 1: VSync, 2: Uncapped, 3: 62.5 FPS\n");
     printf("      --at-resim <0|1>    1: run every gameplay tick as a re-simulation (sounds,\n"
@@ -176,6 +177,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-pad") at.pad = atoi(val.c_str()) != 0;
             else if (arg == "--at-perf") at.perf = atoi(val.c_str()) != 0;
             else if (arg == "--at-item-respawn") at.itemRespawn = atoi(val.c_str());
+            else if (arg == "--at-powerup") at.powerup = atoi(val.c_str());
             else if (arg == "--at-colors") at.colors = atoi(val.c_str());
             else if (arg == "--at-shot-ticks") at.shotTicks = atoi(val.c_str()) != 0;
             else if (arg == "--at-resim") at.resim = atoi(val.c_str()) != 0;

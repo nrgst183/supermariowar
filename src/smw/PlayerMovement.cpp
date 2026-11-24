@@ -1,3 +1,4 @@
+#include "ai.h"
 #include "CpuDriver.h"
 #include "rollback/Replay.h"
 
@@ -338,7 +339,7 @@ void CPlayer::move()
                     suicidetimer.reset();
             }
             //Let go of the jump button so that we clear "lockjump" so we can jump again when we hit the ground if we want to
-            if (inair && vely > 0 && (powerup != 3 || lockjump))
+            if (inair && vely > 0 && (powerup != 3 || lockjump) && !(flying && pPlayerAI->keepsFlying()))
                 playerKeys->game_jump.fDown = false;
         }
     }

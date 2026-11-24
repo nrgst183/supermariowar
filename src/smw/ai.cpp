@@ -60,6 +60,8 @@ void count(ItemUse kind, int player)
     if (cmd::g_autotest.aiBench && player >= 0 && player < 4)
         itemUses[kind][player]++;
 }
+int flyThinks[4] = {};
+int airThinks[4] = {};
 int reversals[4] = {};
 int navTried[3] = {};
 int navReached[3] = {};
@@ -82,6 +84,8 @@ void print()
         reversals[g] = 0;
         printf("aibench: items player %d %s feather %d leaf %d pwings %d statue %d\n", g, (cmd::g_autotest.aiLegacyMask & (1 << g)) ? "old" : "new",
             itemUses[ItemFeather][g], itemUses[ItemLeaf][g], itemUses[ItemPWings][g], itemUses[ItemStatue][g]);
+        printf("aibench: air player %d %s flying %d airborne %d\n", g, (cmd::g_autotest.aiLegacyMask & (1 << g)) ? "old" : "new", flyThinks[g], airThinks[g]);
+        flyThinks[g] = airThinks[g] = 0;
         for (int k = 0; k < ItemKinds; k++)
             itemUses[k][g] = 0;
     }
@@ -812,6 +816,10 @@ void CPlayerAI::UseStoredPowerup(COutputControl * playerKeys, PowerupType poweru
 // --at-ai-bench: direction reversals (dithering) and turns spent pushing against something without moving
 void CPlayerAI::CountBenchmarkStats(COutputControl * playerKeys)
 {
+    if (pPlayer->flying)
+        aibench::flyThinks[pPlayer->globalID]++;
+    if (pPlayer->inair)
+        aibench::airThinks[pPlayer->globalID]++;
     {
         static int benchLastDir[4] = {0, 0, 0, 0};
         const int d = playerKeys->game_left.fDown == playerKeys->game_right.fDown ? 0 : playerKeys->game_left.fDown ? -1 : 1;
@@ -1565,8 +1573,14 @@ void CPlayerAI::UseMovementItems(COutputControl * playerKeys, Action actionType,
         }
     }
 
-    if (!pPlayer->inair)
+    // P-Wings on the ground: a flight starts with a jump in the air, so to get somewhere far or high
+    // (or onto an opponent from above) we take off
+    if (!pPlayer->inair) {
+        if (pPlayer->powerup == 8 && hasTarget && actionType != ACTION_EVADE && !pPlayer->lockjump &&
+                (dy < -40 || dx < -96 || dx > 96))
+            jump = true;
         return;
+    }
 
     // In a fight we want to come down on them, so we aim above them
     const bool fight = actionType == ACTION_FIGHT && hasTarget;
@@ -1576,7 +1590,8 @@ void CPlayerAI::UseMovementItems(COutputControl * playerKeys, Action actionType,
         case 3: // Feather: an extra jump at the top of a jump
             if (pPlayer->extrajumps < game_values.featherjumps && pPlayer->vely > -1.0f) {
                 // ... to get above an opponent next to us (not one right over us), to a goal above
-                // us, or out of danger
+                // us, or out of danger. (Using it more measured worse in AI comparisons, everyone
+                // with a feather: more often near opponents, or to carry a jump further across)
                 const bool overThem = fight && dx > -110 && dx < 110 && (dx < -40 || dx > 40) && dy > -70 && dy < 16;
                 const bool upToGoal = actionType == ACTION_GOAL && targetAbove;
                 if (overThem || upToGoal || fallingIntoDanger) {
@@ -1593,18 +1608,29 @@ void CPlayerAI::UseMovementItems(COutputControl * playerKeys, Action actionType,
             }
             break;
 
-        case 8: // P-Wings: fly over an opponent and dive onto them, up to a goal, or out of danger
+        case 8: // P-Wings: fly over an opponent and dive onto them, to a goal, or out of danger
             if (pPlayer->flying) {
-                jump = true;   // letting go of jump ends the flight
-                if (hasTarget) {
+                jump = true;   // letting go of jump ends the flight (CPlayer::move keeps it held)
+                // Not above the top of the screen: staying there a few seconds kills (the out of
+                // arena timer)
+                const bool tooHigh = pPlayer->iy < 40;
+                if (iFallDanger != 0) {
+                    // Over something deadly: up, and the way out the fall check chose (Think)
+                    playerKeys->game_down.fDown = tooHigh;
+                } else if (hasTarget) {
+                    // An opponent: hold a little above them, then dive when over their head; a goal:
+                    // straight to it
                     const int wantDy = fight ? aboveDy : dy;
-                    const bool overHead = fight && dx > -16 && dx < 16 && dy > 8;
-                    playerKeys->game_down.fDown = !fallingIntoDanger && (overHead || wantDy > 24);
-                    playerKeys->game_left.fDown = dx < -8;
-                    playerKeys->game_right.fDown = dx > 8;
+                    const bool overHead = fight && dx > -20 && dx < 20 && dy > 8 && dy < 160;
+                    playerKeys->game_down.fDown = tooHigh || (!fallingIntoDanger && (overHead || wantDy > 16));
+                    playerKeys->game_left.fDown = dx < -6;
+                    playerKeys->game_right.fDown = dx > 6;
+                } else {
+                    playerKeys->game_down.fDown = tooHigh;   // nothing to go for: stay up, out of reach
                 }
-            } else if (pPlayer->extrajumps == 0 && pPlayer->vely > -2.0f &&
-                    (fallingIntoDanger || (hasTarget && (dy < -64 || (fight && (dx < -120 || dx > 120)))))) {
+            } else if (pPlayer->extrajumps == 0 &&
+                    (fallingIntoDanger || actionType == ACTION_EVADE ||
+                     (hasTarget && (dy < -24 || dx < -48 || dx > 48 || (fight && dy > -8))))) {
                 freshJump();
                 aibench::count(aibench::ItemPWings, pPlayer->globalID);
             }

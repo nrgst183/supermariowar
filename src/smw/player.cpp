@@ -305,6 +305,9 @@ void CPlayer::SetupNewPlayer()
 
     StripPowerups();
     ClearPowerupStates();
+    //(an AI comparison of an item's use: every player has it)
+    if (cmd::g_autotest.enabled && cmd::g_autotest.powerup >= 1 && cmd::g_autotest.powerup <= 8)
+        powerup = static_cast<short>(cmd::g_autotest.powerup);
 
     cape.reset(*this);
 
