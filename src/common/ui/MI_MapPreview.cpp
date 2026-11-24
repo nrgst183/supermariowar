@@ -1,5 +1,6 @@
 #include "MI_MapPreview.h"
 
+#include "DebugProfile.h"
 #include "GameValues.h"
 #include "map.h"
 #include "MapList.h"
@@ -39,6 +40,10 @@ struct PreviewJob {
     unsigned generation = 0;        // of g_map when it started (loaded since: not shown)
     SDL_Thread* thread = nullptr;
     std::atomic<bool> done {false};
+    // A newer choice came while it loaded: the worker stops at its next step, and it isn't shown
+    // (the newer one loads instead, not after it)
+    std::atomic<bool> stale {false};
+    int frames = 0;    // (the main thread's) the menu frames it has run for
 
     ~PreviewJob()
     {
@@ -67,25 +72,51 @@ int SDLCALL runPreviewJob(void* data)
 {
     PreviewJob& job = *static_cast<PreviewJob*>(data);
     setMapPreviewWorker(true);
-    //(below the game, where there are cores to spare. Not on the Xbox: on its single core a thread
-    //below the menu's waits until it sleeps, and its frames yield with Sleep(0), which only lets threads
-    //of its own priority or above run: the preview never came)
-#ifndef SMW_XBOX
+    //(below the game: it gets the time the menu doesn't use, without delaying its frames. On the
+    //Xbox's one core that's the frame's wait for the GPU, which sleeps (sdl_video.cpp); a frame that
+    //never waits starves it, and the menu finishes it then, ApplyBackgroundLoad)
     SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_LOW);
-#endif
 
-    job.map->loadMap(job.path, read_type_preview);
-    job.backgroundPath = mapBackgroundPath(*job.map);
-    const gfxSprite* background = loadedMapBackground(job.backgroundPath);
-    if (!background) {
-        job.backgroundImage = ImageLoader(job.backgroundPath).withoutColorKey().compact().create();
-        background = &job.backgroundImage;
+    //(its steps' times: the debug overlay's PV counters)
+    const uint64_t start = SDL_GetTicksNS();
+    takePreviewTilesetNs();
+    uint64_t mapDone = start, backgroundDone = start;
+    //(each step only if no newer choice came meanwhile: scrolling fast, the one settled on starts
+    //sooner)
+    [&job, &mapDone, &backgroundDone] {
+        job.map->loadMap(job.path, read_type_preview);
+        mapDone = SDL_GetTicksNS();
+        if (job.stale)
+            return;
+        job.backgroundPath = mapBackgroundPath(*job.map);
+        const gfxSprite* background = loadedMapBackground(job.backgroundPath);
+        if (!background) {
+            job.backgroundImage = ImageLoader(job.backgroundPath).withoutColorKey().compact().create();
+            background = &job.backgroundImage;
+        }
+        backgroundDone = SDL_GetTicksNS();
+        if (job.stale)
+            return;
+        job.map->preDrawPreviewBackground(*background, job.background, false);
+        if (job.stale)
+            return;
+        job.map->preDrawPreviewBlocks(job.blocks, false);
+        job.map->preDrawPreviewMapItems(job.background, false);
+        if (job.stale)
+            return;
+        job.map->preDrawPreviewForeground(job.foreground, false);
+        job.map->preDrawPreviewWarps(game_values.toplayer ? job.foreground : job.background, false);
+    }();
+    const uint64_t end = SDL_GetTicksNS();
+    const auto ms = [](uint64_t ns) { return static_cast<int>(ns / 1000000); };
+    const int tilesMs = ms(takePreviewTilesetNs());
+    if (!job.stale) {    //(a load cut short: not the time a preview takes)
+        prof::count(prof::Counter::PreviewTotal, ms(end - start));
+        prof::count(prof::Counter::PreviewMap, ms(mapDone - start));
+        prof::count(prof::Counter::PreviewBg, ms(backgroundDone - mapDone));
+        prof::count(prof::Counter::PreviewDraw, ms(end - backgroundDone));
+        prof::count(prof::Counter::PreviewTiles, tilesMs);
     }
-    job.map->preDrawPreviewBackground(*background, job.background, false);
-    job.map->preDrawPreviewBlocks(job.blocks, false);
-    job.map->preDrawPreviewMapItems(job.background, false);
-    job.map->preDrawPreviewForeground(job.foreground, false);
-    job.map->preDrawPreviewWarps(game_values.toplayer ? job.foreground : job.background, false);
 
     setMapPreviewWorker(false);
     job.done = true;
@@ -230,7 +261,10 @@ void MI_MapPreview::LoadCurrentMapInBackground()
     szMapName = maplist->currentShortmapname();
     const std::string path = maplist->currentFilename();
     if (s_job) {
-        //(one at a time: this one when it's done, unless another comes before)
+        //(one at a time: this one when it's done, unless another comes before. The one loading is
+        //out of date: it stops at its next step, and isn't shown)
+        if (s_job->owner == this && s_job->path != path)
+            s_job->stale = true;
         m_pendingPath = path;
         m_pendingName = szMapName;
         return;
@@ -266,8 +300,18 @@ void MI_MapPreview::StartBackgroundLoad(const std::string& path, const std::stri
 // then it went already), then the newest choice asked for meanwhile loads
 void MI_MapPreview::ApplyBackgroundLoad()
 {
+    //(a worker the menu's frames leave no time to, below their priority: finished now, the menu
+    //waiting for it, rather than a preview that never comes. About a second; on a PC it has a core)
+    constexpr int k_starvedFrames = 60;
+    if (s_job && s_job->owner == this && !s_job->done && ++s_job->frames >= k_starvedFrames)
+        waitForPreviewJob();
+
     if (s_job && s_job->owner == this && s_job->done) {
         waitForPreviewJob();    //(gone if out of date)
+        //(a newer choice came while it loaded: not shown (it may have stopped part way), the newer
+        //one loads now)
+        if (s_job && s_job->stale)
+            s_job.reset();
         if (s_job) {
             std::unique_ptr<PreviewJob> job = std::move(s_job);
             std::swap(surfaceMapBackground, job->background);

@@ -27,6 +27,13 @@ enum class Counter : int {
     Ticks,       // the ticks run this frame
     Objects,
     Eyecandy,
+    // The menus' last map preview loaded in the background, in ms (its worker: ui/MI_MapPreview.cpp)
+    PreviewTotal,   // from start to done (the worker runs only when the menu waits: on one core, the
+                    // rest went to the menu)
+    PreviewMap,     // the map file
+    PreviewBg,      // its background image
+    PreviewDraw,    // the layers drawn
+    PreviewTiles,   // of those, the tilesets' images loaded
     Count
 };
 

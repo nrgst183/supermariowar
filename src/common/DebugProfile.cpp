@@ -10,7 +10,7 @@ constexpr const char* k_sectionNames[] = {
 };
 static_assert(sizeof(k_sectionNames) / sizeof(k_sectionNames[0]) == static_cast<int>(Section::Count));
 
-constexpr const char* k_counterNames[] = {"TICKS", "OBJECTS", "EYECANDY"};
+constexpr const char* k_counterNames[] = {"TICKS", "OBJECTS", "EYECANDY", "PV TOTAL", "PV MAP", "PV BG", "PV DRAW", "PV TILES"};
 static_assert(sizeof(k_counterNames) / sizeof(k_counterNames[0]) == static_cast<int>(Counter::Count));
 } // namespace
 

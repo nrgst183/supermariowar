@@ -84,10 +84,23 @@ bool readPngSize(const fs::path& path, int& width, int& height)
     return width > 0 && height > 0;
 }
 
+// (the preview worker's time loading tileset images: see takePreviewTilesetNs)
+std::atomic<uint64_t> s_previewTilesetNs {0};
+
+struct PreviewImageTimer {
+    const uint64_t start = SDL_GetTicksNS();
+    ~PreviewImageTimer()
+    {
+        if (mapPreviewOnWorker())
+            s_previewTilesetNs += SDL_GetTicksNS() - start;
+    }
+};
+
 // `larger`: the image of the size above (loads it only if this one is missing)
 template <typename Larger>
 gfxSprite loadImageOrDownscale(const std::filesystem::path& path, Larger larger)
 {
+    const PreviewImageTimer timer;
     try {
         return ImageLoader(path).compact().create();
     } catch (const std::string& err) {
@@ -168,8 +181,10 @@ const gfxSprite& CTileset::sprite(DrawSize size) const
         case DrawSize::Ingame:
             break;
     }
-    if (!m_sprite_large)
+    if (!m_sprite_large) {
+        const PreviewImageTimer timer;
         m_sprite_large = ImageLoader(m_tileset_dir / "large.png").compact().create();
+    }
     return m_sprite_large;
 }
 
@@ -362,6 +377,11 @@ void setMapPreviewRunning(bool running)
     s_previewRunning = running;
 }
 
+uint64_t takePreviewTilesetNs()
+{
+    return s_previewTilesetNs.exchange(0);
+}
+
 CTileset* CTilesetManager::tileset(size_t index)
 {
     //(the main thread: a preview loading in the background uses the tilesets; it finishes first)
@@ -409,10 +429,15 @@ void CTilesetManager::trackUse(size_t index)
 
     // Over the budget: unload the least recently used tilesets that the
     // current map doesn't use. The callers only keep a tileset pointer for the
-    // call at hand, so this is safe here.
+    // call at hand, so this is safe here. (The budget is only what's kept of
+    // the others: counting the current map's too, a map whose own were over it
+    // unloaded every other one at each switch between two tilesets, and the
+    // menus' previews loaded them again and again.)
     size_t total = 0;
-    for (size_t i : m_recently_used)
-        total += m_tilesets[i].loadedBytes();
+    for (size_t i : m_recently_used) {
+        if (m_last_map[i] != m_map && !m_tilesets[i].isModified())
+            total += m_tilesets[i].loadedBytes();
+    }
     for (auto it = m_recently_used.begin(); total > MAX_LOADED_BYTES && it != m_recently_used.end();) {
         const size_t i = *it;
         if (m_last_map[i] == m_map || m_tilesets[i].isModified()) {

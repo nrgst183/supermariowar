@@ -94,9 +94,10 @@ bool createDevice(SDL_Renderer* renderer)
     //(16 bits a pixel, as the original game's screen (SDL 1.2's libSDLx, 16-bit): the front and back
     //buffers in half the memory of the 64 MB; the frame is drawn into them dithered)
     pp.BackBufferFormat = D3DFMT_R5G6B5;
-    //(double buffering: one back buffer, as a trial for the 64 MB: the 16-bit buffers cost little,
-    //but one fewer. Triple buffering (2) let a frame that took a little long be made up by the one
-    //queued instead of waiting for the next refresh)
+    //(double buffering: one back buffer, 600 KB fewer of the 64 MB; tried on the console against
+    //triple, it looked as smooth. The present's fence waits for the refresh each frame (asleep:
+    //the map preview worker gets that time), and a frame a little over 16.7 ms takes two. Triple
+    //buffering (2, the disc's --xbox-buffers 2) would let the one queued make that up)
     pp.BackBufferCount = static_cast<UINT>(g_sdlx_wanted_back_buffers);
     pp.Windowed = FALSE;
     pp.EnableAutoDepthStencil = FALSE;
@@ -489,8 +490,10 @@ bool SDL_RenderPresent(SDL_Renderer* renderer)
     // The game draws the next frame into the memory the GPU just showed: wait
     // until the GPU has read it (this is also where the wait for the vertical
     // blank ends up)
-    if (fence)
-        D3DDevice_BlockOnFence(fence);
+    //(asleep, not D3D's BlockOnFence, which spins: the menus' map preview worker, below the game's
+    //priority on the one core, gets this wait's time; it ends within a millisecond of the fence)
+    while (fence && D3DDevice_IsFencePending(fence))
+        Sleep(1);
     const Uint64 swap_end = sdlx_cycles();
     sdlx_overlay_presented(swap_end - copy_start);
     g_sdlx_profile.copy = g_sdlx_profile.copy + (swap_start - copy_start);

@@ -48,6 +48,25 @@ struct MIX_Audio {
     long oggOffset = 0;
 };
 
+// A Vorbis track's decoding, ahead of its mixing. The decoder reads its file as it goes (a disk read
+// now and then, a seek at each loop), so it runs on the mixer thread outside the lock (refillStreams),
+// into this ring of decoded frames that the mixing reads under the lock: the game's thread, taking
+// the lock to play a sound or ask about a track, never waits for the disk. Made on the game's thread
+// with its first frames decoded, before a track has it; from then on only the mixer thread uses it.
+// The track and a refill under way each hold a reference; the last one closes it.
+struct VorbisStream {
+    static constexpr int k_frames = 4096;    // ~93 ms (a power of two)
+
+    stb_vorbis* decoder = nullptr;    // (it closes the file)
+    int rate = 44100;
+    Sint64 loops = 0;     // the extra loops left (-1: forever): the decoder starts over itself
+    bool ended = false;   // nothing more to decode
+    int read = 0;         // the ring's first frame not mixed yet
+    int count = 0;        // and how many are decoded from there
+    volatile LONG refs = 1;
+    Sint16 ring[k_frames * 2];
+};
+
 struct MIX_Track {
     MIX_Mixer* mixer = nullptr;
     MIX_Audio* audio = nullptr;
@@ -65,10 +84,8 @@ struct MIX_Track {
     Uint64 pos = 0;
     Uint32 step = 1u << 16;
 
-    // Vorbis decoding
-    stb_vorbis* decoder = nullptr;
-    std::vector<Sint16> chunk;  // decoded stereo frames
-    int chunk_frames = 0;
+    // Vorbis decoding (decoded ahead, VorbisStream)
+    VorbisStream* stream = nullptr;
 };
 
 struct MIX_Mixer {
@@ -81,6 +98,7 @@ constexpr int k_rate = 44100;
 constexpr int k_packets = 8;
 constexpr int k_packet_frames = 512;       // ~11.6 ms per packet
 constexpr int k_vorbis_chunk_frames = 1024;
+constexpr int k_ring_frames = VorbisStream::k_frames;
 
 CRITICAL_SECTION g_lock;
 bool g_lock_ready = false;
@@ -131,13 +149,18 @@ float effectiveGain(const MIX_Track* track)
     return gain;
 }
 
+void releaseStream(VorbisStream* stream)
+{
+    if (stream && InterlockedDecrement(&stream->refs) == 0) {
+        stb_vorbis_close(stream->decoder);
+        delete stream;
+    }
+}
+
 void closeDecoder(MIX_Track* track)
 {
-    if (track->decoder) {
-        stb_vorbis_close(track->decoder);
-        track->decoder = nullptr;
-    }
-    track->chunk_frames = 0;
+    releaseStream(track->stream);
+    track->stream = nullptr;
 }
 
 // Stops a track and queues its callback; call with the lock held
@@ -172,7 +195,77 @@ stb_vorbis* openVorbis(const MIX_Audio& audio, int* error)
     return decoder;
 }
 
-bool startLocked(MIX_Track* track, Sint64 loops)
+// Decodes into the ring until it holds `upTo` frames (or is full), straight into its free part,
+// starting over at the end while loops are left. Not under the lock: the mixer thread's (a stream a
+// track has), or the game's (one no track has yet)
+void decodeAhead(VorbisStream* stream, int upTo)
+{
+    if (upTo > k_ring_frames)
+        upTo = k_ring_frames;
+    int restarts = 0;
+    while (!stream->ended && stream->count < upTo) {
+        const int write = (stream->read + stream->count) & (k_ring_frames - 1);
+        int n = SDL_min(k_ring_frames - write, upTo - stream->count);
+        n = SDL_min(n, k_vorbis_chunk_frames);
+        const int frames = stb_vorbis_get_samples_short_interleaved(stream->decoder, 2, &stream->ring[write * 2], n * 2);
+        if (frames > 0) {
+            stream->count += frames;
+            restarts = 0;
+            continue;
+        }
+        //(the end: from the start again while loops are left; one that gives nothing even from
+        //its start has ended)
+        if (stream->loops == 0 || ++restarts > 1) {
+            stream->ended = true;
+            break;
+        }
+        if (stream->loops > 0)
+            stream->loops--;
+        stb_vorbis_seek_start(stream->decoder);
+    }
+}
+
+// A Vorbis track's stream, its file opened and its first frames decoded (the game's thread, before
+// the lock: the mixing doesn't wait for that, and starts with them, not a packet of silence)
+VorbisStream* openStream(const MIX_Audio& audio, Sint64 loops, int* error)
+{
+    stb_vorbis* decoder = openVorbis(audio, error);
+    if (!decoder)
+        return nullptr;
+    auto* stream = new VorbisStream();
+    stream->decoder = decoder;
+    stream->rate = static_cast<int>(stb_vorbis_get_info(decoder).sample_rate);
+    stream->loops = loops < -1 ? -1 : loops;
+    decodeAhead(stream, k_vorbis_chunk_frames * 2);
+    return stream;
+}
+
+// Refills the Vorbis tracks' rings (the mixer thread): the streams are taken under the lock, and
+// decoded outside it
+void refillStreams()
+{
+    VorbisStream* streams[16];
+    int n = 0;
+    {
+        Lock lock;
+        if (!g_mixer)
+            return;
+        for (MIX_Track* track : g_mixer->tracks) {
+            VorbisStream* stream = track->stream;
+            if (stream && !stream->ended && k_ring_frames - stream->count >= k_vorbis_chunk_frames && n < 16) {
+                InterlockedIncrement(&stream->refs);
+                streams[n++] = stream;
+            }
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        decodeAhead(streams[i], k_ring_frames);
+        releaseStream(streams[i]);
+    }
+}
+
+// `stream`: the track's Vorbis stream if its audio is Vorbis (openStream), taken over
+bool startLocked(MIX_Track* track, Sint64 loops, VorbisStream* stream, int error)
 {
     closeDecoder(track);
     track->generation++;
@@ -182,18 +275,16 @@ bool startLocked(MIX_Track* track, Sint64 loops)
     track->loops = loops < -1 ? -1 : loops;
 
     MIX_Audio* audio = track->audio;
+    if (!audio || !audio->vorbis)
+        releaseStream(stream);
     if (!audio)
         return SDL_SetError("The track has no audio");
 
     if (audio->vorbis) {
-        int error = 0;
-        track->decoder = openVorbis(*audio, &error);
-        if (!track->decoder)
+        if (!stream)
             return SDL_SetError("Couldn't decode Ogg Vorbis audio (error %d)", error);
-        const stb_vorbis_info info = stb_vorbis_get_info(track->decoder);
-        track->step = static_cast<Uint32>((static_cast<Uint64>(info.sample_rate) << 16) / k_rate);
-        track->chunk.resize(static_cast<size_t>(k_vorbis_chunk_frames) * 2);
-        track->chunk_frames = 0;
+        track->stream = stream;
+        track->step = static_cast<Uint32>((static_cast<Uint64>(stream->rate) << 16) / k_rate);
     } else {
         if (audio->frames == 0)
             return SDL_SetError("The audio is empty");
@@ -203,15 +294,8 @@ bool startLocked(MIX_Track* track, Sint64 loops)
     return true;
 }
 
-// Decodes the next chunk of a Vorbis track; false at the end of the stream
-bool refillVorbis(MIX_Track* track)
-{
-    const int frames = stb_vorbis_get_samples_short_interleaved(track->decoder, 2, track->chunk.data(), k_vorbis_chunk_frames * 2);
-    track->chunk_frames = frames > 0 ? frames : 0;
-    return frames > 0;
-}
-
-// Loops back to the start or stops at the end; false if the track stopped
+// Loops back to the start or stops at the end (PCM; a Vorbis stream loops itself); false if the
+// track stopped
 bool handleEnd(MIX_Track* track)
 {
     if (track->loops == 0) {
@@ -221,10 +305,6 @@ bool handleEnd(MIX_Track* track)
     if (track->loops > 0)
         track->loops--;
     track->pos = 0;
-    if (track->decoder) {
-        stb_vorbis_seek_start(track->decoder);
-        track->chunk_frames = 0;
-    }
     return true;
 }
 
@@ -237,21 +317,20 @@ void mixTrack(MIX_Track* track, int* out, int frames)
         int left = 0, right = 0;
 
         if (audio->vorbis) {
-            size_t idx = static_cast<size_t>(track->pos >> 16);
-            int attempts = 0;
-            while (idx >= static_cast<size_t>(track->chunk_frames)) {
-                track->pos -= static_cast<Uint64>(track->chunk_frames) << 16;
-                if (!refillVorbis(track)) {
-                    if (++attempts > 2 || !handleEnd(track))
-                        break;
-                    continue;
-                }
-                idx = static_cast<size_t>(track->pos >> 16);
-            }
-            if (!track->playing || idx >= static_cast<size_t>(track->chunk_frames))
+            //(the frames decoded ahead, from the ring's first; pos is from there)
+            const VorbisStream* stream = track->stream;
+            if (!stream)
                 break;
-            left = track->chunk[idx * 2];
-            right = track->chunk[idx * 2 + 1];
+            const size_t idx = static_cast<size_t>(track->pos >> 16);
+            if (idx >= static_cast<size_t>(stream->count)) {
+                //(all mixed: the end if there's no more, else not decoded yet (silence until it is))
+                if (stream->ended)
+                    stopLocked(track);
+                break;
+            }
+            const int at = (stream->read + static_cast<int>(idx)) & (k_ring_frames - 1);
+            left = stream->ring[at * 2];
+            right = stream->ring[at * 2 + 1];
         } else {
             size_t idx = static_cast<size_t>(track->pos >> 16);
             if (idx >= audio->frames) {
@@ -270,6 +349,14 @@ void mixTrack(MIX_Track* track, int* out, int frames)
         out[i * 2] += (left * gain) >> 8;
         out[i * 2 + 1] += (right * gain) >> 8;
         track->pos += track->step;
+    }
+
+    // The ring's frames mixed are free for decoding again
+    if (VorbisStream* stream = track->stream) {
+        const int used = static_cast<int>(std::min<Uint64>(track->pos >> 16, static_cast<Uint64>(stream->count)));
+        stream->read = (stream->read + used) & (k_ring_frames - 1);
+        stream->count -= used;
+        track->pos -= static_cast<Uint64>(used) << 16;
     }
 }
 
@@ -298,6 +385,9 @@ DWORD WINAPI mixerThread(LPVOID)
             if (g_packet_status[i] == static_cast<DWORD>(XMEDIAPACKET_STATUS_PENDING))
                 continue;
 
+            //(the music decoded ahead, outside the lock: its file is read here, not while the
+            //game's thread may be waiting for the lock)
+            refillStreams();
             mixPacket(g_packet_data[i]);
 
             XMEDIAPACKET packet;
@@ -885,8 +975,21 @@ bool MIX_PlayTrack(MIX_Track* track, SDL_PropertiesID options)
     if (!track)
         return SDL_SetError("Parameter 'track' is invalid");
     const Sint64 loops = options ? SDL_GetNumberProperty(options, MIX_PROP_PLAY_LOOPS_NUMBER, 0) : 0;
+    //(Vorbis: its file opened and its first frames decoded before the lock, which the mixer thread
+    //would wait on meanwhile. The audio is the game thread's to change, as is this call)
+    MIX_Audio* audio = nullptr;
+    {
+        Lock lock;
+        audio = track->audio;
+    }
+    int error = 0;
+    VorbisStream* stream = audio && audio->vorbis ? openStream(*audio, loops, &error) : nullptr;
     Lock lock;
-    return startLocked(track, loops);
+    if (track->audio != audio) {
+        releaseStream(stream);
+        stream = track->audio && track->audio->vorbis ? openStream(*track->audio, loops, &error) : nullptr;
+    }
+    return startLocked(track, loops, stream, error);
 }
 
 bool MIX_StopTrack(MIX_Track* track, Sint64 fade_out_frames)

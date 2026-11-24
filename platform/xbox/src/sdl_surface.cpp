@@ -8,9 +8,10 @@
 // rules follow SDL3: color key first, then the blend mode with the alpha
 // modulation.
 
+#include <xtl.h>
+
 #include "sdl_internal.h"
 
-#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -187,14 +188,16 @@ struct SourceRows {
     Uint32* buffer = local;
     Uint32* heap = nullptr;
 
-    explicit SourceRows(const SDL_Surface* s)
+    //(`width`: the most pixels a row is asked for: the blit's, not the surface's; a wide sheet's
+    //blits mostly fit the local buffer, no allocation each)
+    SourceRows(const SDL_Surface* s, int width)
         : surface(s)
         , wide(is16(s->format))
     {
         if (wide) {
             table = &widenTable(s->format);
-            if (s->w > 1024) {
-                heap = static_cast<Uint32*>(malloc(static_cast<size_t>(s->w) * 4));
+            if (width > 1024) {
+                heap = static_cast<Uint32*>(malloc(static_cast<size_t>(width) * 4));
                 buffer = heap ? heap : local;
             }
         }
@@ -412,11 +415,21 @@ struct LiveSurface {
 constexpr int k_live = 4096;
 LiveSurface g_live[k_live];
 int g_live_count = 0;
-std::atomic_flag g_live_lock = ATOMIC_FLAG_INIT;    //(the map preview's worker makes surfaces too)
+//(the map preview's worker makes surfaces too. A critical section, not a spin: the worker runs at a
+//low priority on the one core, so the game's thread spinning on the worker's lock never let it run
+//to give it back)
+CRITICAL_SECTION& liveLock()
+{
+    static struct Section {
+        CRITICAL_SECTION section;
+        Section() { InitializeCriticalSection(&section); }
+    } s;
+    return s.section;
+}
 
 struct LiveLock {
-    LiveLock() { while (g_live_lock.test_and_set(std::memory_order_acquire)) {} }
-    ~LiveLock() { g_live_lock.clear(std::memory_order_release); }
+    LiveLock() { EnterCriticalSection(&liveLock()); }
+    ~LiveLock() { LeaveCriticalSection(&liveLock()); }
 };
 
 void trackSurface(SDL_Surface* surface)
@@ -564,7 +577,7 @@ SDL_Surface* SDL_ConvertSurface(SDL_Surface* surface, SDL_PixelFormat format)
         return nullptr;
     }
     const bool srcAlpha = hasAlpha(surface->format);
-    SourceRows rows(surface);
+    SourceRows rows(surface, surface->w);
     for (int y = 0; y < surface->h; y++) {
         const Uint32* s = rows.row(y, 0, surface->w);
         Uint32* d = rowPtr(out, y);
@@ -827,7 +840,7 @@ bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst
     if (dst->format == SDL_PIXELFORMAT_ARGB4444)
         return SDL_SetError("Can't draw on an ARGB4444 surface");
     const PixelOp op = makePixelOp(src, dst);
-    SourceRows rows(src);
+    SourceRows rows(src, area.w);
 
     if (is16(dst->format)) {
         //A 16-bit target (the Xbox's screen and map layers, ARGB1555, as the original game drew):
@@ -839,8 +852,9 @@ bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst
         auto srcRow16 = [&](int y) {
             return reinterpret_cast<const Uint16*>(static_cast<const Uint8*>(src->pixels) + static_cast<size_t>(area.sy + y) * src->pitch) + area.sx;
         };
-        // 16 bits onto 16: a copy is the rows' bytes; a sprite (opaque or see-through) a bit test
-        if (src1555 && !op.colorkey && op.alpha_mod == 255) {
+        // 16 bits onto 16: a copy is the rows' bytes (an alpha modulation without blending is one
+        // too, as in SDL); a sprite (opaque or see-through) a bit test
+        if (src1555 && !op.colorkey && (op.alpha_mod == 255 || !op.blend)) {
             if (!op.blend) {
                 for (int y = 0; y < area.h; y++)
                     memcpy(dstRow(y), srcRow16(y), static_cast<size_t>(area.w) * 2);
@@ -853,6 +867,35 @@ bool SDL_BlitSurface(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surface* dst
                         if (p & 0x8000u)
                             d[x] = p;
                     }
+                }
+            }
+            return true;
+        }
+        // 16 bits onto 16 with an alpha modulation (the screen fades, the menus' backdrop fading in,
+        // see-through sprites): the opaque pixels all get the same alpha, the channels blended in
+        // place (red and blue in one multiply, 16 bits apart so they can't carry into each other),
+        // not widened to 32 bits and packed back. Within a level of the pixel rules' result
+        if (src1555 && !op.colorkey && op.blend) {
+            const Uint32 sa = op.alpha_mod;
+            if (sa == 0)
+                return true;
+            const Uint32 a = sa + (sa >> 7), ia = 256 - a;
+            //(the target's alpha bit, as the pixel rules have it: set if it was, or if the source's
+            //alpha is at least half)
+            const Uint32 alphaBit = sa >= 128 ? 0x8000u : 0u;
+            for (int y = 0; y < area.h; y++) {
+                const Uint16* s = srcRow16(y);
+                Uint16* d = dstRow(y);
+                for (int x = 0; x < area.w; x++) {
+                    const Uint32 p = s[x];
+                    if (!(p & 0x8000u))
+                        continue;
+                    const Uint32 q = d[x];
+                    const Uint32 rbS = ((p & 0x7C00u) << 6) | (p & 0x001Fu);    // r 16-20, b 0-4
+                    const Uint32 rbD = ((q & 0x7C00u) << 6) | (q & 0x001Fu);
+                    const Uint32 rb = ((rbS * a + rbD * ia) >> 8) & 0x001F001Fu;
+                    const Uint32 g = (((p >> 5) & 31u) * a + ((q >> 5) & 31u) * ia) >> 8;
+                    d[x] = static_cast<Uint16>(((rb >> 6) & 0x7C00u) | (rb & 0x001Fu) | (g << 5) | (q & 0x8000u) | alphaBit);
                 }
             }
             return true;
@@ -1026,7 +1069,7 @@ bool SDL_BlitSurfaceScaled(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surfac
     if (dst->format == SDL_PIXELFORMAT_ARGB4444)
         return SDL_SetError("Can't draw on an ARGB4444 surface");
     const PixelOp op = makePixelOp(src, dst);
-    SourceRows rows(src);
+    SourceRows rows(src, sr.w);
 
     const SDL_Rect& clip = dst->clip_rect;
     const int dx0 = SDL_max(dr.x, clip.x), dy0 = SDL_max(dr.y, clip.y);
@@ -1046,6 +1089,15 @@ bool SDL_BlitSurfaceScaled(SDL_Surface* src, const SDL_Rect* srcrect, SDL_Surfac
         if (is16(dst->format)) {
             const Widen& wd = widenTable(dst->format);
             Uint16* d = reinterpret_cast<Uint16*>(static_cast<Uint8*>(dst->pixels) + static_cast<size_t>(y) * dst->pitch);
+            if (!op.blend && !op.colorkey) {
+                //(a copy: the target's pixels aren't read)
+                for (int x = dx0; x < dx1; x++, fx += stepX) {
+                    int sx = sr.x + static_cast<int>(fx >> 16);
+                    if (sx >= sr.x + sr.w) sx = sr.x + sr.w - 1;
+                    d[x] = pack1555(op.src_alpha ? s[sx] : s[sx] | 0xFF000000u);
+                }
+                continue;
+            }
             for (int x = dx0; x < dx1; x++, fx += stepX) {
                 int sx = sr.x + static_cast<int>(fx >> 16);
                 if (sx >= sr.x + sr.w) sx = sr.x + sr.w - 1;

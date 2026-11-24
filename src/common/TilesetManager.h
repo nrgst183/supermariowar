@@ -140,3 +140,5 @@ void bumpMainMapGeneration();
 void setMapPreviewWorker(bool onThisThread);
 void setMapPreviewWaiter(void (*wait)());
 void setMapPreviewRunning(bool running);   // (set by the main thread before the worker starts)
+// The worker's time loading tileset images since the last call (the debug overlay's PV TILES)
+uint64_t takePreviewTilesetNs();
