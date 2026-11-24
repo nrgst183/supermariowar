@@ -285,9 +285,9 @@ void UI_OnlineLobbyMenu::Sync()
     ApplyLayout(host, joining);
     if (!joining && !m_currentFocus && m_dialog == Dialog::None)
         Focus(m_page == Page::Team ? static_cast<UI_Control*>(miTeam) : FirstOption());
-    //(no players of ours to pick a character for, only CPUs: nothing to do in the team box, it's
-    //ready; the buttons have the focus)
-    if (inLobby && m_page == Page::Team && m_dialog == Dialog::None && m_currentFocus == miTeam && !miTeam->hasOwnPlayers()) {
+    //(no players of ours to pick a character for, and no CPUs whose skins we set: nothing to do in
+    //the team box, it's ready; the buttons have the focus)
+    if (inLobby && m_page == Page::Team && m_dialog == Dialog::None && m_currentFocus == miTeam && !miTeam->hasPicks()) {
         miTeam->Lock(true);
         Focus(miContinueButton);
     }
@@ -406,7 +406,7 @@ void UI_OnlineLobbyMenu::Sync()
         if (host) {
             //(the host's own ready is only on its own screen: the lobby counts the others; its players
             //not set yet: say so, not "everyone")
-            const bool meReady = !miTeam->hasOwnPlayers() || miTeam->locked();
+            const bool meReady = !miTeam->hasPicks() || miTeam->locked();
             if (canStart && !meReady) {
                 status = "Everyone else is ready. Press A when you're set";
                 tone = Tone::Info;

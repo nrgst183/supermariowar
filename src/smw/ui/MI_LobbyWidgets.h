@@ -77,6 +77,9 @@ public:
     void Lock(bool lock);
     /// Whether this computer has players in the lobby to pick a character and team for (none: only CPUs)
     bool hasOwnPlayers() const;
+    /// Whether there is anything to pick in the box: its own players, or CPUs whose skins it sets (a local
+    /// game's host with only CPUs sets theirs; none: the box is ready by itself)
+    bool hasPicks() const { return hasOwnPlayers() || !pickableCpus().empty(); }
     /// Called when the focus should go to the buttons under the box
     void SetLeaveDown(std::function<void()> leave) { m_leaveDown = std::move(leave); }
     /// What the local players can do now, for the hint line

@@ -204,6 +204,8 @@ std::string MI_OnlineTeamSelect::hint() const
         return lobby->isHost() ? "Select Continue to choose the match, Cancel to unready" : "Waiting for the host. Cancel to unready";
     if (m_cpuEdit >= 0)
         return "Player 1 picks CPU " + std::to_string(m_cpuEdit + 1) + "'s skin and team";
+    if (!hasOwnPlayers())
+        return "Select to pick the CPUs' skins and teams";
     return "Up/Down: skin  Left/Right: team  Select: ready";
 }
 
@@ -223,6 +225,8 @@ std::vector<prompts::Prompt> MI_OnlineTeamSelect::prompts() const
         a = "CPU skins";
     else if (m_cpuEdit >= 0)
         a = m_cpuEdit == cpus.back() ? "ready" : "next CPU";
+    if (m_cpuEdit < 0 && !hasOwnPlayers())    //(only CPUs: nothing of its own to change)
+        return {{{Pad::A}, {menuKey(prompts::MENU_SELECT)}, a}, {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "leave"}};
     std::vector<prompts::Prompt> row = {
         {{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "skin"},
         {{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "team"},
@@ -522,6 +526,17 @@ void MI_OnlineTeamSelect::Draw()
 
     // The teams: the players in them, in columns
     const int frame = (m_tick / 8) & 1;
+    //The CPU player 1 sets now: the original Players field's box behind it (its arrows: up/down the skin,
+    //left/right the team), under all the sprites (it is bigger than a row)
+    for (int team = 0, row = 0; m_cpuEdit >= 0 && have[m_cpuEdit] && team < 4; team++, row = 0) {
+        for (int s = 0; s < 4; s++) {
+            if (!have[s] || info[s].team != team)
+                continue;
+            if (s == m_cpuEdit)
+                rm->menu_player_select.draw(team * 96 + 25 + m_pos.x, row * 36 + 29 + m_pos.y, {32 + ((m_tick / 8) & 3) * 78, 128, 78, 78});
+            ++row;
+        }
+    }
     for (int team = 0; team < 4; team++) {
         int row = 0;
         for (int s = 0; s < 4; s++) {
@@ -532,13 +547,6 @@ void MI_OnlineTeamSelect::Draw()
             if (const gfxSprite* sprite = skinFrame(s, info[s], info[s].ready && !setting ? 0 : frame))
                 sprite->draw(sx, sy, {0, 0, 32, 32});
             rm->spr_menu_boxed_numbers.draw(team * 96 + 44 + m_pos.x, row * 36 + 72 + m_pos.y, {s * 16, info[s].color * 16, 16, 16});
-            if (setting) {
-                //Who sets it: a "P1" tag over it, bobbing
-                const int bob = (m_tick / 10) & 1;
-                prompts::fill(sx + 18, sy - 6 - bob, 22, 14, BLACK);
-                prompts::fill(sx + 19, sy - 5 - bob, 20, 12, {248, 200, 40, 255});
-                rm->menu_font_small.drawCentered(sx + 29, sy - 5 - bob, "P1");
-            }
             ++row;
         }
     }

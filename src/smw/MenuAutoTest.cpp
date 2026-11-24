@@ -1602,9 +1602,15 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                 }
                 break;
             case 40: shot("c1_lobby_cpus_only"); break;
-            case 45: return MENU_CODE_ONLINE_MATCH_SETTINGS;
-            case 60: return MENU_CODE_MATCH_SELECTION_START;
-            case 75:
+            //(A: on to the CPUs' skins; down: CPU 1's next skin; A: CPU 2)
+            case 42: game_values.playerInput.outputControls[0].menu_select.fPressed = true; break;
+            case 46: game_values.playerInput.outputControls[0].menu_down.fPressed = true; break;
+            case 60: shot("c2_cpu_skin"); break;
+            case 62: game_values.playerInput.outputControls[0].menu_select.fPressed = true; break;
+            case 75: shot("c3_next_cpu"); break;
+            case 85: return MENU_CODE_ONLINE_MATCH_SETTINGS;
+            case 100: return MENU_CODE_MATCH_SELECTION_START;
+            case 115:
                 printf("shots: CPUs only: %d teams, players %d %d %d %d\n", g_sim.score_cnt, game_values.playercontrol[0],
                     game_values.playercontrol[1], game_values.playercontrol[2], game_values.playercontrol[3]);
                 step = 1000;

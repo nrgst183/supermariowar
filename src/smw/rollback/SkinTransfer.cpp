@@ -196,6 +196,12 @@ void SkinExchange::setLocal(const std::vector<LocalSkinFile>& skins)
         }
         m_localRef.push_back(ref);
     }
+    //(skins scrolled past: their uploads stop, not to hold up the one chosen now; the peers ignore them)
+    m_uploads.erase(std::remove_if(m_uploads.begin(), m_uploads.end(),
+                        [&](const Upload& up) {
+                            return std::none_of(m_localRef.begin(), m_localRef.end(), [&](const SkinRef& ref) { return ref.hash == up.hash; });
+                        }),
+        m_uploads.end());
     m_infoSentMask = 0;
 }
 
