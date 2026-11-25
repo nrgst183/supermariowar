@@ -1593,6 +1593,36 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
+    //--at-role lobbyup: Start's lobby with this machine's player and two CPUs: A (ready, down to the
+    //buttons), up (the CPUs' skins: the first), down (its next skin), A (the next CPU), A (ready again)
+    if (at.shotsRole == "lobbyup" && step == 1) {
+        rollback::NetGame& net = rollback::NetGame::instance();
+        COutputControl& keys = game_values.playerInput.outputControls[0];
+        switch (t) {
+            case 1: return MENU_CODE_TO_LOCAL_LOBBY;
+            case 20:
+                if (net.lobby())
+                    net.lobby()->setCpuCount(2);
+                break;
+            case 40: shot("u1_lobby"); break;
+            case 42: keys.menu_select.fPressed = true; break;
+            case 55: shot("u2_ready_down"); break;
+            case 57: keys.menu_up.fPressed = true; break;
+            case 70: shot("u3_up_cpu1"); break;
+            case 72: keys.menu_down.fPressed = true; break;
+            case 85: shot("u4_cpu1_skin"); break;
+            case 87: keys.menu_select.fPressed = true; break;
+            case 100: shot("u5_cpu2"); break;
+            case 102: keys.menu_select.fPressed = true; break;
+            case 115: shot("u6_ready_again"); break;
+            case 120:
+                step = 1000;
+                t = 0;
+                break;
+        }
+        return MENU_CODE_NONE;
+    }
+
     //--at-role cpulobby: Start's lobby with no players of this machine's and four CPUs, then their match
     if (at.shotsRole == "cpulobby" && step == 1) {
         rollback::NetGame& net = rollback::NetGame::instance();
