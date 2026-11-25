@@ -308,6 +308,40 @@ void CMap::drawBackgroundLayers(const gfxSprite& background, gfxSprite& mapspr, 
     SDL_SetSurfaceBlendMode(mapspr.getSurface(), SDL_BLENDMODE_NONE);
 }
 
+bool CMap::redrawCell(short x, short y, const gfxSprite& background, gfxSprite& backmap, gfxSprite& frontmap)
+{
+    for (short layer = 0; layer < MAPLAYERS; layer++) {
+        if (mapdata[x][y][layer].iID == TILESETANIMATED)
+            return false;
+    }
+    const SDL_Rect cell {x * TILESIZE, y * TILESIZE, TILESIZE, TILESIZE};
+    auto drawLayer = [&](gfxSprite& target, int layer) {
+        const TilesetTile& tile = mapdata[x][y][layer];
+        if (tile.iID >= 0)
+            g_tilesetmanager->Draw(target.getSurface(), tile.iID, DrawSize::Ingame, tile.iCol, tile.iRow, x, y);
+    };
+
+    //The back picture: the background's piece (its current frame), the back layers (all four without
+    //the top layer in front)
+    const SDL_Rect frame = BackgroundAnimation::frameRect(iBackgroundFrame);
+    background.draw(SDL_Rect {frame.x + cell.x, frame.y + cell.y, TILESIZE, TILESIZE}, backmap.getSurface(), Vec2i {cell.x, cell.y});
+    drawLayer(backmap, 0);
+    drawLayer(backmap, 1);
+    if (!game_values.toplayer) {
+        drawLayer(backmap, 2);
+        drawLayer(backmap, 3);
+    }
+
+    //The front picture: see-through there, then the front layers
+    SDL_Surface* front = frontmap.getSurface();
+    SDL_FillSurfaceRect(front, &cell, SDL_MapSurfaceRGBA(front, 0, 0, 0, 0));
+    if (game_values.toplayer) {
+        drawLayer(frontmap, 2);
+        drawLayer(frontmap, 3);
+    }
+    return true;
+}
+
 void CMap::predrawbackground(gfxSprite &background, gfxSprite &mapspr)
 {
     //(a match starts with the first frame of an animated background)

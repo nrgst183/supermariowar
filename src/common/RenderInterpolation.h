@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 // Smooth motion: rendering more often than the simulation ticks draws moving
 // things between their positions of the last two ticks. These types are
 // render-only: the simulation never reads them.
@@ -17,6 +19,9 @@ struct RenderPosition {
 struct RenderPrevious {
     RenderPosition pos;
     bool valid = false;
+    //(the padding as bytes of its own, zero: a copy of a temporary would leave garbage there, in the
+    //snapshots, and the sync test would see the garbage differ)
+    uint8_t padding[3] {};
 };
 
 // Moves larger than this between two ticks (warps, wrapping around the screen

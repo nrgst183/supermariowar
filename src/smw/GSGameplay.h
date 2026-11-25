@@ -67,6 +67,11 @@ class GameplayState : public GameState
         void initRunGame();
         void CleanDeadPlayers();
 
+        // The Map Maker's building (GameplayEdit.cpp)
+        void updateEditMode();
+        void drawEditMode();
+        bool autoTestEditScript(int frame);    // --at-role matchedit (true: it had the frame)
+
         void handleInput();
         bool updateAutoTest();
         void updateNetplay();
@@ -158,5 +163,60 @@ bool SwapPlayers(short iUsingPlayerID);
 void UpdateScoreBoard();
 void SetGameModeSettingsFromMenu();
 void LoadMapObjects(bool fPreview);
+// The block of the map at x, y made anew in the running match, the one there before taken out (the
+// editor in the match)
+void SetMapBlockAt(short x, short y);
+// A map item's object put in the running match; and the objects of the items at x, y taken out of it
+struct MapItem;
+struct MapHazard;
+void SpawnMapItem(const MapItem& item);
+void RemoveMapItemObjectsAt(short x, short y);
+// The hazards' objects gone and made again from `hazards` (the Map Maker's list, changed)
+void RespawnMapHazards(const MapHazard* hazards, int count);
+// The switches' lists of blocks made again from the blocks (a rollback restored them)
+void RebuildSwitchBlocks();
+// The match's pictures of the map's layers and its animated tiles (GSMenu.cpp)
+void BuildMatchMapLayers();
+
+// The Map Maker's building (GameplayEdit.cpp): players build the map while the others play it. The
+// building is simulation (the builders' buttons go in their input bytes), so it plays online and rolls back.
+struct InputFrame;
+struct MapMakerBuilder;
+
+namespace matchedit {
+// A builder's hazard and platform settings as they start (each type's defaults)
+void defaultSettings(MapMakerBuilder& b);
+// The match's map just loaded: the Map Maker's blank map made of it, if its rules want one
+void prepareMap();
+// The pause screen (offline): its menu (Resume, who may build, Save, Quit), worked by every local
+// player's buttons; drawn over the match
+void pauseMenuInput();
+void drawPauseMenu();
+// (tests) a row of it chosen and pressed: 0 Resume, 1 the rights, 2 Save, 3 Quit
+void pauseMenuPress(int row);
+bool allowed();    // a Map Maker match played here (online too; not a replay, not the determinism test)
+bool active();     // someone is building now
+bool building(int slot);    // that player builds now
+bool edited();     // this match's map was edited: it differs from its file
+int hostSlot();    // the host's player: it builds always, it gives the rights
+void reset();      // a new match (this machine's state)
+// The builders' keys are read as the menus' (the match reads the game's): each frame, and its events
+void beginFrame();
+void noteEvent(const union SDL_Event& event);
+// A local player's input byte: its builder's buttons while it builds, Back's start, the host's rights
+// commands (`device`: the player's input device; `gameByte`: its byte as a player)
+uint8_t inputByte(int slot, int device, uint8_t gameByte);
+// The simulation's part, each tick before the players' input: the builders and the rights
+void simulate(const InputFrame& input);
+void afterLoadState();    // a rollback restored the level data: what's made from it again
+void syncVisuals();       // each frame drawn: the layer pictures follow the map
+uint32_t levelHash();     // the level data, for the checksums (0: not the Map Maker)
+bool rights(int slot);
+bool isHostHere();        // the host's player is at this machine's controls
+// The host's panel (the pause screen, the online panel): a player's right, Save
+void hostPanelInput(bool left, bool right, bool down, bool select);
+void setPanelRow(int row);    // 0 the rights, 1 Save, -1 neither (the online panel's other row)
+void drawPauseRights(int y, bool withSave);
+}
 
 #endif // GAMESTATE_GAMEPLAY_H

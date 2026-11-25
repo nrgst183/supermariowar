@@ -1,3 +1,4 @@
+#include "GSGameplay.h"
 #include "StateChecksum.h"
 
 #include "DebugProfile.h"
@@ -195,6 +196,9 @@ uint64_t peerChecksum()
     h.add(game_values.screenfade);
     h.add(game_values.screenfadespeed);
     h.add(game_values.appstate);
+    //(the Map Maker: the level data, which its building changes)
+    if (const uint32_t level = matchedit::levelHash())
+        h.add(level);
 
     return h.value();
 }

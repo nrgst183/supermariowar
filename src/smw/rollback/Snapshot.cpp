@@ -3,6 +3,7 @@
 
 #include "GameMode.h"
 #include "GameValues.h"
+#include "GSGameplay.h"
 #include "map.h"
 #include "ObjectBase.h"
 #include "player.h"
@@ -73,6 +74,9 @@ void forEachStateRegion(Fn&& fn)
     fn(&gv.unlocksecretunlocked, sizeof(gv.unlocksecretunlocked), "game_values.unlocksecretunlocked");
 
     g_map->forEachRuntimeRegion(fn);
+    //(the Map Maker changes the level data during the match: it rolls back too)
+    if (game_values.gamemode && game_values.gamemode->gamemode == game_mode_mapmaker)
+        g_map->forEachLevelRegion(fn);
 
     // The active game mode, settings included (they don't change during a match)
     if (CGameMode* mode = game_values.gamemode) {
@@ -222,6 +226,9 @@ void loadState(const Snapshot& snapshot)
     flags.pausegame = pausegame;
     flags.exitinggame = exitinggame;
     flags.exityes = exityes;
+
+    //(the Map Maker: what's made from the level data, not in the snapshot, made again from it)
+    matchedit::afterLoadState();
 }
 
 std::vector<std::byte> Snapshot::arenaBytes() const

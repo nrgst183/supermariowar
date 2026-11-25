@@ -114,7 +114,7 @@ void DisplayStageDetails(bool fForce, short iStageId, short iMouseX, short iMous
     }
 }
 
-int g_iNumGameModeSettings[GAMEMODE_LAST] = {2,2,3,4,3,10,9,6,2,1,3,5,3,3,0,22,6,4,3,4,4,3};
+int g_iNumGameModeSettings[GAMEMODE_LAST] = {2,2,3,4,3,10,9,6,2,1,3,5,3,3,0,22,6,4,3,4,4,3,0};
 
 SDL_Rect rItemDst[NUM_WORLD_ITEMS];
 
@@ -283,7 +283,7 @@ void EditStage(short iEditStage)
     if (iStageType == 0 && iMode >= 0 && iMode < GAMEMODE_LAST) {
         miModeField->setCurrentValue(iMode);
 
-        miModeSettingsButton->setVisible(iMode != game_mode_owned);
+        miModeSettingsButton->setVisible(iMode != game_mode_owned && iMode != game_mode_mapmaker);
 
         for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
             miGoalField[iGameMode]->setVisible(iMode == iGameMode);

@@ -264,6 +264,14 @@ public:
 
     GameModeSettings gamemodesettings;
 
+    // The Map Maker's rules (its Rules page): who starts building, who may build, the map it starts
+    // from. Sent with the match (MatchConfig); not kept in options.bin (its layout stays)
+    struct MapMakerRules {
+        short start = 0;       // 0 the builders start building, 1 everyone starts playing
+        short builders = 0;    // 0 the host (it gives the others the right), 1 everyone
+        short blank = 0;       // 1 a blank map (a floor), not the one chosen
+    } mapmaker;
+
     bool		soundcapable;
 
     std::vector<bool> pfFilters;

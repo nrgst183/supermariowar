@@ -86,6 +86,11 @@ bool NetGame::isLocalSlot(int slot) const
     return m_session && m_session->config().slotPeer[static_cast<size_t>(slot)] == m_session->config().localPeer;
 }
 
+int NetGame::slotPeer(int slot) const
+{
+    return m_session ? m_session->config().slotPeer[static_cast<size_t>(slot)] : -1;
+}
+
 std::string NetGame::slotPlayerName(int slot) const
 {
     if (slot < 0 || slot >= INPUT_MAX_PLAYERS)

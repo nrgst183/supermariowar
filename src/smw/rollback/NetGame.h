@@ -216,6 +216,8 @@ public:
     // GameplayState left the match (back to the menus)
     void onMatchLeft();
     bool isLocalSlot(int slot) const;
+    // The peer whose inputs drive the slot in the running match (-1: none, a CPU's, or no match)
+    int slotPeer(int slot) const;
     // The name of the player of a slot in the current (or last) match: its
     // peer's name at the start, "" for CPU and empty slots
     std::string slotPlayerName(int slot) const;

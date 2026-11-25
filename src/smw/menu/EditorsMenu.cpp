@@ -37,6 +37,12 @@ void editorIcon(int x, int y, bool level)
     theme::icon(x, y, level ? theme::Icon::QuestionBlock : theme::Icon::Star);
 }
 
+// The Map Maker's: the hammer (its mode's icon)
+void mapMakerIcon(int x, int y)
+{
+    rm->menu_mode_small.draw(x, y, {23 * 16, 0, 16, 16});
+}
+
 // ---- a button drawn as a card: an icon, its title and a line under it; or (no line) a choice, green
 // with a tick when it is the one chosen
 class MI_Card : public MI_Button {
@@ -95,7 +101,7 @@ private:
 class MI_SetupPanel : public UI_Control {
 public:
     MI_SetupPanel(short x, short w, const short* y, const short* h, const short* whereY, const short* howY, const bool* level,
-        const bool* online)
+        const bool* online, const bool* mapMaker)
         : UI_Control(x, 0)
         , m_w(w)
         , m_y(y)
@@ -104,6 +110,7 @@ public:
         , m_howY(howY)
         , m_level(level)
         , m_online(online)
+        , m_mapMaker(mapMaker)
     {}
 
     void Draw() override
@@ -114,9 +121,13 @@ public:
         const int y = *m_y;
         menupanel::box(x, y, m_w, *m_h);
         //The editor: its icon and name, a line under them
-        editorIcon(x + 24, y + 17, *m_level);
-        rm->menu_font_large.draw(x + 48, y + 15, *m_level ? "Map Editor" : "World Editor");
-        rm->menu_font_small.drawRightJustified(x + m_w - 24, y + 19, *m_level ? "The levels you battle in" : "Overworlds of levels to play through");
+        if (*m_mapMaker)
+            mapMakerIcon(x + 24, y + 17);
+        else
+            editorIcon(x + 24, y + 17, *m_level);
+        rm->menu_font_large.draw(x + 48, y + 15, *m_mapMaker ? "Maps" : *m_level ? "Map Editor" : "World Editor");
+        rm->menu_font_small.drawRightJustified(x + m_w - 24, y + 19,
+            *m_mapMaker ? "Build a level while it's played" : *m_level ? "The levels you battle in" : "Overworlds of levels to play through");
         prompts::fill(x + 18, y + 44, m_w - 36, 2, {248, 248, 248, 255});
         prompts::fill(x + 18, y + 46, m_w - 36, 1, {0, 40, 104, 255});
         //(the rows' names, level with their buttons)
@@ -133,6 +144,7 @@ private:
     const short* m_howY;
     const bool* m_level;
     const bool* m_online;
+    const bool* m_mapMaker;
 };
 
 } // namespace
@@ -148,20 +160,20 @@ UI_EditorsMenu::UI_EditorsMenu()
         return [this, a] { Want(a); };
     };
 
-    //The first page: maps or worlds
+    //The first page: maps (the Map Maker) or worlds
     miPickBox = new MI_MenuPanel(100, 112, 440, 214);
     AddNonControl(miPickBox);
     miPickText = new MI_Text("What do you want to make?", 320, 128, 0, true, TextAlign::CENTER);
     AddNonControl(miPickText);
-    miMaps = new MI_Card(120, 166, 400, 32, "Maps", "", [](int x, int y) { editorIcon(x, y, true); });
-    miMapsText = new MI_Text("The levels you battle in", 320, 202, 0, false, TextAlign::CENTER);
+    miMaps = new MI_Card(120, 166, 400, 32, "Maps", "", [](int x, int y) { mapMakerIcon(x, y); });
+    miMapsText = new MI_Text("Levels to battle in, built while they're played", 320, 202, 0, false, TextAlign::CENTER);
     AddNonControl(miMapsText);
     miWorlds = new MI_Card(120, 238, 400, 32, "Worlds", "", [](int x, int y) { editorIcon(x, y, false); });
     miWorldsText = new MI_Text("Overworlds of levels to play through", 320, 274, 0, false, TextAlign::CENTER);
     AddNonControl(miWorldsText);
 
     //The second page: where (here or online), how (host or join), then start
-    miSetupPanel = new MI_SetupPanel(36, 568, &m_panelY, &m_panelH, &m_whereY, &m_howY, &m_level, &m_online);
+    miSetupPanel = new MI_SetupPanel(36, 568, &m_panelY, &m_panelH, &m_whereY, &m_howY, &m_level, &m_online, &m_mapMaker);
     AddNonControl(miSetupPanel);
     miLocal = new MI_Card(168, 100, 196, 32, "This computer", "", nullptr, [this] { return !m_online; });
     miOnline = new MI_Card(372, 100, 196, 32, "Online", "", nullptr, [this] { return m_online; });
@@ -180,8 +192,13 @@ UI_EditorsMenu::UI_EditorsMenu()
     miStart = new MI_Button(&rm->spr_selectfield, 170, 322, "Start", 300, TextAlign::CENTER);
 
     //Both pages: how the editors work, and back
-    AddNonControl(new MI_PromptStrip(16, 434, 512, "In the editors:", [] {
+    AddNonControl(new MI_PromptStrip(16, 434, 512, "In the editors:", [this] {
         const bool controller = prompts::lastDevice() == prompts::Device::Controller;
+        //(the Map Maker's page: its own buttons)
+        if (m_setup && m_mapMaker)
+            return controller ? std::vector<prompts::Prompt> {{{prompts::Pad::LB, prompts::Pad::Up}, {}, "build / play"},
+                                    {{prompts::Pad::X}, {}, "palette"}, {{prompts::Pad::RB}, {}, "undo"}}
+                              : std::vector<prompts::Prompt> {{{}, {"Tab"}, "build / play"}, {{}, {"Space"}, "palette"}, {{}, {"Bksp"}, "undo"}};
         return controller ? std::vector<prompts::Prompt> {{{prompts::Pad::Start}, {}, "tools"}, {{prompts::Pad::A}, {}, "place"},
                                 {{prompts::Pad::Back}, {}, "leave"}}
                           : std::vector<prompts::Prompt> {{{}, {"Tab"}, "tools"}, {{}, {"F1"}, "help"}, {{}, {"Esc"}, "leave"}};
@@ -233,7 +250,10 @@ void UI_EditorsMenu::Relink()
     miAddressField->setVisible(false);    //(joining is from the games list, which has Join by address)
     miStatusText->setVisible(setup);
     miWhereText->setVisible(setup);
-    miWhereText->SetText(m_online ? "Edit together with friends over the network" : "Everyone with a controller gets a cursor");
+    if (m_mapMaker)
+        miWhereText->SetText(m_online ? "Build and play together over the network" : "A lobby: players, CPUs, then the map and rules");
+    else
+        miWhereText->SetText(m_online ? "Edit together with friends over the network" : "Everyone with a controller gets a cursor");
     miHowText->setVisible(setup && m_online);
     miHowText->SetText(m_joining ? "Find the game in the games list" : "A lobby friends join from Join a Game");
     miStart->setVisible(setup);
@@ -301,7 +321,9 @@ MenuCodeEnum UI_EditorsMenu::Act()
     switch (action) {
         case Action::Maps:
         case Action::Worlds:
-            m_level = action == Action::Maps;
+        case Action::MapMaker:
+            m_level = action != Action::Worlds;
+            m_mapMaker = m_level;    //(maps: the Map Maker)
             ShowPage(true);
             return MENU_CODE_NONE;
         case Action::Local:
@@ -315,6 +337,8 @@ MenuCodeEnum UI_EditorsMenu::Act()
             Relink();
             return MENU_CODE_NONE;
         case Action::Start:
+            if (m_mapMaker && !(m_online && m_joining))
+                return m_online ? MENU_CODE_MAPMAKER_HOST : MENU_CODE_MAPMAKER_LOCAL;
             if (!m_online)
                 return m_level ? MENU_CODE_RUN_LEVEL_EDITOR : MENU_CODE_RUN_WORLD_EDITOR;
             if (!m_joining)

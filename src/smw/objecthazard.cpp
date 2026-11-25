@@ -19,7 +19,13 @@ void LoadMapHazards(bool fPreview)
     g_sim.objectcontainer[2].clean();
 
     //Create objects for all the map hazards
-    for (const MapHazard& hazard : g_map->maphazards) {
+    for (const MapHazard& hazard : g_map->maphazards)
+        SpawnMapHazard(hazard, fPreview);
+}
+
+void SpawnMapHazard(const MapHazard& hazard, bool fPreview)
+{
+    {
         const Vec2s pos(hazard.ix * 16, hazard.iy * 16);
 
         switch (hazard.itype) {

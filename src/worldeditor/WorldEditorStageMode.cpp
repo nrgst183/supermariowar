@@ -231,7 +231,7 @@ int editor_stage()
                 miBonusItemsButton->SetPosition(430, iMode != 24 ? 220 : 340);
 
                 if (iMode >= 0 && iMode < GAMEMODE_LAST) {
-                    miModeSettingsButton->setVisible(iMode != game_mode_owned);
+                    miModeSettingsButton->setVisible(iMode != game_mode_owned && iMode != game_mode_mapmaker);
 
                     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
                         miGoalField[iGameMode]->setVisible(iMode == iGameMode);

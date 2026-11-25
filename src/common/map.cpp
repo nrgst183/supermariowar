@@ -605,6 +605,129 @@ WarpExit * CMap::getRandomWarpExit(int connection, int currentID)
     return &warpexits[indices[RANDOM_INT(numIndices)]];
 }
 
+void CMap::recalcTileType(short x, short y)
+{
+    for (short k = MAPLAYERS - 1; k >= 0; k--) {
+        const TilesetTile& tile = mapdata[x][y][k];
+        if (tile.iID == TILESETANIMATED)
+            return;
+        if (tile.iID >= 0) {
+            const CTileset* tileset = g_tilesetmanager->tilesetInfo(static_cast<size_t>(tile.iID));
+            const TileType type = tileset ? tileset->tileType(tile.iCol, tile.iRow) : TileType::NonSolid;
+            if (type != TileType::NonSolid) {
+                mapdatatop[x][y] = type;
+                return;
+            }
+        }
+    }
+    mapdatatop[x][y] = TileType::NonSolid;
+}
+
+void CMap::refreshAfterEdit()
+{
+    ClearAnimatedTiles();
+    computeDrawAreas();
+    refreshSpawnAreas();
+    UpdateAllTileGaps();
+}
+
+void CMap::makeBlank(const TilesetTile& floor)
+{
+    for (short x = 0; x < MAPWIDTH; x++) {
+        for (short y = 0; y < MAPHEIGHT; y++) {
+            for (short l = 0; l < MAPLAYERS; l++)
+                mapdata[x][y][l] = TilesetTile {TILESETNONE, 0, 0};
+            objectdata[x][y].iType = -1;
+            objectdata[x][y].fHidden = false;
+            warpdata[x][y].connection = -1;
+            warpdata[x][y].direction = WARP_UNDEFINED;
+            warpdata[x][y].id = -1;
+            for (short t = 0; t < NUMSPAWNAREATYPES; t++)
+                nospawn[t][x][y] = false;
+        }
+        mapdata[x][MAPHEIGHT - 1][0] = floor;
+    }
+    mapitems.clear();
+    maphazards.clear();
+    clearPlatforms();
+    for (short x = 0; x < MAPWIDTH; x++)
+        for (short y = 0; y < MAPHEIGHT; y++)
+            recalcTileType(x, y);
+    recalcWarps();
+    refreshAfterEdit();
+}
+
+void CMap::recalcWarps()
+{
+    bool used[MAPWIDTH][MAPHEIGHT] {};
+    const short before = numwarpexits;
+    numwarpexits = 0;
+    for (short j = 0; j < MAPHEIGHT; j++) {
+        for (short i = 0; i < MAPWIDTH; i++) {
+            const Warp& first = warpdata[i][j];
+            if (first.connection == -1 || used[i][j] || first.direction < 0)
+                continue;
+            //(across for an up or down warp, down for a left or right one)
+            const int movex = first.direction == 0 || first.direction == 2 ? 1 : 0;
+            const int movey = 1 - movex;
+            const WarpEnterDirection direction = first.direction;
+            const short connection = first.connection;
+            int x = i, y = j, blocks = 0;
+            while (x < MAPWIDTH && y < MAPHEIGHT && warpdata[x][y].direction == direction && warpdata[x][y].connection == connection) {
+                used[x][y] = true;
+                if (numwarpexits < MAXWARPS) {
+                    warpdata[x][y].id = numwarpexits;
+                } else {
+                    warpdata[x][y].connection = -1;
+                    warpdata[x][y].direction = WARP_UNDEFINED;
+                }
+                x += movex;
+                y += movey;
+                blocks++;
+            }
+            if (numwarpexits >= MAXWARPS)
+                continue;
+            x -= movex;
+            y -= movey;
+            WarpExit& exit = warpexits[numwarpexits];
+            //(its lock stays with it: another warp in its place unlocked)
+            if (numwarpexits >= before || exit.warpx != i || exit.warpy != j)
+                exit.locktimer = 0;
+            exit.direction = static_cast<WarpExitDirection>(direction);
+            exit.connection = connection;
+            exit.id = numwarpexits;
+            //(where the player comes out, where the lock is shown: CMap::saveMap's)
+            if (direction == 0 || direction == 2) {
+                exit.x = static_cast<short>((((x << 5) + TILESIZE - (i << 5)) >> 1) + (i << 5) - HALFPW);
+                exit.y = static_cast<short>((j << 5) + (direction == 0 ? -1 : 1) + PHOFFSET);
+                exit.lockx = static_cast<short>((((x << 5) + TILESIZE - (i << 5)) >> 1) + (i << 5) - 16);
+                exit.locky = static_cast<short>(j << 5);
+            } else {
+                exit.x = static_cast<short>(direction == 1 ? (i << 5) + TILESIZE - PW - PWOFFSET : (i << 5) - 1 + PWOFFSET);
+                exit.y = static_cast<short>((y << 5) + TILESIZE - PH - 1);
+                exit.lockx = static_cast<short>(i << 5);
+                exit.locky = static_cast<short>((((y << 5) + TILESIZE - (j << 5)) >> 1) + (j << 5) - 16);
+            }
+            exit.warpx = i;
+            exit.warpy = j;
+            exit.numblocks = static_cast<short>(blocks);
+            numwarpexits++;
+        }
+    }
+}
+
+void CMap::refreshSpawnAreas()
+{
+    //(as a save finds them: CMap::saveMap)
+    for (short iType = 0; iType < NUMSPAWNAREATYPES; iType++) {
+        calculatespawnareas(iType, false, false);
+        if (numspawnareas[iType] == 0)
+            calculatespawnareas(iType, true, false);
+        if (numspawnareas[iType] == 0)
+            calculatespawnareas(iType, true, true);
+    }
+}
+
 void CMap::clearWarpLocks()
 {
     for (short iConnection = 0; iConnection < 10; iConnection++) {

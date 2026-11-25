@@ -17,6 +17,7 @@
 #include <SDL3_image/SDL_image.h>
 
 #include <cmath>
+#include <cstring>
 #include <iostream>
 using std::cout;
 using std::endl;
@@ -143,6 +144,18 @@ void CMap::buildDrawAreas(const bool skip[MAPWIDTH][MAPHEIGHT])
 }
 
 std::vector<std::string> g_savedMapFiles;
+
+void CMap::saveMap(const std::string& file, const std::vector<MovingPlatform*>& extra)
+{
+    //(saved during a match, on one machine: what saving changes, the warps' ids, put back as they were)
+    Warp warps[MAPWIDTH][MAPHEIGHT];
+    std::memcpy(warps, warpdata, sizeof(warps));
+    const size_t own = platforms.size();
+    platforms.insert(platforms.end(), extra.begin(), extra.end());
+    saveMap(file);
+    platforms.resize(own);
+    std::memcpy(warpdata, warps, sizeof(warps));
+}
 
 void CMap::saveMap(const std::string& file)
 {

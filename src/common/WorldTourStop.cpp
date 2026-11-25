@@ -87,7 +87,7 @@ TourStop ParseTourStopLine(char* buffer, const Version& version, bool fIsWorld)
 
         //If a valid mode was not detected, then just choose a random mode
         if (ts.iMode < 0 || (ts.iMode >= GAMEMODE_LAST && !isMinigame))
-            ts.iMode = RANDOM_INT(GAMEMODE_LAST);
+            ts.iMode = RANDOM_INT(game_mode_mapmaker);    //(not the Map Maker: it never ends)
 
         pszTemp = strtok(nullptr, ",\n");
 

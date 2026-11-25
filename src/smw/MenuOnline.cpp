@@ -178,6 +178,7 @@ void MenuState::LeaveOnlineLobby(const std::string& message)
         return;
     }
     if (mLobbyOrigin == LobbyOrigin::Editors) {
+        mGameSettingsMenu->SetMapMakerSession(false);    //(the Map Maker's lobby: its session's over)
         mEditorsMenu->SetStatus(message);
         mCurrentMenu = mEditorsMenu.get();
         return;
@@ -272,10 +273,10 @@ void MenuState::BackToLobbyFromEditor()
 // The main menu's Start: the lobby of a local game (who can join: nobody; no network), which the
 // lobby's "who can join" opens to the others. Its players are the main menu's (players and CPUs), or
 // as they were (backing out of a local game's menus).
-void MenuState::OpenLocalLobby()
+void MenuState::OpenLocalLobby(LobbyOrigin origin)
 {
     std::string error;
-    if (!OpenLobby(rollback::LobbyAccess::Nobody, LobbyOrigin::MainMenu, error)) {
+    if (!OpenLobby(rollback::LobbyAccess::Nobody, origin, error)) {
         //(can't be: there's no network to fail; the menus as they were, then)
         printf("lobby: %s\n", error.c_str());
         mMatchSelectionMenu->WorldMapChanged();
@@ -293,8 +294,9 @@ bool MenuState::OpenLobby(rollback::LobbyAccess access, LobbyOrigin origin, std:
         return false;
     rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
 
-    //(backing out of a local game's menus: the lobby as it was)
-    LocalSetup setup = origin == LobbyOrigin::MainMenu ? mLocalSetup : LocalSetup {};
+    //(backing out of a local game's menus: the lobby as it was; the Map Maker's too)
+    const bool local = origin == LobbyOrigin::MainMenu || (origin == LobbyOrigin::Editors && mGameSettingsMenu->MapMakerSession());
+    LocalSetup setup = local ? mLocalSetup : LocalSetup {};
     if (!setup.valid) {
         setup = {};
         setup.localPlayers = 0;
@@ -379,6 +381,12 @@ void MenuState::StartLocalFromLobby()
     LeaveLobbyQuietly();
     ResetOnlineMenus();
     mLocalFromLobby = true;
+    //(the Map Maker: a single game of it, straight to its map and rules)
+    if (mGameSettingsMenu->MapMakerSession()) {
+        game_values.matchtype = MatchType::SingleGame;
+        EnterGameSetup();
+        return;
+    }
     mMatchSelectionMenu->WorldMapChanged();
     mCurrentMenu = mMatchSelectionMenu.get();
     mCurrentMenu->ResetMenu();
@@ -467,6 +475,13 @@ void MenuState::OpenOnlineMatchSettings()
         return;
     }
     mOnlineSetup = true;
+    //(the Map Maker: a single game of it, straight to its map and rules)
+    if (mGameSettingsMenu->MapMakerSession()) {
+        mOnlineSeriesType = MatchType::SingleGame;
+        mOnlineMinigame = false;
+        OpenOnlineGameSettings();
+        return;
+    }
     mMatchSelectionMenu->SetOnlineMode(true, mOnlineMinigame);
     if (mOnlineSeriesType != MatchType::SingleGame)
         mMatchSelectionMenu->SetSelectedMatchType(mOnlineSeriesType);

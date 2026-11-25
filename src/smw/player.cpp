@@ -111,9 +111,30 @@ void CPlayer::SetCorpseType(short type) {
     diedas = type;
 }
 
+void CPlayer::beginEditing()
+{
+    editing = true;
+    if (carriedItem) {
+        carriedItem->Drop();
+        carriedItem = nullptr;
+    }
+    if (state != PlayerState::Waiting)
+        SetupNewPlayer();
+}
+
+void CPlayer::endEditing(short spawnX, short spawnY)
+{
+    editing = false;
+    *respawncounter = 0;    //(it spawns at once)
+    spawnAtX = spawnX;
+    spawnAtY = spawnY;
+}
+
 void CPlayer::update_waitingForRespawn()
 {
     assert(state == PlayerState::Waiting);
+    if (editing)
+        return;    //(building: out of play until it's done)
 
     //use 31 frames to do 0.5 second increments
     if (*respawncounter > 0 && ++waittimer >= 31) {
@@ -124,7 +145,19 @@ void CPlayer::update_waitingForRespawn()
     if (*respawncounter <= 0) {
         *respawncounter = 0;
 
-        if (FindSpawnPoint()) {
+        //(the Map Maker: where the builder's cursor was, if nothing solid is there)
+        bool placed = false;
+        if (spawnAtX >= 0) {
+            const short col = static_cast<short>((spawnAtX + HALFPW) / TILESIZE), row = static_cast<short>((spawnAtY + PH - 1) / TILESIZE);
+            const IO_Block* block = g_map->block(col, row);
+            if (col >= 0 && col < MAPWIDTH && row >= 0 && row < MAPHEIGHT && !(g_map->map(col, row) & tile_flag_solid) && !block) {
+                setXi(spawnAtX);
+                setYi(spawnAtY);
+                placed = true;
+            }
+            spawnAtX = spawnAtY = -1;
+        }
+        if (placed || FindSpawnPoint()) {
             //Make sure spawn point isn't inside a tile
             collisions.checksides(*this);
 

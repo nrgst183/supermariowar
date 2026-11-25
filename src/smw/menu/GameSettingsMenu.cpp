@@ -44,10 +44,13 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     miModeField = new MI_ImageSelectField(&rm->spr_selectfield, &rm->menu_mode_small, 70, 74, "Mode", 500, 120, 16, 16);
 
     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
-        miModeField->add(gamemodes[iGameMode]->GetModeName(), iGameMode);
+        auto& item = miModeField->add(gamemodes[iGameMode]->GetModeName(), iGameMode);
+        if (iGameMode == game_mode_mapmaker)
+            item.iconOverride = 23;    //(the hammer: GetModeIconIndexFromMode)
     }
     miModeField->setOutputPtr(&currentgamemode);
     miModeField->setCurrentValue(0);
+    miModeField->hideItem(game_mode_mapmaker, true);    //(only from the Editors: SetMapMakerSession)
     miModeField->setItemChangedCode(MENU_CODE_MODE_CHANGED);
 
     for (short iGameMode = 0; iGameMode < GAMEMODE_LAST; iGameMode++) {
@@ -56,6 +59,9 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
 
         for (short iGameModeOption = 0; iGameModeOption < GAMEMODE_NUM_OPTIONS; iGameModeOption++) {
             SModeOption* option = &gamemodes[iGameMode]->GetOptions()[iGameModeOption];
+            //(the Map Maker never ends: only "Unlimited")
+            if (iGameMode == game_mode_mapmaker && option->iValue != -1)
+                continue;
             miGoalField[iGameMode]->add(option->szName, option->iValue);
         }
 
@@ -171,7 +177,7 @@ void UI_GameSettingsMenu::SetOnlineView(OnlineView view)
     const bool on = view != OnlineView::Off;
     const bool locked = view == OnlineView::Locked;
 
-    miModeField->SetLocked(locked);
+    miModeField->SetLocked(locked || m_mapMaker);
     for (MI_SelectField<short>* goal : miGoalField)
         goal->SetLocked(locked);
     miMapField->SetLocked(locked);
@@ -264,7 +270,9 @@ void UI_GameSettingsMenu::CloseExitDialog()
 
 void UI_GameSettingsMenu::SetHeaderText(const char* string)
 {
-    miGameSettingsMenuHeaderText->SetText(string);
+    //(the Map Maker's session: its name, a single game's or an online one's)
+    m_header = string;
+    miGameSettingsMenuHeaderText->SetText(m_mapMaker ? "Map Maker" : string);
 }
 
 void UI_GameSettingsMenu::SetStartButtonText(const char* string)
@@ -276,6 +284,21 @@ void UI_GameSettingsMenu::GameModeChanged(short gmID)
 {
     miModeField->setCurrentValue(gmID);
 
+    RefreshGameModeButtons();
+}
+
+void UI_GameSettingsMenu::SetMapMakerSession(bool on)
+{
+    m_mapMaker = on;
+    miModeField->hideItem(game_mode_mapmaker, !on);
+    if (on) {
+        miModeField->setCurrentValue(game_mode_mapmaker);
+    } else if (miModeField->currentValue() == game_mode_mapmaker) {
+        miModeField->setCurrentValue(0);
+    }
+    game_values.gamemode = gamemodes[miModeField->currentValue()];
+    miModeField->SetLocked(on || m_onlineView == OnlineView::Locked);
+    miGameSettingsMenuHeaderText->SetText(on ? "Map Maker" : m_header.c_str());
     RefreshGameModeButtons();
 }
 

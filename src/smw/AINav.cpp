@@ -145,6 +145,13 @@ uint64_t mapStamp()
     }
     for (const MovingPlatform* p : g_map->permanentPlatforms())
         h = (h ^ reinterpret_cast<uintptr_t>(p)) * 1099511628211ull;
+    //(the warps too: the Map Maker changes them in a match, and the graph goes through them)
+    for (int k = 0; k < g_map->warpExitCount(); k++) {
+        const WarpExit& e = g_map->warpExit(k);
+        const uint64_t v = static_cast<uint64_t>(static_cast<uint16_t>(e.warpx)) | static_cast<uint64_t>(static_cast<uint16_t>(e.warpy)) << 16
+            | static_cast<uint64_t>(static_cast<uint16_t>(e.connection)) << 32 | static_cast<uint64_t>(static_cast<uint16_t>(e.direction)) << 48;
+        h = (h ^ v ^ static_cast<uint64_t>(e.numblocks) << 8) * 1099511628211ull;
+    }
     return h;
 }
 

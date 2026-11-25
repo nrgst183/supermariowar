@@ -53,6 +53,7 @@ void GameplayState::simulateTick(const InputFrame& input)
     unsigned int mxcsr = 0;
     if (platform::settleFpu(&x87, &mxcsr))
         determinism::noteFpu(x87, mxcsr);
+    matchedit::simulate(input);    //(the Map Maker's builders; before the input: previousInput is the last tick's)
     applyTickInput(input);
 
     if (game_values.screenfade == 0 && g_sim.countdownState <= COUNTDOWN_START_INDEX)
@@ -266,7 +267,9 @@ void GameplayState::updateScreenFade()
             //display the mode and goal at the start of the game
             if (game_values.startmodedisplay && game_values.singleplayermode == -1) {
                 std::string szMode;
-                if (game_values.gamemode->goal < 0)
+                if (game_values.gamemode->gamemode == game_mode_mapmaker)
+                    szMode = game_values.gamemode->GetModeName();    //(no goal: it never ends)
+                else if (game_values.gamemode->goal < 0)
                     szMode = std::format("{}  {}: X", game_values.gamemode->GetModeName(), game_values.gamemode->GetGoalName());
                 else
                     szMode = std::format("{}  {}: {}", game_values.gamemode->GetModeName(), game_values.gamemode->GetGoalName(), game_values.gamemode->goal);

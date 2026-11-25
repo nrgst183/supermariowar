@@ -853,7 +853,7 @@ void MenuState::update()
 
                 iTournamentAITimer = 60;
             } else if (iTournamentAIStep == 2) {
-                currentgamemode = RANDOM_INT(GAMEMODE_LAST);
+                currentgamemode = RANDOM_INT(game_mode_mapmaker);    //(not the Map Maker: it never ends)
                 game_values.gamemode = gamemodes[currentgamemode];
                 mGameSettingsMenu->GameModeChanged(currentgamemode);
                 game_values.gamemode = gamemodes[mGameSettingsMenu->GetCurrentGameModeID()];
@@ -1281,6 +1281,31 @@ MenuCodeEnum MenuState::OptionsPageCode(int dir) const
 }
 
 // The screen has faded out to start a match: its settings, its map and music, then the gameplay
+// The match's pictures of the map's layers (the back ones, the front ones, the animated tiles'
+// second copies) and its animated tiles: a match's start, and the editor in the match after an edit
+void BuildMatchMapLayers()
+{
+    g_map->predrawbackground(rm->spr_background, rm->spr_backmap[0]);
+    g_map->predrawforeground(rm->spr_frontmap[0]);
+
+    //(the second copy, the animated tiles' other buffer: the same pixels, copied, not drawn again;
+    //set up as the drawing sets it: the back layer opaque, the front one blended)
+    if (rm->useSecondMapLayers(g_map->hasAnimatedTiles())) {
+        if (gfx_copypixels(rm->spr_backmap[0].getSurface(), rm->spr_backmap[1].getSurface()))
+            SDL_SetSurfaceBlendMode(rm->spr_backmap[1].getSurface(), SDL_BLENDMODE_NONE);
+        else
+            g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
+        if (gfx_copypixels(rm->spr_frontmap[0].getSurface(), rm->spr_frontmap[1].getSurface())) {
+            SDL_SetSurfaceColorKey(rm->spr_frontmap[1].getSurface(), false, 0);
+            SDL_SetSurfaceBlendMode(rm->spr_frontmap[1].getSurface(), SDL_BLENDMODE_BLEND);
+        } else {
+            g_map->predrawforeground(rm->spr_frontmap[1]);
+        }
+    }
+    g_map->fitDrawAreas(rm->spr_frontmap[0]);    //(only where it shows)
+    g_map->SetupAnimatedTiles();
+}
+
 void MenuState::LaunchMatch()
 {
     loadlog::mark("match: the fade out ended");
@@ -1368,6 +1393,7 @@ void MenuState::LaunchMatch()
         } else {
             g_map->loadMap(maplist->currentFilename(), read_type_full);
             sShortMapName = maplist->currentShortmapname();
+            matchedit::prepareMap();
         }
 
         loadlog::mark("match: map");
@@ -1393,27 +1419,8 @@ void MenuState::LaunchMatch()
     replay::beginLocal(g_map->loadedFile());
     loadlog::mark("match: replay started");
 
-    g_map->predrawbackground(rm->spr_background, rm->spr_backmap[0]);
-    g_map->predrawforeground(rm->spr_frontmap[0]);
-
-    //(the second copy, the animated tiles' other buffer: the same pixels, copied, not drawn again;
-    //set up as the drawing sets it: the back layer opaque, the front one blended)
-    if (rm->useSecondMapLayers(g_map->hasAnimatedTiles())) {
-        if (gfx_copypixels(rm->spr_backmap[0].getSurface(), rm->spr_backmap[1].getSurface()))
-            SDL_SetSurfaceBlendMode(rm->spr_backmap[1].getSurface(), SDL_BLENDMODE_NONE);
-        else
-            g_map->predrawbackground(rm->spr_background, rm->spr_backmap[1]);
-        if (gfx_copypixels(rm->spr_frontmap[0].getSurface(), rm->spr_frontmap[1].getSurface())) {
-            SDL_SetSurfaceColorKey(rm->spr_frontmap[1].getSurface(), false, 0);
-            SDL_SetSurfaceBlendMode(rm->spr_frontmap[1].getSurface(), SDL_BLENDMODE_BLEND);
-        } else {
-            g_map->predrawforeground(rm->spr_frontmap[1]);
-        }
-    }
-    g_map->fitDrawAreas(rm->spr_frontmap[0]);    //(only where it shows)
+    BuildMatchMapLayers();
     loadlog::mark("match: the map's layers drawn");
-
-    g_map->SetupAnimatedTiles();
     LoadMapObjects(false);
     loadlog::mark("match: animated tiles, map objects");
 
@@ -1445,6 +1452,7 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
             //(a local game's match type: back to its lobby, as it was)
             OpenLocalLobby();
         } else {
+            mGameSettingsMenu->SetMapMakerSession(false);
             mLocalFromLobby = false;
             iDisplayError = DISPLAY_ERROR_NONE;
             iDisplayErrorTimer = 0;
@@ -1465,6 +1473,7 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
             return false;
         }
     } else if (MENU_CODE_TO_EDITORS_MENU == code) {
+        mGameSettingsMenu->SetMapMakerSession(false);
         mEditorsMenu->Open();
         mCurrentMenu = mEditorsMenu.get();
     } else if (MENU_CODE_EDITORS_EXIT == code) {
@@ -1483,6 +1492,20 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         if (!RunEditor(editor))
             return false;
 #endif
+    } else if (MENU_CODE_MAPMAKER_LOCAL == code) {
+        //Editors > Map Maker, here: a local game's lobby (its players, CPUs and skins), then its map and
+        //rules; Back from there, the Editors
+        mGameSettingsMenu->SetMapMakerSession(true);
+        mLocalSetup.valid = false;
+        OpenLocalLobby(LobbyOrigin::Editors);
+    } else if (MENU_CODE_MAPMAKER_HOST == code) {
+        //(online: a match's lobby, found in Join a Game)
+        mGameSettingsMenu->SetMapMakerSession(true);
+        std::string error;
+        if (!OpenLobby(rollback::LobbyAccess::Lan, LobbyOrigin::Editors, error)) {
+            mGameSettingsMenu->SetMapMakerSession(false);
+            mEditorsMenu->SetStatus("Can't host: " + error);
+        }
     } else if (MENU_CODE_JOIN_EDITOR == code) {
         //(a lobby that edits together is joined as any: from the games list)
         mSystemLinkMenu->Open();
@@ -1695,6 +1718,9 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
 
             if (iTournamentAITimer > 0)
                 SetControllingTeamForSettingsMenu(-1, false);
+        } else if (mLocalFromLobby && mGameSettingsMenu->MapMakerSession()) {
+            //(the Map Maker's: back to its lobby, as it was)
+            OpenLocalLobby(LobbyOrigin::Editors);
         } else if (mLocalFromLobby) {
             //(a local game from the lobby has no team select: its teams are the lobby's)
             mCurrentMenu = mMatchSelectionMenu.get();
@@ -1962,7 +1988,7 @@ void MenuState::EnterGameSetup()
         StartGame();
     } else if (MatchType::QuickGame == game_values.matchtype) {
         printf(" Match type: Quick game\n");
-        short iRandomMode = RANDOM_INT( GAMEMODE_LAST);
+        short iRandomMode = RANDOM_INT(game_mode_mapmaker);    //(not the Map Maker: it never ends)
         game_values.gamemode = gamemodes[iRandomMode];
 
         SModeOption * options = game_values.gamemode->GetOptions();

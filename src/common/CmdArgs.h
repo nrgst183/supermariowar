@@ -45,6 +45,9 @@ struct AutoTestArgs {
     int colors = -1;         // --at-colors N: the "Overlay Colors" option (0 night, 1 pipe, 2 castle, 3 SMB3)
     int prompts = -1;        // --at-prompts N: the "Button prompts" option (0 auto, 1 Xbox, 2 original Xbox)
     bool pad = false;
+    int pace = 1;
+    int mmStart = -1;        // --at-mm-start N: the Map Maker's rules: 0 builders start building, 1 playing
+    int mmBlank = -1;        // --at-mm-blank 1: the Map Maker starts from a blank map            // --at-pace N: --at-role matchedit's buttons each held N frames (a person's pace: 15)
     bool perf = false;
     int powerup = -1;        // --at-powerup N: every player (re)spawns with powerup N (3 feather, 8 P-Wings...: AI comparisons)
     int itemRespawn = -1;    // --at-item-respawn N: ticks before a ? block gives an item again (the option)       // --at-perf 1: each match's cost per tick and per frame (perf: lines)        // --at-pad 1: the prompts as for a controller (as if one had been used last)

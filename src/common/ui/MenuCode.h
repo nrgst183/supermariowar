@@ -129,6 +129,8 @@ enum MenuCodeEnum {
     MENU_CODE_HOST_LEVEL_EDITOR,        // editing together (editors/CoEdit.h)
     MENU_CODE_HOST_WORLD_EDITOR,
     MENU_CODE_JOIN_EDITOR,
+    MENU_CODE_MAPMAKER_LOCAL,    // Editors > Map Maker > This computer: its lobby, a local game's
+    MENU_CODE_MAPMAKER_HOST,     // Editors > Map Maker > Online > Host: its lobby, open to the network
     MENU_CODE_EDITORS_ACTION,          // the editors menu's own buttons (UI_EditorsMenu::Act)
     MENU_CODE_TO_ONLINE_OPTIONS_MENU,  // Options > Online: nickname, run-ahead, port
     MENU_CODE_MAIN_MENU_BACK,          // B on the main menu: to its Exit first (UI_MainMenu::focusExit)

@@ -119,7 +119,8 @@ void MenuState::GetNextScriptOperation()
                       game_values.gamemode->gamemode == game_mode_coins ||
                       game_values.gamemode->gamemode == game_mode_classic ||
                       game_values.gamemode->gamemode == game_mode_eggs ||
-                      game_values.gamemode->gamemode == game_mode_owned) {
+                      game_values.gamemode->gamemode == game_mode_owned ||
+                      game_values.gamemode->gamemode == game_mode_mapmaker) {
                 LoadScript("Scripts/NoModeOptions.txt");
             } else if (game_values.gamemode->gamemode == game_mode_jail) {
                 LoadScript("Scripts/JailModeOptions.txt");

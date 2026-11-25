@@ -178,6 +178,30 @@ int nextRandom(uint32_t& state, int max)
 }
 
 // Offline: one generator for all human players, seeded from --at-seed
+// The Map Maker: an auto-play human builds a while now and then (its random buttons paint, erase,
+// page the palette), so that the sync tests, the online tests and replays go through the building too
+template <typename Next>
+uint8_t mapMakerBotByte(int slot, uint8_t byte, Next&& next)
+{
+    if (!game_values.gamemode || game_values.gamemode->gamemode != game_mode_mapmaker)
+        return byte;
+    //(the host gives everyone the right to build first, by its commands: 0xF8 | on | slot)
+    const int host = matchedit::hostSlot();
+    if (slot == host && g_sim.tick >= 20 && g_sim.tick < 24) {
+        const int target = g_sim.tick - 20;
+        if (target != host && game_values.playercontrol[target] == 1)
+            return static_cast<uint8_t>(0xF8 | 4 | target);
+    }
+    const int phase = (g_sim.tick + slot * 37) % 300;
+    if (matchedit::building(slot)) {
+        if (phase == 250)
+            return 0xC0;    //(done)
+        byte = static_cast<uint8_t>(byte | (next(3) == 0 ? 0x20 : 0) | (next(16) == 0 ? 0x40 : 0) | (next(16) == 1 ? 0x80 : 0));
+        return byte == 0xC0 ? 0x40 : byte;
+    }
+    return phase == 100 ? static_cast<uint8_t>(byte | 0x40) : byte;    //(Back: building)
+}
+
 InputFrame autoTestHumanInput()
 {
     static HumanBot bots[4];
@@ -188,7 +212,7 @@ InputFrame autoTestHumanInput()
     for (int i = 0; i < INPUT_MAX_PLAYERS; i++) {
         if (game_values.playercontrol[i] != 1)
             continue;
-        input.players[i] = bots[i].step(next);
+        input.players[i] = mapMakerBotByte(i, bots[i].step(next), next);
     }
     return input;
 }
@@ -202,11 +226,13 @@ uint8_t autoTestNetHumanInput(int slot)
     uint32_t& state = states[slot];
     if (state == 0)
         state = (0x9e3779b9u ^ static_cast<uint32_t>(cmd::g_autotest.seed + 1 + slot) * 2654435761u) | 1u;
-    return bots[slot].step([&state](int max) { return nextRandom(state, max); });
+    auto next = [&state](int max) { return nextRandom(state, max); };
+    return mapMakerBotByte(slot, bots[slot].step(next), next);
 }
 
 // Cheap FNV-1a checksum of the simulation state the --autotest harness prints
 // ("atsum:" lines), so that two runs can be compared beyond the match results
+
 uint32_t autoTestChecksum()
 {
     uint32_t hash = 2166136261u;
@@ -303,6 +329,8 @@ short GetModeIconIndexFromMode(short iMode)
         iMode = 26;
     else if (iMode == game_mode_boxes_minigame)
         iMode = 27;
+    else if (iMode == game_mode_mapmaker)
+        iMode = 23;    //(the hammer)
 
     return iMode;
 }
@@ -440,10 +468,13 @@ void GameplayState::onEnterState()
         gfxSprite::loadGroup(SpriteGroup::Shared);
     }
     g_firstFrameLogged = false;
+    matchedit::reset();
     g_sim.countdownState = 0;
     g_sim.countdownTimer = 0;
 
-    if (game_values.startgamecountdown && game_values.singleplayermode == -1) {
+    //(not the Map Maker's: it starts as you get there)
+    const bool mapMaker = game_values.gamemode && game_values.gamemode->gamemode == game_mode_mapmaker;
+    if (game_values.startgamecountdown && game_values.singleplayermode == -1 && !mapMaker) {
         g_sim.countdownState = 28;
         g_sim.countdownTimer = iCountDownTimes[0];
     }
@@ -498,7 +529,13 @@ void GameplayState::onLeaveState()
 
 void GameplayState::handleInput()
 {
-    game_values.playerInput.ClearPressedKeys(game_values.flags.exitinggame ? 1 : 0);
+    //(the quit dialog and the online panel read the menus' keys: up, down, left, right, A, B)
+    const short keysOf = game_values.flags.exitinggame || onlinePanelOpen() ? 1 : 0;
+    game_values.playerInput.ClearPressedKeys(keysOf);
+    //(the Map Maker's builders: their keys read as the menus' too)
+    const bool mapMaker = matchedit::allowed();
+    if (mapMaker)
+        matchedit::beginFrame();
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -540,7 +577,8 @@ void GameplayState::handleInput()
             } else if (event.key.key == SDLK_ESCAPE) {
                 game_values.playerInput.outputControls[0].game_cancel.fPressed = true;
             } else if (event.key.key == SDLK_TAB) {
-                PlayNextMusicTrack();
+                if (!matchedit::allowed())    //(the Map Maker: Tab switches building and playing)
+                    PlayNextMusicTrack();
             } else if (event.key.key == SDLK_INSERT) {
                 gfx_take_screenshot();
             }
@@ -658,7 +696,9 @@ void GameplayState::handleInput()
 
         //Feed the player control structures with input data
         //Use menu controls when exit game dialog is up
-        game_values.playerInput.Update(event, (game_values.flags.exitinggame ? 1 : 0));
+        game_values.playerInput.Update(event, keysOf);
+        if (mapMaker)
+            matchedit::noteEvent(event);
     }
 }
 
@@ -807,6 +847,9 @@ bool GameplayState::updateAutoTest()
     ++autoTestFrames;
     if (game_values.gamemode->gameover)
         ++autoTestOverFrames;
+    //(--at-role matchedit: the editor in the match, worked by a script; it has the frame while editing)
+    if (cmd::g_autotest.kind == cmd::AutoTestArgs::Kind::Shots && cmd::g_autotest.shotsRole == "matchedit" && autoTestEditScript(autoTestFrames))
+        return true;
     if (cmd::g_autotest.everything && cmd::g_autotest.kind == cmd::AutoTestArgs::Kind::Single) {
         if (autoTestFrames == 240)
             game_values.flags.pausegame = true;
@@ -911,6 +954,9 @@ void GameplayState::update()
 
     handleInput();
 
+    //(the Map Maker: building, the right to build; before the pause and quit keys: Back builds)
+    updateEditMode();
+
     if (updateExitPauseDialog(g_sim.countdownState)) {
         GameStateManager::instance().changeStateTo(&MenuState::instance());
         return;
@@ -922,6 +968,10 @@ void GameplayState::update()
             return;
 
         InputFrame input = gatherLocalInput(game_values.playerInput, game_values.playercontrol);
+        //(the Map Maker's builders: their buttons in their bytes)
+        for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++)
+            if (game_values.playercontrol[slot] == 1)
+                input.players[slot] = matchedit::inputByte(slot, slot, input.players[slot]);
         if (cmd::g_autotest.enabled && cmd::g_autotest.humans > 0)
             input = autoTestHumanInput();
         //The CPU players' buttons: their AI runs here, outside the simulation
@@ -987,6 +1037,7 @@ void GameplayState::updateNetplay()
         net.leaveMatch("quit");
         return;
     }
+    updateEditMode();    //(the Map Maker: Back builds)
 
     const bool quitTest = cmd::g_net.quitAt > 0 && g_sim.tick >= cmd::g_net.quitAt;
     if (updateExitPauseDialog(g_sim.countdownState) || quitTest) {
@@ -1016,6 +1067,8 @@ void GameplayState::updateNetplay()
             input.players[slot] = 0;    //(the online panel has the buttons: this computer's players stand still)
         else
             input.players[slot] = toInputByte(game_values.playerInput.outputControls[device]);
+        if (!onlinePanelOpen())
+            input.players[slot] = matchedit::inputByte(slot, device, input.players[slot]);    //(the Map Maker's builders)
         device++;
     }
 
@@ -1093,7 +1146,7 @@ void GameplayState::render(float alpha)
     static bool s_pausedPictureShown = false;
     static bool s_debugOverlayWasOn = false;
     const bool debugOverlayOn = prof::on();
-    const SDL_Rect dialogs {160, 166, 320, 144};
+    const SDL_Rect dialogs {124, 166, 392, 208};
     const SDL_Rect debugOverlay {0, 0, 360, App::screenHeight};
     const bool restored = frozen && s_pausedPictureValid && (s_pausedPictureShown
         ? gfx_copyrect(s_pausedPicture.getSurface(), blitdest, dialogs)
@@ -1111,7 +1164,9 @@ void GameplayState::render(float alpha)
             interpolator.apply(alpha);
         correctionSmoother.apply();
 
+        matchedit::syncVisuals();    //(the Map Maker: the layer pictures follow the map)
         drawEverything(g_sim.countdownState, iScoreTextOffset);
+        drawEditMode();    //(the Map Maker's builders' cursors and palettes)
 
         correctionSmoother.restore();
         if (smooth)

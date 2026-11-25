@@ -104,6 +104,9 @@ void visitSimulationSettings(Visit&& v, CGameValues& g)
     v(g.spotlights);
     // all game mode settings (the effective ones, see SetGameModeSettingsFromMenu)
     v(g.gamemodesettings);
+    v(g.mapmaker.start);
+    v(g.mapmaker.builders);
+    v(g.mapmaker.blank);
 }
 
 template <typename T> struct is_c_array : std::false_type {};
@@ -764,6 +767,7 @@ void startConfiguredMatch(const MatchConfig& config)
     //The same steps as the menu's match start (MenuState::update)
     const std::string path = mapPathFor(config);
     g_map->loadMap(path, read_type_full);
+    matchedit::prepareMap();
     loadlog::mark("match (lobby's): map");
     LoadCurrentMapBackground();
     loadlog::mark("match (lobby's): background");

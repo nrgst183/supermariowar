@@ -1,5 +1,7 @@
 #include "MapList.h"
 
+#include <memory>
+
 #include "FileList.h"
 #include "GameValues.h"
 #include "linfunc.h"
@@ -456,6 +458,21 @@ void MapList::ReadFilters()
 }
 
 //Forces all the maps to reload the auto filters from the live map files (flush the cache)
+void MapList::refreshAutoFilters(const std::string& file)
+{
+    for (auto& [name, node] : maps) {
+        if (node.filename != file)
+            continue;
+        //(read into a map of its own: the one being played stays as it is)
+        auto summary = std::make_unique<CMap>();
+        summary->loadMap(file, read_type_summary);
+        for (size_t k = 0; k < NUM_AUTO_FILTERS && k < node.pfFilters.size(); k++)
+            node.pfFilters[k] = summary->fAutoFilter[k];
+        WriteMapSummaryCache();
+        return;
+    }
+}
+
 void MapList::ReloadMapAutoFilters()
 {
     auto itr = maps.begin(), lim = maps.end();

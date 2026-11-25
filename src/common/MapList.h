@@ -142,6 +142,8 @@ public:
     }
 
         void ReloadMapAutoFilters();
+        // One map's auto filters read again (it was saved over: the Map Maker), the summary cache written
+        void refreshAutoFilters(const std::string& file);
         void WriteMapSummaryCache();
 
     private:

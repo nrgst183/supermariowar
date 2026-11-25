@@ -55,6 +55,7 @@
 #include "gamemodes/MiniBoss.h"
 #include "gamemodes/MiniBoxes.h"
 #include "gamemodes/MiniPipe.h"
+#include "gamemodes/MapMaker.h"
 #include "gamemodes/Owned.h"
 #include "gamemodes/Race.h"
 #include "gamemodes/ShyGuyTag.h"
@@ -416,6 +417,7 @@ void create_gamemodes()
     gamemodes[19] = createGameMode<CGM_Collection>();
     gamemodes[20] = createGameMode<CGM_Chase>();
     gamemodes[21] = createGameMode<CGM_ShyGuyTag>();
+    gamemodes[22] = createGameMode<CGM_MapMaker>();
 
     currentgamemode = 0;
     game_values.gamemode = gamemodes[currentgamemode];
@@ -567,6 +569,10 @@ void main_game()
     loadlog::mark("game values, modes, settings");
     if (cmd::g_autotest.enabled && cmd::g_autotest.prompts >= 0)
         game_values.buttonprompts = static_cast<short>(cmd::g_autotest.prompts);
+    if (cmd::g_autotest.enabled && cmd::g_autotest.mmStart >= 0)
+        game_values.mapmaker.start = static_cast<short>(cmd::g_autotest.mmStart);
+    if (cmd::g_autotest.enabled && cmd::g_autotest.mmBlank >= 0)
+        game_values.mapmaker.blank = static_cast<short>(cmd::g_autotest.mmBlank);
     if (cmd::g_autotest.enabled && cmd::g_autotest.itemRespawn >= 0)
         game_values.itemrespawntime = static_cast<short>(cmd::g_autotest.itemRespawn);
     if (cmd::g_autotest.enabled && cmd::g_autotest.pad)

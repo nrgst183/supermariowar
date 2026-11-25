@@ -840,6 +840,30 @@ UI_ModeOptionsMenu::UI_ModeOptionsMenu()
     finishModeMenu(mModeSettingsMenu[21], "Shyguy Tag Rules", {miShyGuyTagModeTagOnSuicideField, miShyGuyTagModeTagOnStompField, miShyGuyTagModeFreeTimeField});
 
     //***********************
+    // Map Maker Settings
+    //***********************
+
+    miMapMakerStartField = new MI_SelectField<short>(&rm->spr_selectfield, 120, 180, "Start", 400, 180);
+    miMapMakerStartField->add("Building", 0);
+    miMapMakerStartField->add("Playing", 1);
+    miMapMakerStartField->setOutputPtr(&game_values.mapmaker.start);
+    miMapMakerStartField->setCurrentValue(game_values.mapmaker.start);
+
+    miMapMakerBuildersField = new MI_SelectField<short>(&rm->spr_selectfield, 120, 220, "Who builds", 400, 180);
+    miMapMakerBuildersField->add("Host decides", 0);
+    miMapMakerBuildersField->add("Everyone", 1);
+    miMapMakerBuildersField->setOutputPtr(&game_values.mapmaker.builders);
+    miMapMakerBuildersField->setCurrentValue(game_values.mapmaker.builders);
+
+    miMapMakerMapField = new MI_SelectField<short>(&rm->spr_selectfield, 120, 260, "Start from", 400, 180);
+    miMapMakerMapField->add("The map chosen", 0);
+    miMapMakerMapField->add("A blank map", 1);
+    miMapMakerMapField->setOutputPtr(&game_values.mapmaker.blank);
+    miMapMakerMapField->setCurrentValue(game_values.mapmaker.blank);
+
+    finishModeMenu(mModeSettingsMenu[game_mode_mapmaker], "Map Maker Rules", {miMapMakerStartField, miMapMakerBuildersField, miMapMakerMapField});
+
+    //***********************
     // Boss Mode Settings
     //***********************
 

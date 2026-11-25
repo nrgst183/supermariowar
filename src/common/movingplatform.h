@@ -22,6 +22,11 @@ class MovingPlatform : public sim::ArenaAllocated
         // resource, not owned), without prerendered surfaces. Used for the
         // temporary platforms created during a match (falling donut blocks).
         MovingPlatform(const gfxSprite& sprite, short w, short h, short drawlayer, MovingPlatformPath * path);
+        // A platform of w x h of one tileset tile (its type `type`), its tiles drawn each frame without
+        // prerendered surfaces: the Map Maker's, made during a match (smw/GameplayEdit.cpp)
+        MovingPlatform(const TilesetTile& tile, TileType type, short w, short h, short drawlayer, MovingPlatformPath * path);
+        // Likewise, of w x h tiles of their own (`tiles`, `types`: a column after another)
+        MovingPlatform(const TilesetTile* tiles, const TileType* types, short w, short h, short drawlayer, MovingPlatformPath * path);
         ~MovingPlatform();
 
         void draw();
@@ -56,6 +61,9 @@ class MovingPlatform : public sim::ArenaAllocated
     }
 
         bool IsInNoSpawnZone(short x, short y, short w, short h);
+
+    // Gone at the map's next update (a temporary platform: deleted then)
+    void kill() { fDead = true; }
 
     void SetPlayerId(short playerId) {
         iPlayerId = playerId;
@@ -108,6 +116,7 @@ class MovingPlatform : public sim::ArenaAllocated
         //customSprite.
         std::array<gfxSprite, 2> sprites;
         const gfxSprite* customSprite = nullptr;
+        bool drawTiles = false;    // its tiles drawn from the tilesets each frame (no sprites)
 
         SDL_Rect	rSrcRect;
 

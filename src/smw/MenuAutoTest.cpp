@@ -1783,6 +1783,38 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
     }
 
     //--at-role go: the main menu's Go! (a random game right away; --at-shot-every for its screens)
+    //--at-role matchedit: a single game of the Map Maker, as a person starts one: Editors > Map Maker >
+    //This computer, its lobby, Continue (its map and rules; Back to the lobby and on again), Start. Its
+    //script then: GameplayState::autoTestEditScript
+    if (at.shotsRole == "matchedit" && step == 1) {
+        switch (t) {
+            case 1: return MENU_CODE_TO_EDITORS_MENU;
+            case 6: shot("m0_editors"); break;
+            case 10:
+                mEditorsMenu->Want(UI_EditorsMenu::Action::MapMaker);
+                return MENU_CODE_EDITORS_ACTION;
+            case 20: shot("m1_editors_mapmaker"); break;
+            case 25:
+                mEditorsMenu->Want(UI_EditorsMenu::Action::Start);
+                return MENU_CODE_EDITORS_ACTION;
+            case 45: shot("m2_lobby"); break;
+            case 50: return MENU_CODE_ONLINE_MATCH_SETTINGS;
+            case 65: shot("m3_settings"); break;
+            case 70: return MENU_CODE_TO_MODE_SETTINGS_MENU;
+            case 80: shot("m4_rules"); break;
+            case 85: return MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS;
+            case 90: return MENU_CODE_BACK_TEAM_SELECT_MENU;
+            case 105: shot("m5_back_to_lobby"); break;
+            case 110: return MENU_CODE_ONLINE_MATCH_SETTINGS;
+            case 125:
+                printf("shots: map maker: mode %d, session %d, %d teams\n", mGameSettingsMenu->GetCurrentGameModeID(),
+                    mGameSettingsMenu->MapMakerSession() ? 1 : 0, g_sim.score_cnt);
+                step = 1000;
+                t = 0;
+                return MENU_CODE_START_GAME;
+        }
+        return MENU_CODE_NONE;
+    }
     if (at.shotsRole == "go" && step == 1) {
         step = 1000;
         t = 0;
@@ -1838,7 +1870,7 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             {"mode05", {}, 5}, {"mode06", {}, 6}, {"mode07", {}, 7}, {"mode08", {}, 8}, {"mode09", {}, 9},
             {"mode10", {}, 10}, {"mode11", {}, 11}, {"mode12", {}, 12}, {"mode13", {}, 13}, {"mode14", {}, 14},
             {"mode15", {}, 15}, {"mode16", {}, 16}, {"mode17", {}, 17}, {"mode18", {}, 18}, {"mode19", {}, 19},
-            {"mode20", {}, 20}, {"mode21", {}, 21}, {"bosses", {}, GAMEMODE_LAST},
+            {"mode20", {}, 20}, {"mode21", {}, 21}, {"mode22", {}, 22}, {"bosses", {}, GAMEMODE_LAST},
             {"lobby", {MENU_CODE_TO_MAIN_MENU, MENU_CODE_TO_LOCAL_LOBBY}, -1},
             {"lobbyopts", {MENU_CODE_ONLINE_OPTIONS}, -1},
             {"settings", {MENU_CODE_ONLINE_OPTIONS_BACK, MENU_CODE_ONLINE_MATCH_SETTINGS, MENU_CODE_MATCH_SELECTION_START}, -1},

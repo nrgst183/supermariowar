@@ -34,8 +34,8 @@ smw() {
     HOME="$WORK/home" "$SMW" --datadir "$ROOT/data" --autotest --at-norender 1 "$@"
 }
 
-echo "== Rollback sync test (22 game modes)"
-for mode in $(seq 0 21); do
+echo "== Rollback sync test (23 game modes)"
+for mode in $(seq 0 22); do
     out=$(smw --at-mode "$mode" --at-frames 1500 --at-seed 7 --at-synctest 8 2>&1)
     mismatches=$(grep -c "MISMATCH" <<< "$out")
     if [ "$mismatches" -ne 0 ] || ! grep -q "replay: saved" <<< "$out"; then

@@ -61,6 +61,8 @@ short modeIcon(int mode)
         return 26;
     if (mode == game_mode_boxes_minigame)
         return 27;
+    if (mode == game_mode_mapmaker)
+        return 23;
     return mode >= 0 && mode < GAMEMODE_LAST ? static_cast<short>(mode) : -1;
 }
 } // namespace

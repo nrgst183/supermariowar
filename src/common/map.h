@@ -231,6 +231,9 @@ class CMap
         // The file of the latest loadMap()
         const std::string& loadedFile() const { return szLoadedFile; }
         void saveMap(const std::string& file);
+        std::vector<MapHazard>& hazards() { return maphazards; }
+        // Saved with `extra` platforms too, as if the map's own (the Map Maker's, made in the match)
+        void saveMap(const std::string& file, const std::vector<MovingPlatform*>& extra);
         // A hash of the tiles, their types and the blocks (tests: the same map after a save and load)
         uint32_t tilesHash(int part = 0) const;    // part: 0 all, 1 tiles, 2 types, 3 blocks
 
@@ -239,6 +242,28 @@ class CMap
 
         void UpdateAllTileGaps();
         void UpdateTileGap(short i, short j);
+
+        // The level data edited in place (the editor in the match, smw/GameplayEdit.cpp):
+        // a cell's tile type from its layers' tiles (an animated tile's type isn't loaded in the game:
+        // a cell with one keeps the type it has)
+        void recalcTileType(short x, short y);
+        // ...and what follows from the level data: the draw areas, the spawn areas, the tile gaps; the
+        // animated tiles are cleared (the layers drawn again set them up: SetupAnimatedTiles)
+        void refreshAfterEdit();
+        // Parts of it, for one cell edited in a running match: the spawn areas, the draw areas; the
+        // pictures' part (the animated tiles cleared and the draw areas: then BuildMatchMapLayers)
+        void refreshSpawnAreas();
+        void refreshDrawAreas() { computeDrawAreas(); }
+        void refreshVisuals() { ClearAnimatedTiles(); computeDrawAreas(); }
+        // The warps' ids and exits from the warp cells (as a save works them out: next to each other with
+        // the same direction and connection, one warp; over MAXWARPS, none)
+        void recalcWarps();
+        // The Map Maker's blank map: no tiles, blocks, warps, items, hazards or platforms; a floor of
+        // `floor` along the bottom (the background and music stay)
+        void makeBlank(const TilesetTile& floor);
+        // One cell of the match's layer pictures drawn again (predrawbackground's and predrawforeground's
+        // for that cell): false if the cell has an animated tile (they're set up for the whole map)
+        bool redrawCell(short x, short y, const gfxSprite& background, gfxSprite& backmap, gfxSprite& frontmap);
 
         //void convertMap();
 
@@ -288,10 +313,25 @@ class CMap
     MapBlock * blockat(short x, short y) {
             return &objectdata[x][y];
         }
+    TilesetTile * tileAt(short x, short y, short layer) {
+            return &mapdata[x][y][layer];
+        }
+    std::vector<MapItem>& items() {
+            return mapitems;
+        }
 
     bool spawn(short iType, short x, short y) {
             return !nospawn[iType][x][y];
         }
+    // A cell's type, as play reads it (the editors': set apart from its tiles' types too)
+    TileType tileType(short x, short y) const { return mapdatatop[x][y]; }
+    void setTileType(short x, short y, TileType type) { mapdatatop[x][y] = type; }
+    void setNoSpawn(short iType, short x, short y, bool on) { nospawn[iType][x][y] = on; }
+    // The race goals' and the flag bases' places (iNumRaceGoals, iNumFlagBases: 0 random), the
+    // on/off switches' states (the map's: how they start)
+    Point* raceGoals() { return racegoallocations; }
+    Point* flagBases() { return flagbaselocations; }
+    std::array<short, 4>& switches() { return iSwitches; }
 
         void updatePlatforms();
         void drawPlatforms(short iLayer);
@@ -338,6 +378,20 @@ class CMap
         // stays the same during a match. The permanent moving platforms and
         // the temporary ones (and their list nodes) live in the simulation
         // arena, so only the list object itself is listed here.
+        // The level data the Map Maker's building changes during a match (smw/GameplayEdit.cpp): in its
+        // rollback snapshots too
+        template <typename Fn>
+        void forEachLevelRegion(Fn&& fn) {
+            fn(mapdata, sizeof(mapdata), "map.mapdata");
+            fn(objectdata, sizeof(objectdata), "map.objectdata");
+            fn(nospawn, sizeof(nospawn), "map.nospawn");
+            fn(spawnareas, sizeof(spawnareas), "map.spawnareas");
+            fn(numspawnareas, sizeof(numspawnareas), "map.numspawnareas");
+            fn(totalspawnsize, sizeof(totalspawnsize), "map.totalspawnsize");
+            fn(warpdata, sizeof(warpdata), "map.warpdata");
+            fn(&numwarpexits, sizeof(numwarpexits), "map.numwarpexits");    //(warpexits: a runtime region)
+        }
+
         template <typename Fn>
         void forEachRuntimeRegion(Fn&& fn) {
             fn(mapdatatop, sizeof(mapdatatop), "map.mapdatatop");
@@ -474,6 +528,8 @@ class CMap
         friend int save_as();
         friend int load();
         friend void LoadMapObjects(bool fPreview);
+        friend void SetMapBlockAt(short x, short y);
+        friend void RebuildSwitchBlocks();
         friend void LoadMapHazards(bool fPreview);
         friend void draw_platform(short iPlatform, bool fDrawTileTypes);
         friend void insert_platforms_into_map();

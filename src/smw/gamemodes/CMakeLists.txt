@@ -38,6 +38,8 @@ target_sources(smw PRIVATE
     MiniBoxes.h
     MiniPipe.cpp
     MiniPipe.h
+    MapMaker.cpp
+    MapMaker.h
     Owned.cpp
     Owned.h
     Race.cpp

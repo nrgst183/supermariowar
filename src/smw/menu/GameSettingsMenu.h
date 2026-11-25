@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GameModeType.h"
 #include "uimenu.h"
 
 #include <string>
@@ -28,6 +29,10 @@ public:
     void SetHeaderText(const char*);
     void SetStartButtonText(const char*);
     void HideGMSettingsBtn();
+    // The Map Maker's session (Editors > Map Maker): the mode is it, and can't be changed; otherwise
+    // it isn't among the modes
+    void SetMapMakerSession(bool on);
+    bool MapMakerSession() const { return m_mapMaker; }
     void GameModeChanged(short gmID);
     void RefreshGameModeButtons();
     short GetCurrentGameModeID();
@@ -46,7 +51,7 @@ public:
 
     MI_MapFilterScroll* miMapFilterScroll = nullptr;
     MI_MapField* miMapField = nullptr;
-    MI_SelectField<short>* miGoalField[22];
+    MI_SelectField<short>* miGoalField[GAMEMODE_LAST];
 
 private:
     MI_ImageSelectField* miModeField = nullptr;
@@ -64,6 +69,8 @@ private:
     MI_LockTag* miHostTag[3] {};
     MI_LobbyMap* miMapOverlay = nullptr;
     OnlineView m_onlineView = OnlineView::Off;
+    bool m_mapMaker = false;
+    std::string m_header = "Single Game";    // the header asked for (the Map Maker's session shows its own)
 
     MI_DialogBox* miGameSettingsExitDialogImage = nullptr;
     MI_Text* miGameSettingsExitDialogExitText = nullptr;

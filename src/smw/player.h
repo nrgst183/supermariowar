@@ -100,6 +100,13 @@ public:
 
     void Init();
 
+    // Building in the Map Maker (GameplayEdit.cpp): out of play (what it carries dropped), waiting,
+    // until it's done; then it spawns as after a death
+    void beginEditing();
+    // Done building: spawns at once, at x, y (its top left) if that's free, else where the map lets it
+    void endEditing(short spawnX = -1, short spawnY = -1);
+    bool isEditing() const { return editing; }
+
     /* Player info */
 
     short getGlobalID() const { return globalID; }
@@ -305,6 +312,9 @@ private:
         short localID;
         short subTeamID;
         short colorID;
+        bool editing = false;    // building in the Map Maker: beginEditing
+        short spawnAtX = -1;     // where it spawns when done (the builder's cursor), -1 where the map lets it
+        short spawnAtY = -1;
 
         short ix, iy;			//x, y coordinate (top left of the player rectangle)
         float fx, fy;

@@ -225,6 +225,48 @@ MovingPlatform::MovingPlatform(const gfxSprite& sprite, short w, short h, short 
     fOldVelY = fVelY;
 }
 
+MovingPlatform::MovingPlatform(const TilesetTile* tiles, const TileType* types, short w, short h, short drawlayer, MovingPlatformPath * path)
+    : MovingPlatform(tiles[0], types[0], w, h, drawlayer, path)
+{
+    iTileData.assign(tiles, tiles + w * h);
+    iTileType.assign(types, types + w * h);
+}
+
+MovingPlatform::MovingPlatform(const TilesetTile& tile, TileType type, short w, short h, short drawlayer, MovingPlatformPath * path)
+{
+    fDead = false;
+    iPlayerId = -1;
+
+    iTileData.assign(static_cast<size_t>(w * h), tile);
+    iTileType.assign(static_cast<size_t>(w * h), type);
+
+    iTileWidth = w;
+    iTileHeight = h;
+
+    iDrawLayer = drawlayer;
+
+    iWidth = w * TILESIZE;
+    iHeight = h * TILESIZE;
+
+    iHalfWidth = iWidth >> 1;
+    iHalfHeight = iHeight >> 1;
+
+    drawTiles = true;
+
+    pPath = path;
+    pPath->SetPlatform(this);
+
+    ResetPath();
+
+    rSrcRect = {0, 0, iWidth, iHeight};
+
+    fVelX = pPath->velocity0().x;
+    fVelY = pPath->velocity0().y;
+
+    fOldVelX = fVelX;
+    fOldVelY = fVelY;
+}
+
 MovingPlatform::~MovingPlatform()
 {
     delete pPath;
@@ -244,7 +286,25 @@ void MovingPlatform::draw()
 {
     const SDL_Rect rDstRect = {ix - iHalfWidth + x_shake, iy - iHalfHeight + y_shake, iWidth, iHeight};
 
-    if (customSprite) {
+    if (drawTiles) {
+        //(each tile, and its copy wrapped round the screen's edge where it shows)
+        const int w = App::screenWidth;
+        for (short iCol = 0; iCol < iTileWidth; iCol++) {
+            for (short iRow = 0; iRow < iTileHeight; iRow++) {
+                const TilesetTile& tile = iTileData[iCol * iTileHeight + iRow];
+                CTileset* tileset = tile.iID >= 0 ? g_tilesetmanager->tileset(static_cast<size_t>(tile.iID)) : nullptr;
+                if (!tileset)
+                    continue;
+                const int x = rDstRect.x + iCol * TILESIZE;
+                for (const int at : {x, x - w, x + w}) {
+                    if (at >= w || at + TILESIZE <= 0)
+                        continue;
+                    tileset->draw(DrawSize::Ingame, CTilesetManager::rect(DrawSize::Ingame, tile.iCol, tile.iRow), blitdest,
+                        SDL_Rect {at, rDstRect.y + iRow * TILESIZE, TILESIZE, TILESIZE});
+                }
+            }
+        }
+    } else if (customSprite) {
         customSprite->draw(rSrcRect, blitdest, rDstRect);
 
         //Wrap around the screen edges, like the prerendered tiles do

@@ -44,7 +44,7 @@ void print_help(const char* title, const char* version)
     printf("      --autotest          Enables auto-play; the options below only apply with it\n");
     printf("      --at-match <KIND>   single (default), minigame, tournament, tour, world, menus, shots, or\n"
            "                          everything (all of them in turn; the Xbox's memory test)\n");
-    printf("      --at-mode <N>       Game mode index 0..21 (minigame: 0 pipe, 1 hammer boss,\n"
+    printf("      --at-mode <N>       Game mode index 0..22 (minigame: 0 pipe, 1 hammer boss,\n"
            "                          2 bomb boss, 3 fire boss, 4 boxes); default: cycle all\n");
     printf("      --at-map <NAME>     Map short name (e.g. 0smw); default: cycle the map list\n"
            "                          (tour, world: the file name of the tour or world, e.g. 0smw)\n");
@@ -177,6 +177,9 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-replay-seeks") at.replaySeeks = atoi(val.c_str());
             else if (arg == "--at-prompts") at.prompts = atoi(val.c_str());
             else if (arg == "--at-pad") at.pad = atoi(val.c_str()) != 0;
+            else if (arg == "--at-mm-start") at.mmStart = atoi(val.c_str());
+            else if (arg == "--at-mm-blank") at.mmBlank = atoi(val.c_str());
+            else if (arg == "--at-pace") at.pace = atoi(val.c_str()) > 1 ? atoi(val.c_str()) : 1;
             else if (arg == "--at-perf") at.perf = atoi(val.c_str()) != 0;
             else if (arg == "--at-item-respawn") at.itemRespawn = atoi(val.c_str());
             else if (arg == "--at-powerup") at.powerup = atoi(val.c_str());

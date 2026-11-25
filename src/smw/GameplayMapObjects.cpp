@@ -19,6 +19,10 @@
 #include "objects/blocks/ViewBlock.h"
 #include "objects/blocks/WeaponBreakableBlock.h"
 #include "objects/moving/MO_Coin.h"
+#include "objects/moving/MO_PirhanaPlant.h"
+#include "objects/IO_BulletBillCannon.h"
+#include "objects/IO_FlameCannon.h"
+#include "objects/overmap/WO_OrbitHazard.h"
 
 #include <format>
 #include <string>
@@ -96,6 +100,97 @@ IO_Block* spawnMapBlock(short typeId, Vec2s drawPos, const MapBlock& objdata, co
         case MapBlock_WpnBreakLeaf: return new B_WeaponBreakableBlock(&rm->spr_weaponbreakableblock, drawPos, WeaponDamageType::Leaf);
         default: return nullptr;
     }
+}
+
+void SetMapBlockAt(short x, short y)
+{
+    //The block there now out of the match (and of the switches' lists)
+    if (IO_Block* old = g_map->blockdata[x][y]) {
+        for (auto& blocks : g_map->switchBlocks)
+            blocks.remove(old);
+        old->remove();
+        g_map->blockdata[x][y] = nullptr;
+    }
+    //The map's block there in it
+    const short typeId = g_map->objectdata[x][y].iType;
+    IO_Block* block = spawnMapBlock(typeId, {static_cast<short>(x * 32), static_cast<short>(y * 32)}, g_map->objectdata[x][y], g_map->iSwitches);
+    if (block)
+        block = g_sim.noncolcontainer.add(block);
+    g_map->blockdata[x][y] = block;
+    if (block && typeId >= MapBlock_SwitchToggleRed && typeId <= MapBlock_SwitchBlockBlue)
+        g_map->switchBlocks[typeId - MapBlock_SwitchToggleRed].push_back(block);
+    for (short i = x - 1; i <= x + 1; i++)
+        for (short j = y - 1; j <= y + 1; j++)
+            if (i >= 0 && i < MAPWIDTH && j >= 0 && j < MAPHEIGHT)
+                g_map->UpdateTileGap(i, j);
+}
+
+void RebuildSwitchBlocks()
+{
+    for (auto& blocks : g_map->switchBlocks)
+        blocks.clear();
+    for (short x = 0; x < MAPWIDTH; x++) {
+        for (short y = 0; y < MAPHEIGHT; y++) {
+            const short typeId = g_map->objectdata[x][y].iType;
+            if (g_map->blockdata[x][y] && typeId >= MapBlock_SwitchToggleRed && typeId <= MapBlock_SwitchBlockBlue)
+                g_map->switchBlocks[typeId - MapBlock_SwitchToggleRed].push_back(g_map->blockdata[x][y]);
+        }
+    }
+}
+
+void SpawnMapItem(const MapItem& item)
+{
+    const Vec2s pos(item.ix * 32, item.iy * 32);
+    switch (item.itype) {
+        case GreenSpring: g_sim.objectcontainer[1].add(new CO_Spring(&rm->spr_spring, pos, false)); break;
+        case Spike: g_sim.objectcontainer[1].add(new CO_Spike(&rm->spr_spike, pos)); break;
+        case GreenKuriboShoe: g_sim.objectcontainer[1].add(new CO_KuriboShoe(&rm->spr_kuriboshoe, pos, false)); break;
+        case GoldenSpring: g_sim.objectcontainer[1].add(new CO_Spring(&rm->spr_spring, pos, true)); break;
+        case StickyKuriboShoe: g_sim.objectcontainer[1].add(new CO_KuriboShoe(&rm->spr_kuriboshoe, pos, true)); break;
+        case ThrowBox: {
+            //(a powerup in it as the match's boxes get one: 40% of them, by the item weights)
+            short iCountWeight = 0;
+            for (short iPowerup = 0; iPowerup < NUM_POWERUPS; iPowerup++)
+                iCountWeight += game_values.powerupweights[iPowerup];
+            short iItem = NO_POWERUP;
+            if (iCountWeight > 0 && RANDOM_INT(100) < 40) {
+                const int iRandPowerup = RANDOM_INT(iCountWeight) + 1;
+                iItem = 0;
+                int iPowerupWeightCount = game_values.powerupweights[iItem];
+                while (iPowerupWeightCount < iRandPowerup)
+                    iPowerupWeightCount += game_values.powerupweights[++iItem];
+            }
+            g_sim.objectcontainer[1].add(new CO_ThrowBox(&rm->spr_throwbox, pos, iItem));
+            break;
+        }
+    }
+}
+
+void RemoveMapItemObjectsAt(short x, short y)
+{
+    //(the item's object while it's still where the map put it: a spring carried away stays)
+    for (const auto& object : g_sim.objectcontainer[1].list()) {
+        const bool item = dynamic_cast<CO_Spring*>(object.get()) || dynamic_cast<CO_Spike*>(object.get())
+            || dynamic_cast<CO_KuriboShoe*>(object.get()) || dynamic_cast<CO_ThrowBox*>(object.get());
+        if (item && (object->x() + 16) / 32 == x && (object->y() + 16) / 32 == y)
+            object->remove();
+    }
+}
+
+void RespawnMapHazards(const MapHazard* hazards, int count)
+{
+    //(the bullets and flames out already stay: only what the map put there)
+    CObjectContainer* containers[] = {&g_sim.noncolcontainer, &g_sim.objectcontainer[1]};
+    for (CObjectContainer* container : containers) {
+        for (const auto& object : container->list()) {
+            CObject* o = object.get();
+            if (dynamic_cast<OMO_OrbitHazard*>(o) || dynamic_cast<IO_BulletBillCannon*>(o) || dynamic_cast<IO_FlameCannon*>(o)
+                || dynamic_cast<MO_PirhanaPlant*>(o))
+                o->remove();
+        }
+    }
+    for (int k = 0; k < count; k++)
+        SpawnMapHazard(hazards[k], false);
 }
 
 void LoadMapObjects(bool fPreview)

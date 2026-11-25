@@ -23,6 +23,7 @@ enum GameModeType {
     game_mode_collection,
     game_mode_chase,
     game_mode_shyguytag,
+    game_mode_mapmaker,    // building the map while playing it (smw/gamemodes/MapMaker.h)
     GAMEMODE_LAST,
     game_mode_bonus = 999,
     game_mode_pipe_minigame = 1000,

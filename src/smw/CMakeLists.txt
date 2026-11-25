@@ -21,6 +21,7 @@ add_executable(smw WIN32
 	GameplayInterpolation.cpp
 	GameplayInterpolation.h
 	GameplayMapObjects.cpp
+	GameplayEdit.cpp
 	GameplayPause.cpp
 	NetOverlay.cpp
 	NetOverlay.h

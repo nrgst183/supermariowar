@@ -1,5 +1,7 @@
 #pragma once
 
+#include "GameModeType.h"
+
 #include "uimenu.h"
 #include "GameplayStyles.h"
 #include "MatchTypes.h"
@@ -37,7 +39,7 @@ public:
 
 private:
     // Game Mode Settings Menu
-    UI_Menu mModeSettingsMenu[22];
+    UI_Menu mModeSettingsMenu[GAMEMODE_LAST];
 
     UI_Menu mBossSettingsMenu;
 
@@ -147,6 +149,10 @@ private:
     MI_SelectField<bool>* miShyGuyTagModeTagOnSuicideField;
     MI_SelectField<short>* miShyGuyTagModeTagOnStompField;
     MI_SelectField<short>* miShyGuyTagModeFreeTimeField;
+
+    MI_SelectField<short>* miMapMakerStartField;
+    MI_SelectField<short>* miMapMakerBuildersField;
+    MI_SelectField<short>* miMapMakerMapField;
 
     // Boss
     MI_SelectField<Boss>* miBossModeTypeField;

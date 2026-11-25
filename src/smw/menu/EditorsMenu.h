@@ -9,9 +9,11 @@ class MI_Text;
 class MI_TextField;
 class UI_Control;
 
-// Main menu > Editors: first the map (level) editor or the world editor, two
-// big buttons; then on this computer or online (host, or join an address), and
-// Start (editors/EditorLauncher.h, editors/CoEdit.h)
+// Main menu > Editors: first maps (the Map Maker: a match that builds its map as
+// it's played) or worlds (the world editor), big buttons; then on this computer or
+// online (host, or join from the games list), and Start (the Map Maker: a lobby, as
+// a match's; the world editor: editors/EditorLauncher.h, editors/CoEdit.h). The old
+// level editor isn't in the menu: the Map Maker took its place.
 class UI_EditorsMenu : public UI_Menu {
 public:
     UI_EditorsMenu();
@@ -29,7 +31,7 @@ public:
     // Opening the menu: the choice again
     void Open();
 
-    enum class Action { None, Maps, Worlds, Local, Online, Host, Join, Start };
+    enum class Action { None, Maps, Worlds, MapMaker, Local, Online, Host, Join, Start };    //(MapMaker: Maps)
     void Want(Action action) { m_pending = action; }
 
 private:
@@ -40,6 +42,7 @@ private:
     Action m_pending = Action::None;
     bool m_setup = false;     // the second page
     bool m_level = true;      // maps (else worlds)
+    bool m_mapMaker = true;   // maps: the Map Maker (not an editor: a match)
     bool m_online = false;
     bool m_joining = false;
     short m_panelY = 42;     // the setup panel (it fits what shows, centered)

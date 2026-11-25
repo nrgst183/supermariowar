@@ -130,6 +130,7 @@ bool CPlayerAI::improvedFighting() const
         case game_mode_survival:
         case game_mode_chase:
         case game_mode_shyguytag:
+        case game_mode_mapmaker:
             return true;
         default:
             return false;

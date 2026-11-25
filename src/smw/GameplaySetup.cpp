@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cassert>
 #include <cstring>
+#include <cstdio>
 
 #include "GSGameplayInternal.h"
 
@@ -31,6 +32,21 @@ void GameplayState::createPlayers()
             if (game_values.playercontrol[iPlayer] > 0) {
                 short teamid, subteamid;
                 LookupTeamID(iPlayer, &teamid, &subteamid);
+                //(a player on no team, the teams made before it joined: a team of its own; its score
+                //g_sim.score[-1] would write over the simulation state before the scores)
+                if (teamid < 0) {
+                    fprintf(stderr, "[setup] player %d is on no team: a team of its own\n", iPlayer);
+                    if (g_sim.score_cnt < 4) {
+                        teamid = g_sim.score_cnt++;
+                        game_values.teamcounts[teamid] = 1;
+                        game_values.teamids[teamid][0] = iPlayer;
+                    } else {
+                        teamid = 3;
+                        game_values.teamids[3][std::min<short>(game_values.teamcounts[3], 2)] = iPlayer;
+                        game_values.teamcounts[3] = std::min<short>(game_values.teamcounts[3] + 1, 3);
+                    }
+                    subteamid = static_cast<short>(game_values.teamcounts[teamid] - 1);
+                }
 
                 CPlayerAI * ai = nullptr;
                 if (game_values.playercontrol[iPlayer] == 2)

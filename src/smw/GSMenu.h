@@ -180,7 +180,7 @@ class MenuState : public GameState
         LocalSetup mLocalSetup;
         bool mLocalFromLobby = false;   // the match menus (and matches) of a local game from the lobby
         short mLocalTeams = 0;
-        void OpenLocalLobby();
+        void OpenLocalLobby(LobbyOrigin origin = LobbyOrigin::MainMenu);
         bool OpenLobby(rollback::LobbyAccess access, LobbyOrigin origin, std::string& error);
         void StartLocalFromLobby();
         // A lobby that edits together (CoEdit.h): Editors > Online > Host opens it; its Start (the host)

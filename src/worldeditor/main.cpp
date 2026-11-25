@@ -348,6 +348,7 @@ void inner_main()
     SetStageMode(19, "Card Collection", "Points", 10, 30);
     SetStageMode(20, "Phanto Chase", "Points", 50, 200);
     SetStageMode(21, "Shy Guy Tag", "Points", 50, 200);
+    SetStageMode(22, "Map Maker", "Kills", 5, 20);
 
     //Setup The Mode Menu
     mCurrentMenu = &mStageSettingsMenu;

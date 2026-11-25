@@ -4,6 +4,7 @@
 #include "GameValues.h"
 #include "ResourceManager.h"
 #include "SimulationState.h"
+#include "gfx.h"
 #include "rollback/NetGame.h"
 #include "gamemodes/Tag.h"
 #include "ui/InputPrompts.h"
@@ -30,8 +31,12 @@ void drawExitPauseDialog()
         ~Restore() { x_shake = x; y_shake = y; }
     } restore {shakeX, shakeY};
 
-    if (game_values.flags.pausegame) {
-        menupanel::dialogBox(190, 172, 260, 128);
+    if (game_values.flags.pausegame && matchedit::allowed()) {
+        //(the Map Maker: its own pause menu)
+        matchedit::drawPauseMenu();
+    } else if (game_values.flags.pausegame) {
+        const bool mapMaker = false;
+        menupanel::dialogBox(mapMaker ? 130 : 190, 172, mapMaker ? 380 : 260, mapMaker ? 196 : 128);
         rm->menu_font_large.drawCentered(App::screenWidth/2, 194, "Pause");
 
         short iMode = GetModeIconIndexFromMode(game_values.gamemode->gamemode);
@@ -45,7 +50,10 @@ void drawExitPauseDialog()
         else
             szGoal += std::to_string(game_values.gamemode->goal);
 
-        rm->menu_font_large.drawCentered(App::screenWidth/2, 264, szGoal.c_str());
+        if (mapMaker)
+            matchedit::drawPauseRights(264, true);
+        else
+            rm->menu_font_large.drawCentered(App::screenWidth/2, 264, szGoal.c_str());
     }
 
     if (game_values.flags.exitinggame) {
@@ -66,6 +74,8 @@ void drawExitPauseDialog()
 
 namespace {
 bool s_onlinePanel = false;
+int s_onlineRow = 0;
+bool s_pendingPanelShot = false;    // the Map Maker's host: 0 Run-Ahead, 1 the players' rights, 2 Save
 
 // The run-ahead settings, in the order left/right go through them (-1: Auto)
 constexpr short RUN_AHEAD_SETTINGS[] = {-1, 0, 1, 2, 3};
@@ -114,7 +124,9 @@ void drawOnlinePanel()
     const int ahead = runAheadSetting(game_values.runahead, delay);
     const int late = std::max(0, delay - ahead);
 
-    const int x = 100, y = 116, w = 440, h = 204;
+    //(the Map Maker: its rows under the run-ahead's, the players' right to build and the host's Save)
+    const bool mapMaker = matchedit::allowed();
+    const int x = 60, y = mapMaker ? 80 : 116, w = 520, h = mapMaker ? 290 : 204;
     menupanel::box(x, y, w, h);
     rm->menu_font_large.drawCentered(320, y + 10, "Online");
 
@@ -128,7 +140,7 @@ void drawOnlinePanel()
 
     //The setting, with its arrows
     const std::string setting = game_values.runahead < 0 ? "Auto (" + std::to_string(ahead) + ")" : game_values.runahead == 0 ? "Off" : framesText(game_values.runahead);
-    menupanel::row(x + 20, y + 62, w - 40, 36, true);
+    menupanel::row(x + 20, y + 62, w - 40, 36, !mapMaker || !matchedit::isHostHere() || s_onlineRow == 0);    //(the host's chosen row)
     rm->menu_font_large.draw(x + 34, y + 70, "Run-Ahead");
     rm->menu_font_large.drawRightJustified(x + w - 34, y + 70, "< " + setting + " >");
 
@@ -142,8 +154,25 @@ void drawOnlinePanel()
 
     using prompts::Pad;
     using prompts::menuKey;
-    prompts::drawPromptsLarge(320, y + 164, {{{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
-        {{Pad::Start}, {menuKey(prompts::MENU_CANCEL)}, "close"}}, 14, 400);
+    if (mapMaker)
+        matchedit::drawPauseRights(y + 160, true);
+    //(--at-online-panel with --at-shots: a screenshot of it, once the match runs)
+    static bool s_panelShot = false;
+    if (cmd::g_autotest.onlinePanel && !cmd::g_autotest.shotsDir.empty() && !s_panelShot && g_sim.tick > 120) {
+        s_panelShot = true;
+        s_pendingPanelShot = true;
+    }
+    if (mapMaker && matchedit::isHostHere())
+        prompts::drawPromptsLarge(320, y + h - 40, {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "row"},
+            {{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
+            {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "select"}, {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "close"}}, 14, 500);
+    else
+        prompts::drawPromptsLarge(320, y + h - 40, {{{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
+            {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "close"}}, 14, 400);
+    if (s_pendingPanelShot) {
+        s_pendingPanelShot = false;
+        gfx_save_screenshot(cmd::g_autotest.shotsDir + "/online_panel_p" + std::to_string(net.localPeer()) + ".png");
+    }
 }
 
 bool IsPauseAllowed()
@@ -175,11 +204,24 @@ bool updateExitPauseDialog(short iCountDownState) // true on exit
             //Online: the pause button opens the online panel (and while it's up, it has the keys)
             if (rollback::NetGame::instance().inMatch() && !game_values.gamemode->gameover) {
                 if (s_onlinePanel) {
-                    if (playerKeys->game_start.fPressed || playerKeys->game_cancel.fPressed || playerKeys->menu_cancel.fPressed) {
+                    //(the panel reads the menus' keys: B closes it, as the menus' back)
+                    if (playerKeys->menu_cancel.fPressed) {
                         closeOnlinePanel();
                         ifSoundOnPlay(rm->sfx_pause);
                         game_values.playerInput.ResetKeys();
                         break;
+                    }
+                    //(the Map Maker's host: down to its rows, the players' rights and Save)
+                    if (matchedit::allowed() && matchedit::isHostHere()) {
+                        if (playerKeys->menu_down.fPressed)
+                            s_onlineRow = (s_onlineRow + 1) % 3;
+                        if (playerKeys->menu_up.fPressed)
+                            s_onlineRow = (s_onlineRow + 2) % 3;
+                        matchedit::setPanelRow(s_onlineRow - 1);
+                        if (s_onlineRow > 0) {
+                            matchedit::hostPanelInput(playerKeys->menu_left.fPressed, playerKeys->menu_right.fPressed, false, playerKeys->menu_select.fPressed);
+                            continue;
+                        }
                     }
                     if (playerKeys->menu_left.fPressed)
                         changeRunAhead(-1);
