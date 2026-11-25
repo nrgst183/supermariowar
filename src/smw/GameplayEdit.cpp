@@ -146,6 +146,7 @@ bool s_switchPressed[SLOTS] {};    // Tab (or the script): building starts or en
 bool s_lbHeld[SLOTS] {};           // a pad's LB held (L+Up: the switch), by input device
 bool s_chordHeld[SLOTS] {};        // L+Up held last time (the switch on the press only)
 bool s_undoPressed[SLOTS] {};      // the undo button (RB, Backspace, Ctrl+Z), by input device
+bool s_pausePressed[SLOTS] {};     // building: the pause (a pad's Start, the keyboard's P), by input device
 bool s_wantRights[SLOTS] {};       // the host's toggles on its panel, sent as commands until the match has them
 bool s_wantPending[SLOTS] {};      // (only those: else the panel shows the match's rights)
 int s_rightsSlot = 1;              // the panel: the player whose right the host gives or takes
@@ -1771,6 +1772,8 @@ const char* const HAZARD_NAMES[HAZARD_TYPES] = {"Fire bar", "Roto disc", "Bullet
 // A tileset's tile, a block, a map item, a warp, a hazard or a platform (its number: `index`; a warp's:
 // its connection + 10 x its direction; a hazard's: its type; a platform's: its path) at x, y (the
 // brush, the palette)
+Uint64 animClock();
+
 void drawBrushPiece(uint8_t kind, const TilesetTile& tile, short index, int x, int y)
 {
     if (kind == BrushType) {
@@ -1827,7 +1830,7 @@ void drawBrushPiece(uint8_t kind, const TilesetTile& tile, short index, int x, i
         mapItemsPicture().draw(x, y, {index * TILESIZE, 0, TILESIZE, TILESIZE});
     } else if (tile.iID == TILESETANIMATED) {
         //(its frames side by side: the first; its row iCol, its column iRow, as the map keeps them)
-        const int frame = static_cast<int>((SDL_GetTicks() / 133) % 4);
+        const int frame = static_cast<int>((animClock() / 133) % 4);
         rm->spr_tileanimation[0].draw(x, y, {(tile.iCol * 4 + frame) * TILESIZE, tile.iRow * TILESIZE, TILESIZE, TILESIZE});
     } else if (tile.iID >= 0) {
         if (CTileset* tileset = g_tilesetmanager->tileset(static_cast<size_t>(tile.iID)))
@@ -1848,6 +1851,16 @@ void cellFrame(int x, int y, int w, int h, SDL_Color light)
     prompts::fill(x, y + h - 2, w, 2, light);
     prompts::fill(x, y + 2, 2, h - 4, light);
     prompts::fill(x + w - 2, y + 2, 2, h - 4, light);
+}
+
+// The clock of the hands' and the pictures' motion: the wall clock's; the autotest's run as fast as it
+// goes (no --at-realtime), a drawn frame a 60th of a second (its screenshots as a person would see them)
+Uint64 s_drawnFrames = 0;
+Uint64 animClock()
+{
+    if (cmd::g_autotest.enabled && cmd::g_autotest.realtime == 0)
+        return s_drawnFrames * 16;
+    return SDL_GetTicks();
 }
 
 // A builder's hand: the level editor's glove (Mario Paint's), white, pointing up and left, its cuff in
@@ -1876,7 +1889,7 @@ void drawGlove(int slot, SDL_Rect cell, SDL_Point tip, SDL_Color color, const st
     };
     static Glove gloves[4];
     Glove& g = gloves[slot & 3];
-    const Uint64 now = SDL_GetTicks();
+    const Uint64 now = animClock();
     const float tx = static_cast<float>(tip.x), ty = static_cast<float>(tip.y);
 
     //(not drawn a while: it appears where it is, popping in)
@@ -2535,6 +2548,8 @@ void reset()
 
 void beginFrame()
 {
+    for (bool& pressed : s_pausePressed)
+        pressed = false;
     for (int slot = 0; slot < SLOTS; slot++)
         s_menuKeys.inputControls[slot] = game_values.playerInput.inputControls[slot];
     s_menuKeys.ClearPressedKeys(1);
@@ -2556,6 +2571,12 @@ void noteEvent(const SDL_Event& event)
     } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && event.gbutton.button == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER) {
         from = event.gbutton.which;
         flags = s_undoPressed;
+    } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && event.gbutton.button == SDL_GAMEPAD_BUTTON_START) {
+        from = event.gbutton.which;
+        flags = s_pausePressed;
+    } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key == SDLK_P) {
+        from = DEVICE_KEYBOARD_ID;
+        flags = s_pausePressed;
     } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key == SDLK_TAB) {
         from = DEVICE_KEYBOARD_ID;
         flags = s_switchPressed;
@@ -2987,21 +3008,32 @@ void GameplayState::updateEditMode()
     COutputControl* game = game_values.playerInput.outputControls;    // read as the game's keys
 
     if (game_values.flags.pausegame) {
+        //(its menu has the keys: B or Escape resumes, its Quit quits; not the game's quit key too)
         matchedit::pauseMenuInput();
-        //Back on the pause screen: the quit dialog
         for (int slot = 0; slot < SLOTS; slot++) {
-            if (game[slot].game_cancel.fPressed) {
-                game_values.flags.pausegame = false;
-                game_values.flags.exitinggame = true;
-                game_values.playerInput.ResetKeys();
-                return;
-            }
+            game[slot].game_cancel.fPressed = false;
+            game[slot].game_start.fPressed = false;
         }
+        //(a pad's Start, the keyboard's P: back to the match)
+        for (const bool pressed : s_pausePressed)
+            if (pressed)
+                game_values.flags.pausegame = false;
         return;
     }
     s_menuWasOpen = false;    //(not paused: the menu opens on Resume next time)
     if (game_values.flags.exitinggame)
         return;
+    //Building, the game's pause and quit keys are building's (a keyboard's Enter paints, its Escape
+    //erases): not the game's then. The pause: a pad's Start, the keyboard's P (its Quit: the pause menu's)
+    for (int slot = 0; slot < SLOTS; slot++) {
+        if (!localHuman(slot) || !building(slot))
+            continue;
+        const int device = deviceOf(slot) & 3;
+        game[device].game_start.fPressed = false;
+        game[device].game_cancel.fPressed = false;
+        if (s_pausePressed[device] && !rollback::NetGame::instance().inMatch())
+            game_values.flags.pausegame = true;
+    }
 
 }
 
@@ -3009,6 +3041,7 @@ void GameplayState::drawEditMode()
 {
     if (!mode())
         return;
+    s_drawnFrames++;
     const CGM_MapMaker& m = *mode();
     {
         static short s_weather[3] = {-1, -1, -1};
@@ -3209,6 +3242,8 @@ bool GameplayState::autoTestEditScript(int f)
                 steps.insert(steps.end(), bytes);
         };
         add({0}, 18);
+        //(the keyboard's keys while building: Enter doesn't pause, P does, Escape goes back)
+        add({514, 0, 0, 517, 515, 0, 0, 517, 516, 0, 0, 517});
         add({256 + 1});
         add({B_DOWN, 0}, 3);
         add({B_PAINT | B_RIGHT, B_PAINT}, 10);
@@ -3368,7 +3403,21 @@ bool GameplayState::autoTestEditScript(int f)
             return false;
         }
         int byte = steps[step++];
-        if (byte >= 512) {
+        if (byte == 517) {
+            printf("keytest: paused %d, quitting %d, building %d\n", game_values.flags.pausegame ? 1 : 0, game_values.flags.exitinggame ? 1 : 0, building(0) ? 1 : 0);
+            byte = 0;
+        } else if (byte >= 514) {
+            //(514 Enter, 515 P, 516 Escape: pressed and let go)
+            const SDL_Keycode keys[3] = {SDLK_RETURN, SDLK_P, SDLK_ESCAPE};
+            for (const bool down : {true, false}) {
+                SDL_Event key {};
+                key.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+                key.key.key = keys[byte - 514];
+                key.key.down = down;
+                SDL_PushEvent(&key);
+            }
+            byte = 0;
+        } else if (byte >= 512) {
             //(512: Backspace down, 513: up)
             SDL_Event key {};
             key.type = byte == 512 ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;

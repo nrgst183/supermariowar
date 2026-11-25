@@ -10,7 +10,7 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 
 - [What's new in this fork](#whats-new-in-this-fork)
   - [Online multiplayer](#online-multiplayer)
-  - [Map and world editors in the game](#map-and-world-editors-in-the-game)
+  - [Map Maker and world editor in the game](#map-maker-and-world-editor-in-the-game)
   - [Theater: replays of every match](#theater-replays-of-every-match)
   - [Improvements](#improvements)
 - [History](#history)
@@ -43,12 +43,16 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 
 See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 
-### Map and world editors in the game
+### Map Maker and world editor in the game
 
-![The map editor: three players editing a map together with the blocks palette open, the tools menu (undo, redo, copy an area, paste, fill), and pasting a copied area; and the world editor with its modes menu open](docs/gfx/fork/map_editor.png)
+![The Map Maker: the palette's Hazards tab with a fire bar's length being changed; the map being played while it's built, with a fire bar, moving platforms, the builder's glove and its brush card; the pause menu after a save; and the world editor with its modes menu open](docs/gfx/fork/map_maker.png)
 
-- **Make and edit maps and worlds right in the game** (**Main menu, Editors**), with a mouse and keyboard or a controller: rectangles, fill, copy and paste, and undo.
-- **Edit together**: one player hosts a map or a world in a lobby, the others find it in Join a Game and edit it with them at the same time, online or on one computer; anyone can join in while it's going.
+- **The Map Maker** (**Main menu, Editors, Maps**): build a map *while it's being played*. Start it on this computer or online, set up players and CPUs in the usual lobby, pick a map (or a blank one) and go. Everyone with the right to build gets a glove cursor; the others, CPUs included, keep playing on the map as it changes.
+  - **L + Up** (Tab) switches between building and playing: you spawn where your hand is, and go back to building where your character is. **RB** (Backspace) undoes.
+  - Everything the old level editor could do: tiles on 4 layers and animated tiles, all 30 blocks (hidden ones, on/off switches, ? blocks with one powerup, an item set or your own mix), items, warps, hazards with their settings, moving platforms of any shape on straight, looping or circular paths, tile types, no-spawn zones, race goals and flag bases, weather, background and music. Pencil, rectangle, fill, copy and paste.
+  - The host gives and takes the right to build, and saves the map from the pause menu. It plays the same online as everything else (rollback included).
+- **The world editor** (**Main menu, Editors, Worlds**), with a mouse and keyboard or a controller.
+- **Edit together**: one player hosts a Map Maker game or a world in a lobby, the others find it in Join a Game, online or on one computer; anyone can join in while it's going.
 
 ### Theater: replays of every match
 

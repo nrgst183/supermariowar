@@ -77,7 +77,61 @@ recognises an original Xbox controller by its USB ids (Microsoft's and the licen
 or its name; through an adapter that reports itself as an Xbox 360 pad, it shows the Xbox
 style.
 
+## The Map Maker (main menu > Editors > Maps)
+
+![Editors > Maps; the lobby it opens (players, CPUs and skins); the settings, the mode locked to Map Maker; and its rules](gfx/fork/map_maker_menus.png)
+
+A map is built in a match, while it's played (`src/smw/GameplayEdit.cpp`, the mode
+`CGM_MapMaker`). **Editors > Maps** asks where (this computer, or online: host, or join from
+the games list), then opens the usual lobby: players, CPUs, skins. **Continue** goes straight
+to the map and the **Rules** (the mode can't be changed there, and the Map Maker isn't among
+the other modes):
+
+| Rule | |
+|---|---|
+| Start | Building (the players who may build start with a cursor) or Playing |
+| Who builds | Host decides (the host gives and takes the right) or Everyone |
+| Start from | The map chosen, or a blank map (a floor to stand on) |
+
+There's no countdown: the match starts building at once. The CPU players play on the map as
+it changes; so do the players who aren't building.
+
+| Controller | Keyboard | |
+|---|---|---|
+| D-pad / stick | arrows | the cursor (the glove), a cell at a time |
+| A / B | Enter / Escape | paint / erase (held: along the way); with the rectangle, copy or fill: from where it's pressed |
+| X | Space | the palette |
+| Y | Shift | the layer (1, 2 behind the players; 3, 4 in front) |
+| RB | Backspace, Ctrl+Z | undo your last stroke (a rectangle, fill or paste: all of it) |
+| LB + Up | Tab | building to playing (you spawn where your hand is), and back (the cursor where your character is) |
+| Start | P | the pause menu |
+
+**The palette** (X) has a tab per kind of thing: X goes to the next tab, Y through the
+tilesets on the **Tiles** tab, A takes, B goes back. **Blocks** (all 30; Y: hidden or not; the
+on/off blocks set how the map's switches start), **?** (random, one of the game's item sets,
+or a mix: A adds or takes out a powerup), **Items**, **Warps** (a number's warps go to each
+other), **Hazards** and **Moving** platforms (their settings under them: A, then left/right,
+then A), **Backdrop**, **Music**, **Types** (a cell's type set apart from its tiles: solid,
+ice, death...), **Spawns** (no-spawn zones: everyone's, a team's, the items'), **Animated**
+tiles, **Weather** (clouds, ghosts, leaves, snow, fish, rain, bubbles, on each layer),
+**Goals** (race goals, flag bases), and **Tools** (pencil, rectangle, fill, copy, paste).
+
+The card at the bottom left shows the brush, its layer and the tool. While someone builds,
+the things play doesn't show are marked on the map: warps, hazards, hidden blocks, race goals
+and flag bases; with the Types or Spawns brush, the map's types or zones.
+
+**The pause menu**: Resume, Who builds (the host: left/right a player, A gives or takes the
+right), Save map (as "*map* made", in the map list from then on; its filters and thumbnail
+made again), Quit. Online the match can't pause: the online panel has the rights and Save.
+
+Building is part of the simulation (a builder's buttons go in its input byte), so it plays
+the same on every computer online, in rollbacks, and in the sync tests.
+
 ## The editors (main menu > Editors)
+
+The Map Maker took the old map (level) editor's place in the menu: **Editors > Maps** opens the
+Map Maker. The world editor is **Editors > Worlds**. The level editor is still in the code
+(and `smw-leveledit` still builds); what follows is about both editors as they were.
 
 The map (level) editor and the world editor run inside the game
 (`src/smw/editors/EditorLauncher.h`). They are the standalone editors' code, compiled
@@ -195,6 +249,12 @@ The others may Save As a copy of their own.
   world editor): two or more games edit together with scripted controllers, at the same
   time and on the same cells; each prints a hash of its document (`cotest:`), which must
   be the same everywhere. `--at-role colocal`: two controllers in one editor
+- `--at-role matchedit`: the Map Maker as a person plays it: Editors > Maps, its lobby, its
+  rules, then a scripted builder using every palette tab, the tools, undo, the keyboard's keys
+  and the pause menu's Save (its map is removed afterwards). With `--at-synctest 8` every tick is
+  rolled back and played again (0 mismatches); `--at-pace N` holds each button N frames and
+  `--at-realtime 3` plays at normal speed, to watch it; `--at-mm-blank 1` / `--at-mm-start 1`
+  set its rules. `--at-mode 22` plays it with CPU builders pressing random buttons
 - `--at-role edux`: the map editor's screens with a controller (a ? block, the zones page,
   F1, the tileset screen's B, move mode's tools, the exit prompt); `--at-role edmouse`: the
   map editor with the mouse; `--at-role mouse`: the menus with the mouse; `--at-role
