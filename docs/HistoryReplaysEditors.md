@@ -96,15 +96,22 @@ the other modes):
 There's no countdown: the match starts building at once. The CPU players play on the map as
 it changes; so do the players who aren't building.
 
-| Controller | Keyboard | |
-|---|---|---|
-| D-pad / stick | arrows | the cursor (the glove), a cell at a time |
-| A / B | Enter / Escape | paint / erase (held: along the way); with the rectangle, copy or fill: from where it's pressed |
-| X | Space | the palette |
-| Y | Shift | the layer (1, 2 behind the players; 3, 4 in front) |
-| RB | Backspace, Ctrl+Z | undo your last stroke (a rectangle, fill or paste: all of it) |
-| LB + Up | Tab | building to playing (you spawn where your hand is), and back (the cursor where your character is) |
-| Start | P | the pause menu |
+| Controller | Keyboard | Mouse | |
+|---|---|---|---|
+| D-pad / stick | arrows | move it | the cursor (the glove) |
+| A | Enter | left button | paint (held: along the way); with the rectangle, copy or fill: from where it's pressed |
+| B | Delete | right button | erase, the same way |
+| X | Space | middle button | the palette |
+| Y | Shift | | the layer (1, 2 behind the players; 3, 4 in front) |
+| RB | Backspace, Ctrl+Z | | undo your last stroke (a rectangle, fill or paste: all of it) |
+| LB + Up | Tab | | building to playing (you spawn where your hand is), and back (the cursor where your character is) |
+| Start | Escape | | the pause menu (click a row, or right-click to resume) |
+
+With the mouse, the glove follows the pointer. In the palette, click a tab (or the arrows at
+the ends of the tab row, or scroll over it) and click what you want; the wheel scrolls the
+tilesets and changes a setting; a right click, or a click off the palette, goes back. On the
+keyboard, Escape in the palette goes back instead of pausing. The bars show the mouse's
+buttons after the mouse was used, the keys after a key.
 
 **The palette** (X) has a tab per kind of thing: X goes to the next tab, Y through the
 tilesets on the **Tiles** tab, A takes, B goes back. **Blocks** (all 30; Y: hidden or not; the

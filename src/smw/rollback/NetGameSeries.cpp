@@ -21,6 +21,18 @@ void NetGame::sendSeries(int peer, const net::ByteWriter& w)
     m_lobby->sendGameMessage(peer, w.data(), w.size());
 }
 
+void NetGame::sendMusic(const std::string& song)
+{
+    if (!m_lobby || !isHost() || !inMatch())
+        return;
+    std::vector<uint8_t> buffer(song.size() + 16);
+    net::ByteWriter w(buffer.data(), buffer.size());
+    w.u8(static_cast<uint8_t>(net::MsgType::Music));
+    w.u8(m_matchId);
+    w.str(song);
+    sendSeries(-1, w);
+}
+
 void NetGame::addSeriesEvent(const SeriesEvent& event)
 {
     if (m_seriesEvents.size() < 64)

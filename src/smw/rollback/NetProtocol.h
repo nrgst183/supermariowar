@@ -101,6 +101,7 @@ enum class MsgType : uint8_t {
     WheelStop = 84,
     WorldInput = 85,     // joiner -> host
     WorldTick = 86,
+    Music = 87,          // host -> all, in a match: u8 match id, str the song playing (below the data folder)
     // Editing together in a lobby (a map or world editor session instead of a match: CoEdit.h).
     // In this range so that the lobby hands them to NetGame, in any phase
     EditStart = 88,    // host -> joiner: u8 editor (0 map, 1 world): the session is on, join it

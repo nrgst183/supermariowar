@@ -758,6 +758,16 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
                 m_session->onMessage(peer, data, size, nowMs);
             break;
 
+        case net::MsgType::Music: {
+            const uint8_t matchId = r.u8();
+            std::string song = r.str();
+            if (r.ok() && peer == 0 && !isHost()) {
+                m_hostSongMatch = matchId;
+                m_hostSong = std::move(song);
+            }
+            break;
+        }
+
         case net::MsgType::EditStart:
         case net::MsgType::EditData:
             if (m_editHandler)

@@ -180,6 +180,10 @@ public:
         return m_currentMusic;
     }
     void setRandomMusic(MusicCategory category, const std::string& mapName, const std::string& background);
+    // A song picked elsewhere (online: the host's game's)
+    void setCurrentMusic(const std::filesystem::path& song) {
+        m_currentMusic = song;
+    }
     void setNextMusic(MusicCategory category, const std::string& mapName, const std::string& background);
 
     size_t currentIndex() const {

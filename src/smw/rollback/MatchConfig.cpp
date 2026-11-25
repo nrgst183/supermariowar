@@ -772,7 +772,9 @@ void startConfiguredMatch(const MatchConfig& config)
     LoadCurrentMapBackground();
     loadlog::mark("match (lobby's): background");
 
-    if (game_values.music) {
+    //(online, a joiner plays the host's game's song: GameplayEffects.cpp, joinerFollowsHostMusic())
+    const bool joiner = NetGame::instance().lobby() && !NetGame::instance().isHost();
+    if (game_values.music && !joiner) {
         musiclist->setRandomMusic(static_cast<MusicCategory>(g_map->musicCategoryID), stripPathAndExtension(path), g_map->szBackgroundFile);
         rm->backgroundmusic[0] = sfxMusic(musiclist->currentMusic());
         rm->backgroundmusic[0].play(game_values.playnextmusic, false);

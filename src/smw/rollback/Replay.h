@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <map>
 #include <string>
 #include <vector>
@@ -118,6 +119,10 @@ void recordTick(const InputFrame& input);
 void afterTick();
 // The match's song changed (any song the game picks for it, at random or the next one)
 void noteMusic();
+// A song as replays and the online match name it (below the data folder, the same song on another
+// computer), and back to its file here
+std::string songName(const std::filesystem::path& song);
+std::filesystem::path songFile(const std::string& name);
 // Online: a confirmed checksum (after tick `frame`)
 void recordChecksum(int frame, uint64_t sum);
 // The match is over: writes the replay (the ticks up to the current one).

@@ -41,7 +41,7 @@ constexpr int HEIGHT = 16;
 int drawPad(int x, int y, Pad pad);
 int padWidth(Pad pad);
 int drawKey(int x, int y, const std::string& label);
-int drawMouse(int x, int y, bool left, bool right);
+int drawMouse(int x, int y, bool left, bool right, bool middle = false);
 // The pad glyph on a controller, else the key cap ("" key: the mouse);
 // then the label. Returns the total width.
 int drawPrompt(int x, int y, Pad pad, const std::string& key, const std::string& label);

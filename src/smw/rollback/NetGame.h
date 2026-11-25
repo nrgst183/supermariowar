@@ -126,6 +126,10 @@ public:
     // Joiner: asks the host to stop the bonus wheel; host: the stopped wheel
     void sendWheelPress(uint16_t step);
     void sendWheelStop(const WheelStopMsg& stop);
+    // The match's music: the host's game picks the songs and tells the others (`song`: its path below
+    // the data folder); a joiner plays the host's (hostSong(): "" until the host said, this match)
+    void sendMusic(const std::string& song);
+    std::string hostSong() const { return m_hostSongMatch == m_matchId ? m_hostSong : std::string(); }
     // The world map lockstep: a new screen (epoch), with these human slots
     void worldBegin(uint16_t epoch, uint8_t humanMask);
     void worldEnd() { m_world.end(); }
@@ -205,6 +209,7 @@ public:
 
     // ---- gameplay
     bool inMatch() const { return m_inMatch; }
+    uint8_t matchId() const { return m_matchId; }
     struct Outcome {
         int ticks = 0;
         bool ended = false;     // the match is over (confirmed)
@@ -276,6 +281,8 @@ private:
 
     MatchConfig m_config;
     uint8_t m_matchId = 0;
+    std::string m_hostSong;          // joiner: the song the host's match plays, and that match
+    uint8_t m_hostSongMatch = 0xFF;
     int m_matchesStarted = 0;
     // Host: the match being started
     uint8_t m_ackedMask = 0;

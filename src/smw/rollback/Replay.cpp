@@ -1115,4 +1115,14 @@ const PlaybackStatus& playbackStatus()
     return g_play.status;
 }
 
+std::string songName(const std::filesystem::path& song)
+{
+    return songRef(song);
+}
+
+std::filesystem::path songFile(const std::string& name)
+{
+    return songPath(name);
+}
+
 } // namespace replay

@@ -1,6 +1,7 @@
 #include "gfxSDL.h"
 
 #include "gfx.h"
+#include "CmdArgs.h"
 #include "path.h"
 
 #include <SDL3_image/SDL_image.h>
@@ -50,6 +51,10 @@ SDL_Window* createWindow(bool fullscreen)
     Uint32 window_flags = SDL_WINDOW_RESIZABLE;
     if (fullscreen)
         window_flags |= SDL_WINDOW_FULLSCREEN;
+#ifndef SMW_XBOX
+    if (cmd::g_autotest.enabled && cmd::g_autotest.minimized)
+        window_flags |= SDL_WINDOW_MINIMIZED;    //(--at-minimized: out of the way)
+#endif
 
     SDL_Window* window = SDL_CreateWindow("smw",
         GFX_SCREEN_W, GFX_SCREEN_H,

@@ -1,3 +1,4 @@
+#include "rollback/NetGame.h"
 #include "rollback/Replay.h"
 #include "GSGameplay.h"
 
@@ -308,8 +309,64 @@ void playSFX()
     }
 }
 
+// Online, the host's game picks the songs (at random, the next one, the Map Maker's music) and tells
+// the others which plays; theirs play that one. True on a joiner that leaves the songs to the host
+// (it picks none itself): the host's has come, or may still come (a few seconds; a host with the music
+// off sends none)
+bool joinerFollowsHostMusic()
+{
+    rollback::NetGame& net = rollback::NetGame::instance();
+    if (!net.inMatch() || replay::playing())
+        return false;
+    if (net.isHost()) {
+        static int sentMatch = -1;
+        static std::string sent;
+        const std::string song = musiclist->currentMusic().empty() ? std::string() : replay::songName(musiclist->currentMusic());
+        if (game_values.music && !song.empty() && (song != sent || sentMatch != net.matchId())) {
+            sent = song;
+            sentMatch = net.matchId();
+            net.sendMusic(song);
+            printf("netplay: music: the host's song %s%c", song.c_str(), 10);
+        }
+        return false;
+    }
+    static int heardMatch = -1, waitMatch = -1;
+    static std::string heard;
+    static Uint64 waitStart = 0;
+    const std::string song = net.hostSong();
+    if (song.empty()) {
+        if (waitMatch != net.matchId()) {
+            waitMatch = net.matchId();
+            waitStart = SDL_GetTicks();
+        }
+        return SDL_GetTicks() - waitStart < 3000;
+    }
+    if (song == heard && heardMatch == net.matchId())
+        return true;
+    heard = song;
+    heardMatch = net.matchId();
+    const std::filesystem::path path = replay::songFile(song);
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(path, ec)) {
+        printf("netplay: the host's song %s isn't here; ours plays\n", song.c_str());
+        return true;
+    }
+    musiclist->setCurrentMusic(path);
+    replay::noteMusic();
+    printf("netplay: music: playing the host's song %s%c", song.c_str(), 10);
+    if (game_values.music) {
+        rm->backgroundmusic[0].stop();
+        rm->backgroundmusic[0] = sfxMusic(path);
+        //(after the invincibility or time warning music, if that's playing)
+        if (!rm->sfx_invinciblemusic.isPlaying() && !rm->sfx_timewarning.isPlaying())
+            rm->backgroundmusic[0].play(game_values.playnextmusic, false);
+    }
+    return true;
+}
+
 void playMusic()
 {
+    const bool hostPicks = joinerFollowsHostMusic();
     //Make sure music and sound effects keep playing
     if (game_values.flags.slowdownon != -1) {
         if (!rm->sfx_slowdownmusic.isPlaying())
@@ -330,7 +387,7 @@ void playMusic()
     //If no background music is playing, then play some
     if (!rm->backgroundmusic[0].isPlaying() && !rm->sfx_invinciblemusic.isPlaying() && !rm->sfx_timewarning.isPlaying() && !game_values.gamemode->gameover) {
         //(a replay plays the songs it recorded: replay::syncMusic)
-        if (game_values.playnextmusic && !replay::playing()) {
+        if (game_values.playnextmusic && !replay::playing() && !hostPicks) {
             musiclist->setNextMusic(static_cast<MusicCategory>(g_map->musicCategoryID), maplist->currentShortmapname(), g_map->szBackgroundFile);
             rm->backgroundmusic[0] = sfxMusic(musiclist->currentMusic());
             replay::noteMusic();
@@ -344,8 +401,8 @@ void PlayNextMusicTrack()
 {
     if (game_values.gamemode->gameover || game_values.flags.playinvinciblesound || rm->sfx_timewarning.isPlaying())
         return;
-    //(a replay plays the songs it recorded: replay::syncMusic)
-    if (replay::playing())
+    //(a replay plays the songs it recorded: replay::syncMusic; online, the host's game picks them)
+    if (replay::playing() || joinerFollowsHostMusic())
         return;
 
     rm->backgroundmusic[0].stop();

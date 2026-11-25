@@ -53,6 +53,7 @@ struct AutoTestArgs {
     int itemRespawn = -1;    // --at-item-respawn N: ticks before a ? block gives an item again (the option)       // --at-perf 1: each match's cost per tick and per frame (perf: lines)        // --at-pad 1: the prompts as for a controller (as if one had been used last)
     int replaySeeks = 0;     // --replay: jump to a random tick every N frames (tests the theater's seeking)
     bool norender = false;   // skip drawing and presenting (much faster under valgrind or sanitizers)
+    bool minimized = false;  // --at-minimized 1: the window opens minimized (runs in the background)
     int shotEvery = 0;       // save a PNG of the screen every N drawn frames of an online match; 0 = off
     std::string shotDir;     // ... into this directory
     // --at-match shots: walks through the main and online menus and saves screenshots (PNG) of them

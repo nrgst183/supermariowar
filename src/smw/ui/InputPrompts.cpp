@@ -695,19 +695,19 @@ int drawKey(int x, int y, const std::string& label)
     return w + 1;
 }
 
-int drawMouse(int x, int y, bool left, bool right)
+int drawMouse(int x, int y, bool left, bool right, bool middle)
 {
     const SDL_Color red {232, 56, 40, 255};
     art(x, y, {
         ".#######.",
-        "#LLL#RRR#",
-        "#LLL#RRR#",
+        "#LLLMRRR#",
+        "#LLLMRRR#",
         "#########",
         "#wwwwwww#",
         "#wwwwwww#",
         "#wwwwwww#",
         ".#######.",
-    }, {{'#', BLACK}, {'L', left ? red : SILVER_LIGHT}, {'R', right ? red : SILVER_LIGHT}, {'w', SILVER_LIGHT}});
+    }, {{'#', BLACK}, {'L', left ? red : SILVER_LIGHT}, {'R', right ? red : SILVER_LIGHT}, {'M', middle ? red : BLACK}, {'w', SILVER_LIGHT}});
     return 19;
 }
 
@@ -728,10 +728,12 @@ int drawPrompt(int x, int y, Pad pad, const std::string& key, const std::string&
     int w = 0;
     if (g_last == Device::Controller)
         w = drawPad(x, y, pad);
-    else if (key.empty())
+    else if (key.empty() || key == "LMB")
         w = drawMouse(x, y, true, false);
     else if (key == "RMB")
         w = drawMouse(x, y, false, true);
+    else if (key == "MMB")
+        w = drawMouse(x, y, false, false, true);
     else
         w = drawKey(x, y, key);
     if (!label.empty()) {
@@ -746,7 +748,7 @@ int promptWidth(Pad pad, const std::string& key, const std::string& label)
     int w = 0;
     if (g_last == Device::Controller)
         w = padWidth(pad);
-    else if (key.empty() || key == "RMB")
+    else if (key.empty() || key == "LMB" || key == "RMB" || key == "MMB")
         w = 19;
     else
         w = std::max(16, textWidth(key) + 8) + 1;

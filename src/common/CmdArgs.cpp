@@ -70,6 +70,7 @@ void print_help(const char* title, const char* version)
            "                          to DIR (with --at-role host|join|orig, --at-addr IP[:PORT], --at-nick NAME)\n");
     printf("      --at-norender <0|1> 1: don't draw or present frames (faster headless runs,\n"
            "                          e.g. under valgrind); the simulation is unaffected\n");
+    printf("      --at-minimized <0|1> 1: the window opens minimized (out of the way)\n");
     printf("      --at-humans <N>     The first N players are \"human\" players, driven by\n"
            "                          seeded random input from outside the simulation\n");
     printf("      --at-synctest <N>   Rollback sync test: every tick, roll back up to N ticks,\n"
@@ -196,6 +197,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-determinism-ref") at.determinismRef = val;
             else if (arg == "--at-determinism-out") at.determinismOut = val;
             else if (arg == "--at-norender") at.norender = atoi(val.c_str()) != 0;
+            else if (arg == "--at-minimized") at.minimized = atoi(val.c_str()) != 0;
             else if (arg == "--at-shot-every") at.shotEvery = atoi(val.c_str());
             else if (arg == "--at-shot-dir") at.shotDir = val;
             else if (arg == "--at-shots") at.shotsDir = val;
