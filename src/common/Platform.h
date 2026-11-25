@@ -40,6 +40,8 @@ uint64_t imageBytes();
 /// The floating point units as the simulation needs them (the Xbox's, settled every tick); what
 /// they were is returned. False where there's nothing to do
 bool settleFpu(unsigned short* x87Found, unsigned int* mxcsrFound);
+/// The modes now, not changed (false where not known)
+bool peekFpu(unsigned short* x87, unsigned int* mxcsr);
 
 /// The test's measurements (--at-match everything), since the last call: the lowest free memory,
 /// the frames shown, the images decoded and read from a cache. known: false where not measured

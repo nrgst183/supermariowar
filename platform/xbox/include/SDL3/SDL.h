@@ -866,6 +866,7 @@ bool SDL_XboxProfileOn(void);
 // without flush-to-zero or denormals-are-zero. Something else on the thread (the mixer, Direct3D)
 // may have changed them since: what they were is returned (the determinism test shows it).
 void SDL_XboxSettleFpu(unsigned short* x87Found, unsigned int* mxcsrFound);
+void SDL_XboxPeekFpu(unsigned short* x87, unsigned int* mxcsr);
 
 // What the game is doing (a line: "Match: <map>, <mode>"), for the crash screen: a crash (an
 // exception, or an error the game couldn't handle) shows the error on the screen with this, the

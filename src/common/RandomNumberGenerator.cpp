@@ -2,7 +2,25 @@
 
 #include <cassert>
 #include <climits>
+#include <cstdint>
+#include <cstring>
 #include <ctime>
+
+namespace {
+// A double truncated toward zero to an int, from its bits: what the conversion gives, without the
+// x87's rounding mode switched for it (on the Xbox; see getInteger)
+int truncateToInt(double d)
+{
+    uint64_t bits = 0;
+    std::memcpy(&bits, &d, sizeof(bits));
+    const int exponent = static_cast<int>((bits >> 52) & 0x7FF) - 1075;
+    if (((bits >> 52) & 0x7FF) == 0)
+        return 0;
+    const uint64_t mantissa = (bits & ((uint64_t(1) << 52) - 1)) | (uint64_t(1) << 52);
+    const uint64_t magnitude = exponent >= 0 ? (exponent < 11 ? mantissa << exponent : 0) : (exponent > -64 ? mantissa >> -exponent : 0);
+    return (bits >> 63) ? -static_cast<int>(magnitude) : static_cast<int>(magnitude);
+}
+} // namespace
 
 namespace {
 // Salt for the cosmetic generator's time seed, so it does not mirror the
@@ -70,7 +88,21 @@ uint32_t RandomNumberGenerator::getNext()
 int RandomNumberGenerator::getInteger(int rMin, int rMax)
 {
     assert(rMax > rMin);
-    int rVal = (static_cast<double>(getNext()) / ((static_cast<float>(UINT_MAX))+1)) * (rMax-rMin) + rMin;
+    const uint32_t next = getNext();
+    const uint64_t range = static_cast<uint64_t>(static_cast<int64_t>(rMax) - rMin);
+    //The number next / 2^32 * range + rMin, truncated toward zero, in integers: exactly the double
+    //math's below for a range under 2^21 (there the double product is exact). No double converted
+    //to an int: on the Xbox's x87 that switches the rounding mode to chop and back, and xemu then
+    //rounds the SSE floats toward zero for a while (the simulation played differently there)
+    if (range < (1u << 21)) {
+        const uint64_t scaled = static_cast<uint64_t>(next) * range;
+        int64_t value = static_cast<int64_t>(scaled >> 32) + rMin;
+        if (value < 0 && (scaled & 0xFFFFFFFFu))
+            value++;    //(toward zero, as the conversion of the double)
+        assert(value < rMax && value >= rMin);
+        return static_cast<int>(value);
+    }
+    const int rVal = truncateToInt((static_cast<double>(next) / ((static_cast<float>(UINT_MAX))+1)) * (rMax-rMin) + rMin);
     assert(rVal < rMax && rVal >= rMin);
     return rVal;
 }

@@ -17,6 +17,7 @@ void sdlx_mixer_dispatch_callbacks();
 void sdlx_video_quit();
 // The back buffers wanted: 1 (double buffering), 2 (triple); the disc's --xbox-buffers N (sdl_main_xbox.cpp)
 extern int g_sdlx_wanted_back_buffers;
+extern bool g_sdlx_no_audio;    // --xbox-no-audio: no DirectSound, no mixer thread (tests)
 
 // The debug overlay (sdl_overlay.cpp): a frame begins presenting (the game's work is done), the
 // present's own time (cycles), and the overlay drawn into the frame's pixels (when it's on)

@@ -408,6 +408,9 @@ DWORD WINAPI mixerThread(LPVOID)
 
 bool startOutput()
 {
+    //(--xbox-no-audio: nothing plays, and no thread mixes; the tracks are kept as without a sound card)
+    if (g_sdlx_no_audio)
+        return true;
     HRESULT hr = DirectSoundCreate(NULL, &g_dsound, NULL);
     if (FAILED(hr))
         return SDL_SetError("DirectSoundCreate failed (0x%08x)", static_cast<unsigned>(hr));

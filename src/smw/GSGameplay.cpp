@@ -785,8 +785,10 @@ void GameplayState::update_world()
 
     handleP2PCollisions();
 
+    determinism::checkFpu("the start of the world's update");
     //Move platforms
     g_map->updatePlatforms();
+    determinism::checkFpu("the platforms");
 
     game_values.flags.playskidsound = false;
     game_values.flags.playinvinciblesound = false;
@@ -795,13 +797,16 @@ void GameplayState::update_world()
     for (CPlayer* player : g_sim.players)
         player->move();    //move all objects before doing object-object collision detection in
     //->think(), so we test against the new position after object-map collision detection
+    determinism::checkFpu("the players' moves");
 
     playSFX();
+    determinism::checkFpu("the sounds");
 
     g_sim.noncolcontainer.update();
     g_sim.objectcontainer[0].update();
     g_sim.objectcontainer[1].update();
     g_sim.objectcontainer[2].update();
+    determinism::checkFpu("the objects' updates");
 
     handleP2ObjCollisions();
     if (game_values.flags.swapplayers) {

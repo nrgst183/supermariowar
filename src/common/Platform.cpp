@@ -70,6 +70,12 @@ bool settleFpu(unsigned short* x87Found, unsigned int* mxcsrFound)
     return true;
 }
 
+bool peekFpu(unsigned short* x87, unsigned int* mxcsr)
+{
+    SDL_XboxPeekFpu(x87, mxcsr);
+    return true;
+}
+
 StageStats takeStageStats()
 {
     StageStats s;
@@ -146,6 +152,11 @@ uint64_t imageBytes()
 }
 
 bool settleFpu(unsigned short*, unsigned int*)
+{
+    return false;
+}
+
+bool peekFpu(unsigned short*, unsigned int*)
 {
     return false;
 }

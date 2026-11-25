@@ -48,6 +48,7 @@ struct SDL_Texture {
 SdlxProfile g_sdlx_profile;
 bool g_sdlx_overlay = false;
 int g_sdlx_back_buffers = 0;
+bool g_sdlx_no_audio = false;
 int g_sdlx_wanted_back_buffers = 1;    // (1: double buffering, 2: triple; the overlay shows it)
 
 namespace {

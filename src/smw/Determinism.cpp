@@ -2,6 +2,8 @@
 
 #include "CmdArgs.h"
 #include "path.h"
+#include "Platform.h"
+#include "SimulationState.h"
 #include "RandomNumberGenerator.h"
 #include "rollback/StateChecksum.h"
 
@@ -83,6 +85,9 @@ struct State {
     std::vector<std::string> laterDifference;    // a later pass's first values different from the first's
     std::vector<std::string> report;
     std::map<std::pair<unsigned, unsigned>, long> fpuSeen;    // (x87 control word, MXCSR) -> ticks
+    std::map<std::string, long> fpuChanged;    // a tick's points where the modes weren't the simulation's -> times
+    std::string fpuFirstChange;
+    std::string floatTest;    // the CPU's float math checked by itself (floatSelfTest)
 };
 State g;
 
@@ -241,6 +246,48 @@ void say(const std::string& line)
     g.report.push_back(line);
 }
 
+// The CPU's float math checked by itself (before the matches): float sums and products (SSE, as the
+// simulation's) against the same done exactly in double and rounded to float. On a correct CPU, or
+// emulator, none differ
+std::string floatSelfTest()
+{
+    volatile float a = 58.5f, b = -4.1f;
+    long wrongSame = 0;
+    const long sameTimes = 2000000;
+    for (long k = 0; k < sameTimes; k++) {
+        volatile float sum = a + b;
+        if (sum != 54.4000015f)
+            wrongSame++;
+    }
+    uint32_t seed = 12345;
+    auto nextFloat = [&seed]() {
+        seed = seed * 1664525u + 1013904223u;
+        const float mantissa = static_cast<float>(seed >> 8) / 16777216.0f;    //(0..1)
+        seed = seed * 1664525u + 1013904223u;
+        const float scale = static_cast<float>(1 << (seed >> 28)) * ((seed >> 27) & 1 ? -1.0f : 1.0f);
+        return (mantissa + 0.5f) * scale;
+    };
+    long wrongAdd = 0, wrongMul = 0;
+    const long pairs = 2000000;
+    char example[96] = "";
+    for (long k = 0; k < pairs; k++) {
+        volatile float x = nextFloat(), y = nextFloat();
+        volatile float sum = x + y, product = x * y;
+        const float sumExact = static_cast<float>(static_cast<double>(x) + static_cast<double>(y));
+        const float productExact = static_cast<float>(static_cast<double>(x) * static_cast<double>(y));
+        if (sum != sumExact) {
+            if (!wrongAdd++)
+                snprintf(example, sizeof(example), " (e.g. %.9g + %.9g = %.9g, not %.9g)", static_cast<double>(x), static_cast<double>(y),
+                    static_cast<double>(sum), static_cast<double>(sumExact));
+        }
+        if (product != productExact)
+            wrongMul++;
+    }
+    char text[256];
+    snprintf(text, sizeof(text), "Float self-test: 58.5+-4.1 wrong %ld of %ld; sums wrong %ld, products wrong %ld of %ld%s", wrongSame,
+        sameTimes, wrongAdd, wrongMul, pairs, example);
+    return text;
+}
 } // namespace
 
 bool configure()
@@ -261,6 +308,8 @@ bool configure()
     if (at.seed == 0)
         at.seed = 1;
     printf("determinism: %d matches, %d pass(es), checksums every %d ticks\n", SUITE_SIZE, g.passes, EVERY);
+    g.floatTest = floatSelfTest();
+    printf("determinism: %s\n", g.floatTest.c_str());
     return true;
 }
 
@@ -291,6 +340,22 @@ void noteFpu(unsigned short x87, unsigned int mxcsr)
 {
     if (g.active)
         g.fpuSeen[{x87, mxcsr & ~0x3Fu}]++;    //(without the sticky exception flags)
+}
+
+void checkFpu(const char* where)
+{
+    unsigned short x87 = 0;
+    unsigned int mxcsr = 0;
+    if (!g.active || !platform::peekFpu(&x87, &mxcsr))
+        return;
+    if (x87 == 0x027F && (mxcsr & ~0x3Fu) == 0x1F80)
+        return;
+    g.fpuChanged[where]++;
+    if (g.fpuFirstChange.empty()) {
+        char text[160];
+        snprintf(text, sizeof(text), "first at tick %d, after %s: %04x/%04x", g_sim.tick, where, x87, mxcsr & ~0x3Fu);
+        g.fpuFirstChange = text;
+    }
 }
 
 void sample(int index, int frame, uint64_t sum)
@@ -384,6 +449,13 @@ void finish()
             snprintf(part, sizeof(part), " %04x/%04x x%ld", modes.first, modes.second, ticks);
             line += part;
         }
+        say(line);
+    }
+    say(g.floatTest);
+    if (!g.fpuChanged.empty()) {
+        std::string line = "FPU changed in ticks: " + g.fpuFirstChange + ";";
+        for (const auto& [where, times] : g.fpuChanged)
+            line += " " + where + " x" + std::to_string(times);
         say(line);
     }
 

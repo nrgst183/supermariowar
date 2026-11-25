@@ -224,6 +224,17 @@ void sdlx_set_fpu_precision()
 }
 
 
+void SDL_XboxPeekFpu(unsigned short* x87, unsigned int* mxcsr)
+{
+    unsigned short cw = 0;
+    unsigned int csr = 0;
+    __asm__ volatile("fnstcw %0" : "=m"(cw));
+    __asm__ volatile("stmxcsr %0" : "=m"(csr));
+    *x87 = cw;
+    *mxcsr = csr;
+}
+
+
 void SDL_XboxSettleFpu(unsigned short* x87Found, unsigned int* mxcsrFound)
 {
     unsigned short cw = 0;
@@ -239,10 +250,11 @@ void SDL_XboxSettleFpu(unsigned short* x87Found, unsigned int* mxcsrFound)
     // SSE: all exceptions masked (0x1F80), round to nearest, no flush-to-zero (bit 15) or
     // denormals-are-zero (bit 6); the sticky flags (bits 0-5) cleared
     const unsigned int wantedMxcsr = 0x1F80;
-    if (cw != wantedCw)
-        __asm__ volatile("fldcw %0" : : "m"(wantedCw));
-    if ((mxcsr & ~0x3Fu) != wantedMxcsr)
-        __asm__ volatile("ldmxcsr %0" : : "m"(wantedMxcsr));
+    //(loaded even when they read right: xemu can keep rounding SSE floats toward zero after an x87
+    //rounding switch (a double converted to an int) although MXCSR reads round-to-nearest; loading
+    //MXCSR again makes it round as it says)
+    __asm__ volatile("fldcw %0" : : "m"(wantedCw));
+    __asm__ volatile("ldmxcsr %0" : : "m"(wantedMxcsr));
 }
 
 

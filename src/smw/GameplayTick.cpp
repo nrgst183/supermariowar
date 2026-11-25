@@ -55,6 +55,7 @@ void GameplayState::simulateTick(const InputFrame& input)
         determinism::noteFpu(x87, mxcsr);
     matchedit::simulate(input);    //(the Map Maker's builders; before the input: previousInput is the last tick's)
     applyTickInput(input);
+    determinism::checkFpu("the input");
 
     if (game_values.screenfade == 0 && g_sim.countdownState <= COUNTDOWN_START_INDEX)
         updateForceExitTimer();
@@ -80,6 +81,7 @@ void GameplayState::simulateTick(const InputFrame& input)
     updatePlayerSwapAnimation();
 
     updateWind();
+    determinism::checkFpu("the end of the tick");
 
     ++g_sim.tick;
     if (g_sim.gameoverTick < 0 && game_values.gamemode->gameover)

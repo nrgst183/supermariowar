@@ -139,6 +139,10 @@ int main(void)
             k++;
             continue;
         }
+        if (fileArgs[k] == "--xbox-no-audio") {
+            g_sdlx_no_audio = true;
+            continue;
+        }
         argv.push_back(fileArgs[k].data());
     }
     if (!fileArgs.empty())

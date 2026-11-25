@@ -34,6 +34,9 @@ void matchStarting(int index);
 /// The FPU modes found at the start of a tick (before being set as the simulation needs them):
 /// the report lists the ones seen
 void noteFpu(unsigned short x87, unsigned int mxcsr);
+/// The test: the FPU modes checked at a point of a tick (`where`); the report names the first point
+/// where they weren't the simulation's any more, and how often
+void checkFpu(const char* where);
 
 /// A state checksum of the match being played, `frame` ticks in
 void sample(int index, int frame, uint64_t sum);
