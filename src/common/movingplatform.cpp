@@ -146,7 +146,7 @@ MovingPlatform::MovingPlatform(const std::vector<TilesetTile>& tiledata, const s
 
     //The tiles drawn: runs of tiles in each row, rows with the same runs merged (the opaque ones and
     //the rest apart)
-    const auto buildParts = [&](std::vector<SDL_Rect>& parts, bool wantOpaque) {
+    const auto buildParts = [&](sim::vector<SDL_Rect>& parts, bool wantOpaque) {
         std::vector<SDL_Rect> rowRuns;
         for (short iRow = 0; iRow < iTileHeight; iRow++) {
             rowRuns.clear();
@@ -321,7 +321,7 @@ void MovingPlatform::draw()
         //where they show (a platform as wide as the screen can show on both sides)
         SDL_Surface* surface = sprites[1 - g_iCurrentDrawIndex].getSurface();
         const int w = App::screenWidth;
-        const auto drawAll = [&](const std::vector<SDL_Rect>& parts) {
+        const auto drawAll = [&](const sim::vector<SDL_Rect>& parts) {
             for (const SDL_Rect& part : parts) {
                 const int x = rDstRect.x + part.x;
                 const int y = rDstRect.y + part.y;

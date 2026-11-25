@@ -4,6 +4,8 @@ add_executable(smw WIN32
 	ai.cpp
 	AINav.cpp
 	CpuDriver.cpp
+	CrashReport.cpp
+	CrashReport.h
 	MatchHistory.cpp
 	GameplayTheater.cpp
 	AIObjects.cpp

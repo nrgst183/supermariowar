@@ -123,12 +123,13 @@ class MovingPlatform : public sim::ArenaAllocated
         //The parts of the prerendered tiles that aren't empty (in the sprites): drawing only these
         //skips a platform's empty tiles, which every frame were read and compared pixel by pixel
         //(an airship's outline: a good share of its rectangle). Rows of tiles with the same
-        //columns merged into one rectangle.
-        std::vector<SDL_Rect> drawParts;
+        //columns merged into one rectangle. (In the arena like the rest: a snapshot copies the
+        //platform, and a debug build's std::vector has a part on the heap a restore would leave stale)
+        sim::vector<SDL_Rect> drawParts;
         //On the Xbox, of those the parts opaque all over (static tiles without a pixel of the color
         //key: most of a platform's): copied, without the key (the same pixels, far faster there: a
         //memcpy, not a test of each pixel). drawParts has the rest (on a PC, all).
-        std::vector<SDL_Rect> drawOpaque;
+        sim::vector<SDL_Rect> drawOpaque;
 
         short iDrawLayer;
 

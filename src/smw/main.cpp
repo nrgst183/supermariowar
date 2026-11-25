@@ -95,6 +95,7 @@
 #endif
 
 #include <SDL3/SDL_main.h>
+#include "CrashReport.h"
 
 //now it's really time for an "engine" (aka resource manager)
 
@@ -464,6 +465,7 @@ void main_game();
 
 int main(int argc, char *argv[])
 {
+    installCrashReport();    //(a crash: its stack trace in the log)
     const cmd::Args cmd = cmd::parse_args(argc, argv);
     if (!cmd.success) {
         return 1;
