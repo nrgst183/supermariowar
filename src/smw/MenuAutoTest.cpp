@@ -1806,6 +1806,12 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             case 90: return MENU_CODE_BACK_TEAM_SELECT_MENU;
             case 105: shot("m5_back_to_lobby"); break;
             case 110: return MENU_CODE_ONLINE_MATCH_SETTINGS;
+            case 120:
+                //(the README's screenshots, --at-mm-demo 2: two CPUs playing on the map too)
+                if (cmd::g_autotest.mmDemo == 2)
+                    for (int k = 2; k < 4; k++)
+                        game_values.playercontrol[k] = 2;
+                break;
             case 125:
                 printf("shots: map maker: mode %d, session %d, %d teams\n", mGameSettingsMenu->GetCurrentGameModeID(),
                     mGameSettingsMenu->MapMakerSession() ? 1 : 0, g_sim.score_cnt);

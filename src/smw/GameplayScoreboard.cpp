@@ -116,7 +116,10 @@ void GameplayState::drawScoreboard(short iScoreTextOffset[4])
                         if (player->ownerPlayerID > -1)
                             rm->spr_ownedtags.draw(iScoreOffsetX - 8, iScoreOffsetY - 8, {player->ownerColorOffsetX, 0, 48, 48});
 
-                        player->GetScoreboardSprite()->at(iScoreboardSprite).draw(iScoreOffsetX, iScoreOffsetY, {player->iSrcOffsetX, 0, 32, 32});
+                        //(the Map Maker: a builder's portrait framed in its color, the character and a glove by turns)
+                        const bool builder = matchedit::building(globalID);
+                        if (!builder || !matchedit::drawBuilderPortrait(globalID, iScoreOffsetX, iScoreOffsetY))
+                            player->GetScoreboardSprite()->at(iScoreboardSprite).draw(iScoreOffsetX, iScoreOffsetY, {player->iSrcOffsetX, 0, 32, 32});
 
                         //Display jail if player is jailed
                         if (player->jail.isActive())
@@ -129,6 +132,7 @@ void GameplayState::drawScoreboard(short iScoreTextOffset[4])
                         //Display tanooki powerup if player has it
                         if (player->tanookisuit.isOn())
                             rm->spr_storedpowerupsmall.draw(iScoreOffsetX + 16, iScoreOffsetY + 16, {App::screenWidth/2, 0, 16, 16});
+
                     } else {
                         rm->spr_player[globalID][iScoreboardSprite].draw(g_sim.score[i].x + scoreoffsets[k], g_sim.score[i].y + 2, {0, 0, 32, 32});
                     }

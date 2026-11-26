@@ -150,7 +150,8 @@ changing the brush each make a sound, and the cells changed flash a ring (white 
 taken away, yellow undone). While you build, a faint grid marks the cells' corners around your
 cursor, and when the cursor rests a moment a label over it names what's under it (what B would
 erase, or LB + Down copy), outlined. The cursor shows what it's doing: red while erasing, the
-tool's icon by it for anything but the pencil, marching dashes while it carries a picked-up part.
+tool's icon by it for anything but the pencil, marching dashes while it carries a picked-up part. A builder's scoreboard portrait, at the top, is framed in its color and shows its character and a
+glove by turns, while it builds.
 While someone builds, the things play doesn't show are marked near the builders' cursors: warps,
 hazards, hidden blocks, race goals and flag bases (all of a kind while its part is in hand); with
 the Types or Spawns brush, the map's types or zones.
@@ -293,7 +294,8 @@ The others may Save As a copy of their own.
   redo all the way (`redotest:`), the computer's keys and mouse buttons (`pctest:`), the keyboard's keys
   and the pause menu's Save (its map is removed afterwards). With `--at-synctest 8` every tick is
   rolled back and played again (0 mismatches); `--at-pace N` holds each button N frames and
-  `--at-realtime 3` plays at normal speed, to watch it; `--at-mm-blank 1` / `--at-mm-start 1`
+  `--at-realtime 3` plays at normal speed, to watch it; `--at-mm-demo 1` plays a short demo of the newer controls, `--at-mm-demo 2` takes the README's
+  screenshots (`s1_building`, `s2_palette`, `s3_controls`); `--at-mm-blank 1` / `--at-mm-start 1`
   set its rules. `--at-mode 22` plays it with CPU builders pressing random buttons
 - `--at-role edux`: the map editor's screens with a controller (a ? block, the zones page,
   F1, the tileset screen's B, move mode's tools, the exit prompt); `--at-role edmouse`: the

@@ -4506,6 +4506,38 @@ void pauseMenuDo(int row, bool left, bool right, bool select)
 }
 } // namespace
 
+// A builder's scoreboard portrait: framed in its color (not the players' plain card), and by turns its
+// character and a glove as big (its cursor's), a quick flip between them. Only drawn: true while it's
+// the glove's turn (the caller draws the character otherwise)
+bool drawBuilderPortrait(int slot, int x, int y)
+{
+    static const std::vector<const char*> GLOVE = {"..##............", ".#ww#...........", ".#www#..........", "..#www#.........",
+        "...#www###......", "....#wwwww##....", "...##wwwwwww#...", "..#ww#wwwwwww#..", "..#wwwwwwwwww#..", "...#wwwwwwwww#..",
+        "....#wwwwwwww#..", ".....#wwwwww#...", "......#cccc#....", "......#cccc#....", ".......####.....", "................"};
+    const SDL_Color color = slotColor(slot), black {0, 0, 0, 255};
+    //(the frame: black, the color, a lighter line inside)
+    prompts::fill(x - 3, y - 3, 38, 38, black);
+    prompts::fill(x - 2, y - 2, 36, 36, color);
+    prompts::fill(x - 1, y - 1, 34, 34, theme::shade(color, 150));
+    prompts::fill(x, y, 32, 32, theme::shade(color, 45));
+    //(the turns: 1.4 s round, a flip (narrowing to a line, widening again) at each change)
+    constexpr Uint64 TURN = 700, FLIP = 120;
+    const Uint64 t = SDL_GetTicks() % (TURN * 2);
+    const bool glove = t >= TURN;
+    const Uint64 intoTurn = t % TURN;
+    const bool flipping = intoTurn < FLIP / 2 || intoTurn > TURN - FLIP / 2;
+    if (flipping) {
+        //(the edge on: a thin line of the color)
+        prompts::fill(x + 14, y + 2, 4, 28, theme::shade(color, 150));
+        return true;
+    }
+    if (!glove)
+        return false;
+    const std::vector<prompts::Ink> inks = {{'#', black}, {'w', {248, 248, 248, 255}}, {'c', color}};
+    prompts::art(x, y, GLOVE, inks, 2);
+    return true;
+}
+
 bool sheetCoversScreen()
 {
     static bool wasOpen = false;
@@ -5280,6 +5312,35 @@ bool GameplayState::autoTestEditScript(int f)
                 steps.insert(steps.end(), bytes);
         };
         add({0}, 18);
+        if (cmd::g_autotest.mmDemo == 2) {
+            //(--at-mm-demo 2, the README's: each part put on its cell (the cursor's jumps; the palette's tabs
+            //straight): a spring on the wooden block, a fire bar between the big blocks (its length changed
+            //in the palette: 561, the shot), a row of ? blocks in the sky; the cursor resting on one, its name
+            //over it (560); the controls sheet (563))
+            auto at = [&](int x, int y) { add({jumpTo(x), 0, jumpTo(JUMP_ROWS_AT + y), 0}); };
+            add({0}, 170);    //(the "Map Maker" title gone first)
+            add({B_PALETTE, 0, mouseTabByte(PageItems + 1), 0, B_PAINT, 0});
+            at(1, 6);
+            add({B_PAINT, 0});
+            add({B_PALETTE, 0, mouseTabByte(PageHazards + 1), 0, B_DOWN, 0, B_PAINT, 0, B_LEFT, 0});
+            add({0}, 50);
+            add({561, B_PAINT, 0, B_UP, 0, B_ERASE, 0});
+            at(11, 6);
+            add({B_PAINT, 0});
+            add({B_PALETTE, 0, mouseTabByte(PageBlocks + 1), 0, B_RIGHT, 0, B_PAINT, 0});
+            at(9, 2);
+            add({B_PAINT | B_RIGHT, B_PAINT}, 3);
+            add({B_PAINT, 0});
+            at(11, 2);
+            add({0}, 70);
+            add({560});
+            add({0}, 4);
+            add({562});
+            add({0}, 6);
+            add({563, 564});
+            add({0}, 30);
+            return false;
+        }
         if (cmd::g_autotest.mmDemo) {
             //(--at-mm-demo: a few things painted, so there are recent parts; on through them and back; the
             //eyedropper; the pause menu's Clear map, pressed twice; one undo: the map back. 530 pauses, 532
@@ -5581,6 +5642,22 @@ bool GameplayState::autoTestEditScript(int f)
             } else if (byte >= 920) {
                 clickHit(true, byte - 920);
             }
+            byte = -1;
+        } else if (byte >= 560 && byte <= 564) {
+            //(the README's screenshots: building, the palette; the controls sheet opened, shot, shut)
+            //(the building shot: as the builder's portrait shows its glove (waiting a frame or two for it))
+            if (byte == 560 && (SDL_GetTicks() % 1400 < 780 || SDL_GetTicks() % 1400 > 1320))
+                step--;
+            else if (byte == 560)
+                shot("s1_building");
+            else if (byte == 561)
+                shot("s2_palette");
+            else if (byte == 562)
+                s_helpOpen = true;
+            else if (byte == 563)
+                shot("s3_controls");
+            else
+                s_helpOpen = false;
             byte = -1;
         } else if (byte >= 530 && byte <= 532) {
             //(the demo's pause menu: paused; a row down; that row pressed)

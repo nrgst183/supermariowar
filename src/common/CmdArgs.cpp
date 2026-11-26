@@ -182,7 +182,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-pad") at.pad = atoi(val.c_str()) != 0;
             else if (arg == "--at-mm-start") at.mmStart = atoi(val.c_str());
             else if (arg == "--at-mm-blank") at.mmBlank = atoi(val.c_str());
-            else if (arg == "--at-mm-demo") at.mmDemo = atoi(val.c_str()) != 0;
+            else if (arg == "--at-mm-demo") at.mmDemo = atoi(val.c_str());
             else if (arg == "--at-pace") at.pace = atoi(val.c_str()) > 1 ? atoi(val.c_str()) : 1;
             else if (arg == "--at-perf") at.perf = atoi(val.c_str()) != 0;
             else if (arg == "--at-item-respawn") at.itemRespawn = atoi(val.c_str());
