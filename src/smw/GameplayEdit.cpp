@@ -353,6 +353,27 @@ uint8_t mouseStepByte(int dx, int dy, bool paint, bool erase)
     return static_cast<uint8_t>(((MOUSE_STEP + q) << 2) | 3);
 }
 
+// The mouse's jumps: up and down at once (the keys' are let go of both, as left and right), the rest a
+// number: 0..19 the cursor to that column, 20..34 to that row (the mouse's cell at once, a tick an
+// axis, not a cell a tick). Not 0xFC and up: the host's rights commands
+constexpr int JUMP_ROWS_AT = MAPWIDTH, JUMPS = MAPWIDTH + MAPHEIGHT;
+static_assert(JUMPS <= 45, "the jumps fit the bytes with up and down");
+
+bool jumpByte(uint8_t byte)
+{
+    return (byte & 0x0C) == 0x0C && (byte & 3) != 3 && byte < 0xF0 && (byte & 3) + 3 * (byte >> 4) < JUMPS;
+}
+
+int jumpOf(uint8_t byte)
+{
+    return (byte & 3) + 3 * (byte >> 4);
+}
+
+uint8_t jumpTo(int jump)
+{
+    return static_cast<uint8_t>(((jump / 3) << 4) | 0x0C | (jump % 3));
+}
+
 uint8_t mouseTabByte(int tab)
 {
     return static_cast<uint8_t>(((MOUSE_TAB + tab) << 2) | 3);
@@ -361,6 +382,8 @@ uint8_t mouseTabByte(int tab)
 // A byte's buttons as the keys' would be: a mouse command's A and B (a tab's: none); another's as it is
 uint8_t mouseButtons(uint8_t byte)
 {
+    if (jumpByte(byte))
+        return 0;
     if (!mouseCommand(byte))
         return byte;
     if ((byte >> 2) >= MOUSE_TAB)
@@ -2234,6 +2257,17 @@ void builderTick(CGM_MapMaker& m, MapMakerBuilder& b, uint8_t byte, uint8_t prev
             undo(m, slot);
         return;
     }
+    //The mouse's jump: the cursor to the mouse's column or row, at once (on the map)
+    if (jumpByte(byte)) {
+        const int jump = jumpOf(byte);
+        if (!b.palette) {
+            if (jump < JUMP_ROWS_AT)
+                b.cx = static_cast<short>(jump);
+            else
+                b.cy = static_cast<short>(jump - JUMP_ROWS_AT);
+        }
+        return;
+    }
     //The mouse's: a tab; a step, with A or B held (then read as the keys' A and B)
     const bool mouse = mouseCommand(byte);
     if (mouse && (byte >> 2) >= MOUSE_TAB && (byte >> 2) < CMD_PICK) {
@@ -3838,6 +3872,18 @@ uint8_t mouseByte(int slot, const CGM_MapMaker& m, bool& used)
         ms.stroke = true;
     if (dx == 0 && dy == 0 && !ms.stroke)
         return 0;
+    //(not painting: straight to the mouse's cell, a column then a row; painting, a cell a tick, every
+    //cell on the way)
+    if (!ms.stroke) {
+        used = true;
+        ms.idle = 0;
+        if (cx != b.cx) {
+            b.cx = static_cast<short>(cx);
+            return jumpTo(cx);
+        }
+        b.cy = static_cast<short>(cy);
+        return jumpTo(JUMP_ROWS_AT + cy);
+    }
     mouseMove(b, dx, dy);
     used = true;
     ms.idle = 0;
@@ -4001,6 +4047,8 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
         byte = B_PALETTE;    //(X and Y together alone: not "done")
     if ((byte & (B_LEFT | B_RIGHT)) == (B_LEFT | B_RIGHT))
         byte &= ~(B_LEFT | B_RIGHT);    //(left and right at once: neither; not the undo button, not the mouse's)
+    if ((byte & (B_UP | B_DOWN)) == (B_UP | B_DOWN))
+        byte &= ~(B_UP | B_DOWN);       //(up and down too: the mouse's jumps)
     return byte;
 }
 
@@ -4064,7 +4112,7 @@ void simulate(const InputFrame& input)
                     m->history.size() < historyBefore || m->redo.size() < redoBefore,
                     !sameRecent(brushBefore, recentOf(b)));
             }
-        } else if (!mouseCommand(byte) && (byte & B_PALETTE) && !(prev & B_PALETTE) && game_values.playercontrol[slot] == 1) {
+        } else if (!mouseCommand(byte) && !jumpByte(byte) && (byte & B_PALETTE) && !(prev & B_PALETTE) && game_values.playercontrol[slot] == 1) {
             setBuilding(*m, slot, true);
         }
     }
@@ -4561,6 +4609,15 @@ void GameplayState::updateEditMode()
 
 }
 
+// Where a builder's cursor is drawn: its cell; the mouse's builder's, the cell under the mouse (at
+// once: the match has it a tick or two later)
+SDL_Point shownCell(int slot, const MapMakerBuilder& b)
+{
+    if (b.palette || slot != mouseSlot() || !s_mouse.active)
+        return {b.cx, b.cy};
+    return {std::clamp(s_mouse.x / TILESIZE, 0, MAPWIDTH - 1), std::clamp(s_mouse.y / TILESIZE, 0, MAPHEIGHT - 1)};
+}
+
 void GameplayState::drawEditMode()
 {
     if (!mode())
@@ -4674,8 +4731,10 @@ void GameplayState::drawEditMode()
             lowestTool = b.tool;
             lowestBrush = b.brush;
         }
-        //The brush at the cursor, framed in the player's color (pulsing), the player's number on it
-        const int x = b.cx * TILESIZE, y = b.cy * TILESIZE;
+        //The brush at the cursor, framed in the player's color (pulsing), the player's number on it (the
+        //mouse's builder: under the mouse, at once)
+        const SDL_Point at = shownCell(slot, b);
+        const int x = at.x * TILESIZE, y = at.y * TILESIZE;
         drawBrushPiece(b.brush, b.tile,
             static_cast<short>(b.brush == BrushItem ? b.item
                 : b.brush == BrushWarp ? b.warpConn + b.warpDir * WARP_CONNECTIONS
@@ -4747,8 +4806,13 @@ void GameplayState::drawEditMode()
             continue;
         const MapMakerBuilder& b = m.builders[slot];
         const bool down = (g_sim.previousInput[slot] & (B_PAINT | B_ERASE)) && g_sim.previousInput[slot] != B_UNDO;
-        const SDL_Rect cell = b.palette ? s_paletteCell[slot] : SDL_Rect {b.cx * TILESIZE, b.cy * TILESIZE, TILESIZE, TILESIZE};
-        const SDL_Point tip = b.palette ? s_paletteTip[slot] : SDL_Point {cell.x + TILESIZE / 2, cell.y + TILESIZE / 2};
+        const SDL_Point at = shownCell(slot, b);
+        const SDL_Rect cell = b.palette ? s_paletteCell[slot] : SDL_Rect {at.x * TILESIZE, at.y * TILESIZE, TILESIZE, TILESIZE};
+        //(the mouse's: its fingertip on the pointer, exactly)
+        const bool mouseHere = !b.palette && slot == mouseSlot() && s_mouse.active;
+        const SDL_Point tip = b.palette ? s_paletteTip[slot]
+            : mouseHere ? SDL_Point {std::clamp(s_mouse.x, 0, App::screenWidth - 1), std::clamp(s_mouse.y, 0, App::screenHeight - 1)}
+                        : SDL_Point {cell.x + TILESIZE / 2, cell.y + TILESIZE / 2};
         drawGlove(slot, cell, tip, slotColor(slot), "P" + std::to_string(slot + 1), down);
     }
     //What the builders' buttons do: a bar at the bottom (the top while a cursor is down there), if one
@@ -5081,6 +5145,9 @@ bool GameplayState::autoTestEditScript(int f)
         //the strip's fourth (539, 545))
         add({535, 512, 513, 0, 0, 0, 546, 540, 0, 0, 0, 536});
         add({543, 906, 906, 906, 906, 546, 544, 906, 906, 906, 906, 536});
+        //(the mouse across the map, no button: the cursor there at once, a tick a column then a row (548))
+        add({600 + 2 + 13 * MAPWIDTH, 906, 906, 906, 906, 906, 906, 906, 906, 906, 906});
+        add({600 + 18 + 1 * MAPWIDTH, 906, 906, 906, 548});
         add({537, 541, 0, 0, 0, 538, 541, 541, 0, 0});
         add({539, 542, 0, 0, 0, 0, 0, 0, 0, 0, 545});
         //(undo, again and again, past everything built: the map as it began, 518 checks)
@@ -5255,6 +5322,11 @@ bool GameplayState::autoTestEditScript(int f)
                 button(byte == 543 ? SDL_BUTTON_X1 : SDL_BUTTON_X2);
             }
             byte = byte == 541 || byte == 542 || byte == 540 || byte == 543 || byte == 544 ? -1 : 0;
+        } else if (byte == 548) {
+            const MapMakerBuilder& b = m->builders[0];
+            printf("jumptest: the mouse to (18, 1), 3 ticks on the cursor's at (%d, %d): %s\n", b.cx, b.cy,
+                b.cx == 18 && b.cy == 1 ? "there" : "NOT there");
+            byte = 0;
         } else if (byte == 533) {
             s_builtHash = builtMapHash(*m);
             byte = 0;

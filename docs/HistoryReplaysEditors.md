@@ -115,7 +115,9 @@ it changes; so do the players who aren't building.
 | LB + Up | Tab | | building to playing (you spawn where your hand is), and back (the cursor where your character is) |
 | Start | Escape | | the pause menu (click a row, or right-click to resume) |
 
-With the mouse, the glove follows the pointer. In the palette, click a tab (or the arrows at
+With the mouse, the glove is on the pointer and the cursor snaps to the cell under it at once (the
+match has it a tick or two later: a jump to its column, then its row); painting, it goes a cell a
+tick, so every cell on the way is painted. In the palette, click a tab (or the arrows at
 the ends of the tab row, or scroll over it) and click what you want; the wheel scrolls the
 tilesets and changes a setting; a right click, or a click off the palette, goes back. On the
 keyboard, Escape in the palette goes back instead of pausing. The bars show the mouse's
