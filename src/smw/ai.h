@@ -43,12 +43,15 @@ public:
     void Reset() {
         player = nullptr;
         goal = nullptr;
+        nearGoal = nullptr;
         stomp = nullptr;
         teammate = nullptr;
         threat = nullptr;
 
         playerdistance = App::screenWidth * 1000;
         goaldistance = App::screenWidth * 1000;
+        nearGoalDistance = App::screenWidth * 1000;
+        nearGoalWrap = false;
         stompdistance = App::screenWidth * 1000;
         teammatedistance = App::screenWidth * 1000;
         threatdistance = App::screenWidth * 1000;
@@ -66,6 +69,9 @@ public:
     CPlayer * teammate;
 
     CObject * goal;
+    CObject * nearGoal;       // the goal nearest as the crow flies and about level with us (one on the way)
+    int nearGoalDistance;
+    bool nearGoalWrap;
     CObject * stomp;
     CObject * threat;
 
@@ -164,6 +170,10 @@ private:
 protected:
     bool improved() const;
     bool improvedFighting() const;
+    bool smarter() const;
+    bool smarterItems() const;    // the item modes where going for the items by the way there helps
+    bool NeedsPathToItem(int x, int y) const;
+    bool measuredPaths = false;    // this think's goals are measured by the way there (ainav::MeasureFrom)    // the newest changes (on unless an A/B test leaves this player plain: --at-ai-plain)
 
     CPlayer * pPlayer = nullptr;
 

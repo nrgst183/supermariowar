@@ -64,6 +64,10 @@
 void CPlayerAI::GetNearestObjects()
 {
     nearestObjects.Reset();
+    //(the goals measured by the way to them from where we stand: one search for them all)
+    int spotCol = 0, spotRow = 0;
+    measuredPaths = smarterItems() && !pPlayer->inair && ainav::PlayerSpot(pPlayer->ix, pPlayer->iy, spotCol, spotRow) &&
+                    ainav::MeasureFrom(spotCol, spotRow);
 
     ScanMiddleLayerObjects();
     ScanBackLayerObjects();
@@ -71,6 +75,13 @@ void CPlayerAI::GetNearestObjects()
     ScanPlayers();
     ScanPowerupBlocks();
 
+    //One we're about to run into anyway (near, about level): that first, then on to the one chosen
+    if (measuredPaths && nearestObjects.nearGoal && nearestObjects.nearGoal != nearestObjects.goal && !nearestObjects.goalIsBlock &&
+        nearestObjects.nearGoalDistance < 64 * 64) {
+        nearestObjects.goal = nearestObjects.nearGoal;
+        nearestObjects.goaldistance = nearestObjects.nearGoalDistance;
+        nearestObjects.goalwrap = nearestObjects.nearGoalWrap;
+    }
     if (nearestObjects.goal && !nearestObjects.goalIsBlock)
         nearestObjects.goalValue = ItemValue(nearestObjects.goal);
 }
@@ -650,6 +661,17 @@ void CPlayerAI::DistanceToObject(CObject * object, CObject ** target, int * near
     }
 
     int distance_player_pow2 = tx*tx + ty*ty;    // a^2 = b^2 + c^2 :)
+    //A goal: how far it is to get to (the way there, squared, as the distances are), not as the crow
+    //flies; one there's no way to only when there's nothing else. And the nearest about level with us
+    if (target == &nearestObjects.goal && measuredPaths) {
+        if (ty > -40 && ty < 40 && distance_player_pow2 < nearestObjects.nearGoalDistance) {
+            nearestObjects.nearGoal = object;
+            nearestObjects.nearGoalDistance = distance_player_pow2;
+            nearestObjects.nearGoalWrap = fScreenWrap;
+        }
+        const int length = ainav::PathLength(object->x() + object->w() / 2, object->y() + object->h() / 2);
+        distance_player_pow2 = length >= 0 ? length * length : distance_player_pow2 * 4 + 640 * 640;
+    }
     if (weightPct != 100)
         distance_player_pow2 = static_cast<int>(static_cast<long long>(distance_player_pow2) * weightPct / 100);
 

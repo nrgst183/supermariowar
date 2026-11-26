@@ -67,11 +67,21 @@ MI_InputControlField::MI_InputControlField(gfxSprite * nspr, short x, short y, s
 MI_InputControlField::~MI_InputControlField()
 {}
 
+#ifdef SMW_XBOX
+    //(the Xbox controller's buttons by their names, in the system layer's order: sdl_events.cpp)
+    const char * MI_InputControlField::Joynames[30] = {
+        "Left Stick Up", "Left Stick Down", "Left Stick Left", "Left Stick Right", "Right Stick Up", "Right Stick Down", "Right Stick Left",
+        "Right Stick Right", "D-Pad Up", "D-Pad Down", "D-Pad Left", "D-Pad Right", "A", "B", "X", "Start", "Back", "Y", "Black", "White",
+        "Left Trigger", "Right Trigger", "Left Stick Click", "Right Stick Click", "Button 13", "Button 14", "Button 15", "Button 16",
+        "Button 17", "Button 18"
+    };
+#else
     const char * MI_InputControlField::Joynames[30] = {
         "Joystick Up", "Joystick Down", "Joystick Left", "Joystick Right", "Stick 2 Up", "Stick 2 Down", "Stick 2 Left", "Stick 2 Right", "Pad Up", "Pad Down",
         "Pad Left", "Pad Right", "Button 1", "Button 2", "Button 3", "Button 4", "Button 5", "Button 6", "Button 7", "Button 8",
         "Button 9", "Button 10", "Button 11", "Button 12", "Button 13", "Button 14", "Button 15", "Button 16", "Button 17", "Button 18"
     };
+#endif
 
 MenuCodeEnum MI_InputControlField::Modify(bool modify)
 {

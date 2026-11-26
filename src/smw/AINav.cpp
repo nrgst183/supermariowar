@@ -10,6 +10,8 @@
 #include "MovingPlatformPaths.h"
 #include "TileTypes.h"
 
+#include <algorithm>
+
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -961,6 +963,9 @@ int targetGoals(int targetX, int targetY, std::array<int, 4>& goalNodes)
 // Dijkstra from the node start to the nearest goal, with a binary heap (ties broken by node
 // number, so every machine picks the same path): the path's first edge (an index into the edges)
 // and its length; -1 when there is no way (or we're there)
+// (the last search's distances: with no goals it goes everywhere, MeasureFrom)
+std::vector<int> g_searchDist;
+std::vector<int> g_measured;    // MeasureFrom's
 int search(int start, const std::array<int, 4>& goalNodes, int goals, int& distance)
 {
     for (int k = 0; k < goals; k++) {
@@ -968,7 +973,7 @@ int search(int start, const std::array<int, 4>& goalNodes, int goals, int& dista
             return -1;
     }
     const int nodes = g_graph.nodes();
-    static std::vector<int> dist;
+    std::vector<int>& dist = g_searchDist;
     static std::vector<int> firstEdge;   // the edge out of the start that leads here
     static std::vector<unsigned char> done;
     static std::vector<uint32_t> heap;   // (distance << 12) | node; a push per edge at most
@@ -1067,6 +1072,34 @@ Step stepFor(int edge, int col, int row, int distance)
 }
 
 }  // namespace
+
+bool MeasureFrom(int col, int row)
+{
+    if (!g_map || col < 0 || row < 0 || row >= H)
+        return false;
+    ensureGraph();
+    const int start = node(col, row);
+    if (!g_graph.spot[start])
+        return false;
+    int distance = 0;
+    search(start, {}, 0, distance);    //(no goal: every spot)
+    g_measured = g_searchDist;
+    return true;
+}
+
+int PathLength(int targetX, int targetY)
+{
+    if (g_measured.empty())
+        return -1;
+    std::array<int, 4> goalNodes {};
+    const int goals = targetGoals(targetX, targetY, goalNodes);
+    int best = 1 << 30;
+    for (int k = 0; k < goals; k++) {
+        if (goalNodes[k] < static_cast<int>(g_measured.size()))
+            best = std::min(best, g_measured[static_cast<size_t>(goalNodes[k])]);
+    }
+    return best >= (1 << 30) ? -1 : best * 16;    //(a walk of a tile costs 2)
+}
 
 Step NextStep(int col, int row, int targetX, int targetY)
 {

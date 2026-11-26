@@ -109,6 +109,33 @@ bool CPlayerAI::improved() const
     return !(cmd::g_autotest.aiLegacyMask & (1 << pPlayer->globalID));
 }
 
+// The newest behaviour: on unless an AI comparison asked for the one before it (--at-ai-plain)
+bool CPlayerAI::smarter() const
+{
+    return improved() && !(cmd::g_autotest.aiPlainMask & (1 << pPlayer->globalID));
+}
+
+// The item modes where the items stay put (coins, eggs, flags, cards, Frenzy's boxes): choosing one by
+// the way there, following that way, and taking one we pass on the way won AI comparisons. Where they
+// move about (Stomp's enemies, Greed's dropped coins, a carried star) or the goal is an area to hold
+// (Domination), a way worked out to where they were lost: those keep going straight at them
+bool CPlayerAI::smarterItems() const
+{
+    if (!smarter())
+        return false;
+    switch (game_values.gamemode->gamemode) {
+        case game_mode_coins:
+        case game_mode_eggs:
+        case game_mode_ctf:
+        case game_mode_frenzy:
+        case game_mode_health:
+        case game_mode_collection:
+            return true;
+        default:
+            return false;
+    }
+}
+
 // The stomp fighting and path following help in the modes that are about knocking out the
 // others or getting somewhere; in the item modes (coins, eggs, flags, stars...) they made the
 // CPU worse in AI comparisons, so those keep the original behaviour.
@@ -1019,13 +1046,21 @@ void CPlayerAI::GoForGoal(COutputControl * playerKeys, short ix, short iy, MO_Ca
         wrap = (d > App::screenWidth / 2 || d < -App::screenWidth / 2) && ainav::CanCrossEdge(iy, goalY);
     }
 
-    if (improvedFighting() && (NeedsPath(goalX, goalY) || (pPlayer->inair && navMove != 0)) && NavigateTo(playerKeys, goalX, goalY)) {
+    //(the path to it. The item modes too, but only where going straight at it can't work: higher
+    //than a jump, a wall between, below and off to the side; an item a jump up is jumped at)
+    const bool pathed = improvedFighting() ? NeedsPath(goalX, goalY) : smarterItems() && NeedsPathToItem(goalX, goalY);
+    if ((improvedFighting() || smarterItems()) && (pathed || (pPlayer->inair && navMove != 0)) && NavigateTo(playerKeys, goalX, goalY)) {
         //Following the path to it
-    } else if ((leftX > ix && wrap) || (leftX < ix && !wrap))
-        playerKeys->game_left.fDown = true;
-    else
-        playerKeys->game_right.fDown = true;
-
+    } else {
+        //(not following a path: on the ground, the last path's move is forgotten, or the next jump
+        //(any jump) would carry it out again: a hop on the spot over and over)
+        if (smarterItems() && !pPlayer->inair)
+            navMove = 0;
+        if ((leftX > ix && wrap) || (leftX < ix && !wrap))
+            playerKeys->game_left.fDown = true;
+        else
+            playerKeys->game_right.fDown = true;
+    }
     // Under it: jump up to it (an item rising out of its block can't be taken yet, and a feather
     // up high comes down to us: no point jumping at those); over it: drop down to it
     const bool notYet = improved() && nearestObjects.goalValue >= 0 &&
@@ -1163,6 +1198,18 @@ bool CPlayerAI::NeedsPath(int x, int y) const
         return true;
     // On another level and not close: the way there may go around
     return (dy < -24 || dy > 24) && adx > 96;
+}
+
+// An item mode's goal (a coin, a card, an egg...): a path only where going straight at it and jumping
+// can't get it: more than a jump above, a wall between us, or below and off to the side
+bool CPlayerAI::NeedsPathToItem(int x, int y) const
+{
+    const int dx = ainav::HorizontalDistance(x - (pPlayer->ix + PW / 2), pPlayer->iy, y);
+    const int dy = y - (pPlayer->iy + PH / 2);
+    const int adx = dx < 0 ? -dx : dx;
+    if (dy < -100 || (dy > 48 && adx > 64))
+        return true;
+    return adx > 16 && ainav::FreeRun(pPlayer->ix, pPlayer->iy, dx < 0 ? -1 : 1, 1) == 0;
 }
 
 bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)

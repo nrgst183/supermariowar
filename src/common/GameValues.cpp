@@ -51,6 +51,30 @@ SDL_Keycode controlkeys[2][2][4][NUM_KEYS] = { { { {SDLK_LEFT, SDLK_RIGHT, SDLK_
     }
 };
 
+#ifdef SMW_XBOX
+namespace {
+// The Xbox controller's buttons as the system layer numbers them (sdl_events.cpp)
+constexpr SDL_Keycode XBOX_X = JOY_BUTTON_START + 2;
+constexpr SDL_Keycode XBOX_Y = JOY_BUTTON_START + 5;
+constexpr SDL_Keycode XBOX_START = JOY_BUTTON_START + 3;
+
+// The controller's own layout on the Xbox: A jumps, X runs (turbo), Y uses the item, Start pauses,
+// Back cancels; in the menus A selects, B goes back, X is random, Y scrolls fast. (Changed from B
+// running, X the item and Start scrolling fast: a controls file still on those gets these)
+void xboxControllerLayout(CInputPlayerControl& pad, bool onlyOldDefaults)
+{
+    SDL_Keycode* game = pad.inputGameControls[0].keys;
+    SDL_Keycode* menu = pad.inputGameControls[1].keys;
+    if (!onlyOldDefaults || (game[4] == JOY_BUTTON_START + 1 && game[5] == JOY_BUTTON_START + 2)) {
+        game[4] = XBOX_X;    // turbo
+        game[5] = XBOX_Y;    // the item
+    }
+    if (!onlyOldDefaults || menu[7] == XBOX_START)
+        menu[7] = XBOX_Y;    // fast scroll
+}
+} // namespace
+#endif
+
 namespace {
 /*
 0 == poison mushroom
@@ -241,6 +265,7 @@ void CGameValues::init()
 
         //Set the players input to the default configuration (will be overwritten by options.bin settings)
 #ifdef SMW_XBOX
+        xboxControllerLayout(inputConfiguration[iPlayer][1], false);
         // No keyboard on the Xbox: each player uses the controller in their port
         // (the joystick instance IDs 1-4 are the controller ports)
         inputConfiguration[iPlayer][1].iDevice = static_cast<SDL_JoystickID>(iPlayer + 1);
@@ -452,6 +477,10 @@ void CGameConfig::ReadInputConfig() {
         // Old files stored a 16 bit joystick index, so those players fall back to the keyboard.
         const size_t configsSize = sizeof(CInputPlayerControl) * 8;
         controls.read_raw(inputConfiguration, configsSize);
+#ifdef SMW_XBOX
+        for (short iPlayer = 0; iPlayer < MAX_PLAYERS; iPlayer++)
+            xboxControllerLayout(inputConfiguration[iPlayer][1], true);
+#endif
 
         std::array<SDL_GUID, MAX_PLAYERS> savedDeviceGuids = {};
         if (fileSize == configsSize + sizeof(SDL_GUID) * MAX_PLAYERS) {

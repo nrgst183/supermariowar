@@ -33,11 +33,11 @@ if(TARGET smw)
 		--at-determinism-out "${CMAKE_CURRENT_BINARY_DIR}/determinism_checksums.txt")
 	add_test(NAME determinism.repeatable COMMAND smw ${smw_determinism_args})
 	set_tests_properties(determinism.repeatable PROPERTIES
-		ENVIRONMENT "SDL_VIDEO_DRIVER=dummy;SDL_AUDIO_DRIVER=dummy" TIMEOUT 600 LABELS determinism)
+		ENVIRONMENT "SDL_VIDEO_DRIVER=dummy;SDL_AUDIO_DRIVER=dummy;SMW_HOME=${CMAKE_CURRENT_BINARY_DIR}/home" TIMEOUT 600 LABELS determinism)
 	if(MSVC)
 		add_test(NAME determinism.reference COMMAND smw ${smw_determinism_args}
 			--at-determinism-ref "${PROJECT_SOURCE_DIR}/tests/determinism/reference.txt")
 		set_tests_properties(determinism.reference PROPERTIES
-			ENVIRONMENT "SDL_VIDEO_DRIVER=dummy;SDL_AUDIO_DRIVER=dummy" TIMEOUT 600 LABELS determinism)
+			ENVIRONMENT "SDL_VIDEO_DRIVER=dummy;SDL_AUDIO_DRIVER=dummy;SMW_HOME=${CMAKE_CURRENT_BINARY_DIR}/home" TIMEOUT 600 LABELS determinism)
 	endif()
 endif()

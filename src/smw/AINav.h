@@ -82,6 +82,11 @@ int RiseColumn(int col, int row, int toCol, int toRow);
 
 // The first move of the shortest path from (col,row) to the spot nearest to the point (x,y)
 Step NextStep(int col, int row, int targetX, int targetY);
+// The way from the spot (col,row) to every other, measured in one search (to choose among goals by
+// how far they are to get to, not as the crow flies); false when (col,row) isn't a spot. Then
+// PathLength: the length of the way (about pixels) to the spot nearest the point (x,y), -1 if none
+bool MeasureFrom(int col, int row);
+int PathLength(int targetX, int targetY);
 
 // Moving platforms (not the falling ones): each one's way is cut into points a short ride apart;
 // a path gets on at a point (Board), rides from point to point (Ride) and gets off at one (Walk,

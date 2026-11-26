@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <algorithm>
+#include <utility>
 #include <deque>
 
 struct SDL_Joystick {
@@ -85,6 +86,50 @@ void pushJoyButton(int port, int button, bool down)
     event.jbutton.button = static_cast<Uint8>(button);
     event.jbutton.down = down;
     sdlx_push_event(event);
+}
+
+// The same as a gamepad's (SDL sends both on a PC: the game reads the gamepad ones for the Map
+// Maker's shoulders and Start, and the triggers): the buttons by their SDL gamepad names
+void pushGamepadButton(int port, SDL_GamepadButton button, bool down)
+{
+    SDL_Event event;
+    memset(&event, 0, sizeof(event));
+    event.type = down ? SDL_EVENT_GAMEPAD_BUTTON_DOWN : SDL_EVENT_GAMEPAD_BUTTON_UP;
+    event.gbutton.timestamp = nowNs();
+    event.gbutton.which = static_cast<SDL_JoystickID>(port + 1);
+    event.gbutton.button = static_cast<Uint8>(button);
+    event.gbutton.down = down;
+    sdlx_push_event(event);
+}
+
+void pushGamepadAxis(int port, SDL_GamepadAxis axis, Sint16 value)
+{
+    SDL_Event event;
+    memset(&event, 0, sizeof(event));
+    event.type = SDL_EVENT_GAMEPAD_AXIS_MOTION;
+    event.gaxis.timestamp = nowNs();
+    event.gaxis.which = static_cast<SDL_JoystickID>(port + 1);
+    event.gaxis.axis = static_cast<Uint8>(axis);
+    event.gaxis.value = value;
+    sdlx_push_event(event);
+}
+
+// A joystick button's gamepad button (the order of updatePort's), or -1: the triggers are axes
+int gamepadButtonOf(int button)
+{
+    switch (button) {
+        case 0: return SDL_GAMEPAD_BUTTON_SOUTH;
+        case 1: return SDL_GAMEPAD_BUTTON_EAST;
+        case 2: return SDL_GAMEPAD_BUTTON_WEST;
+        case 3: return SDL_GAMEPAD_BUTTON_START;
+        case 4: return SDL_GAMEPAD_BUTTON_BACK;
+        case 5: return SDL_GAMEPAD_BUTTON_NORTH;
+        case 6: return SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER;    // Black
+        case 7: return SDL_GAMEPAD_BUTTON_LEFT_SHOULDER;     // White
+        case 10: return SDL_GAMEPAD_BUTTON_LEFT_STICK;
+        case 11: return SDL_GAMEPAD_BUTTON_RIGHT_STICK;
+        default: return -1;
+    }
 }
 
 void pushJoyHat(int port, Uint8 value)
@@ -182,9 +227,23 @@ void updatePort(int port, const XINPUT_GAMEPAD* pad)
             state.buttons[i] = buttons[i];
             if (g_joystick_events)
                 pushJoyButton(port, i, buttons[i]);
+            //(and as a gamepad's: the triggers as their axes, pressed all the way or let go)
+            if (i == 8 || i == 9)
+                pushGamepadAxis(port, i == 8 ? SDL_GAMEPAD_AXIS_LEFT_TRIGGER : SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, buttons[i] ? 32767 : 0);
+            else if (gamepadButtonOf(i) >= 0)
+                pushGamepadButton(port, static_cast<SDL_GamepadButton>(gamepadButtonOf(i)), buttons[i]);
         }
     }
     if (hat != state.hat) {
+        //(the d-pad as a gamepad's four buttons)
+        const Uint8 was = state.hat;
+        const std::pair<Uint8, SDL_GamepadButton> dpad[4] = {{SDL_HAT_UP, SDL_GAMEPAD_BUTTON_DPAD_UP},
+            {SDL_HAT_DOWN, SDL_GAMEPAD_BUTTON_DPAD_DOWN}, {SDL_HAT_LEFT, SDL_GAMEPAD_BUTTON_DPAD_LEFT},
+            {SDL_HAT_RIGHT, SDL_GAMEPAD_BUTTON_DPAD_RIGHT}};
+        for (const auto& [bit, button] : dpad) {
+            if ((hat & bit) != (was & bit))
+                pushGamepadButton(port, button, (hat & bit) != 0);
+        }
         state.hat = hat;
         if (g_joystick_events)
             pushJoyHat(port, hat);

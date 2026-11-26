@@ -548,6 +548,11 @@ bool captureConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_PLAYE
         return false;
     }
 
+    //Whose turn it is to think (one CPU a tick): from the start in every match, not from where the
+    //match before left it, or a match would play out differently after another than on its own. Here,
+    //before the settings are kept: the match and its replay (and the others online) start from it
+    game_values.cputurn = -1;
+
     config = MatchConfig();
     config.seed = seed;
     config.matchType = game_values.matchtype;

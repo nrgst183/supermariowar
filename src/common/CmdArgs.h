@@ -29,6 +29,7 @@ struct AutoTestArgs {
     int seed = 0;            // RNG seed for reproducible runs; 0 = time based
     int cpuLevel = -1;       // CPU difficulty 0-4; -1 = keep the configured one
     int aiLegacyMask = 0;    // bit k: player k uses the original CPU logic (for comparing AI versions)
+    int aiPlainMask = 0;     // --at-ai-plain: players whose bit is set don't use the newest AI changes (A/B tests)
     bool aiBench = false;    // print kills/deaths per player at the end of each match
     bool shotTicks = false;  // --at-shot-every counts simulation ticks instead of drawn frames
     bool resim = false;      // run every gameplay tick as a re-simulation (side effects suppressed)

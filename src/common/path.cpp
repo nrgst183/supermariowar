@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <string>
 #include <sys/stat.h>
 
@@ -15,6 +16,20 @@ std::string SMW_Root_Data_Dir;
 
 std::string GetHomeDirectory()
 {
+    //SMW_HOME: the settings folder somewhere else (test runs: not the player's options, history and
+    //replays; on Windows the usual folder comes from the system, not from APPDATA)
+    if (const char* home = getenv("SMW_HOME"); home && *home) {
+        std::string result(home);
+        if (result.back() != '/' && result.back() != '\\')
+            result += '/';
+        static const bool made = [&result] {
+            std::error_code ec;
+            std::filesystem::create_directories(result, ec);
+            return true;
+        }();
+        (void)made;
+        return result;
+    }
 #ifdef __APPLE__
     std::string result("/Library/Preferences/.smw/");
     char* folder = getenv("HOME");
