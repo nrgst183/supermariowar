@@ -99,13 +99,19 @@ it changes; so do the players who aren't building.
 
 | Controller | Keyboard | Mouse | |
 |---|---|---|---|
-| D-pad / stick | arrows | move it | the cursor (the glove) |
-| A | Enter | left button | paint (held: along the way); with the rectangle, copy or fill: from where it's pressed |
+| D-pad / stick | arrows | move it | the cursor (the glove); held, it speeds up |
+| A | Enter | left button | paint (held: along the way); with the rectangle, copy or fill: from where it's pressed. Shift held as you start dragging: a straight line (it keeps to the row or column) |
 | B | Delete | right button | erase, the same way |
 | X | Space | middle button | the palette |
-| Y | Shift | | the layer (1, 2 behind the players; 3, 4 in front) |
-| RB | Backspace, Ctrl+Z | | undo your last stroke (a rectangle, fill or paste: all of it); hold it to keep undoing. It goes back as far as you like, to how the map started |
+| Y | Shift | Ctrl + wheel | the layer (1, 2 behind the players; 3, 4 in front). While you use the mouse, Shift is for straight lines instead |
+| RB | Backspace, Ctrl+Z | back side button | undo your last stroke (a rectangle, fill or paste: all of it); hold it to keep undoing. It goes back as far as you like, to how the map started |
+| LB + RB | Ctrl+Y, Ctrl+Shift+Z | forward side button | redo what you undid (hold to keep redoing). Changing the map again drops what's left to redo |
+| | T | | the next tool: pencil, rectangle, fill |
+| | 2 - 8 | | the recent part with that number (the numbers are on the strip) |
 | LT / RT | Page Up / Page Down | | the palette's tab before / after (with the palette shut: it opens) |
+| LB + Left / Right | Q / E | wheel (over the map), or click one | the recent parts: the one before / after (see below) |
+| LB + Down | R | Ctrl + left button | copy what's under the cursor: it becomes the brush, with its settings (a ? block's contents, a fire bar's length, a platform's path) |
+| LB + B | G | Ctrl + right button | pick up what's under the cursor, to move it: it's taken off the map and becomes the brush; paint to put it down (like grabbing a part in Mario Maker). Undo puts it back |
 | LB + Up | Tab | | building to playing (you spawn where your hand is), and back (the cursor where your character is) |
 | Start | Escape | | the pause menu (click a row, or right-click to resume) |
 
@@ -125,13 +131,24 @@ ice, death...), **Spawns** (no-spawn zones: everyone's, a team's, the items'), *
 tiles, **Weather** (clouds, ghosts, leaves, snow, fish, rain, bubbles, on each layer),
 **Goals** (race goals, flag bases), and **Tools** (pencil, rectangle, fill, copy, paste).
 
-The card at the bottom left shows the brush, its layer and the tool. While someone builds,
+The card at the bottom left shows the brush, its layer and the tool. Next to it are the
+**recent parts**: the last 8 brushes you used (from the palette or copied off the map; click
+one to use it), so you
+can switch between a few things without opening the palette. Placing, erasing, undoing and
+changing the brush each make a sound, and the cells changed flash a ring (white put down, red
+taken away, yellow undone). While you build, a faint grid marks the cells' corners around your
+cursor, and when the cursor rests a moment a label over it names what's under it (what B would
+erase, or LB + Down copy). The card shows the tool only if it isn't the pencil, and the layer only
+for tiles; the bar shows Y (layer) with tiles, else LB + B (move). While someone builds,
 the things play doesn't show are marked on the map: warps, hazards, hidden blocks, race goals
 and flag bases; with the Types or Spawns brush, the map's types or zones.
 
 **The pause menu**: Resume, Who builds (the host: left/right a player, A gives or takes the
 right), Save map (as "*map* made", in the map list from then on; its filters and thumbnail
-made again), Quit. Online the match can't pause: the online panel has the rights and Save.
+made again), Clear map (the host: everything placed goes, tiles, blocks, items, hazards,
+platforms, warps, types and no-spawn zones, but not the backdrop, music or weather; press it
+twice to be sure; one undo brings it all back), Quit. Online the match can't pause: the online
+panel (Start) has the rights, Save and Clear map, under the run-ahead.
 
 Building is part of the simulation (a builder's buttons go in its input byte), so it plays
 the same on every computer online, in rollbacks, and in the sync tests.
@@ -259,7 +276,9 @@ The others may Save As a copy of their own.
   time and on the same cells; each prints a hash of its document (`cotest:`), which must
   be the same everywhere. `--at-role colocal`: two controllers in one editor
 - `--at-role matchedit`: the Map Maker as a person plays it: Editors > Maps, its lobby, its
-  rules, then a scripted builder using every palette tab, the tools, undo, the keyboard's keys
+  rules, then a scripted builder using every palette tab, the tools, the recent parts, copying
+  from the map (a fire bar with its settings), picking up to move, Clear map and its undo, undo all the way back (`undotest:`),
+  redo all the way (`redotest:`), the computer's keys and mouse buttons (`pctest:`), the keyboard's keys
   and the pause menu's Save (its map is removed afterwards). With `--at-synctest 8` every tick is
   rolled back and played again (0 mismatches); `--at-pace N` holds each button N frames and
   `--at-realtime 3` plays at normal speed, to watch it; `--at-mm-blank 1` / `--at-mm-start 1`

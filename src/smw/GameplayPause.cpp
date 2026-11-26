@@ -108,6 +108,8 @@ void closeOnlinePanel()
     if (s_onlinePanel)
         game_values.WriteConfig();    //(the run-ahead chosen: next time too)
     s_onlinePanel = false;
+    if (matchedit::allowed())
+        matchedit::setPanelRow(-1);    //(Clear map's "press again": gone with the panel)
 }
 
 void drawOnlinePanel()
@@ -211,12 +213,12 @@ bool updateExitPauseDialog(short iCountDownState) // true on exit
                         game_values.playerInput.ResetKeys();
                         break;
                     }
-                    //(the Map Maker's host: down to its rows, the players' rights and Save)
+                    //(the Map Maker's host: down to its rows, the players' rights, Save and Clear map)
                     if (matchedit::allowed() && matchedit::isHostHere()) {
                         if (playerKeys->menu_down.fPressed)
-                            s_onlineRow = (s_onlineRow + 1) % 3;
+                            s_onlineRow = (s_onlineRow + 1) % 4;
                         if (playerKeys->menu_up.fPressed)
-                            s_onlineRow = (s_onlineRow + 2) % 3;
+                            s_onlineRow = (s_onlineRow + 3) % 4;
                         matchedit::setPanelRow(s_onlineRow - 1);
                         if (s_onlineRow > 0) {
                             matchedit::hostPanelInput(playerKeys->menu_left.fPressed, playerKeys->menu_right.fPressed, false, playerKeys->menu_select.fPressed);

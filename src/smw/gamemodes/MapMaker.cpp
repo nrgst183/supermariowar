@@ -29,6 +29,7 @@ void CGM_MapMaker::init()
     std::memset(static_cast<void*>(bulks), 0, sizeof(bulks));
     bulkCount = 0;
     history.clear();
+    redo.clear();
     for (int slot = 0; slot < 4; slot++) {
         rights[slot] = slot == hostSlot || game_values.mapmaker.builders == 1;
         MapMakerBuilder& b = builders[slot];

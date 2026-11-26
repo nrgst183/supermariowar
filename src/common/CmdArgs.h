@@ -48,6 +48,7 @@ struct AutoTestArgs {
     bool pad = false;
     int pace = 1;
     int mmStart = -1;        // --at-mm-start N: the Map Maker's rules: 0 builders start building, 1 playing
+    bool mmDemo = false;     // --at-mm-demo 1: --at-role matchedit plays a short demo of the recent parts, the eyedropper and Clear map
     int mmBlank = -1;        // --at-mm-blank 1: the Map Maker starts from a blank map            // --at-pace N: --at-role matchedit's buttons each held N frames (a person's pace: 15)
     bool perf = false;
     int powerup = -1;        // --at-powerup N: every player (re)spawns with powerup N (3 feather, 8 P-Wings...: AI comparisons)

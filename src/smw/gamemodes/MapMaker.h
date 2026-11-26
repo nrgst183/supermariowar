@@ -22,6 +22,15 @@ constexpr int MAP_CELLS = MAPWIDTH * MAPHEIGHT;
 
 // A builder's editor (its cursor, brush and palette): simulation state, worked by the input bytes of
 // its slot while it builds (smw/GameplayEdit.cpp), so it rolls back with the rest of the match
+// A brush used lately (the recent parts' strip): what it is, enough to take it again
+struct MapMakerRecent {
+    uint8_t brush;        // GameplayEdit.cpp's Brush
+    uint8_t flags;        // a block's: 1 on, 2 hidden
+    short a, b, c;        // a tile's tileset, column, row; a block's type and contents; the others' kind
+    uint32_t mix;         // a ? block's mix
+};
+constexpr int MAP_MAKER_RECENT = 8;
+
 struct MapMakerBuilder {
     short cx = MAPWIDTH / 2;
     short cy = MAPHEIGHT / 2;
@@ -58,6 +67,8 @@ struct MapMakerBuilder {
     short page = 0;
     short px = 0, py = 0;
     short scrollX = 0, scrollY = 0;
+    MapMakerRecent recent[MAP_MAKER_RECENT] {};    // the brushes used lately, the newest first
+    short recentCount = 0;
 };
 
 // A moving platform the Map Maker made: of the brush's tile, `w` wide, its left end at x, y (a circle's:
@@ -133,6 +144,9 @@ public:
     short bulkCount = 0;
     sim::vector<uint8_t> history;             // every edit since the match started, packed (only what it changed),
                                               // the oldest first: undone as far back as it goes
+    sim::vector<uint8_t> redo;                // what undo took back, the same way packed (each record the cells as
+                                              // the undo found them): redone a stroke at a time; a builder's
+                                              // dropped when it changes the map again
     bool edited = false;                      // the map differs from its file
     bool started = false;                     // the first tick's done (the builders started building)
     short background = -1;                    // the background chosen (its place in the backgrounds' list; -1: the map's)

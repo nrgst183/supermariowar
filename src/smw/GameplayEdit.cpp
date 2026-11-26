@@ -25,6 +25,7 @@
 #include "ui/SmwTheme.h"
 
 #include <algorithm>
+#include <tuple>
 #include <map>
 #include <cmath>
 #include <cstdio>
@@ -148,7 +149,18 @@ bool s_chordHeld[SLOTS] {};        // L+Up held last time (the switch on the pre
 bool s_undoPressed[SLOTS] {};      // the undo button (RB, Backspace, Ctrl+Z), by input device
 bool s_undoHeld[SLOTS] {};         // ... held down (it undoes again and again after a moment)
 int s_undoHeldTicks[SLOTS] {};
+bool s_redoPressed[SLOTS] {};      // redo (LB+RB, Ctrl+Y, Ctrl+Shift+Z, the mouse's forward button), as undo's
+bool s_redoHeld[SLOTS] {};
+int s_redoHeldTicks[SLOTS] {};
+bool s_toolPressed[SLOTS] {};      // T: the next tool (pencil, rectangle, fill)
+int s_recentJump[SLOTS] {};        // 1..8: that many recent brushes on (the strip's numbers), a next a tick
+bool s_recentJumpGap[SLOTS] {};
 int s_tabStep[SLOTS] {};           // the triggers (Page Up/Down): the palette's tab before (-1) or after (1)
+int s_recentStep[SLOTS] {};        // LB+Left/Right, Q/E, the mouse's wheel: the recent brush before (-1) or after (1)
+bool s_pickPressed[SLOTS] {};      // LB+Down, R, Ctrl+click: the brush of what's under the cursor
+bool s_grabPressed[SLOTS] {};      // LB+B, G, Ctrl+right click: what's under the cursor picked up (to move it)
+bool s_lbChord[SLOTS][4] {};       // (LB with Left, Right, Down, B held last tick: each a press once)
+bool s_clearPending = false;       // the pause menu's Clear map: the host's command, sent next tick
 bool s_triggerHeld[SLOTS][2] {};   // (a trigger pressed in: one step until it's let go)
 bool s_pausePressed[SLOTS] {};     // building: the pause (a pad's Start), by input device
 bool s_escPressed[SLOTS] {};       // the keyboard's Escape: the pause (the palette open: back), by input device
@@ -157,12 +169,13 @@ bool s_deleteHeld = false;
 bool s_wantRights[SLOTS] {};       // the host's toggles on its panel, sent as commands until the match has them
 bool s_wantPending[SLOTS] {};      // (only those: else the panel shows the match's rights)
 int s_rightsSlot = 1;              // the panel: the player whose right the host gives or takes
-int s_pauseRow = 0;                // the online panel: 0 the players' rights, 1 Save
+int s_pauseRow = 0;                // the online panel: 0 the players' rights, 1 Save, 2 Clear map
 int s_menuRow = 0;                 // the pause screen's menu: 0 Resume, 1 the rights, 2 Save, 3 Quit
 bool s_menuWasOpen = false;        // (opened again: on Resume)
 std::string s_savedNote;           // "Saved as ...", shown on the pause screen a while
 Uint64 s_savedAt = 0;
 bool s_savedThisPause = false;     // saved since the pause screen opened (nothing's changed since)
+bool s_clearArmed = false;         // Clear map pressed once: pressed again, it clears
 int s_scriptByte[SLOTS] {-1, -1, -1, -1};    // --at-role matchedit: the bytes it plays
 TilesetTile s_shown[MAPWIDTH][MAPHEIGHT][MAPLAYERS];    // the map the layer pictures show
 bool s_shownValid = false;
@@ -315,12 +328,23 @@ const char* const TAB_NAMES[PALETTE_TABS] = {"Tiles", "Blocks", "?", "Items", "W
 // are let go of one of them), and a number in the rest: MOUSE_STEP.. a step of the cursor (a cell any
 // way, or none) with A or B held; MOUSE_TAB.. a tab of the palette. (Not 3: the undo button's; not 62
 // or 63: the host's rights commands)
+// After the tabs, the builder's commands of the same kind: the brush of what's under the cursor (the
+// eyedropper), the map cleared (the host's), the recent brushes' next and previous
 constexpr int MOUSE_STEP = 4, MOUSE_TAB = 40;
-static_assert(MOUSE_STEP + 36 <= MOUSE_TAB && MOUSE_TAB + PALETTE_TABS < 62, "the mouse's commands fit the byte");
+constexpr int CMD_PICK = MOUSE_TAB + PALETTE_TABS, CMD_CLEAR = CMD_PICK + 1, CMD_RECENT_NEXT = CMD_PICK + 2, CMD_RECENT_PREV = CMD_PICK + 3,
+              CMD_GRAB = CMD_PICK + 4, CMD_REDO = CMD_PICK + 5, CMD_TOOL = CMD_PICK + 6;
+//(the eyedropper; Clear map; the recent brushes; pick up (to move); redo; the next tool: pencil,
+//rectangle, fill. 62 and up would be RIGHTS_CMD's)
+static_assert(MOUSE_STEP + 36 <= MOUSE_TAB && CMD_TOOL < 62, "the mouse's commands fit the byte");
 
 bool mouseCommand(uint8_t byte)
 {
-    return (byte & 3) == 3 && (byte >> 2) >= MOUSE_STEP && (byte >> 2) < MOUSE_TAB + PALETTE_TABS;
+    return (byte & 3) == 3 && (byte >> 2) >= MOUSE_STEP && (byte >> 2) <= CMD_TOOL;
+}
+
+uint8_t commandByte(int command)
+{
+    return static_cast<uint8_t>((command << 2) | 3);
 }
 
 uint8_t mouseStepByte(int dx, int dy, bool paint, bool erase)
@@ -1017,6 +1041,279 @@ void restoreLevel(CGM_MapMaker& m, const MapMakerEdit& edit)
     std::copy(&edit.bases[0][0], &edit.bases[0][0] + 8, &m.bases[0][0]);
 }
 
+// The cells just changed, each a moment's ring drawn round it (as Mario Maker's pieces pop in): put
+// down (white), taken away (red), undone (yellow). Only drawn: not while the match is played again
+struct CellFlash {
+    short x, y;
+    uint8_t kind;    // 0 put, 1 taken away, 2 undone
+    Uint64 at;       // SDL_GetTicks()
+};
+std::vector<CellFlash> s_flashes;
+
+void flashCell(int x, int y, int kind)
+{
+    if (sim::isResimulating() || x < 0 || y < 0 || s_flashes.size() >= 600)
+        return;
+    s_flashes.push_back({static_cast<short>(x), static_cast<short>(y), static_cast<uint8_t>(kind), SDL_GetTicks()});
+}
+
+// A sound for what a builder did this tick (Mario Maker's: every piece put down makes one): a piece
+// put, taken away, undone, a brush taken. Not too often (a stroke drawn makes one every few ticks);
+// not while the match is played again (a rollback)
+void buildSound(const CGM_MapMaker& m, int slot, uint8_t byte, bool changed, bool undone, bool newBrush)
+{
+    static int lastTick[4] {-100, -100, -100, -100};
+    if (sim::isResimulating() || !rm || slot < 0 || slot >= 4)
+        return;
+    sfxSound* sound = nullptr;
+    if (undone)
+        sound = &rm->sfx_spit;
+    else if (changed && (mouseButtons(byte) & B_PAINT))
+        sound = &rm->sfx_bump;
+    else if (changed && (mouseButtons(byte) & B_ERASE))
+        sound = &rm->sfx_kicksound;
+    else if (newBrush && !m.builders[slot].palette)
+        sound = &rm->sfx_inventory;
+    if (!sound || (g_sim.tick - lastTick[slot] < 5 && g_sim.tick >= lastTick[slot]))
+        return;
+    lastTick[slot] = g_sim.tick;
+    ifSoundOnPlay(*sound);
+}
+
+// ---- The recent brushes (the strip by the brush card): every brush taken goes first; the next and
+// previous go round them
+MapMakerRecent recentOf(const MapMakerBuilder& b)
+{
+    MapMakerRecent r {};
+    r.brush = b.brush;
+    switch (b.brush) {
+    case BrushTile: r.a = b.tile.iID; r.b = b.tile.iCol; r.c = b.tile.iRow; break;
+    case BrushBlock:
+        r.a = b.block;
+        r.flags = static_cast<uint8_t>((b.blockOn ? 1 : 0) | (b.blockHidden ? 2 : 0));
+        r.c = b.contents;
+        r.mix = b.mix;
+        break;
+    case BrushItem: r.a = b.item; break;
+    case BrushWarp: r.a = b.warpConn; r.b = b.warpDir; break;
+    case BrushHazard: r.a = b.hazard; break;
+    case BrushPlatform: r.a = b.platformKind; break;
+    case BrushType: r.a = b.typeBrush; break;
+    case BrushSpawn: r.a = b.spawnBrush; break;
+    default: r.a = b.modeObject; break;
+    }
+    return r;
+}
+
+bool sameRecent(const MapMakerRecent& x, const MapMakerRecent& y)
+{
+    return x.brush == y.brush && x.flags == y.flags && x.a == y.a && x.b == y.b && x.c == y.c && x.mix == y.mix;
+}
+
+void applyRecent(MapMakerBuilder& b, const MapMakerRecent& r)
+{
+    b.brush = r.brush;
+    switch (r.brush) {
+    case BrushTile: b.tile = TilesetTile {r.a, r.b, r.c}; break;
+    case BrushBlock:
+        b.block = r.a;
+        b.blockOn = r.flags & 1;
+        b.blockHidden = (r.flags & 2) != 0;
+        b.contents = r.c;
+        b.mix = r.mix;
+        break;
+    case BrushItem: b.item = r.a; break;
+    case BrushWarp: b.warpConn = r.a; b.warpDir = r.b; break;
+    case BrushHazard: b.hazard = r.a; break;
+    case BrushPlatform: b.platformKind = r.a; break;
+    case BrushType: b.typeBrush = r.a; break;
+    case BrushSpawn: b.spawnBrush = r.a; break;
+    default: b.modeObject = r.a; break;
+    }
+}
+
+// The brush now first in the recent ones (taken from the palette, picked up, gone back to)
+void noteRecent(MapMakerBuilder& b)
+{
+    const MapMakerRecent now = recentOf(b);
+    if (b.recentCount > 0 && sameRecent(b.recent[0], now))
+        return;
+    int k = 0;
+    while (k < b.recentCount && !sameRecent(b.recent[k], now))
+        k++;
+    if (k == b.recentCount && b.recentCount < MAP_MAKER_RECENT)
+        b.recentCount++;
+    k = std::min(k, MAP_MAKER_RECENT - 1);
+    for (; k > 0; k--)
+        b.recent[k] = b.recent[k - 1];
+    b.recent[0] = now;
+}
+
+// The next (1) or previous (-1) of the recent brushes: they go round, the first is the brush
+void stepRecent(MapMakerBuilder& b, int dir)
+{
+    if (b.recentCount < 2)
+        return;
+    if (dir > 0) {
+        const MapMakerRecent first = b.recent[0];
+        for (int k = 0; k + 1 < b.recentCount; k++)
+            b.recent[k] = b.recent[k + 1];
+        b.recent[b.recentCount - 1] = first;
+    } else {
+        const MapMakerRecent last = b.recent[b.recentCount - 1];
+        for (int k = b.recentCount - 1; k > 0; k--)
+            b.recent[k] = b.recent[k - 1];
+        b.recent[0] = last;
+    }
+    applyRecent(b, b.recent[0]);
+}
+
+// A ? block's contents as the brush gives them (defaultBlockSettings's other way): the default
+// weights, an item set's, one powerup, or a mix of those it can give
+void blockContentsOf(const MapBlock& block, short& contents, uint32_t& mix)
+{
+    auto gives = [&](short c, uint32_t x) {
+        MapBlock made {};
+        made.iType = block.iType;
+        defaultBlockSettings(made, c, x);
+        return std::equal(std::begin(block.iSettings), std::end(block.iSettings), std::begin(made.iSettings));
+    };
+    mix = 0;
+    contents = -1;
+    if (gives(-1, 0))
+        return;
+    for (const short set : ITEM_SETS) {
+        if (gives(static_cast<short>(-10 - set), 0)) {
+            contents = static_cast<short>(-10 - set);
+            return;
+        }
+    }
+    int count = 0, one = 0;
+    for (int i = 0; i < NUM_BLOCK_SETTINGS && i < 32; i++) {
+        if (block.iSettings[i] > 0) {
+            mix |= 1u << i;
+            count++;
+            one = i;
+        }
+    }
+    if (count == 1) {
+        contents = static_cast<short>(one);
+        mix = 0;
+    } else if (count > 1) {
+        contents = -2;
+    }
+}
+
+// (a setting from a hazard's or platform's number, within its range)
+short settingFrom(const Setting& setting, float value)
+{
+    return static_cast<short>(std::clamp(static_cast<int>(value + 0.5f), static_cast<int>(setting.min), static_cast<int>(setting.max)));
+}
+
+// The eyedropper: the brush of what's under the cursor (what B would erase first: a block, an item, a
+// hazard, a platform, a warp, the topmost tile, whose layer the brush goes on), with its settings (a ?
+// block's contents, a fire bar's length, a platform's path...): painted, the same again. Nothing
+// there: as it was (false)
+bool pickBrush(const CGM_MapMaker& m, MapMakerBuilder& b)
+{
+    const short x = b.cx, y = b.cy;
+    const MapBlock& block = *g_map->blockat(x, y);
+    if (block.iType != -1) {
+        b.brush = BrushBlock;
+        b.block = block.iType;
+        b.blockOn = true;
+        b.blockHidden = block.fHidden;
+        b.contents = -1;
+        b.mix = 0;
+        if (block.iType >= 7 && block.iType <= 10)
+            b.blockOn = m.switches[block.iType - 7] != 0;
+        else if (block.iType >= 11 && block.iType <= 14)
+            b.blockOn = block.iSettings[0] != 0;
+        else if (block.iType == 1 || block.iType == 15)
+            blockContentsOf(block, b.contents, b.mix);
+        return true;
+    }
+    if (const int item = itemAt(m, x, y); item >= 0) {
+        b.brush = BrushItem;
+        b.item = static_cast<short>(m.items[item].itype);
+        return true;
+    }
+    if (const int k = hazardAt(m, x, y); k >= 0) {
+        const MapHazard& h = m.hazards[k];
+        const int type = static_cast<int>(h.itype) % HAZARD_TYPES;
+        const Setting* set = HAZARD_SETTING[type];
+        short* s = b.hazardSet[type];
+        b.brush = BrushHazard;
+        b.hazard = static_cast<short>(type);
+        switch (h.itype) {
+        case MapHazardType::FireBar:
+            s[0] = settingFrom(set[0], h.iparam[0]);
+            s[1] = settingFrom(set[1], std::fabs(h.dparam[0]) / 0.005f);
+            s[2] = h.dparam[0] < 0 ? 1 : 0;
+            break;
+        case MapHazardType::RotoDisc:
+            s[0] = settingFrom(set[0], h.iparam[0]);
+            s[1] = settingFrom(set[1], h.dparam[2] / 16.0f);
+            s[2] = settingFrom(set[2], std::fabs(h.dparam[0]) / 0.005f);
+            s[3] = h.dparam[0] < 0 ? 1 : 0;
+            break;
+        case MapHazardType::BulletBill:
+            s[0] = settingFrom(set[0], h.iparam[0] / 30.0f);
+            s[1] = settingFrom(set[1], std::fabs(h.dparam[0]));
+            s[2] = h.dparam[0] < 0 ? 1 : 0;
+            break;
+        default:
+            s[0] = settingFrom(set[0], h.iparam[0] / 30.0f);
+            s[1] = settingFrom(set[1], h.iparam[1]);
+            break;
+        }
+        return true;
+    }
+    if (const int k = platformAt(m, x, y); k >= 0) {
+        const MapMakerPlatform& p = m.platforms[k];
+        const int kind = p.kind % PLATFORM_KINDS;
+        short* s = b.platformSet[kind];
+        b.brush = BrushPlatform;
+        b.platformKind = static_cast<short>(kind);
+        s[0] = p.w;
+        s[1] = p.h;
+        s[2] = p.copied;
+        if (kind == 0) {
+            s[3] = p.way;
+            s[4] = p.dist;
+            s[5] = p.speed;
+        } else if (kind == 1) {
+            s[3] = p.way;
+            s[4] = p.speed;
+        } else {
+            s[3] = p.rx;
+            s[4] = p.ry;
+            s[5] = p.speed;
+            s[6] = p.spin;
+        }
+        if (!p.copied)
+            b.tile = p.tile;    //(what it's made of: the tile brush's)
+        return true;
+    }
+    const Warp& warp = *g_map->warp(x, y);
+    if (warp.connection != -1) {
+        b.brush = BrushWarp;
+        b.warpConn = warp.connection;
+        b.warpDir = warp.direction;
+        return true;
+    }
+    for (int layer = MAPLAYERS - 1; layer >= 0; layer--) {
+        const TilesetTile& tile = *g_map->tileAt(x, y, layer);
+        if (tile.iID == TILESETNONE)
+            continue;
+        b.brush = BrushTile;
+        b.tile = tile;
+        b.layer = static_cast<short>(layer);
+        return true;
+    }
+    return false;
+}
+
 // ---- The history: every edit packed in a record, the oldest first; an undo takes back a builder's
 // newest stroke, as far back as there are records (the oldest go past MAP_MAKER_HISTORY_BYTES).
 // A record: u16 its size, u8 its kind (1 a cell or the level-wide things, 2 a rectangle, fill or a
@@ -1170,8 +1467,21 @@ uint16_t sizeAt(const sim::vector<uint8_t>& h, size_t at)
 } // namespace history
 
 // The tick's staged edits packed into the history (the oldest records dropped past its size)
+void dropRedo(CGM_MapMaker& m, int slot);
+
 void commitStaged(CGM_MapMaker& m)
 {
+    //(a builder that changed the map: its redo gone)
+    if (!m.redo.empty()) {
+        bool changed[SLOTS] {};
+        for (int k = 0; k < m.editCount; k++)
+            changed[m.edits[k].slot & 3] = true;
+        for (int k = 0; k < m.bulkCount; k++)
+            changed[m.bulks[k].slot & 3] = true;
+        for (int s = 0; s < SLOTS; s++)
+            if (changed[s])
+                dropRedo(m, s);
+    }
     for (int k = 0; k < m.editCount; k++)
         history::packEdit(m.history, m.edits[k]);
     for (int k = 0; k < m.bulkCount; k++)
@@ -1220,11 +1530,16 @@ uint64_t builtMapHash(const CGM_MapMaker& m)
             }
         }
     }
+    //(the items as a set: an undo puts one back at the list's end)
     mix(&m.itemCount, sizeof(m.itemCount));
-    for (int k = 0; k < m.itemCount; k++) {
-        mix(&m.items[k].itype, sizeof(m.items[k].itype));
-        mix(&m.items[k].ix, sizeof(m.items[k].ix));
-        mix(&m.items[k].iy, sizeof(m.items[k].iy));
+    std::vector<MapItem> items(m.items, m.items + m.itemCount);
+    std::sort(items.begin(), items.end(), [](const MapItem& p, const MapItem& q) {
+        return std::tie(p.iy, p.ix, p.itype) < std::tie(q.iy, q.ix, q.itype);
+    });
+    for (const MapItem& item : items) {
+        mix(&item.itype, sizeof(item.itype));
+        mix(&item.ix, sizeof(item.ix));
+        mix(&item.iy, sizeof(item.iy));
     }
     mix(&m.hazardCount, sizeof(m.hazardCount));
     mix(&m.platformCount, sizeof(m.platformCount));
@@ -1307,9 +1622,21 @@ void removePlatform(CGM_MapMaker& m, int k)
 }
 
 // The cell put back as the edit has it
+// The platform a record made (platformKind 1), to take away: where the record's copy of it is (a
+// redo's), else where the cell is (an undo's: the platform was made there)
+int recordPlatform(const CGM_MapMaker& m, const MapMakerEdit& edit)
+{
+    const short px = edit.platform.w > 0 ? edit.platform.x : edit.x, py = edit.platform.w > 0 ? edit.platform.y : edit.y;
+    for (int k = 0; k < m.platformCount; k++)
+        if (m.platforms[k].x == px && m.platforms[k].y == py)
+            return k;
+    return -1;
+}
+
 void restoreCell(CGM_MapMaker& m, const MapMakerEdit& edit)
 {
     const short x = edit.x, y = edit.y;
+    flashCell(x, y, 2);
     bool tiles = false;
     for (int l = 0; l < MAPLAYERS; l++) {
         TilesetTile* tile = g_map->tileAt(x, y, l);
@@ -1380,12 +1707,9 @@ void restoreCell(CGM_MapMaker& m, const MapMakerEdit& edit)
         RespawnMapHazards(m.hazards, m.hazardCount);
     }
     if (edit.platformKind == 1) {
-        for (int k = 0; k < m.platformCount; k++) {
-            if (m.platforms[k].x == x && m.platforms[k].y == y) {
-                removePlatform(m, k);
-                break;
-            }
-        }
+        const int k = recordPlatform(m, edit);
+        if (k >= 0)
+            removePlatform(m, k);
     } else if (edit.platformKind == 2 && m.platformCount < MADE_PLATFORMS) {
         MapMakerPlatform& p = m.platforms[m.platformCount++];
         copyPlatform(p, edit.platform);
@@ -1430,45 +1754,185 @@ void restoreBulk(CGM_MapMaker& m, const MapMakerBulk& bulk)
     m.edited = true;
 }
 
-// A builder's newest stroke taken back: all its records, the newest first (in the history, as far
-// back as it goes)
-void undo(CGM_MapMaker& m, int slot)
+// A record put back (its cells as they were), and the other way packed into `back` (what's there
+// now, as the record would put it back): an undo's record goes in the redo, a redo's in the history
+void applyRecord(CGM_MapMaker& m, const uint8_t* record, sim::vector<uint8_t>& back)
 {
-    commitStaged(m);
-    sim::vector<uint8_t>& h = m.history;
-    //(the newest record of this builder's: its stroke)
-    bool found = false;
+    //(its builder and stroke: in its head, not unpacked)
+    const short slot = record[3];
     short stroke = 0;
-    for (size_t at = h.size(); at > 0 && !found;) {
-        const size_t start = at - history::sizeAt(h, at - history::TAIL);
-        if (h[start + 3] == static_cast<uint8_t>(slot)) {
-            found = true;
-            std::memcpy(&stroke, &h[start + 4], sizeof(stroke));
+    std::memcpy(&stroke, record + 4, sizeof(stroke));
+    if (record[2] == 2) {
+        static MapMakerBulk bulk, now;    //(big: not on the stack)
+        history::unpackBulk(record, bulk);
+        std::memset(static_cast<void*>(&now), 0, sizeof(now));
+        now.slot = slot;
+        now.stroke = stroke;
+        now.layer = bulk.layer;
+        now.blocks = bulk.blocks;
+        std::copy(std::begin(bulk.changed), std::end(bulk.changed), std::begin(now.changed));
+        for (int cell = 0; cell < MAP_CELLS; cell++) {
+            if (!bulkBit(bulk, cell))
+                continue;
+            const short x = static_cast<short>(cell % MAPWIDTH), y = static_cast<short>(cell / MAPWIDTH);
+            if (bulk.blocks) {
+                now.blockType[cell] = g_map->blockat(x, y)->iType;
+            } else {
+                now.tiles[cell] = *g_map->tileAt(x, y, bulk.layer);
+                now.types[cell] = static_cast<uint8_t>(g_map->tileType(x, y));
+            }
+        }
+        history::packBulk(back, now);
+        restoreBulk(m, bulk);
+        return;
+    }
+    MapMakerEdit edit, now;
+    history::unpackEdit(record, edit);
+    std::memset(static_cast<void*>(&now), 0, sizeof(now));
+    now.slot = slot;
+    now.stroke = stroke;
+    if (edit.x < 0) {
+        captureLevel(m, now);
+        history::packEdit(back, now);
+        restoreLevel(m, edit);
+        return;
+    }
+    captureCell(m, edit.x, edit.y, now);
+    //(a platform it takes away: made again the other way; one it makes: taken away the other way)
+    if (edit.platformKind == 1) {
+        const int k = recordPlatform(m, edit);
+        if (k >= 0) {
+            now.platformKind = 2;
+            copyPlatform(now.platform, m.platforms[k]);
+        }
+    } else if (edit.platformKind == 2) {
+        now.platformKind = 1;
+        copyPlatform(now.platform, edit.platform);
+    }
+    history::packEdit(back, now);
+    restoreCell(m, edit);
+}
+
+// The records past MAP_MAKER_HISTORY_BYTES dropped, the oldest first
+void trimRecords(sim::vector<uint8_t>& records)
+{
+    size_t drop = 0;
+    while (records.size() - drop > MAP_MAKER_HISTORY_BYTES)
+        drop += history::sizeAt(records, drop);
+    if (drop > 0)
+        records.erase(records.begin(), records.begin() + static_cast<std::ptrdiff_t>(drop));
+}
+
+// A builder's newest stroke in `records`: false if it has none
+bool newestStroke(const sim::vector<uint8_t>& records, int slot, short& stroke)
+{
+    for (size_t at = records.size(); at > 0;) {
+        const size_t start = at - history::sizeAt(records, at - history::TAIL);
+        if (records[start + 3] == static_cast<uint8_t>(slot)) {
+            std::memcpy(&stroke, &records[start + 4], sizeof(stroke));
+            return true;
         }
         at = start;
     }
-    if (!found)
+    return false;
+}
+
+// A builder's newest stroke in `from` put back, its records the newest first, each the other way into
+// `back` (an undo: from the history into the redo; a redo: the other way)
+void takeBack(CGM_MapMaker& m, int slot, sim::vector<uint8_t>& from, sim::vector<uint8_t>& back)
+{
+    short stroke = 0;
+    if (!newestStroke(from, slot, stroke))
         return;
-    for (size_t at = h.size(); at > 0;) {
-        const size_t start = at - history::sizeAt(h, at - history::TAIL);
+    for (size_t at = from.size(); at > 0;) {
+        const size_t start = at - history::sizeAt(from, at - history::TAIL);
         short recordStroke = 0;
-        std::memcpy(&recordStroke, &h[start + 4], sizeof(recordStroke));
-        if (h[start + 3] == static_cast<uint8_t>(slot) && recordStroke == stroke) {
-            if (h[start + 2] == 2) {
-                static MapMakerBulk bulk;    //(big: not on the stack)
-                history::unpackBulk(&h[start], bulk);
-                restoreBulk(m, bulk);
-            } else {
-                MapMakerEdit edit;
-                history::unpackEdit(&h[start], edit);
-                if (edit.x < 0)
-                    restoreLevel(m, edit);
-                else
-                    restoreCell(m, edit);
-            }
-            h.erase(h.begin() + static_cast<std::ptrdiff_t>(start), h.begin() + static_cast<std::ptrdiff_t>(at));
+        std::memcpy(&recordStroke, &from[start + 4], sizeof(recordStroke));
+        if (from[start + 3] == static_cast<uint8_t>(slot) && recordStroke == stroke) {
+            applyRecord(m, &from[start], back);
+            from.erase(from.begin() + static_cast<std::ptrdiff_t>(start), from.begin() + static_cast<std::ptrdiff_t>(at));
         }
         at = start;
+    }
+    trimRecords(back);
+    m.edited = true;
+}
+
+// A builder's redo dropped (it changed the map: what it undid can't come back over it)
+void dropRedo(CGM_MapMaker& m, int slot)
+{
+    sim::vector<uint8_t>& r = m.redo;
+    for (size_t at = 0; at < r.size();) {
+        const size_t n = history::sizeAt(r, at);
+        if (r[at + 3] == static_cast<uint8_t>(slot))
+            r.erase(r.begin() + static_cast<std::ptrdiff_t>(at), r.begin() + static_cast<std::ptrdiff_t>(at + n));
+        else
+            at += n;
+    }
+}
+
+// A builder's newest stroke taken back (in the history, as far back as it goes); kept to redo
+void undo(CGM_MapMaker& m, int slot)
+{
+    commitStaged(m);
+    takeBack(m, slot, m.history, m.redo);
+}
+
+// What a builder's last undo took back, done again (back in the history, to undo again)
+void redo(CGM_MapMaker& m, int slot)
+{
+    commitStaged(m);
+    takeBack(m, slot, m.redo, m.history);
+}
+
+// The map cleared (the host's, from the pause menu: Mario Maker's reset rocket): everything placed goes,
+// tiles, blocks, items, hazards, platforms, warps, types and no-spawn marks (not the background, the
+// music, the weather); one stroke, so an undo brings it all back
+void clearMap(CGM_MapMaker& m, int slot, short stroke)
+{
+    //(the platforms: each one's taken away, to be made again by the undo)
+    while (m.platformCount > 0) {
+        const int k = m.platformCount - 1;
+        MapMakerEdit& edit = pushEdit(m, slot, stroke);
+        captureCell(m, m.platforms[k].x, m.platforms[k].y, edit);
+        edit.platformKind = 2;
+        copyPlatform(edit.platform, m.platforms[k]);
+        removePlatform(m, k);
+    }
+    MapMakerBuilder eraser {};
+    eraser.brush = BrushTile;
+    for (short y = 0; y < MAPHEIGHT; y++) {
+        for (short x = 0; x < MAPWIDTH; x++) {
+            bool any = g_map->blockat(x, y)->iType != -1 || itemAt(m, x, y) >= 0 || hazardAt(m, x, y) >= 0 ||
+                       g_map->warp(x, y)->connection != -1 || typeSetApart(x, y);
+            for (int l = 0; l < MAPLAYERS && !any; l++)
+                any = g_map->tileAt(x, y, l)->iID != TILESETNONE;
+            for (short t = 0; t < NUMSPAWNAREATYPES && !any; t++)
+                any = !g_map->spawn(t, x, y);
+            if (!any)
+                continue;
+            MapMakerEdit& edit = pushEdit(m, slot, stroke);
+            captureCell(m, x, y, edit);
+            flashCell(x, y, 1);
+            //(what's there, a thing at a time, as B takes them; then its type and spawn marks)
+            eraser.cx = x;
+            eraser.cy = y;
+            for (int k = 0; k < 12; k++)
+                erase(m, eraser);
+            if (typeSetApart(x, y)) {
+                g_map->setTileType(x, y, tilesType(x, y));
+                tilesChanged(x, y, true);
+            }
+            bool spawns = false;
+            for (short t = 0; t < NUMSPAWNAREATYPES; t++) {
+                if (!g_map->spawn(t, x, y)) {
+                    g_map->setNoSpawn(t, x, y, false);
+                    spawns = true;
+                }
+            }
+            if (spawns)
+                g_map->refreshSpawnAreas();
+        }
     }
     m.edited = true;
 }
@@ -1772,9 +2236,34 @@ void builderTick(CGM_MapMaker& m, MapMakerBuilder& b, uint8_t byte, uint8_t prev
     }
     //The mouse's: a tab; a step, with A or B held (then read as the keys' A and B)
     const bool mouse = mouseCommand(byte);
-    if (mouse && (byte >> 2) >= MOUSE_TAB) {
+    if (mouse && (byte >> 2) >= MOUSE_TAB && (byte >> 2) < CMD_PICK) {
         if (b.palette && !b.adjusting)
             openTab(b, (byte >> 2) - MOUSE_TAB);
+        return;
+    }
+    //(the eyedropper, the recent brushes: on the map, as it's pressed)
+    if (mouse && (byte >> 2) >= CMD_PICK) {
+        if ((byte >> 2) == CMD_REDO) {
+            if (byte != prev)
+                redo(m, slot);
+        } else if (!b.palette && byte != prev) {
+            if ((byte >> 2) == CMD_TOOL) {
+                //(pencil, rectangle, fill, round; from copy or paste: the pencil)
+                b.tool = static_cast<short>(b.tool >= 2 ? 0 : b.tool + 1);
+                b.anchoring = false;
+            } else if ((byte >> 2) == CMD_PICK) {
+                pickBrush(m, b);
+            } else if ((byte >> 2) == CMD_GRAB) {
+                //(pick up, as Mario Maker's: the brush of what's there, and it's taken off the map (one
+                //stroke: undone, back); painted, it's put down there)
+                if (pickBrush(m, b)) {
+                    b.stroke++;
+                    editCell(m, b, slot, false);
+                }
+            }
+            else if ((byte >> 2) == CMD_RECENT_NEXT || (byte >> 2) == CMD_RECENT_PREV)
+                stepRecent(b, (byte >> 2) == CMD_RECENT_NEXT ? 1 : -1);
+        }
         return;
     }
     int mdx = 0, mdy = 0;
@@ -1788,7 +2277,9 @@ void builderTick(CGM_MapMaker& m, MapMakerBuilder& b, uint8_t byte, uint8_t prev
     auto pressed = [&](uint8_t bit) { return (byte & bit) && !(prev & bit); };
     const bool held = byte & (B_LEFT | B_RIGHT | B_UP | B_DOWN);
     b.holdFrames = held ? static_cast<short>(std::min(b.holdFrames + 1, 1000)) : 0;
-    auto stepped = [&](uint8_t bit) { return pressed(bit) || ((byte & bit) && b.holdFrames > 14 && b.holdFrames % 3 == 0); };
+    //(held: again after a moment, every 3 ticks; held longer, faster: every 2, then every tick)
+    const int every = b.holdFrames > 90 ? 1 : b.holdFrames > 45 ? 2 : 3;
+    auto stepped = [&](uint8_t bit) { return pressed(bit) || ((byte & bit) && b.holdFrames > 14 && b.holdFrames % every == 0); };
 
     if (b.palette) {
         int w = 1, h = 1;
@@ -2356,8 +2847,14 @@ struct MouseState {
     bool left = false, right = false;
     bool leftClick = false, rightClick = false, middleClick = false;    // pressed since the last tick
     int wheel = 0;
+    bool ctrlWheel = false;       // the wheel turned with Ctrl held (the map: the layer)
+    int lineX = -1, lineY = -1;   // the map: where a stroke began; with Shift held then, it keeps to its row
+    bool lineShift = false;       // or column (a straight line)
+    bool back = false, forward = false;    // the side buttons: undo, redo
     bool stroke = false;          // the map: a button held, the cursor got to where it went down: painting
     bool take = false;            // the palette: A pressed where the cursor gets to
+    bool pick = false;            // the map: Ctrl+click, the eyedropper where the cursor gets to
+    bool grab = false;            // the map: Ctrl+right click, pick up where the cursor gets to
     int aimX = -1, aimY = -1;     // the palette: the cell it goes to
     MapMakerBuilder pred;
     bool predValid = false;
@@ -2366,7 +2863,9 @@ struct MouseState {
     std::vector<uint8_t> queue;   // bytes to send first (presses, and let go)
 };
 MouseState s_mouse;
-SDL_Rect s_pauseRowRect[4] {};    // the pause menu's rows and players (the mouse's)
+SDL_Rect s_pauseRowRect[5] {};    // the pause menu's rows and players (the mouse's)
+SDL_Rect s_recentRect[MAP_MAKER_RECENT] {};    // the mouse's builder's recent brushes, drawn by its card (k: k nexts on)
+int s_recentShown = 0;
 SDL_Rect s_pauseChipRect[SLOTS] {};
 bool s_pauseClick = false, s_pauseRightClick = false, s_pauseMoved = false;
 int s_pauseClickX = 0, s_pauseClickY = 0;
@@ -2751,14 +3250,30 @@ std::string brushName(const MapMakerBuilder& b)
     }
 }
 
+// A brush's piece number for drawBrushPiece (its item, hazard, block and its state...)
+short brushPieceIndex(const MapMakerBuilder& b)
+{
+    return static_cast<short>(b.brush == BrushItem ? b.item
+            : b.brush == BrushWarp ? b.warpConn + b.warpDir * WARP_CONNECTIONS
+            : b.brush == BrushHazard ? b.hazard
+            : b.brush == BrushPlatform ? b.platformKind
+            : b.brush == BrushType ? b.typeBrush
+            : b.brush == BrushSpawn ? b.spawnBrush
+            : b.brush == BrushModeObject ? b.modeObject
+            : static_cast<short>(b.block | (b.blockOn ? 0 : 64) | (b.blockHidden && hideable(b.block) ? 128 : 0)));
+}
+
 // The brush card: a builder's brush (its picture, its name), its layer and tool, by the bar (the side
-// away from its hand)
+// away from its hand); then its recent brushes, small squares on (LB+Left/Right, Q/E, the wheel)
 void drawBrushCard(int slot, const MapMakerBuilder& b, int barY, bool barAtTop)
 {
     static const char* const TOOLS_SHORT[TOOLS] = {"Pencil", "Rectangle", "Fill", "Copy", "Paste"};
     const std::string name = brushName(b);
     const bool tiles = b.brush == BrushTile;
-    const std::string detail = std::string(TOOLS_SHORT[b.tool % TOOLS]) + (tiles ? "  -  layer " + std::to_string(b.layer + 1) + (b.layer >= 2 ? " (front)" : "") : "");
+    //(under the name only what isn't the usual: a tool but the pencil, the tiles' layer)
+    std::string detail = b.tool % TOOLS != 0 ? std::string(TOOLS_SHORT[b.tool % TOOLS]) : std::string();
+    if (tiles)
+        detail += (detail.empty() ? "" : "  -  ") + std::string("layer ") + std::to_string(b.layer + 1) + (b.layer >= 2 ? " (front)" : "");
     const int w = std::max(rm->menu_font_small.getWidth(name.c_str()), rm->menu_font_small.getWidth(detail.c_str())) + 56;
     const int h = 42;
     const int y = barAtTop ? barY + 26 : barY - h - 2;
@@ -2770,18 +3285,37 @@ void drawBrushCard(int slot, const MapMakerBuilder& b, int barY, bool barAtTop)
     prompts::fill(x, y, w, h, SDL_Color {0, 0, 0, 255});
     prompts::fill(x + 2, y + 2, w - 4, h - 4, SDL_Color {16, 24, 48, 255});
     prompts::fill(x + 2, y + 2, 4, h - 4, slotColor(slot));
-    drawBrushPiece(b.brush, b.tile,
-        static_cast<short>(b.brush == BrushItem ? b.item
-            : b.brush == BrushWarp ? b.warpConn + b.warpDir * WARP_CONNECTIONS
-            : b.brush == BrushHazard ? b.hazard
-            : b.brush == BrushPlatform ? b.platformKind
-            : b.brush == BrushType ? b.typeBrush
-            : b.brush == BrushSpawn ? b.spawnBrush
-            : b.brush == BrushModeObject ? b.modeObject
-            : static_cast<short>(b.block | (b.blockOn ? 0 : 64) | (b.blockHidden && hideable(b.block) ? 128 : 0))),
-        x + 10, y + 5);
-    rm->menu_font_small.draw(x + 48, y + 6, name.c_str());
-    rm->menu_font_small.draw(x + 48, y + 22, detail.c_str());
+    drawBrushPiece(b.brush, b.tile, brushPieceIndex(b), x + 10, y + 5);
+    rm->menu_font_small.draw(x + 48, y + (detail.empty() ? 14 : 6), name.c_str());
+    if (!detail.empty())
+        rm->menu_font_small.draw(x + 48, y + 22, detail.c_str());
+
+    //(the recent ones, the one in hand first: the others in the order the next goes)
+    const int shown = std::min<int>(b.recentCount, MAP_MAKER_RECENT);
+    if (slot == mouseSlot())
+        s_recentShown = shown;
+    if (shown < 2)
+        return;
+    const int cell = 36;
+    const bool left = x > 4;    //(the card on the right: the strip to its left)
+    const int sx = left ? x - 4 - (shown - 1) * cell : x + w + 4;
+    for (int k = 1; k < shown; k++) {
+        const int cx = sx + (left ? shown - 1 - k : k - 1) * cell;
+        const int cy = y + (h - cell) / 2;
+        prompts::fill(cx, cy, cell - 2, cell, SDL_Color {0, 0, 0, 255});
+        prompts::fill(cx + 1, cy + 1, cell - 4, cell - 2, SDL_Color {16, 24, 48, 255});
+        MapMakerBuilder r = b;
+        applyRecent(r, b.recent[k]);
+        drawBrushPiece(r.brush, r.tile, brushPieceIndex(r), cx + 1, cy + 2);
+        if (slot == mouseSlot())
+            s_recentRect[k] = {cx, cy, cell - 2, cell};
+        //(the keyboard's or the mouse's builder: its number key, 2..8)
+        if (s_mouse.active || prompts::lastDevice() == prompts::Device::Keyboard) {
+            const std::string key = std::to_string(k + 1);
+            prompts::fill(cx + 1, cy + 1, 10, 13, SDL_Color {0, 0, 0, 255});
+            rm->menu_font_small.draw(cx + 2, cy, key.c_str());
+        }
+    }
 }
 
 std::string s_savedPath;    // the last save's file
@@ -2966,7 +3500,9 @@ void mouseEvent(const SDL_Event& event)
         s_mouse.x = static_cast<int>(event.button.x);
         s_mouse.y = static_cast<int>(event.button.y);
         s_mouse.active = true;
-        if (event.button.button == SDL_BUTTON_LEFT) {
+        if (event.button.button == SDL_BUTTON_LEFT && down && (SDL_GetModState() & SDL_KMOD_CTRL)) {
+            s_mouse.pick = true;    //(Ctrl+click: the eyedropper, not paint)
+        } else if (event.button.button == SDL_BUTTON_LEFT) {
             s_mouse.left = down;
             s_mouse.leftClick = s_mouse.leftClick || down;
             if (down) {
@@ -2974,10 +3510,16 @@ void mouseEvent(const SDL_Event& event)
                 s_pauseClickX = s_mouse.x;
                 s_pauseClickY = s_mouse.y;
             }
+        } else if (event.button.button == SDL_BUTTON_RIGHT && down && (SDL_GetModState() & SDL_KMOD_CTRL)) {
+            s_mouse.grab = true;    //(Ctrl+right click: pick up, not erase)
         } else if (event.button.button == SDL_BUTTON_RIGHT) {
             s_mouse.right = down;
             s_mouse.rightClick = s_mouse.rightClick || down;
             s_pauseRightClick = s_pauseRightClick || down;
+        } else if (event.button.button == SDL_BUTTON_X1 && down) {
+            s_mouse.back = true;
+        } else if (event.button.button == SDL_BUTTON_X2 && down) {
+            s_mouse.forward = true;
         } else if (event.button.button == SDL_BUTTON_MIDDLE && down) {
             s_mouse.middleClick = true;
         }
@@ -2986,6 +3528,7 @@ void mouseEvent(const SDL_Event& event)
     case SDL_EVENT_MOUSE_WHEEL:
         s_mouse.active = true;
         s_mouse.wheel += event.wheel.y > 0 ? -1 : event.wheel.y < 0 ? 1 : 0;
+        s_mouse.ctrlWheel = (SDL_GetModState() & SDL_KMOD_CTRL) != 0;
         break;
     case SDL_EVENT_KEY_DOWN:
         //(the keys: the mouse's not used, but for its Shift and Ctrl)
@@ -3039,11 +3582,39 @@ void noteEvent(const SDL_Event& event)
         });
     } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && (event.key.key == SDLK_PAGEUP || event.key.key == SDLK_PAGEDOWN)) {
         forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_tabStep[device] = event.key.key == SDLK_PAGEDOWN ? 1 : -1; });
+    } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && (event.key.key == SDLK_Q || event.key.key == SDLK_E)) {
+        //(Q, E: the recent brushes; R: the eyedropper)
+        forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_recentStep[device] = event.key.key == SDLK_E ? 1 : -1; });
+    } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key == SDLK_R) {
+        forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_pickPressed[device] = true; });
+    } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key == SDLK_G) {
+        forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_grabPressed[device] = true; });
+    } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key == SDLK_T) {
+        forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_toolPressed[device] = true; });
+    } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key >= SDLK_1 && event.key.key <= SDLK_8
+               && !(event.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_ALT))) {
+        //(1: the brush in hand; 2..8: the strip's recent ones, as numbered)
+        const int on = static_cast<int>(event.key.key - SDLK_1);
+        forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_recentJump[device] = on; });
+    } else if (event.type == SDL_EVENT_KEY_DOWN && (event.key.mod & SDL_KMOD_CTRL)
+               && (event.key.key == SDLK_Y || (event.key.key == SDLK_Z && (event.key.mod & SDL_KMOD_SHIFT)))) {
+        //(Ctrl+Y, Ctrl+Shift+Z: redo; the key's own repeat, again)
+        forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_redoPressed[device] = true; });
     }
     //The undo button held (RB, Backspace): it undoes again and again
     if ((event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) &&
         event.gbutton.button == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER) {
-        forDevice(event.gbutton.which, [&](int device) { s_undoHeld[device] = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN; });
+        //(LB held: redo instead)
+        const bool down = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
+        forDevice(event.gbutton.which, [&](int device) {
+            if (down && s_lbHeld[device]) {
+                s_redoPressed[device] = s_redoHeld[device] = true;
+            } else if (down) {
+                s_undoPressed[device] = s_undoHeld[device] = true;
+            } else {
+                s_undoHeld[device] = s_redoHeld[device] = false;
+            }
+        });
     } else if ((event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) && !event.key.repeat &&
                event.key.key == SDLK_BACKSPACE) {
         forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_undoHeld[device] = event.type == SDL_EVENT_KEY_DOWN; });
@@ -3065,9 +3636,6 @@ void noteEvent(const SDL_Event& event)
         from = event.gbutton.which;
         flags = s_lbHeld;
         on = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
-    } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && event.gbutton.button == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER) {
-        from = event.gbutton.which;
-        flags = s_undoPressed;
     } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && event.gbutton.button == SDL_GAMEPAD_BUTTON_START) {
         from = event.gbutton.which;
         flags = s_pausePressed;
@@ -3078,7 +3646,7 @@ void noteEvent(const SDL_Event& event)
         from = DEVICE_KEYBOARD_ID;
         flags = s_switchPressed;
     } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat
-        && (event.key.key == SDLK_BACKSPACE || (event.key.key == SDLK_Z && (event.key.mod & SDL_KMOD_CTRL)))) {
+        && (event.key.key == SDLK_BACKSPACE || (event.key.key == SDLK_Z && (event.key.mod & SDL_KMOD_CTRL) && !(event.key.mod & SDL_KMOD_SHIFT)))) {
         from = DEVICE_KEYBOARD_ID;
         flags = s_undoPressed;
     }
@@ -3130,7 +3698,12 @@ uint8_t mouseByte(int slot, const CGM_MapMaker& m, bool& used)
     if (ms.active) {
         //The palette: the middle button; a tab, a cell clicked (the cursor there, then A); wheeled, a row or
         //(a row alone) a column on; off the strip, back. The right button: back
-        if (ms.middleClick && ms.queue.empty()) {
+        if ((ms.back || ms.forward) && ms.queue.empty()) {
+            //(the side buttons: undo, redo; in the palette too)
+            ms.queue = {ms.back ? B_UNDO : commandByte(CMD_REDO), 0};
+            ms.back = ms.forward = false;
+            unforeseen();
+        } else if (ms.middleClick && ms.queue.empty()) {
             ms.queue = {B_PALETTE, 0};
             unforeseen();
         } else if (b.palette && b.adjusting) {
@@ -3175,8 +3748,29 @@ uint8_t mouseByte(int slot, const CGM_MapMaker& m, bool& used)
                 ms.aimX = h > 1 ? b.px : std::clamp(b.px + ms.wheel, 0, w - 1);
                 ms.aimY = h > 1 ? std::clamp(b.py + ms.wheel, 0, h - 1) : b.py;
             }
+        } else if (ms.wheel != 0 && ms.ctrlWheel) {
+            //The map: Ctrl+wheel, the layer (tiles)
+            ms.queue = {B_LAYER, 0};
+            unforeseen();
+        } else if (ms.wheel != 0) {
+            //The map: the wheel, the recent brushes
+            ms.queue = {commandByte(ms.wheel > 0 ? CMD_RECENT_NEXT : CMD_RECENT_PREV)};
+            unforeseen();
+        } else if (ms.leftClick) {
+            //(a recent brush clicked, by the card: on to it, not painting)
+            for (int k = 1; k < s_recentShown; k++) {
+                if (!inRect(at, s_recentRect[k]))
+                    continue;
+                for (int n = 0; n < k; n++)
+                    ms.queue.insert(ms.queue.end(), {commandByte(CMD_RECENT_NEXT), 0});
+                ms.left = false;
+                unforeseen();
+                break;
+            }
         }
     }
+    if (b.palette)
+        ms.pick = ms.grab = false;
     ms.moved = ms.leftClick = ms.rightClick = ms.middleClick = false;
     ms.wheel = 0;
     if (!ms.queue.empty()) {
@@ -3214,8 +3808,30 @@ uint8_t mouseByte(int slot, const CGM_MapMaker& m, bool& used)
     }
     //The map: the cursor to the cell under the mouse; a button held there, painting (or erasing) on the
     //way after
-    const int cx = std::clamp(ms.x / TILESIZE, 0, MAPWIDTH - 1), cy = std::clamp(ms.y / TILESIZE, 0, MAPHEIGHT - 1);
+    int cx = std::clamp(ms.x / TILESIZE, 0, MAPWIDTH - 1), cy = std::clamp(ms.y / TILESIZE, 0, MAPHEIGHT - 1);
+    //(Shift held as a stroke begins: it keeps to that row or column, whichever the mouse goes along more)
+    if (!ms.left && !ms.right) {
+        ms.lineX = -1;
+    } else if (ms.lineX < 0) {
+        ms.lineX = cx;
+        ms.lineY = cy;
+        ms.lineShift = (SDL_GetModState() & SDL_KMOD_SHIFT) != 0;
+    }
+    if (ms.lineShift && ms.lineX >= 0) {
+        if (std::abs(cx - ms.lineX) >= std::abs(cy - ms.lineY))
+            cy = ms.lineY;
+        else
+            cx = ms.lineX;
+    }
     const int dx = (cx > b.cx) - (cx < b.cx), dy = (cy > b.cy) - (cy < b.cy);
+    if ((ms.pick || ms.grab) && dx == 0 && dy == 0) {
+        const bool grab = ms.grab && !ms.pick;
+        ms.pick = ms.grab = false;
+        used = true;
+        ms.idle = 0;
+        unforeseen();
+        return commandByte(grab ? CMD_GRAB : CMD_PICK);
+    }
     if (!ms.left && !ms.right)
         ms.stroke = false;
     else if (dx == 0 && dy == 0)
@@ -3241,9 +3857,32 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
                 return static_cast<uint8_t>(RIGHTS_CMD | (s_wantRights[s] ? 4 : 0) | s);
         }
     }
+    //The host's Clear map (its pause menu), building or not
+    if (slot == m->hostSlot && s_clearPending) {
+        s_clearPending = false;
+        return commandByte(CMD_CLEAR);
+    }
     //The switch: Tab, or L+Up (as it's pressed)
     const COutputControl& keys = s_menuKeys.outputControls[device & 3];
     const bool chord = s_lbHeld[device & 3] && keys.menu_up.fDown;
+    //LB with Left / Right: the recent brush before / after; with Down: the eyedropper; with B: pick up
+    //(each as pressed)
+    {
+        const bool lb = s_lbHeld[device & 3];
+        const bool now[4] = {lb && keys.menu_left.fDown, lb && keys.menu_right.fDown, lb && keys.menu_down.fDown,
+            lb && keys.menu_cancel.fDown};
+        bool* was = s_lbChord[device & 3];
+        if (now[0] && !was[0])
+            s_recentStep[device & 3] = -1;
+        if (now[1] && !was[1])
+            s_recentStep[device & 3] = 1;
+        if (now[2] && !was[2])
+            s_pickPressed[device & 3] = true;
+        if (now[3] && !was[3])
+            s_grabPressed[device & 3] = true;
+        for (int k = 0; k < 4; k++)
+            was[k] = now[k];
+    }
     const bool flip = s_switchPressed[device & 3] || (chord && !s_chordHeld[device & 3]);
     s_chordHeld[device & 3] = chord;
     s_switchPressed[device & 3] = false;
@@ -3261,8 +3900,56 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
     } else {
         s_undoHeldTicks[device & 3] = 0;
     }
+    //Redo, as undo (held: again and again)
+    const bool redoNow = s_redoPressed[device & 3];
+    s_redoPressed[device & 3] = false;
+    if (redoNow && building(slot)) {
+        s_redoHeldTicks[device & 3] = 0;
+        return commandByte(CMD_REDO);
+    }
+    if (s_redoHeld[device & 3] && building(slot)) {
+        const int held = ++s_redoHeldTicks[device & 3];
+        if (held > 24 && (held - 24) % 6 == 0)
+            return commandByte(CMD_REDO);
+    } else {
+        s_redoHeldTicks[device & 3] = 0;
+    }
     if (flip && building(slot))
         return B_DONE;
+    //The eyedropper, the recent brushes (on the map, not in the palette)
+    if (building(slot) && !m->builders[slot].palette) {
+        if (s_pickPressed[device & 3]) {
+            s_pickPressed[device & 3] = false;
+            return commandByte(CMD_PICK);
+        }
+        if (s_grabPressed[device & 3]) {
+            s_grabPressed[device & 3] = false;
+            return commandByte(CMD_GRAB);
+        }
+        if (s_toolPressed[device & 3]) {
+            s_toolPressed[device & 3] = false;
+            return commandByte(CMD_TOOL);
+        }
+        //(a number: that many nexts, a tick between each (a press each))
+        if (s_recentJump[device & 3] > 0) {
+            s_recentJumpGap[device & 3] = !s_recentJumpGap[device & 3];
+            if (!s_recentJumpGap[device & 3])
+                return 0;
+            s_recentJump[device & 3]--;
+            return commandByte(CMD_RECENT_NEXT);
+        }
+        if (s_recentStep[device & 3] != 0) {
+            const int step = s_recentStep[device & 3];
+            s_recentStep[device & 3] = 0;
+            return commandByte(step > 0 ? CMD_RECENT_NEXT : CMD_RECENT_PREV);
+        }
+    } else {
+        s_pickPressed[device & 3] = false;
+        s_grabPressed[device & 3] = false;
+        s_toolPressed[device & 3] = false;
+        s_recentJump[device & 3] = 0;
+        s_recentStep[device & 3] = 0;
+    }
     //The triggers: the palette's tab before or after (the palette shut: it opens)
     if (s_tabStep[device & 3] != 0 && building(slot)) {
         const int step = s_tabStep[device & 3];
@@ -3291,10 +3978,13 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
             return byte;
     }
     uint8_t byte = 0;
-    byte |= keys.menu_left.fDown ? B_LEFT : 0;
-    byte |= keys.menu_right.fDown ? B_RIGHT : 0;
-    byte |= keys.menu_up.fDown ? B_UP : 0;
-    byte |= keys.menu_down.fDown ? B_DOWN : 0;
+    //(LB held: the arrows are its chords, not the cursor's)
+    if (!s_lbHeld[device & 3]) {
+        byte |= keys.menu_left.fDown ? B_LEFT : 0;
+        byte |= keys.menu_right.fDown ? B_RIGHT : 0;
+        byte |= keys.menu_up.fDown ? B_UP : 0;
+        byte |= keys.menu_down.fDown ? B_DOWN : 0;
+    }
     //(the keyboard's: Delete erases, Escape is the pause (the palette's back); a keyboard player's cancel
     //key erases if it isn't Escape)
     const CInputPlayerControl* control = game_values.playerInput.inputControls[device & 3];
@@ -3302,11 +3992,11 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
         const bool escCancels = control->inputGameControls[1].keys[5] == SDLK_ESCAPE;
         byte |= (keys.menu_cancel.fDown && !escCancels) || s_deleteHeld || (s_escHeld && m->builders[slot].palette) ? B_ERASE : 0;
     } else {
-        byte |= keys.menu_cancel.fDown ? B_ERASE : 0;
+        byte |= keys.menu_cancel.fDown && !s_lbHeld[device & 3] ? B_ERASE : 0;    //(LB+B: pick up, not erase)
     }
     byte |= keys.menu_select.fDown ? B_PAINT : 0;
     byte |= keys.menu_random.fDown ? B_PALETTE : 0;
-    byte |= keys.menu_scrollfast.fDown ? B_LAYER : 0;
+    byte |= keys.menu_scrollfast.fDown && !(s_mouse.active && slot == mouseSlot()) ? B_LAYER : 0;
     if (byte == B_DONE)
         byte = B_PALETTE;    //(X and Y together alone: not "done")
     if ((byte & (B_LEFT | B_RIGHT)) == (B_LEFT | B_RIGHT))
@@ -3344,13 +4034,36 @@ void simulate(const InputFrame& input)
             }
             continue;
         }
+        //The host clears the map (from its pause menu: building or not)
+        if (slot == m->hostSlot && byte == commandByte(CMD_CLEAR)) {
+            if (prev != byte) {
+                clearMap(*m, slot, ++m->builders[slot].stroke);
+                if (!sim::isResimulating())
+                    ifSoundOnPlay(rm->sfx_bobombsound);
+            }
+            continue;
+        }
         if (!m->rights[slot])
             continue;
         if (player->isEditing()) {
-            if (byte == B_DONE && prev != B_DONE)
+            if (byte == B_DONE && prev != B_DONE) {
                 setBuilding(*m, slot, false, true);
-            else
-                builderTick(*m, m->builders[slot], byte, prev);
+            } else {
+                MapMakerBuilder& b = m->builders[slot];
+                const size_t historyBefore = m->history.size(), redoBefore = m->redo.size();
+                const int stagedBefore = m->editCount + m->bulkCount;
+                const int editsBefore = m->editCount;
+                const MapMakerRecent brushBefore = recentOf(b);
+                builderTick(*m, b, byte, prev);
+                //(the cells it changed: a ring each; taken away red (B, a pick up))
+                const bool away = (mouseButtons(byte) & B_ERASE) || (mouseCommand(byte) && (byte >> 2) == CMD_GRAB);
+                for (int k = m->editCount >= editsBefore ? editsBefore : 0; k < m->editCount; k++)
+                    flashCell(m->edits[k].x, m->edits[k].y, away ? 1 : 0);
+                noteRecent(b);
+                buildSound(*m, slot, byte, m->editCount + m->bulkCount > stagedBefore,
+                    m->history.size() < historyBefore || m->redo.size() < redoBefore,
+                    !sameRecent(brushBefore, recentOf(b)));
+            }
         } else if (!mouseCommand(byte) && (byte & B_PALETTE) && !(prev & B_PALETTE) && game_values.playercontrol[slot] == 1) {
             setBuilding(*m, slot, true);
         }
@@ -3470,6 +4183,8 @@ bool isHostHere()
 
 void setPanelRow(int row)
 {
+    if (row != s_pauseRow)
+        s_clearArmed = false;    //(Clear map's "press again": gone once another row's chosen)
     s_pauseRow = row;
 }
 
@@ -3480,7 +4195,7 @@ void hostPanelInput(bool left, bool right, bool down, bool select)
         return;
     syncWantedRights();
     if (down)
-        s_pauseRow = s_pauseRow == 0 ? 1 : 0;
+        setPanelRow((s_pauseRow + 1) % 3);
     if (s_pauseRow < 0)
         return;
     if (s_pauseRow == 0) {
@@ -3496,7 +4211,18 @@ void hostPanelInput(bool left, bool right, bool down, bool select)
             s_wantRights[s_rightsSlot] = !shownRight(*m, s_rightsSlot);
             s_wantPending[s_rightsSlot] = true;
         }
-    } else if (select) {
+    } else if (s_pauseRow == 2 && select) {
+        //Clear map (online, where the match can't pause): twice, as the pause menu's
+        if (!s_clearArmed) {
+            s_clearArmed = true;
+        } else {
+            s_clearArmed = false;
+            s_clearPending = true;
+            s_savedNote = "Map cleared: undo brings it back";
+            s_savedAt = SDL_GetTicks();
+        }
+        ifSoundOnPlay(rm->sfx_pause);
+    } else if (s_pauseRow == 1 && select) {
         s_savedNote = "Saved as " + saveMadeMap();
         s_savedAt = SDL_GetTicks();
         s_savedThisPause = true;
@@ -3505,12 +4231,12 @@ void hostPanelInput(bool left, bool right, bool down, bool select)
 }
 
 namespace {
-enum PauseRow { RowResume, RowRights, RowSave, RowQuit, PAUSE_ROWS };
+enum PauseRow { RowResume, RowRights, RowSave, RowClear, RowQuit, PAUSE_ROWS };
 
-// A row the local player can use: the rights and Save are the host's
+// A row the local player can use: the rights, Save and Clear are the host's
 bool pauseRowUsable(int row)
 {
-    return (row != RowRights && row != RowSave) || isHostHere();
+    return (row != RowRights && row != RowSave && row != RowClear) || isHostHere();
 }
 
 void pauseMenuDo(int row, bool left, bool right, bool select)
@@ -3524,6 +4250,16 @@ void pauseMenuDo(int row, bool left, bool right, bool select)
     } else if (row == RowSave && select && isHostHere()) {
         s_pauseRow = 1;
         hostPanelInput(false, false, false, true);
+    } else if (row == RowClear && select && isHostHere()) {
+        //(twice: the first asks; the second clears it, as the host's next tick: one undo brings it back)
+        if (!s_clearArmed) {
+            s_clearArmed = true;
+            ifSoundOnPlay(rm->sfx_pause);
+        } else {
+            s_clearArmed = false;
+            s_clearPending = true;
+            game_values.flags.pausegame = false;
+        }
     } else if (row == RowResume && select) {
         game_values.flags.pausegame = false;
     } else if (row == RowQuit && select) {
@@ -3541,6 +4277,7 @@ void pauseMenuInput()
         s_menuWasOpen = true;
         s_menuRow = RowResume;
         s_savedThisPause = false;
+        s_clearArmed = false;
     }
     //(any local player's buttons, read as the menus')
     bool up = false, down = false, left = false, right = false, select = false, cancel = false;
@@ -3553,6 +4290,7 @@ void pauseMenuInput()
         select = select || keys.menu_select.fPressed;
         cancel = cancel || keys.menu_cancel.fPressed;
     }
+    const int rowBefore = s_menuRow;
     for (int step = 0; step < PAUSE_ROWS && (up || down); step++) {
         s_menuRow = (s_menuRow + (down ? 1 : PAUSE_ROWS - 1)) % PAUSE_ROWS;
         if (pauseRowUsable(s_menuRow))
@@ -3579,6 +4317,9 @@ void pauseMenuInput()
     }
     cancel = cancel || s_pauseRightClick;
     s_pauseMoved = s_pauseClick = s_pauseRightClick = false;
+    //(Clear map's "press again": gone once another row's chosen)
+    if (s_menuRow != rowBefore || s_menuRow != RowClear)
+        s_clearArmed = false;
     if (cancel) {
         game_values.flags.pausegame = false;    //(B: back to the match)
         return;
@@ -3598,7 +4339,7 @@ void drawPauseMenu()
     syncWantedRights();
     const CGM_MapMaker* m = mode();
     const bool host = isHostHere();
-    const int x = 90, y = 48, w = 460, h = 384;
+    const int x = 90, y = 10, w = 460, h = 458;
     menupanel::box(x, y, w, h);
     const SDL_Color dark {8, 16, 48, 255};
     const SDL_Color light {248, 248, 248, 255};
@@ -3624,7 +4365,7 @@ void drawPauseMenu()
         const bool usable = pauseRowUsable(row);
         menupanel::row(rx, ry, rw, rh, row == s_menuRow, !usable);
         s_pauseRowRect[row] = {rx, ry, rw, rh};
-        const char* names[PAUSE_ROWS] = {"Resume", "Who builds", "Save map", "Quit"};
+        const char* names[PAUSE_ROWS] = {"Resume", "Who builds", "Save map", "Clear map", "Quit"};
         rm->menu_font_large.draw(rx + 14, ry + 7, names[row]);
         if (row == RowRights) {
             //Each player: its color, a hammer if it may build; faded if it may not; a CPU's gray "CPU"
@@ -3648,6 +4389,10 @@ void drawPauseMenu()
                 if (host && s_menuRow == RowRights && slot == s_rightsSlot)
                     cellFrame(cx + 1, ry + 2, cell - 2, rh - 4, light);
             }
+        } else if (row == RowClear && s_clearArmed) {
+            const int sw = rm->menu_font_small.getWidth("Press again") + 16;
+            prompts::fill(rx + rw - 12 - sw, ry + 8, sw, 18, {184, 48, 40, 255});
+            rm->menu_font_small.drawRightJustified(rx + rw - 20, ry + 10, "Press again");
         } else if (row == RowSave) {
             //(saved a moment ago: a green "Saved"; else the file's name)
             if (justSaved) {
@@ -3675,6 +4420,11 @@ void drawPauseMenu()
         line1 = justSaved ? "Saved as \"" + saveName + "\"." : "Saves the map as it is now, as \"" + saveName + "\".";
         line2 = "It's in the map list from then on.";
         break;
+    case RowClear:
+        line1 = !host ? "Empties the whole map. The host chooses." : s_clearArmed ? "Sure? Press again to empty the whole map."
+                                                                             : "Empties the whole map, to start over.";
+        line2 = "Changed your mind? Undo brings it all back.";
+        break;
     default:
         line1 = "Ends the match: back to the map and the rules.";
         line2 = s_savedThisPause ? "Your map is saved." : m && m->edited ? "Save first to keep what you built." : "Nothing's been built yet.";
@@ -3696,6 +4446,18 @@ void drawPauseMenu()
             {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "palette"}}, 14);
     prompts::drawPrompts(App::screenWidth / 2, buildY + 36,
         {{{Pad::Y}, {menuKey(prompts::MENU_SCROLL)}, "layer"}, {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::LB, Pad::Up}, {"Tab"}, "play here"}}, 14);
+    prompts::drawPrompts(App::screenWidth / 2, buildY + 55,
+        {{{Pad::LB, Pad::Left, Pad::Right}, mouse ? std::vector<std::string> {"Wheel"} : std::vector<std::string> {"Q", "E"}, "recent"},
+            {{Pad::LB, Pad::Down}, {mouse ? "Ctrl+LMB" : "R"}, "copy"}, {{Pad::LB, Pad::B}, {mouse ? "Ctrl+RMB" : "G"}, "pick up"}}, 14);
+    //(redo; on a computer too: the tool, the recent ones by number, straight lines)
+    std::vector<prompts::Prompt> more {{{Pad::LB, Pad::RB}, {mouse ? "Fwd btn" : "Ctrl+Y"}, "redo"}};
+    if (mouse || prompts::lastDevice() == prompts::Device::Keyboard) {
+        more.push_back({{}, {"T"}, "tool"});
+        more.push_back({{}, {"2-8"}, "by number"});
+        if (mouse)
+            more.push_back({{}, {"Shift+drag"}, "line"});
+    }
+    prompts::drawPrompts(App::screenWidth / 2, buildY + 74, more, 14);
 
     //What the buttons do here
     prompts::fill(x + 18, y + h - 44, w - 36, 1, {0, 40, 104, 255});
@@ -3703,7 +4465,7 @@ void drawPauseMenu()
     std::vector<prompts::Prompt> row {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"}};
     if (rights)
         row.push_back({{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "player"});
-    row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, rights ? "allow / stop" : s_menuRow == RowSave ? "save" : s_menuRow == RowQuit ? "quit" : "resume"});
+    row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, rights ? "allow / stop" : s_menuRow == RowSave ? "save" : s_menuRow == RowClear ? (s_clearArmed ? "clear it" : "clear") : s_menuRow == RowQuit ? "quit" : "resume"});
     if (s_menuRow != RowResume && !rights)
         row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "resume"});
     //(too wide (the keys' names): "choose" left out)
@@ -3733,12 +4495,16 @@ void drawPauseRights(int y, bool withSave)
             cellFrame(x + 4, y - 2, cell - 8, 28, SDL_Color {255, 255, 255, 255});
     }
     if (withSave && host) {
-        //The Save button under them (or what the last save did)
-        const int bx = App::screenWidth / 2 - 60, by = y + 30;
-        prompts::fill(bx, by, 120, 22, SDL_Color {40, 120, 40, 255});
-        rm->menu_font_small.drawCentered(App::screenWidth / 2, by + 5, "Save map");
-        if (s_pauseRow == 1)
-            cellFrame(bx - 2, by - 2, 124, 26, SDL_Color {255, 255, 255, 255});
+        //The Save and Clear map buttons under them (or what the last one did)
+        const int by = y + 30, bw = 130;
+        for (int k = 0; k < 2; k++) {
+            const int bx = App::screenWidth / 2 + (k == 0 ? -bw - 6 : 6);
+            prompts::fill(bx, by, bw, 22, k == 0 ? SDL_Color {40, 120, 40, 255} : SDL_Color {160, 48, 40, 255});
+            const char* label = k == 0 ? "Save map" : s_clearArmed ? "Press again" : "Clear map";
+            rm->menu_font_small.drawCentered(bx + bw / 2, by + 5, label);
+            if (s_pauseRow == 1 + k)
+                cellFrame(bx - 2, by - 2, bw + 4, 26, SDL_Color {255, 255, 255, 255});
+        }
     }
     const bool note = !s_savedNote.empty() && SDL_GetTicks() - s_savedAt < 4000;
     const int noteY = withSave && host ? y + 56 : y + 30;
@@ -3867,10 +4633,36 @@ void GameplayState::drawEditMode()
             }
         }
     }
+    //(a builder of this machine's on the map: the grid round its cursor, marks at the cells' corners, as
+    //Mario Maker's; not over the whole map)
+    constexpr int GRID_REACH = 4;
+    std::vector<SDL_Point> cursors;
+    for (int slot = 0; slot < SLOTS; slot++)
+        if (building(slot) && localHuman(slot) && !m.builders[slot].palette)
+            cursors.push_back({m.builders[slot].cx, m.builders[slot].cy});
+    auto nearCursor = [&](int x, int y) {
+        for (const SDL_Point& c : cursors)
+            if (x >= c.x - GRID_REACH + 1 && x <= c.x + GRID_REACH && y >= c.y - GRID_REACH + 1 && y <= c.y + GRID_REACH)
+                return true;
+        return false;
+    };
+    for (short x = 1; x < MAPWIDTH && !cursors.empty(); x++) {
+        for (short y = 1; y < MAPHEIGHT; y++) {
+            if (!nearCursor(x, y))
+                continue;
+            //(a small cross, light on a dark shadow: seen on light and dark tiles)
+            const int px = x * TILESIZE, py = y * TILESIZE;
+            prompts::fill(px - 2, py, 6, 1, SDL_Color {16, 16, 24, 255});
+            prompts::fill(px, py - 2, 1, 6, SDL_Color {16, 16, 24, 255});
+            prompts::fill(px - 3, py - 1, 6, 1, SDL_Color {236, 236, 244, 255});
+            prompts::fill(px - 1, py - 3, 1, 6, SDL_Color {236, 236, 244, 255});
+        }
+    }
     bool any = false;
     int lowest = 0;
     int lowestLayer = 1;
     int lowestTool = 0;
+    int lowestBrush = BrushTile;
     for (int slot = 0; slot < SLOTS; slot++) {
         if (!building(slot))
             continue;
@@ -3880,6 +4672,7 @@ void GameplayState::drawEditMode()
             lowest = b.cy;
             lowestLayer = b.layer;
             lowestTool = b.tool;
+            lowestBrush = b.brush;
         }
         //The brush at the cursor, framed in the player's color (pulsing), the player's number on it
         const int x = b.cx * TILESIZE, y = b.cy * TILESIZE;
@@ -3908,6 +4701,40 @@ void GameplayState::drawEditMode()
             cellFrame(x, y, std::min(b.clipW, static_cast<short>(MAPWIDTH - b.cx)) * TILESIZE, std::min(b.clipH, static_cast<short>(MAPHEIGHT - b.cy)) * TILESIZE,
                 SDL_Color {248, 248, 248, 255});
         (void)bright;
+    }
+    //(the cells just changed: a ring each, growing out from it, a quarter of a second)
+    {
+        const Uint64 now = SDL_GetTicks();
+        constexpr Uint64 FLASH_MS = 240;
+        static const SDL_Color FLASH_COLOR[3] = {{248, 248, 248, 255}, {232, 72, 56, 255}, {248, 216, 64, 255}};
+        s_flashes.erase(std::remove_if(s_flashes.begin(), s_flashes.end(), [&](const CellFlash& f) { return now - f.at >= FLASH_MS; }),
+            s_flashes.end());
+        for (const CellFlash& f : s_flashes) {
+            const int grow = 1 + static_cast<int>((now - f.at) * 6 / FLASH_MS);
+            cellFrame(f.x * TILESIZE - grow, f.y * TILESIZE - grow, TILESIZE + grow * 2, TILESIZE + grow * 2, FLASH_COLOR[f.kind % 3]);
+        }
+    }
+    //(what's under a builder's cursor, named over it, once the cursor's rested there a moment: what B
+    //takes, the eyedropper copies; not while painting or erasing)
+    static int s_restFrames[SLOTS] {};
+    static SDL_Point s_restAt[SLOTS] {};
+    for (int slot = 0; slot < SLOTS; slot++) {
+        const MapMakerBuilder& b = m.builders[slot];
+        const bool moved = s_restAt[slot].x != b.cx || s_restAt[slot].y != b.cy;
+        s_restAt[slot] = {b.cx, b.cy};
+        s_restFrames[slot] = moved || (g_sim.previousInput[slot] & (B_PAINT | B_ERASE)) ? 0 : std::min(s_restFrames[slot] + 1, 1000);
+        if (!building(slot) || !localHuman(slot) || b.palette || b.anchoring || s_restFrames[slot] < 20)
+            continue;
+        MapMakerBuilder here = b;
+        if (!pickBrush(m, here))
+            continue;
+        const std::string name = brushName(here);
+        const int w = rm->menu_font_small.getWidth(name.c_str()) + 10, h = 18;
+        const int x = std::clamp(b.cx * TILESIZE + TILESIZE / 2 - w / 2, 2, App::screenWidth - w - 2);
+        const int y = b.cy > 0 ? b.cy * TILESIZE - h - 2 : (b.cy + 1) * TILESIZE + 2;
+        prompts::fill(x, y, w, h, SDL_Color {0, 0, 0, 255});
+        prompts::fill(x + 1, y + 1, w - 2, h - 2, SDL_Color {24, 32, 64, 255});
+        rm->menu_font_small.draw(x + 5, y + 2, name.c_str());
     }
     for (int slot = 0; slot < SLOTS; slot++) {
         if (building(slot) && m.builders[slot].palette)
@@ -3951,7 +4778,10 @@ void GameplayState::drawEditMode()
     std::vector<prompts::Prompt> row {{{Pad::A}, {mouse ? "LMB" : menuKey(prompts::MENU_SELECT)}, lowestTool == 1 ? "rectangle" : lowestTool == 2 ? "fill"
             : lowestTool == 3 ? "copy" : lowestTool == 4 ? "paste" : "paint"},
         {{Pad::B}, {mouse ? "RMB" : "Del"}, "erase"},
-        {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "palette"}, {{Pad::Y}, {menuKey(prompts::MENU_SCROLL)}, layerLabel.c_str()},
+        {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "palette"},
+        //(the layer only matters to tiles: with another brush, moving things instead)
+        lowestBrush == BrushTile ? prompts::Prompt {{Pad::Y}, {mouse ? "Ctrl+Wheel" : menuKey(prompts::MENU_SCROLL)}, layerLabel}
+                                 : prompts::Prompt {{Pad::LB, Pad::B}, {mouse ? "Ctrl+RMB" : "G"}, "move"},
         {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::LB, Pad::Up}, {"Tab"}, "play here"}};
     //(as many as fit: closer together, then "play")
     int gap = 14;
@@ -3981,6 +4811,9 @@ void pressTab()
 bool GameplayState::autoTestEditScript(int f)
 {
     static uint64_t s_startHash = 0;    // the map as the building begins (the undo test's)
+    static uint64_t s_markHash = 0;     // the map at a mark (the eyedropper's and Clear map's tests)
+    static MapMakerRecent s_markRecent {};
+    static uint64_t s_builtHash = 0;    // the map built, before it's all undone (the redo test's)
     auto shot = [](const char* name) {
         if (!cmd::g_autotest.norender)
             gfx_save_screenshot(cmd::g_autotest.shotsDir + "/" + name + ".png");
@@ -4011,6 +4844,52 @@ bool GameplayState::autoTestEditScript(int f)
                 steps.insert(steps.end(), bytes);
         };
         add({0}, 18);
+        if (cmd::g_autotest.mmDemo) {
+            //(--at-mm-demo: a few things painted, so there are recent parts; on through them and back; the
+            //eyedropper; the pause menu's Clear map, pressed twice; one undo: the map back. 530 pauses, 532
+            //the row below, 531 presses it)
+            add({B_DOWN, 0}, 3);
+            add({B_PAINT | B_RIGHT, B_PAINT}, 6);
+            add({B_PALETTE, 0, B_DOWN, 0, B_DOWN, 0, B_PAINT, 0});
+            add({B_UP, 0}, 3);
+            add({B_PAINT | B_RIGHT, B_PAINT}, 3);
+            add({B_PALETTE, 0, B_PALETTE, 0, B_RIGHT, 0, B_PAINT, 0});
+            add({B_UP, 0}, 3);
+            add({B_PAINT | B_LEFT, B_PAINT, B_PAINT}, 4);
+            add({B_PALETTE, 0, B_PALETTE, 0, B_PALETTE, 0, B_PAINT, 0});
+            add({B_RIGHT, 0}, 6);
+            add({B_PAINT, 0});
+            add({0}, 8);
+            for (const int dir : {CMD_RECENT_NEXT, CMD_RECENT_NEXT, CMD_RECENT_NEXT, CMD_RECENT_PREV, CMD_RECENT_PREV, CMD_RECENT_PREV}) {
+                add({commandByte(dir), 0});
+                add({0}, 5);
+            }
+            add({B_LEFT, 0}, 5);
+            add({0}, 4);
+            add({commandByte(CMD_PICK), 0});
+            add({0}, 6);
+            add({B_DOWN, 0}, 2);
+            add({B_PAINT | B_RIGHT, B_PAINT}, 4);
+            add({0}, 8);
+            //(the last one picked up, carried up and over, put down)
+            add({commandByte(CMD_GRAB), 0});
+            add({0}, 4);
+            add({B_UP, 0}, 3);
+            add({B_RIGHT, 0}, 3);
+            add({B_PAINT, 0});
+            add({0}, 8);
+            add({530});
+            add({0}, 6);
+            add({532, 0, 0, 532, 0, 0, 532});
+            add({0}, 6);
+            add({531});
+            add({0}, 12);
+            add({531});
+            add({0}, 16);
+            add({B_UNDO, 0});
+            add({0}, 20);
+            return false;
+        }
         //(the keyboard's keys while building: Enter doesn't pause, Escape does, and goes back)
         add({514, 0, 0, 517, 516, 0, 0, 517, 516, 0, 0, 517});
         add({256 + 1});
@@ -4131,6 +5010,10 @@ bool GameplayState::autoTestEditScript(int f)
         //cells down, a flame cannon facing up (its facing: A, right twice, A))
         add({B_PALETTE, 0, B_PALETTE, 0, B_DOWN, 0, B_PAINT, 0, B_RIGHT, 0, B_RIGHT, 0, 256 + 12, B_PAINT, 0, B_ERASE, 0});
         add({B_PAINT, 0});
+        //(the brush's settings set back to the fire bar's first; the eyedropper on it: its length (7) again,
+        //painted, the same fire bar (522))
+        add({521, B_PALETTE, 0, B_DOWN, 0, B_PAINT, 0, B_LEFT, 0, B_LEFT, 0, B_PAINT, 0, B_ERASE, 0});
+        add({commandByte(CMD_PICK), 0, B_PAINT, 0, 0, 522});
         add({B_DOWN, 0}, 2);
         add({B_LEFT, 0}, 4);
         add({B_PALETTE, 0, B_RIGHT, 0, B_RIGHT, 0, B_RIGHT, 0, B_DOWN, 0, B_DOWN, 0, B_PAINT, 0, B_RIGHT, 0, B_RIGHT, 0, B_PAINT, 0, B_ERASE, 0});
@@ -4181,10 +5064,34 @@ bool GameplayState::autoTestEditScript(int f)
         add({600 + 12 + 9 * MAPWIDTH});
         add({906}, 12);
         add({900, 906, 906, 901, 906, 906, 906, 256 + 30});
+        //(the recent brushes: on one and back, the brush as it was (519, 520); the eyedropper where the
+        //cursor is, painted there again: the map as it was (521, 522); the host's Clear map (the online
+        //panel's, pressed twice: 525), the map empty (523); undone once, all back (524))
+        add({0, 0, 519, 256 + 32, commandByte(CMD_RECENT_NEXT), 0, 256 + 33, commandByte(CMD_RECENT_PREV), 0, 520});
+        add({B_LEFT, 0}, 3);
+        add({521, commandByte(CMD_PICK), 0, 256 + 34, B_PAINT, 0, 0, 522});
+        //(Clear map first: the picking up after it changes the map, so the clear's redo goes)
+        add({525, 525, 0, 0, 0, 523, 256 + 35, B_UNDO, 0, 0, 524, 256 + 36, 526});
+        //(picked up (to move it): gone from there, two cells on (528); back, put down: as it was; undone
+        //twice (the putting down, the picking up), as it was too (529))
+        add({521, commandByte(CMD_GRAB), 0, B_RIGHT, 0, B_RIGHT, 0, 528, B_LEFT, 0, B_LEFT, 0, B_PAINT, 0, 0, 529});
+        add({B_UNDO, 0, 0, B_UNDO, 0, 0, 529});
+        //(the computer's keys and buttons, as real events: Backspace undoes, Ctrl+Y redoes; the mouse's
+        //back button undoes, its forward redoes (536: the map as it was, each); T the next tool (538); 4,
+        //the strip's fourth (539, 545))
+        add({535, 512, 513, 0, 0, 0, 546, 540, 0, 0, 0, 536});
+        add({543, 906, 906, 906, 906, 546, 544, 906, 906, 906, 906, 536});
+        add({537, 541, 0, 0, 0, 538, 541, 541, 0, 0});
+        add({539, 542, 0, 0, 0, 0, 0, 0, 0, 0, 545});
         //(undo, again and again, past everything built: the map as it began, 518 checks)
-        add({0, 0});
+        add({0, 0, 533});
         add({B_UNDO, 0}, 250);
         add({518, 256 + 31});
+        //(redo, again and again: the map as it was built (534); undone all the way again (518))
+        add({commandByte(CMD_REDO), 0}, 250);
+        add({534});
+        add({B_UNDO, 0}, 250);
+        add({518});
     }
     if (f > 70 && (step < steps.size() || hold > 0)) {
         if (hold > 0) {
@@ -4246,6 +5153,115 @@ bool GameplayState::autoTestEditScript(int f)
                 clickHit(true, byte - 920);
             }
             byte = -1;
+        } else if (byte >= 530 && byte <= 532) {
+            //(the demo's pause menu: paused; a row down; that row pressed)
+            if (byte == 530)
+                game_values.flags.pausegame = true;
+            else if (byte == 532)
+                s_menuRow = std::min(s_menuRow + 1, static_cast<int>(matchedit::RowQuit));
+            else
+                matchedit::pauseMenuPress(s_menuRow);
+            byte = -1;
+        } else if (byte == 526) {
+            matchedit::setPanelRow(-1);
+            byte = 0;
+        } else if (byte == 525) {
+            matchedit::setPanelRow(2);
+            matchedit::hostPanelInput(false, false, false, true);
+            byte = 0;
+        } else if (byte == 528 || byte == 529) {
+            const MapMakerBuilder& b = m->builders[0];
+            if (byte == 528) {
+                MapMakerBuilder here = b;
+                here.cx = static_cast<short>(b.cx - 2);
+                const bool still = pickBrush(*m, here) && sameRecent(recentOf(here), recentOf(b));
+                printf("grabtest: picked up brush %d: %s, the map %s\n", b.brush, still ? "STILL there" : "gone from there",
+                    builtMapHash(*m) == s_markHash ? "UNCHANGED" : "changed");
+            } else {
+                printf("grabtest: the map %s as before\n", builtMapHash(*m) == s_markHash ? "is" : "is NOT");
+            }
+            byte = 0;
+        } else if (byte >= 519 && byte <= 524) {
+            const MapMakerBuilder& b = m->builders[0];
+            if (byte == 519 || byte == 521) {
+                s_markRecent = b.recent[0];
+                s_markHash = builtMapHash(*m);
+            } else if (byte == 520) {
+                printf("recenttest: %d recent, the brush %s as it was\n", b.recentCount, sameRecent(b.recent[0], s_markRecent) ? "is" : "is NOT");
+            } else if (byte == 522) {
+                printf("picktest: picked brush %d, painted again: the map %s\n", b.brush, builtMapHash(*m) == s_markHash ? "unchanged" : "CHANGED");
+                s_markHash = builtMapHash(*m);
+            } else if (byte == 523) {
+                int cells = 0;
+                for (int x = 0; x < MAPWIDTH; x++)
+                    for (int y = 0; y < MAPHEIGHT; y++)
+                        for (int l = 0; l < MAPLAYERS; l++)
+                            cells += (g_map->tileAt(x, y, l)->iID != TILESETNONE ? 1 : 0) + (g_map->blockat(x, y)->iType >= 0 && l == 0 ? 1 : 0);
+                int live = 0;
+                for (int k = 0; k < m->platformCount; k++)
+                    live += m->platforms[k].live ? 1 : 0;
+                printf("cleartest: tiles %d, items %d, hazards %d, platforms %d\n", cells, m->itemCount, m->hazardCount, live);
+            } else {
+                printf("cleartest: undone, the map %s as before\n", builtMapHash(*m) == s_markHash ? "is" : "is NOT");
+            }
+            byte = 0;
+        } else if (byte >= 535 && byte <= 546) {
+            //(the computer's keys and mouse buttons: as their events would be)
+            const MapMakerBuilder& b = m->builders[0];
+            static short toolBefore = 0;
+            static MapMakerRecent fourth {};
+            auto key = [](SDL_Keycode k, SDL_Keymod mod) {
+                for (const bool down : {true, false}) {
+                    SDL_Event e {};
+                    e.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+                    e.key.key = k;
+                    e.key.mod = mod;
+                    e.key.down = down;
+                    SDL_PushEvent(&e);
+                }
+            };
+            auto button = [](Uint8 which) {
+                for (const bool down : {true, false}) {
+                    SDL_Event e {};
+                    e.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+                    e.button.button = which;
+                    e.button.down = down;
+                    e.button.x = static_cast<float>(s_mouse.x);
+                    e.button.y = static_cast<float>(s_mouse.y);
+                    SDL_PushEvent(&e);
+                }
+            };
+            if (byte == 535) {
+                s_markHash = builtMapHash(*m);
+            } else if (byte == 536) {
+                printf("pctest: undone and redone, the map %s as it was\n", builtMapHash(*m) == s_markHash ? "is" : "is NOT");
+            } else if (byte == 546) {
+                printf("pctest: undone, the map %s\n", builtMapHash(*m) != s_markHash ? "changed" : "NOT changed");
+            } else if (byte == 537) {
+                toolBefore = b.tool;
+            } else if (byte == 538) {
+                printf("pctest: T, the tool %d to %d\n", toolBefore, b.tool);
+            } else if (byte == 539) {
+                fourth = b.recent[3];
+            } else if (byte == 545) {
+                printf("pctest: 4, the brush %s the strip's fourth\n", sameRecent(b.recent[0], fourth) ? "is" : "is NOT");
+            } else if (byte == 540) {
+                key(SDLK_Y, SDL_KMOD_LCTRL);
+            } else if (byte == 541) {
+                key(SDLK_T, SDL_KMOD_NONE);
+            } else if (byte == 542) {
+                key(SDLK_4, SDL_KMOD_NONE);
+            } else if (byte == 543 || byte == 544) {
+                button(byte == 543 ? SDL_BUTTON_X1 : SDL_BUTTON_X2);
+            }
+            byte = byte == 541 || byte == 542 || byte == 540 || byte == 543 || byte == 544 ? -1 : 0;
+        } else if (byte == 533) {
+            s_builtHash = builtMapHash(*m);
+            byte = 0;
+        } else if (byte == 534) {
+            printf("redotest: redone all the way, the map %s as it was built (redo %zu bytes)\n",
+                builtMapHash(*m) == s_builtHash ? "is" : "is NOT", m->redo.size());
+            byte = 0;
         } else if (byte == 518) {
             printf("undotest: undone all the way, the map %s as it began (history %zu bytes)\n",
                 builtMapHash(*m) == s_startHash ? "is" : "is NOT", m->history.size());
@@ -4273,7 +5289,7 @@ bool GameplayState::autoTestEditScript(int f)
             SDL_PushEvent(&key);
             byte = 0;
         } else if (byte >= 256) {
-            shot(("e" + std::to_string(byte - 256) + (byte == 257 ? "_building" : byte == 258 ? "_painted" : byte == 259 ? "_palette" : byte == 264 ? "_music_page" : byte == 265 ? "_contents_page" : byte == 266 ? "_warps" : byte == 267 ? "_warps_page" : byte == 268 ? "_hazards_page" : byte == 269 ? "_platforms_page" : byte == 270 ? "_hazards_platforms" : byte == 271 ? "_undo_once" : byte == 272 ? "_undone" : byte == 273 ? "_rect" : byte == 274 ? "_fill_erased" : byte == 275 ? "_rect_undone" : byte == 276 ? "_types" : byte == 277 ? "_spawns" : byte == 278 ? "_animated" : byte == 279 ? "_weather_page" : byte == 280 ? "_blocks_hidden_off" : byte == 281 ? "_paste" : byte == 282 ? "_paste_undone" : byte == 283 ? "_tools_page" : byte == 284 ? "_mouse_drawn" : byte == 285 ? "_mouse_palette" : byte == 286 ? "_mouse_item" : byte == 287 ? "_all_undone" : "_blocks")).c_str());
+            shot(("e" + std::to_string(byte - 256) + (byte == 257 ? "_building" : byte == 258 ? "_painted" : byte == 259 ? "_palette" : byte == 264 ? "_music_page" : byte == 265 ? "_contents_page" : byte == 266 ? "_warps" : byte == 267 ? "_warps_page" : byte == 268 ? "_hazards_page" : byte == 269 ? "_platforms_page" : byte == 270 ? "_hazards_platforms" : byte == 271 ? "_undo_once" : byte == 272 ? "_undone" : byte == 273 ? "_rect" : byte == 274 ? "_fill_erased" : byte == 275 ? "_rect_undone" : byte == 276 ? "_types" : byte == 277 ? "_spawns" : byte == 278 ? "_animated" : byte == 279 ? "_weather_page" : byte == 280 ? "_blocks_hidden_off" : byte == 281 ? "_paste" : byte == 282 ? "_paste_undone" : byte == 283 ? "_tools_page" : byte == 284 ? "_mouse_drawn" : byte == 285 ? "_mouse_palette" : byte == 286 ? "_mouse_item" : byte == 287 ? "_all_undone" : byte == 288 ? "_recent" : byte == 289 ? "_recent_next" : byte == 290 ? "_picked" : byte == 291 ? "_cleared" : byte == 292 ? "_clear_undone" : "_blocks")).c_str());
             byte = 0;
         }
         if (building(0) && byte >= 0)
@@ -4310,6 +5326,10 @@ bool GameplayState::autoTestEditScript(int f)
         if (!s_savedPath.empty())
             std::remove(s_savedPath.c_str());
     }
+    if (f == end + 37 * slow)
+        matchedit::pauseMenuPress(matchedit::RowClear);    //(Clear map, pressed once: "Press again")
+    if (f == end + 39 * slow)
+        shot("e7a_pause_clear_armed");
     if (f == end + 40 * slow)
         s_menuRow = matchedit::RowQuit;
     if (f == end + 44 * slow)

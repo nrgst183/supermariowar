@@ -216,7 +216,7 @@ bool rights(int slot);
 bool isHostHere();        // the host's player is at this machine's controls
 // The host's panel (the pause screen, the online panel): a player's right, Save
 void hostPanelInput(bool left, bool right, bool down, bool select);
-void setPanelRow(int row);    // 0 the rights, 1 Save, -1 neither (the online panel's other row)
+void setPanelRow(int row);    // 0 the rights, 1 Save, 2 Clear map, -1 none (the online panel's other row)
 void drawPauseRights(int y, bool withSave);
 }
 
