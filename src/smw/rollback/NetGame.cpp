@@ -182,6 +182,7 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
     options.mesh.dataHash = simulationDataHash();
     options.name = args.name;
     options.localPlayers = 1;
+    options.bots = args.bot;
     options.downloadDirs = mapDownloadDirs();
     options.mapSlowdown = args.slowMap;
     options.skinSearchDirs = skinSearchDirs();
@@ -822,7 +823,8 @@ void NetGame::applyLobbySlots(std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot)
 
     for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
         const LobbySlot& slot = m_lobby->slot(k);
-        game_values.playercontrol[k] = slot.kind == SlotKind::Human ? 1 : slot.kind == SlotKind::Cpu ? 2 : 0;
+        //(a bot peer's players: CPU players, driven by that peer, --net-bot)
+        game_values.playercontrol[k] = slot.kind == SlotKind::Human ? (slot.bot ? 2 : 1) : slot.kind == SlotKind::Cpu ? 2 : 0;
         peerOfSlot[static_cast<size_t>(k)] = slot.kind == SlotKind::Human ? slot.peer : -1;
         game_values.colorids[k] = game_values.teamcolors ? slot.team : slot.color;
     }
@@ -857,6 +859,7 @@ bool NetGame::startMatch(std::string& error)
 
     m_matchId++;
     m_ackedMask = 1;
+    m_startSent = false;
     m_mapFile.reset();
     m_startMs = monotonicMs();
     m_lastMatchError.clear();
@@ -882,10 +885,22 @@ void NetGame::hostUpdateStart(uint32_t nowMs)
             return;
         }
     }
+    //(the host begins half the worst round trip after sending Start: as the farthest peer gets it, so
+    //all start together; else the host runs that far ahead and stalls at the start, waiting for them)
+    if (m_startSent) {
+        if (static_cast<int32_t>(nowMs - m_beginAtMs) >= 0)
+            beginMatch();
+        return;
+    }
     if ((m_ackedMask & peers) == peers) {
         m_lobby->sendStart(m_matchId);
         m_transport->flush();
-        beginMatch();
+        float rtt = 0, jitter = 0;
+        m_lobby->worstRtt(rtt, jitter);
+        m_startSent = true;
+        m_beginAtMs = nowMs + static_cast<uint32_t>(std::clamp(rtt / 2.0f, 0.0f, 250.0f));
+        if (m_beginAtMs == nowMs)
+            beginMatch();
         return;
     }
     //(signed: a match started again during this pump has a start time after nowMs)
@@ -1025,10 +1040,11 @@ void NetGame::beginMatch()
     session.peerCount = net::MAX_PEERS;
     session.localPeer = m_lobby->localPeer();
     const std::array<int, net::MAX_PEERS> connections = m_lobby->mesh().peerConnections();
-    //The host's machine plays the CPU players: their AI's buttons are its input (CpuDriver.h)
+    //The host's machine plays the CPU players: their AI's buttons are its input (CpuDriver.h); a bot
+    //peer's own (--net-bot) its machine does
     for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
         const MatchSlot& slot = config.slots[static_cast<size_t>(k)];
-        session.slotPeer[static_cast<size_t>(k)] = slot.control == 2 ? 0 : slot.peer;
+        session.slotPeer[static_cast<size_t>(k)] = slot.control == 2 ? (slot.peer > 0 ? slot.peer : 0) : slot.peer;
     }
     int peers = 1;
     for (int p = 0; p < net::MAX_PEERS; p++) {
@@ -1061,6 +1077,16 @@ void NetGame::beginMatch()
     m_lastMatchError.clear();
     printf("netplay: match %d starts: mode %d, map %s, %d peers, local peer %d, input delay %d\n", m_matchId, config.gameMode,
         config.mapRef.c_str(), peers, session.localPeer, session.inputDelay);
+    //(who plays each slot, and whose machine drives it: a --net-bot peer drives its CPU players)
+    std::string slotList;
+    for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
+        const MatchSlot& slot = config.slots[static_cast<size_t>(k)];
+        if (slot.control == 0)
+            continue;
+        slotList += " P" + std::to_string(k + 1) + (slot.control == 2 ? " CPU" : " human") + " (peer " +
+                    std::to_string(session.slotPeer[static_cast<size_t>(k)]) + ")";
+    }
+    printf("netplay: match %d slots:%s\n", m_matchId, slotList.c_str());
     if (!config.series.empty()) {
         //Every peer must have come to the same series state
         const uint64_t hostHash = seriesStateHash(config.series);

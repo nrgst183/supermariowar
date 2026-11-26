@@ -202,6 +202,7 @@ void NetLobby::rebuildSlots()
             slot.kind = SlotKind::Human;
             slot.peer = static_cast<int8_t>(p);
             slot.localIndex = static_cast<uint8_t>(i);
+            slot.bot = peer.bots;
             slot.team = m_human[static_cast<size_t>(p)].team[i];
             slot.color = m_human[static_cast<size_t>(p)].color[i];
         }
@@ -745,7 +746,8 @@ void NetLobby::sendPeerInfo()
     ByteWriter w(m_buffer.data(), m_buffer.size());
     w.u8(static_cast<uint8_t>(MsgType::PeerInfo));
     w.str(self.name);
-    w.u8(static_cast<uint8_t>(m_options.localPlayers));
+    //(the top bit: its players are bots, --net-bot)
+    w.u8(static_cast<uint8_t>(m_options.localPlayers | (m_options.bots ? 0x80 : 0)));
     w.u8(self.ready ? 1 : 0);
     w.u8(m_round);
     w.u64(m_lackedMap);
@@ -930,7 +932,9 @@ void NetLobby::updateTransferInfo()
 void NetLobby::onPeerInfo(int peer, ByteReader& r)
 {
     const std::string name = cleanName(r.str());
-    int localPlayers = r.u8();
+    const int playersByte = r.u8();
+    const bool bots = (playersByte & 0x80) != 0;
+    int localPlayers = playersByte & 0x7F;
     const bool ready = r.u8() != 0;
     const uint8_t round = r.u8();
     LobbyPeer& p = m_peers[static_cast<size_t>(peer)];
@@ -951,6 +955,7 @@ void NetLobby::onPeerInfo(int peer, ByteReader& r)
 
     p.name = name.empty() ? defaultName(peer) : name;
     p.localPlayers = localPlayers;
+    p.bots = bots;
     p.ready = ready && round == m_round;
     rebuildSlots();
     markDirty();

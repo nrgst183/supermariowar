@@ -18,6 +18,7 @@ namespace loadscreen {
 namespace {
 constexpr Uint64 SHOW_EVERY_NS = 33000000;    // (about 30 times a second: the screen moves, the loading isn't slowed)
 constexpr int FIRST_ESTIMATE = 450;           // (the steps of a first run, before any was counted)
+constexpr Uint64 SHOW_AFTER_NS = 250000000;   // (no bar before loading has taken this long: a fast load just ends)
 
 void (*g_drawScreen)() = nullptr;
 SDL_ThreadID g_thread = 0;
@@ -25,6 +26,8 @@ int g_steps = 0;
 int g_expected = FIRST_ESTIMATE;
 const char* g_phase = "";
 Uint64 g_shownAt = 0;
+Uint64 g_beganAt = 0;
+bool g_barShown = false;    // (the bar came up: loading took a while)
 
 std::string countFile()
 {
@@ -35,6 +38,10 @@ void show(double done)
 {
     if (!g_drawScreen || !rm)
         return;
+    //(a fast load: no bar at all, not a flash of one)
+    if (SDL_GetTicksNS() - g_beganAt < SHOW_AFTER_NS)
+        return;
+    g_barShown = true;
     blitdest = screen;
     g_drawScreen();
 
@@ -81,6 +88,8 @@ void begin(void (*drawScreen)())
         fclose(file);
     }
     g_phase = "";
+    g_beganAt = SDL_GetTicksNS();
+    g_barShown = false;
     show(0.0);
 }
 
@@ -106,7 +115,8 @@ void end()
     if (!g_drawScreen)
         return;
     g_phase = "Ready";
-    show(1.0);
+    if (g_barShown)
+        show(1.0);
     if (FILE* file = fopen(countFile().c_str(), "w")) {
         fprintf(file, "%d\n", g_steps);
         fclose(file);

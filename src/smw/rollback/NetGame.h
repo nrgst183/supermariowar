@@ -287,6 +287,8 @@ private:
     // Host: the match being started
     uint8_t m_ackedMask = 0;
     uint32_t m_startMs = 0;
+    bool m_startSent = false;      // the host: Start sent, its own match begins at m_beginAtMs (as the farthest
+    uint32_t m_beginAtMs = 0;      // peer gets it: half the worst round trip on)
     std::shared_ptr<const std::vector<uint8_t>> m_mapFile;
     // Joiner: the config of the next match
     bool m_pendingConfig = false;    // arrived, not checked yet (e.g. during the end of the last match)

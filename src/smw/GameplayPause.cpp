@@ -77,16 +77,10 @@ bool s_onlinePanel = false;
 int s_onlineRow = 0;
 bool s_pendingPanelShot = false;    // the Map Maker's host: 0 Run-Ahead, 1 the players' rights, 2 Save
 
-// The run-ahead settings, in the order left/right go through them (-1: Auto)
-constexpr short RUN_AHEAD_SETTINGS[] = {-1, 0, 1, 2, 3};
-
+// The run-ahead setting, left/right: Auto (-1), Off (0), then 1 to RUN_AHEAD_MAX frames
 void changeRunAhead(int direction)
 {
-    const short* begin = std::begin(RUN_AHEAD_SETTINGS);
-    const short* end = std::end(RUN_AHEAD_SETTINGS);
-    const short* at = std::find(begin, end, game_values.runahead);
-    const long index = std::clamp<long>((at == end ? 0 : at - begin) + direction, 0, (end - begin) - 1);
-    game_values.runahead = begin[index];
+    game_values.runahead = static_cast<short>(std::clamp(game_values.runahead + direction, -1, RUN_AHEAD_MAX));
 }
 
 std::string framesText(int frames)

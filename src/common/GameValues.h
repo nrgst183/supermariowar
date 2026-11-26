@@ -162,7 +162,7 @@ public:
     short		wandfreezetime;
     bool		toplayer;
     bool		smoothmotion = true;    // draw moving things between ticks (interpolated)
-    short		runahead = -1;          // online run-ahead: show the match this many ticks ahead (0..3, -1 Auto: the input delay), less input lag
+    short		runahead = -1;          // online run-ahead: show the match this many ticks ahead (0..10, -1 Auto: the input delay), less input lag
     bool		shownetstats = false;   // online: the network info line (ping, input delay, rollbacks)
     bool		showpingbars = true;    // online and in online replays: signal bars on the other players' score panels
 #ifdef SMW_XBOX

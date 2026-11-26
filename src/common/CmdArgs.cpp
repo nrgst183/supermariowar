@@ -65,7 +65,7 @@ void print_help(const char* title, const char* version)
            "                          eyecandy and other side effects suppressed); the\n"
            "                          results must match a normal run\n");
     printf("      --at-online-panel 1 Online matches: the online panel (the pause button's) open\n");
-    printf("      --at-runahead <N>   Run-ahead (online): show the match N ticks (0..3, -1 Auto) ahead; the\n"
+    printf("      --at-runahead <N>   Run-ahead (online): show the match N ticks (0..10, -1 Auto) ahead; the\n"
            "                          simulation (and its checksums) must be unaffected\n");
     printf("      --at-shots <DIR>    --at-match shots: save screenshots of the main, online and lobby menus\n"
            "                          to DIR (with --at-role host|join|orig, --at-addr IP[:PORT], --at-nick NAME)\n");
@@ -108,6 +108,8 @@ void print_help(const char* title, const char* version)
     printf("      --net-sim-latency <MS> Simulated one-way latency of every packet sent\n");
     printf("      --net-sim-jitter <MS>  Simulated +- jitter of that latency\n");
     printf("      --net-sim-loss <PCT>   Simulated loss of the unreliable packets sent\n");
+    printf("      --net-bot 1         (Joining) this machine's players are CPU players it drives over the network:\n"
+           "                          bots with this machine's latency (with --autotest --at-humans 1)\n");
 }
 
 
@@ -191,6 +193,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-shot-ticks") at.shotTicks = atoi(val.c_str()) != 0;
             else if (arg == "--at-resim") at.resim = atoi(val.c_str()) != 0;
             else if (arg == "--at-runahead") at.runahead = atoi(val.c_str());
+            else if (arg == "--at-lagtest") at.lagtest = atoi(val.c_str());
             else if (arg == "--at-online-panel") at.onlinePanel = atoi(val.c_str()) != 0;
             else if (arg == "--at-realtime") at.realtime = atoi(val.c_str());
             else if (arg == "--at-humans") at.humans = atoi(val.c_str());
@@ -248,6 +251,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--net-sim-latency") net.simLatencyMs = atoi(val.c_str());
             else if (arg == "--net-sim-jitter") net.simJitterMs = atoi(val.c_str());
             else if (arg == "--net-sim-loss") net.simLossPercent = static_cast<float>(atof(val.c_str()));
+            else if (arg == "--net-bot") net.bot = atoi(val.c_str()) != 0;
             else {
                 fprintf(stderr, "Error: unknown option `%s`, see `--help`\n", arg.c_str());
                 return result;

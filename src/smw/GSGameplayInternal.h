@@ -7,12 +7,14 @@
 
 constexpr int COUNTDOWN_START_INDEX = 4;
 
-// The run-ahead (ticks, 0..3) of a setting: -1 is Auto, as much as the input delay (what hides
-// the delay, and no more: past it, the run-ahead only guesses)
+// The run-ahead (ticks, 0..RUN_AHEAD_MAX) of a setting: -1 is Auto, as much as the input delay (what
+// hides the delay, and no more: past it, the run-ahead only guesses). A tick run ahead costs about
+// what a tick does (10 us on a PC)
+constexpr int RUN_AHEAD_MAX = 10;
 constexpr int runAheadSetting(int setting, int inputDelay)
 {
     const int ticks = setting < 0 ? inputDelay : setting;
-    return ticks < 0 ? 0 : ticks > 3 ? 3 : ticks;
+    return ticks < 0 ? 0 : ticks > RUN_AHEAD_MAX ? RUN_AHEAD_MAX : ticks;
 }
 
 #ifdef _DEBUG

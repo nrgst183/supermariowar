@@ -230,6 +230,82 @@ uint8_t autoTestNetHumanInput(int slot)
     return mapMakerBotByte(slot, bots[slot].step(next), next);
 }
 
+// --at-lagtest: the first local player's input: still until it's stood on the ground a while, then
+// jump held; lagTestCheck (after the frame's ticks and run-ahead: the state drawn) counts the frames
+// until the player is seen going up
+struct LagTest {
+    int frame = 0;          // update()s
+    int phase = 0;          // 0 standing still, 1 jump pressed (waiting to see it), 2 resting after
+    int still = 0, rest = 0;
+    int pressFrame = 0;
+    Uint64 pressNs = 0;
+    float baseY = 0;
+    int samples = 0, sumFrames = 0, minFrames = 1000, maxFrames = 0;
+    double sumMs = 0;
+    int slot = -1;
+};
+LagTest s_lag;
+
+uint8_t lagTestInput(int slot)
+{
+    LagTest& lt = s_lag;
+    if (lt.slot < 0)
+        lt.slot = slot;
+    if (slot != lt.slot)
+        return 0;
+    lt.frame++;
+    CPlayer* player = GetPlayerFromGlobalID(slot);
+    if (lt.samples >= cmd::g_autotest.lagtest || !player)
+        return 0;
+    if (lt.phase == 2) {
+        if (++lt.rest > 40)
+            lt.phase = 0;
+        return 0;
+    }
+    if (lt.phase == 0) {
+        //(on the ground: ready, and not moved up or down a while)
+        const float y = player->renderPosition().fy;
+        lt.still = player->isready() && y == lt.baseY ? lt.still + 1 : 0;
+        lt.baseY = y;
+        if (lt.still < 30)
+            return 0;
+        lt.phase = 1;
+        lt.pressFrame = lt.frame;
+        lt.pressNs = SDL_GetTicksNS();
+        lt.baseY = player->renderPosition().fy;
+    }
+    return InputBit::Jump;
+}
+
+void lagTestCheck(int inputDelay, int runAhead)
+{
+    LagTest& lt = s_lag;
+    if (lt.phase != 1 || lt.slot < 0)
+        return;
+    CPlayer* player = GetPlayerFromGlobalID(lt.slot);
+    const int frames = lt.frame - lt.pressFrame;
+    if (!player || frames > 60) {
+        lt.phase = 2;    //(it couldn't jump: not counted)
+        lt.rest = 0;
+        return;
+    }
+    if (player->renderPosition().fy > lt.baseY - 0.5f)
+        return;
+    const double ms = static_cast<double>(SDL_GetTicksNS() - lt.pressNs) / 1e6;
+    lt.samples++;
+    lt.sumFrames += frames;
+    lt.sumMs += ms;
+    lt.minFrames = std::min(lt.minFrames, frames);
+    lt.maxFrames = std::max(lt.maxFrames, frames);
+    printf("lagtest: jump %d seen %d frames after the press (%.1f ms) | input delay %d, run-ahead %d\n", lt.samples, frames, ms,
+        inputDelay, runAhead);
+    if (lt.samples == cmd::g_autotest.lagtest)
+        printf("lagtest: average %.2f frames (%.1f ms), %d to %d, over %d jumps | input delay %d, run-ahead %d\n",
+            static_cast<double>(lt.sumFrames) / lt.samples, lt.sumMs / lt.samples, lt.minFrames, lt.maxFrames, lt.samples, inputDelay, runAhead);
+    lt.phase = 2;
+    lt.rest = 0;
+}
+
 // Cheap FNV-1a checksum of the simulation state the --autotest harness prints
 // ("atsum:" lines), so that two runs can be compared beyond the match results
 
@@ -1068,7 +1144,9 @@ void GameplayState::updateNetplay()
             input.players[slot] = cpudriver::next(slot);
             continue;
         }
-        if (cmd::g_autotest.enabled && cmd::g_autotest.humans > 0)
+        if (cmd::g_autotest.enabled && cmd::g_autotest.lagtest > 0)
+            input.players[slot] = lagTestInput(slot);
+        else if (cmd::g_autotest.enabled && cmd::g_autotest.humans > 0)
             input.players[slot] = autoTestNetHumanInput(slot);
         else if (onlinePanelOpen())
             input.players[slot] = 0;    //(the online panel has the buttons: this computer's players stand still)
@@ -1090,6 +1168,8 @@ void GameplayState::updateNetplay()
         }
         runAhead(ahead);
     }
+    if (cmd::g_autotest.enabled && cmd::g_autotest.lagtest > 0 && net.inMatch())
+        lagTestCheck(net.inputDelay(), runAheadFrames());
 
     if (outcome.ended || outcome.failed) {
         if (cmd::g_autotest.enabled) {

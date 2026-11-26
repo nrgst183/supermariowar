@@ -4,7 +4,8 @@
 //
 // While the game loads (the splash screen's "Loading..."), each image and sound loaded is a step: the
 // screen is drawn again with a bar and the kind of thing loading, at most every few hundredths of a second, so
-// a slow machine (the Xbox's first boot) shows it moving. The bar's whole is the count of the last
+// a slow machine (the Xbox's first boot) shows it moving. A fast one (a PC: about 0.2 s) shows no bar:
+// it only comes up once loading has taken a quarter of a second, and "Ready" only after it did. The bar's whole is the count of the last
 // time's steps (kept in loadsteps.txt in the settings folder), an estimate the first time.
 namespace loadscreen {
 

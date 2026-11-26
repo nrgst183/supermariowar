@@ -35,7 +35,7 @@ namespace rollback {
 
 struct MatchSlot {
     uint8_t control = 0;     // game_values.playercontrol: 0 empty, 1 human, 2 CPU
-    int8_t peer = -1;        // the peer whose inputs drive it (humans only)
+    int8_t peer = -1;        // the peer whose inputs drive it (a human's; a CPU's: -1, the host, or a --net-bot peer)
     int16_t color = 0;
     bool keyboard = true;    // keyboard players drop through platforms with "down"
     int16_t storedPowerup = -1;

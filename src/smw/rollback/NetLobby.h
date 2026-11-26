@@ -217,6 +217,7 @@ struct LobbyPeer {
     bool present = false;
     std::string name;
     int localPlayers = 1;
+    bool bots = false;    // its players are CPU players it drives (--net-bot: its AI's buttons, over the network)
     bool ready = false;
     int pingMs = -1;    // round trip between this machine and the peer (-1: unknown, or ourselves)
     bool lacksMap = false;    // joiners: it doesn't have the lobby's map and won't download it (see peerLacksMap)
@@ -229,6 +230,7 @@ struct LobbySlot {
     SlotKind kind = SlotKind::Empty;
     int8_t peer = -1;          // Human: the peer whose player it is
     uint8_t localIndex = 0;    // Human: which of that peer's players
+    bool bot = false;          // Human: its peer's AI plays it (--net-bot): a CPU player in the match, driven by that peer
     uint8_t team = 0;          // 0..3
     uint8_t color = 0;         // 0..3
 };
@@ -287,6 +289,7 @@ public:
         NetMesh::Options mesh;
         std::string name;               // empty: "Player N"
         int localPlayers = 1;
+        bool bots = false;              // (testing, --net-bot) this peer's players are CPU players it drives
         // Where downloaded maps go: the first one that can be written
         std::vector<std::string> downloadDirs;
         // Skins: the folders whose skin files are hashed (to see which skins we have), and where

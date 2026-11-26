@@ -1,6 +1,7 @@
 #include "OnlineMenu.h"
 
 #include "GameValues.h"
+#include "GSGameplayInternal.h"    //(RUN_AHEAD_MAX)
 #include "ResourceManager.h"
 #include "rollback/NetGame.h"
 #include "ui/MI_Button.h"
@@ -49,10 +50,9 @@ UI_OnlineMenu::UI_OnlineMenu()
     miRunAheadField = new MI_SelectField<short>(&rm->spr_selectfield, 64, 114, "Run-Ahead", 512, 150);
     miRunAheadField->add("Auto", -1);    //(as much as the input delay)
     miRunAheadField->add("Off", 0);
-    miRunAheadField->add("1 Frame", 1);
-    miRunAheadField->add("2 Frames", 2);
-    miRunAheadField->add("3 Frames", 3);
-    game_values.runahead = std::clamp<short>(game_values.runahead, -1, 3);
+    for (short frames = 1; frames <= RUN_AHEAD_MAX; frames++)
+        miRunAheadField->add(frames == 1 ? "1 Frame" : std::to_string(frames) + " Frames", frames);
+    game_values.runahead = std::clamp<short>(game_values.runahead, -1, RUN_AHEAD_MAX);
     miRunAheadField->setOutputPtr(&game_values.runahead);
     miRunAheadField->setCurrentValue(game_values.runahead);
 

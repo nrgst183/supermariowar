@@ -615,7 +615,8 @@ bool captureConfig(MatchConfig& config, const std::array<int8_t, INPUT_MAX_PLAYE
     for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
         MatchSlot& slot = config.slots[static_cast<size_t>(k)];
         slot.control = static_cast<uint8_t>(game_values.playercontrol[k]);
-        slot.peer = slot.control == 1 ? peerOfSlot[static_cast<size_t>(k)] : -1;
+        //(a CPU player has a peer only if a bot peer drives it, --net-bot; else the host does)
+        slot.peer = slot.control == 1 || (slot.control == 2 && peerOfSlot[static_cast<size_t>(k)] > 0) ? peerOfSlot[static_cast<size_t>(k)] : -1;
         if (slot.control == 1 && slot.peer < 0) {
             error = "player " + std::to_string(k + 1) + " is human but no peer drives it";
             return false;

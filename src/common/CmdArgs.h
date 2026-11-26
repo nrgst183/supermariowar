@@ -34,6 +34,8 @@ struct AutoTestArgs {
     bool shotTicks = false;  // --at-shot-every counts simulation ticks instead of drawn frames
     bool resim = false;      // run every gameplay tick as a re-simulation (side effects suppressed)
     int runahead = 0;        // --at-runahead N: run-ahead ticks online, -1 Auto (the setting isn't used in auto-play)
+    int lagtest = 0;         // --at-lagtest N: online, the first local player stands still, then jumps, N times: how many
+                             // frames until the jump is on the screen (input delay, run-ahead; "lagtest:" lines)
     bool onlinePanel = false;   // --at-online-panel 1: the online panel (pause button, online) open in the matches
     int realtime = 0;        // 0: unthrottled; 1/2/3: normal pacing with the VSync/Uncapped/62.5 FPS frame
                              // rate, printing the measured tick and render rates
@@ -87,6 +89,8 @@ struct NetArgs {
     int timeoutMs = 5000;      // --net-timeout MS: a silent peer is gone after this long
     int quitAt = 0;            // --net-quit-at F: leave the match at frame F (disconnect test)
     int upnp = -1;             // --net-upnp 0|1: ask the router to forward the host's port (-1: yes, except with --autotest)
+    bool bot = false;          // --net-bot 1: (a joiner, testing) its players are CPU players this machine drives: the AI's
+                               // buttons sent as its input, with this machine's latency (--net-sim-latency)
     // Network condition simulator (testing only)
     int simLatencyMs = 0;      // --net-sim-latency MS: added one-way delay of every packet sent
     int simJitterMs = 0;       // --net-sim-jitter MS: +- random variation of that delay
