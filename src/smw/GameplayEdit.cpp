@@ -146,6 +146,10 @@ bool s_switchPressed[SLOTS] {};    // Tab (or the script): building starts or en
 bool s_lbHeld[SLOTS] {};           // a pad's LB held (L+Up: the switch), by input device
 bool s_chordHeld[SLOTS] {};        // L+Up held last time (the switch on the press only)
 bool s_undoPressed[SLOTS] {};      // the undo button (RB, Backspace, Ctrl+Z), by input device
+bool s_undoHeld[SLOTS] {};         // ... held down (it undoes again and again after a moment)
+int s_undoHeldTicks[SLOTS] {};
+int s_tabStep[SLOTS] {};           // the triggers (Page Up/Down): the palette's tab before (-1) or after (1)
+bool s_triggerHeld[SLOTS][2] {};   // (a trigger pressed in: one step until it's let go)
 bool s_pausePressed[SLOTS] {};     // building: the pause (a pad's Start), by input device
 bool s_escPressed[SLOTS] {};       // the keyboard's Escape: the pause (the palette open: back), by input device
 bool s_escHeld = false;            // the keyboard's Escape, Delete held (Delete erases; Escape: the palette's back)
@@ -881,14 +885,15 @@ void erase(CGM_MapMaker& m, const MapMakerBuilder& b)
                 changed = true;
             }
         }
-        if (changed)
+        if (changed) {
             m.edited = true;
-        return;
-    }
-    //(the type brush: the type the tiles give; the spawn brush: spawning here again)
-    if (b.brush == BrushType) {
-        if (!typeSetApart(b.cx, b.cy))
             return;
+        }
+        //(none of its kind here: what's there goes, as with any other brush)
+    }
+    //(the type brush: the type the tiles give; the spawn brush: spawning here again; else, nothing of
+    //theirs here, what's there goes)
+    if (b.brush == BrushType && typeSetApart(b.cx, b.cy)) {
         g_map->setTileType(b.cx, b.cy, tilesType(b.cx, b.cy));
         tilesChanged(b.cx, b.cy, true);
         m.edited = true;
@@ -906,8 +911,8 @@ void erase(CGM_MapMaker& m, const MapMakerBuilder& b)
         if (changed) {
             g_map->refreshSpawnAreas();
             m.edited = true;
+            return;
         }
-        return;
     }
     MapBlock* block = g_map->blockat(b.cx, b.cy);
     if (block->iType != -1) {
@@ -1012,14 +1017,235 @@ void restoreLevel(CGM_MapMaker& m, const MapMakerEdit& edit)
     std::copy(&edit.bases[0][0], &edit.bases[0][0] + 8, &m.bases[0][0]);
 }
 
-// A new edit at the end (the oldest dropped when they're all used), zeroed: its padding too
+// ---- The history: every edit packed in a record, the oldest first; an undo takes back a builder's
+// newest stroke, as far back as there are records (the oldest go past MAP_MAKER_HISTORY_BYTES).
+// A record: u16 its size, u8 its kind (1 a cell or the level-wide things, 2 a rectangle, fill or a
+// paste's layer), u8 the builder, i16 the stroke, then what was there before (only the parts it
+// changed), and its size again (to walk back from the newest). A tick's edits are staged in full
+// (m.edits, m.bulks) and packed at its end (commitStaged).
+namespace history {
+constexpr size_t HEAD = 6, TAIL = 2;
+
+void put(sim::vector<uint8_t>& out, const void* p, size_t n)
+{
+    const auto* b = static_cast<const uint8_t*>(p);
+    out.insert(out.end(), b, b + n);
+}
+
+template <typename T>
+void putValue(sim::vector<uint8_t>& out, const T& v)
+{
+    put(out, &v, sizeof(T));
+}
+
+// (the bytes of a struct from one field to before another: the fields between)
+template <typename A, typename B>
+size_t span(const MapMakerEdit& e, const A& from, const B& to)
+{
+    return static_cast<size_t>(reinterpret_cast<const uint8_t*>(&to) - reinterpret_cast<const uint8_t*>(&from));
+    (void)e;
+}
+
+void begin(sim::vector<uint8_t>& out, uint8_t kind, short slot, short stroke)
+{
+    const uint16_t size = 0;
+    putValue(out, size);
+    putValue(out, kind);
+    putValue(out, static_cast<uint8_t>(slot));
+    putValue(out, stroke);
+}
+
+void end(sim::vector<uint8_t>& out, size_t start)
+{
+    const uint16_t size = static_cast<uint16_t>(out.size() + TAIL - start);
+    std::memcpy(&out[start], &size, sizeof(size));
+    putValue(out, size);
+}
+
+void packEdit(sim::vector<uint8_t>& out, const MapMakerEdit& e)
+{
+    const size_t start = out.size();
+    begin(out, 1, e.slot, e.stroke);
+    putValue(out, e.x);
+    putValue(out, e.y);
+    if (e.x < 0) {
+        //(the level-wide things: from the background to the end)
+        put(out, &e.background, sizeof(MapMakerEdit) - span(e, e.slot, e.background));
+    } else {
+        //(the cell: its tiles to its hazard's mark; the hazard, the platform only when there's one)
+        put(out, &e.tiles, span(e, e.tiles, e.hazard));
+        if (e.hadHazard)
+            putValue(out, e.hazard);
+        putValue(out, e.platformKind);
+        if (e.platformKind != 0) {
+            MapMakerPlatform platform = e.platform;
+            platform.live = nullptr;
+            putValue(out, platform);
+        }
+    }
+    end(out, start);
+}
+
+void unpackEdit(const uint8_t* p, MapMakerEdit& e)
+{
+    std::memset(static_cast<void*>(&e), 0, sizeof(e));
+    auto get = [&p](void* to, size_t n) {
+        std::memcpy(to, p, n);
+        p += n;
+    };
+    p += HEAD;
+    get(&e.x, sizeof(e.x));
+    get(&e.y, sizeof(e.y));
+    if (e.x < 0) {
+        get(&e.background, sizeof(MapMakerEdit) - span(e, e.slot, e.background));
+    } else {
+        get(&e.tiles, span(e, e.tiles, e.hazard));
+        if (e.hadHazard)
+            get(&e.hazard, sizeof(e.hazard));
+        get(&e.platformKind, sizeof(e.platformKind));
+        if (e.platformKind != 0)
+            get(&e.platform, sizeof(e.platform));
+    }
+}
+
+void packBulk(sim::vector<uint8_t>& out, const MapMakerBulk& b)
+{
+    const size_t start = out.size();
+    begin(out, 2, b.slot, b.stroke);
+    putValue(out, b.layer);
+    putValue(out, static_cast<uint8_t>(b.blocks ? 1 : 0));
+    uint16_t count = 0;
+    for (int cell = 0; cell < MAP_CELLS; cell++)
+        count = static_cast<uint16_t>(count + ((b.changed[cell / 8] >> (cell % 8)) & 1));
+    putValue(out, count);
+    for (int cell = 0; cell < MAP_CELLS; cell++) {
+        if (!((b.changed[cell / 8] >> (cell % 8)) & 1))
+            continue;
+        putValue(out, static_cast<uint16_t>(cell));
+        if (b.blocks) {
+            putValue(out, b.blockType[cell]);
+        } else {
+            putValue(out, b.tiles[cell]);
+            putValue(out, b.types[cell]);
+        }
+    }
+    end(out, start);
+}
+
+void unpackBulk(const uint8_t* p, MapMakerBulk& b)
+{
+    std::memset(static_cast<void*>(&b), 0, sizeof(b));
+    auto get = [&p](void* to, size_t n) {
+        std::memcpy(to, p, n);
+        p += n;
+    };
+    p += HEAD;
+    get(&b.layer, sizeof(b.layer));
+    uint8_t blocks = 0;
+    get(&blocks, 1);
+    b.blocks = blocks != 0;
+    uint16_t count = 0;
+    get(&count, sizeof(count));
+    for (int k = 0; k < count; k++) {
+        uint16_t cell = 0;
+        get(&cell, sizeof(cell));
+        if (cell >= MAP_CELLS)
+            break;
+        b.changed[cell / 8] = static_cast<uint8_t>(b.changed[cell / 8] | (1 << (cell % 8)));
+        if (b.blocks) {
+            get(&b.blockType[cell], sizeof(b.blockType[cell]));
+        } else {
+            get(&b.tiles[cell], sizeof(b.tiles[cell]));
+            get(&b.types[cell], sizeof(b.types[cell]));
+        }
+    }
+}
+
+uint16_t sizeAt(const sim::vector<uint8_t>& h, size_t at)
+{
+    uint16_t size = 0;
+    std::memcpy(&size, &h[at], sizeof(size));
+    return size;
+}
+} // namespace history
+
+// The tick's staged edits packed into the history (the oldest records dropped past its size)
+void commitStaged(CGM_MapMaker& m)
+{
+    for (int k = 0; k < m.editCount; k++)
+        history::packEdit(m.history, m.edits[k]);
+    for (int k = 0; k < m.bulkCount; k++)
+        history::packBulk(m.history, m.bulks[k]);
+    if (m.editCount > 0)
+        std::memset(static_cast<void*>(m.edits), 0, sizeof(m.edits));
+    if (m.bulkCount > 0)
+        std::memset(static_cast<void*>(m.bulks), 0, sizeof(m.bulks));
+    m.editCount = 0;
+    m.bulkCount = 0;
+    size_t drop = 0;
+    while (m.history.size() - drop > MAP_MAKER_HISTORY_BYTES)
+        drop += history::sizeAt(m.history, drop);
+    if (drop > 0)
+        m.history.erase(m.history.begin(), m.history.begin() + static_cast<std::ptrdiff_t>(drop));
+}
+
+// What the builders can change, as one number (the test's: undone all the way, the map is as it began)
+uint64_t builtMapHash(const CGM_MapMaker& m)
+{
+    uint64_t h = 1469598103934665603ull;
+    auto mix = [&h](const void* p, size_t n) {
+        const auto* b = static_cast<const uint8_t*>(p);
+        for (size_t k = 0; k < n; k++)
+            h = (h ^ b[k]) * 1099511628211ull;
+    };
+    for (short x = 0; x < MAPWIDTH; x++) {
+        for (short y = 0; y < MAPHEIGHT; y++) {
+            for (int l = 0; l < MAPLAYERS; l++) {
+                const TilesetTile& t = *g_map->tileAt(x, y, l);
+                mix(&t.iID, sizeof(t.iID));
+                mix(&t.iCol, sizeof(t.iCol));
+                mix(&t.iRow, sizeof(t.iRow));
+            }
+            const MapBlock& b = *g_map->blockat(x, y);
+            mix(&b.iType, sizeof(b.iType));
+            mix(&b.fHidden, sizeof(b.fHidden));
+            const Warp& w = *g_map->warp(x, y);
+            mix(&w.connection, sizeof(w.connection));
+            mix(&w.direction, sizeof(w.direction));
+            const TileType type = g_map->tileType(x, y);
+            mix(&type, sizeof(type));
+            for (short t = 0; t < NUMSPAWNAREATYPES; t++) {
+                const bool spawn = g_map->spawn(t, x, y);
+                mix(&spawn, sizeof(spawn));
+            }
+        }
+    }
+    mix(&m.itemCount, sizeof(m.itemCount));
+    for (int k = 0; k < m.itemCount; k++) {
+        mix(&m.items[k].itype, sizeof(m.items[k].itype));
+        mix(&m.items[k].ix, sizeof(m.items[k].ix));
+        mix(&m.items[k].iy, sizeof(m.items[k].iy));
+    }
+    mix(&m.hazardCount, sizeof(m.hazardCount));
+    mix(&m.platformCount, sizeof(m.platformCount));
+    for (int k = 0; k < m.platformCount; k++) {
+        mix(&m.platforms[k].x, sizeof(m.platforms[k].x));
+        mix(&m.platforms[k].y, sizeof(m.platforms[k].y));
+    }
+    mix(&m.background, sizeof(m.background));
+    mix(&m.music, sizeof(m.music));
+    mix(m.eyecandy, sizeof(m.eyecandy));
+    mix(m.switches, sizeof(m.switches));
+    mix(&m.goalCount, sizeof(m.goalCount));
+    mix(&m.baseCount, sizeof(m.baseCount));
+    return h;
+}
+
+// A new edit staged (the staged ones packed first when they're all used), zeroed: its padding too
 MapMakerEdit& pushEdit(CGM_MapMaker& m, int slot, short stroke)
 {
-    if (m.editCount == MAP_MAKER_UNDO) {
-        for (int k = 0; k + 1 < MAP_MAKER_UNDO; k++)
-            m.edits[k] = m.edits[k + 1];
-        m.editCount--;
-    }
+    if (m.editCount == MAP_MAKER_UNDO)
+        commitStaged(m);
     MapMakerEdit& edit = m.edits[m.editCount++];
     std::memset(static_cast<void*>(&edit), 0, sizeof(edit));
     edit.slot = static_cast<short>(slot);
@@ -1204,59 +1430,54 @@ void restoreBulk(CGM_MapMaker& m, const MapMakerBulk& bulk)
     m.edited = true;
 }
 
+// A builder's newest stroke taken back: all its records, the newest first (in the history, as far
+// back as it goes)
 void undo(CGM_MapMaker& m, int slot)
 {
-    int last = -1;
-    for (int k = m.editCount - 1; k >= 0 && last < 0; k--)
-        if (m.edits[k].slot == slot)
-            last = k;
-    //(a rectangle or fill, if it's the newer stroke)
-    int bulk = -1;
-    for (int k = m.bulkCount - 1; k >= 0 && bulk < 0; k--)
-        if (m.bulks[k].slot == slot)
-            bulk = k;
-    if (bulk >= 0 && (last < 0 || m.bulks[bulk].stroke > m.edits[last].stroke)) {
-        //(all of the stroke's: a paste has a bulk a layer)
-        const short stroke = m.bulks[bulk].stroke;
-        for (int k = bulk; k >= 0; k--) {
-            if (m.bulks[k].slot != slot || m.bulks[k].stroke != stroke)
-                continue;
-            restoreBulk(m, m.bulks[k]);
-            for (int i = k; i + 1 < m.bulkCount; i++)
-                m.bulks[i] = m.bulks[i + 1];
-            m.bulkCount--;
-            std::memset(static_cast<void*>(&m.bulks[m.bulkCount]), 0, sizeof(MapMakerBulk));
+    commitStaged(m);
+    sim::vector<uint8_t>& h = m.history;
+    //(the newest record of this builder's: its stroke)
+    bool found = false;
+    short stroke = 0;
+    for (size_t at = h.size(); at > 0 && !found;) {
+        const size_t start = at - history::sizeAt(h, at - history::TAIL);
+        if (h[start + 3] == static_cast<uint8_t>(slot)) {
+            found = true;
+            std::memcpy(&stroke, &h[start + 4], sizeof(stroke));
         }
-        return;
+        at = start;
     }
-    if (last < 0)
+    if (!found)
         return;
-    const short stroke = m.edits[last].stroke;
-    for (int k = last; k >= 0; k--) {
-        const MapMakerEdit edit = m.edits[k];
-        if (edit.slot != slot || edit.stroke != stroke)
-            continue;
-        if (edit.x < 0) {
-            restoreLevel(m, edit);
-        } else {
-            restoreCell(m, edit);
+    for (size_t at = h.size(); at > 0;) {
+        const size_t start = at - history::sizeAt(h, at - history::TAIL);
+        short recordStroke = 0;
+        std::memcpy(&recordStroke, &h[start + 4], sizeof(recordStroke));
+        if (h[start + 3] == static_cast<uint8_t>(slot) && recordStroke == stroke) {
+            if (h[start + 2] == 2) {
+                static MapMakerBulk bulk;    //(big: not on the stack)
+                history::unpackBulk(&h[start], bulk);
+                restoreBulk(m, bulk);
+            } else {
+                MapMakerEdit edit;
+                history::unpackEdit(&h[start], edit);
+                if (edit.x < 0)
+                    restoreLevel(m, edit);
+                else
+                    restoreCell(m, edit);
+            }
+            h.erase(h.begin() + static_cast<std::ptrdiff_t>(start), h.begin() + static_cast<std::ptrdiff_t>(at));
         }
-        for (int i = k; i + 1 < m.editCount; i++)
-            m.edits[i] = m.edits[i + 1];
-        m.editCount--;
-        std::memset(static_cast<void*>(&m.edits[m.editCount]), 0, sizeof(MapMakerEdit));
+        at = start;
     }
     m.edited = true;
 }
 
-// A new rectangle or fill to undo, zeroed (the oldest dropped when they're all used)
+// A new rectangle or fill staged (the staged ones packed first when they're all used), zeroed
 MapMakerBulk& pushBulk(CGM_MapMaker& m, int slot, short stroke, short layer, bool blocks)
 {
-    if (m.bulkCount == MAP_MAKER_BULK) {
-        for (int k = 0; k + 1 < MAP_MAKER_BULK; k++)
-            m.bulks[k] = m.bulks[k + 1];
-        m.bulkCount--;
-    }
+    if (m.bulkCount == MAP_MAKER_BULK)
+        commitStaged(m);
     MapMakerBulk& bulk = m.bulks[m.bulkCount++];
     std::memset(static_cast<void*>(&bulk), 0, sizeof(bulk));
     bulk.slot = static_cast<short>(slot);
@@ -2319,7 +2540,7 @@ void drawStrip(int slot, const MapMakerBuilder& b)
         ? std::vector<prompts::Prompt> {{{Pad::Left, Pad::Right}, s_mouse.active ? std::vector<std::string> {"Wheel"}
                   : std::vector<std::string> {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
               {{Pad::A}, {s_mouse.active ? "LMB" : menuKey(prompts::MENU_SELECT)}, "done"}}
-        : std::vector<prompts::Prompt> {{{Pad::X}, {menuKey(prompts::MENU_RANDOM)}, "tab"},
+        : std::vector<prompts::Prompt> {{{Pad::LT, Pad::RT}, {"PgUp", "PgDn"}, "tabs"},
               {{Pad::A}, {s_mouse.active ? "LMB" : menuKey(prompts::MENU_SELECT)}, settings ? "change" : onContentsPage(b) && b.py == 1 ? "add/remove" : "take"},
               {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::B}, {s_mouse.active ? "RMB" : "Esc"}, "back"}};
     //(Y: on the tiles, the next tileset; on the blocks, hidden or not)
@@ -2788,10 +3009,45 @@ void mouseEvent(const SDL_Event& event)
     }
 }
 
+// Per input device: `apply` to the devices whose players' controls are `from`
+template <typename Apply>
+void forDevice(SDL_JoystickID from, Apply apply)
+{
+    for (int device = 0; device < SLOTS; device++) {
+        const CInputPlayerControl* control = game_values.playerInput.inputControls[device];
+        if (control && control->iDevice == from)
+            apply(device);
+    }
+}
+
 void noteEvent(const SDL_Event& event)
 {
     s_menuKeys.Update(event, 1);
     mouseEvent(event);
+    //The triggers: the palette's tab before and after (pressed in past halfway; again once let go);
+    //the keyboard's Page Up and Page Down
+    if (event.type == SDL_EVENT_GAMEPAD_AXIS_MOTION &&
+        (event.gaxis.axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || event.gaxis.axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER)) {
+        const int side = event.gaxis.axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER ? 1 : 0;
+        forDevice(event.gaxis.which, [&](int device) {
+            if (event.gaxis.value > 16000 && !s_triggerHeld[device][side]) {
+                s_triggerHeld[device][side] = true;
+                s_tabStep[device] = side ? 1 : -1;
+            } else if (event.gaxis.value < 8000) {
+                s_triggerHeld[device][side] = false;
+            }
+        });
+    } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && (event.key.key == SDLK_PAGEUP || event.key.key == SDLK_PAGEDOWN)) {
+        forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_tabStep[device] = event.key.key == SDLK_PAGEDOWN ? 1 : -1; });
+    }
+    //The undo button held (RB, Backspace): it undoes again and again
+    if ((event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) &&
+        event.gbutton.button == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER) {
+        forDevice(event.gbutton.which, [&](int device) { s_undoHeld[device] = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN; });
+    } else if ((event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) && !event.key.repeat &&
+               event.key.key == SDLK_BACKSPACE) {
+        forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_undoHeld[device] = event.type == SDL_EVENT_KEY_DOWN; });
+    }
     if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
         const bool down = event.type == SDL_EVENT_KEY_DOWN;
         if (event.key.key == SDLK_ESCAPE)
@@ -2993,10 +3249,31 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
     s_switchPressed[device & 3] = false;
     const bool undo = s_undoPressed[device & 3];
     s_undoPressed[device & 3] = false;
-    if (undo && building(slot))
+    if (undo && building(slot)) {
+        s_undoHeldTicks[device & 3] = 0;
         return B_UNDO;
+    }
+    //(held: again after a moment, then about ten a second; a tick between, the undo's a press)
+    if (s_undoHeld[device & 3] && building(slot)) {
+        const int held = ++s_undoHeldTicks[device & 3];
+        if (held > 24 && (held - 24) % 6 == 0)
+            return B_UNDO;
+    } else {
+        s_undoHeldTicks[device & 3] = 0;
+    }
     if (flip && building(slot))
         return B_DONE;
+    //The triggers: the palette's tab before or after (the palette shut: it opens)
+    if (s_tabStep[device & 3] != 0 && building(slot)) {
+        const int step = s_tabStep[device & 3];
+        s_tabStep[device & 3] = 0;
+        s_mouse.predValid = false;
+        const MapMakerBuilder& b = m->builders[slot];
+        if (!b.palette)
+            return B_PALETTE;
+        if (!b.adjusting)
+            return mouseTabByte((tabOfPage(b.page) + step + PALETTE_TABS) % PALETTE_TABS);
+    }
     if (s_scriptByte[slot] >= 0) {
         const uint8_t byte = static_cast<uint8_t>(s_scriptByte[slot]);
         s_scriptByte[slot] = -1;
@@ -3078,6 +3355,7 @@ void simulate(const InputFrame& input)
             setBuilding(*m, slot, true);
         }
     }
+    commitStaged(*m);    //(the tick's edits into the history)
 }
 
 void afterLoadState()
@@ -3702,6 +3980,7 @@ void pressTab()
 
 bool GameplayState::autoTestEditScript(int f)
 {
+    static uint64_t s_startHash = 0;    // the map as the building begins (the undo test's)
     auto shot = [](const char* name) {
         if (!cmd::g_autotest.norender)
             gfx_save_screenshot(cmd::g_autotest.shotsDir + "/" + name + ".png");
@@ -3722,6 +4001,7 @@ bool GameplayState::autoTestEditScript(int f)
         hold = 0;
         held = 0;
         doneAt = -1;
+        s_startHash = builtMapHash(*m);
         if (!building(0))
             pressTab();    //(the rules: building from the start; else the switch)
         steps.clear();
@@ -3901,6 +4181,10 @@ bool GameplayState::autoTestEditScript(int f)
         add({600 + 12 + 9 * MAPWIDTH});
         add({906}, 12);
         add({900, 906, 906, 901, 906, 906, 906, 256 + 30});
+        //(undo, again and again, past everything built: the map as it began, 518 checks)
+        add({0, 0});
+        add({B_UNDO, 0}, 250);
+        add({518, 256 + 31});
     }
     if (f > 70 && (step < steps.size() || hold > 0)) {
         if (hold > 0) {
@@ -3962,6 +4246,10 @@ bool GameplayState::autoTestEditScript(int f)
                 clickHit(true, byte - 920);
             }
             byte = -1;
+        } else if (byte == 518) {
+            printf("undotest: undone all the way, the map %s as it began (history %zu bytes)\n",
+                builtMapHash(*m) == s_startHash ? "is" : "is NOT", m->history.size());
+            byte = 0;
         } else if (byte == 517) {
             printf("keytest: paused %d, quitting %d, building %d\n", game_values.flags.pausegame ? 1 : 0, game_values.flags.exitinggame ? 1 : 0, building(0) ? 1 : 0);
             byte = 0;
@@ -3985,7 +4273,7 @@ bool GameplayState::autoTestEditScript(int f)
             SDL_PushEvent(&key);
             byte = 0;
         } else if (byte >= 256) {
-            shot(("e" + std::to_string(byte - 256) + (byte == 257 ? "_building" : byte == 258 ? "_painted" : byte == 259 ? "_palette" : byte == 264 ? "_music_page" : byte == 265 ? "_contents_page" : byte == 266 ? "_warps" : byte == 267 ? "_warps_page" : byte == 268 ? "_hazards_page" : byte == 269 ? "_platforms_page" : byte == 270 ? "_hazards_platforms" : byte == 271 ? "_undo_once" : byte == 272 ? "_undone" : byte == 273 ? "_rect" : byte == 274 ? "_fill_erased" : byte == 275 ? "_rect_undone" : byte == 276 ? "_types" : byte == 277 ? "_spawns" : byte == 278 ? "_animated" : byte == 279 ? "_weather_page" : byte == 280 ? "_blocks_hidden_off" : byte == 281 ? "_paste" : byte == 282 ? "_paste_undone" : byte == 283 ? "_tools_page" : byte == 284 ? "_mouse_drawn" : byte == 285 ? "_mouse_palette" : byte == 286 ? "_mouse_item" : "_blocks")).c_str());
+            shot(("e" + std::to_string(byte - 256) + (byte == 257 ? "_building" : byte == 258 ? "_painted" : byte == 259 ? "_palette" : byte == 264 ? "_music_page" : byte == 265 ? "_contents_page" : byte == 266 ? "_warps" : byte == 267 ? "_warps_page" : byte == 268 ? "_hazards_page" : byte == 269 ? "_platforms_page" : byte == 270 ? "_hazards_platforms" : byte == 271 ? "_undo_once" : byte == 272 ? "_undone" : byte == 273 ? "_rect" : byte == 274 ? "_fill_erased" : byte == 275 ? "_rect_undone" : byte == 276 ? "_types" : byte == 277 ? "_spawns" : byte == 278 ? "_animated" : byte == 279 ? "_weather_page" : byte == 280 ? "_blocks_hidden_off" : byte == 281 ? "_paste" : byte == 282 ? "_paste_undone" : byte == 283 ? "_tools_page" : byte == 284 ? "_mouse_drawn" : byte == 285 ? "_mouse_palette" : byte == 286 ? "_mouse_item" : byte == 287 ? "_all_undone" : "_blocks")).c_str());
             byte = 0;
         }
         if (building(0) && byte >= 0)
@@ -4042,6 +4330,7 @@ bool GameplayState::autoTestEditScript(int f)
         }
     }
     if (f == end + 50 * slow)
-        printf("mousetest: paused %d after Resume clicked\n", game_values.flags.pausegame ? 1 : 0);
+        printf("mousetest: %s\n", s_pauseRowRect[matchedit::RowResume].w == 0 ? "skipped (the pause menu wasn't drawn: --at-norender)"
+            : game_values.flags.pausegame ? "paused 1 after Resume clicked (FAILED)" : "paused 0 after Resume clicked");
     return false;    //(the match goes on: the others play while it builds)
 }

@@ -252,8 +252,8 @@ void gfx_show_catched_error(const std::string& error)
     gfx.showErrorBox(message.c_str());
 }
 
-void gfx_take_screenshot() {
-    gfx.takeScreenshot();
+std::string gfx_take_screenshot() {
+    return gfx.takeScreenshot();
 }
 
 bool gfx_save_screenshot(const std::string& path) {

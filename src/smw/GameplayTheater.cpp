@@ -16,8 +16,9 @@
 //     (paused: 1 frame)  (d-pad < >)
 //   rewind / fast fwd   LT / RT (hold)    Shift+Left / Shift+Right (hold)
 //   speed               d-pad up / down   Up / Down     the clock button (right click: slower)
-//   follow a player     X                 F             the camera button
+//   follow a player     X                 F             the camera button  (the view zooms in on them)
 //   hide the bar        Y                 H             the eye button
+//   screenshot          R3 (right stick)  F12, Insert   (the picture without the bar: in "screenshots")
 //   the controls        Back              F1            the ? block
 //   leave               B                 Escape        the pipe
 //   jump                                  Home / End    click / drag on the timeline
@@ -106,6 +107,15 @@ struct Theater {
     bool hidden = false;
     bool help = false;
     int follow = -1;           // the followed slot, -1: nobody
+    //The view zoomed in on the followed player: how far (1 none, eased toward 2 while following), its
+    //middle (eased after the player), and the picture of the match it's made from
+    float zoom = 1.0f;
+    float viewX = App::screenWidth / 2.0f;
+    float viewY = App::screenHeight / 2.0f;
+    SDL_Rect viewArea {0, 0, App::screenWidth, App::screenHeight};    // the part of the match shown (this frame)
+    SdlSurfacePtr zoomCopy;
+    bool scoresAfterZoom = false;    // the scoreboard left out of the match's picture, drawn over the zoom (not zoomed)
+    bool shot = false;               // a screenshot asked for: taken this frame, before the bar's drawn
     int holdBack = 0;
     int holdForward = 0;
     bool dragging = false;
@@ -512,6 +522,7 @@ void drawHelp()
         {SPEED, "Slower / faster", {Pad::Down, Pad::Up}, {"Down", "Up"}},
         {FOLLOW, "Follow a player", {Pad::X}, {"F"}},
         {HIDE, "Hide the bar", {Pad::Y}, {"H"}},
+        {CONTROL_COUNT, "Screenshot (no bar)", {Pad::RStick}, {"F12"}},
         {HELP, "These controls", {Pad::Back}, {"F1"}},
         {LEAVE, "Leave", {Pad::B}, {"Esc"}},
         {CONTROL_COUNT, "Jump in the replay", {Pad::LStick}, {}},
@@ -570,6 +581,15 @@ bool padPressed(prompts::Button b)
 
 } // namespace
 
+// Whether the theater zooms this frame: then the match's scoreboard is drawn after the zoom (not
+// zoomed with the match), not with the match
+bool GameplayState::theaterDrawsScores()
+{
+    Theater& th = g_theater;
+    th.scoresAfterZoom = replay::playing() && (th.follow >= 0 || th.zoom > 1.0f);
+    return th.scoresAfterZoom;
+}
+
 void GameplayState::resetTheater()
 {
     g_theater = Theater();
@@ -600,6 +620,8 @@ void GameplayState::theaterEvent(const SDL_Event& event)
                 th.followNext = true;
             else if (key == SDLK_H)
                 th.toggleHide = true;
+            else if (key == SDLK_F12 || key == SDLK_INSERT)
+                th.shot = true;
             else if (key == SDLK_F1 || key == SDLK_SLASH)
                 th.toggleHelp = true;
             else if (key == SDLK_ESCAPE || key == SDLK_BACKSPACE)
@@ -719,6 +741,8 @@ void GameplayState::updateReplay()
         }
         if (padPressed(prompts::X))
             th.followNext = true;
+        if (padPressed(prompts::RSTICK))
+            th.shot = true;
         if (padPressed(prompts::Y))
             th.toggleHide = true;
         if (padPressed(prompts::BACK))
@@ -845,6 +869,8 @@ void GameplayState::updateReplay()
         static int demo = 0;
         ++demo;
         if (demo == 30) { th.follow = nextFollow(-1); showUi(); }
+        if (demo == 96)
+            th.shot = true;    //(the screenshot button: the picture saved without the bar)
         if (demo == 108) { prompts::setLastDevice(prompts::Device::Controller); jumpToMoment(1); showUi(); }
         if (demo == 172) { th.confirmLeave = true; prompts::setLastDevice(prompts::Device::Controller); }
         if (demo == 177) { th.confirmLeave = false; prompts::setLastDevice(prompts::Device::Keyboard); }
@@ -940,6 +966,52 @@ void GameplayState::leaveReplay()
     GameStateManager::instance().changeStateTo(&MenuState::instance());
 }
 
+namespace {
+constexpr float FOLLOW_ZOOM = 2.0f;    // how close the view comes to a followed player
+constexpr float ZOOM_EASE = 0.12f;     // (a frame's part of the way: the zoom and the view's middle)
+
+// The match's picture zoomed in on the followed player (the theater's own drawing comes after, on top,
+// not zoomed): the part around them stretched over the screen
+void zoomOnFollowed(Theater& th)
+{
+    const CPlayer* followed = nullptr;
+    for (const CPlayer* player : g_sim.players)
+        if (player->getGlobalID() == th.follow)
+            followed = player;
+    const float wanted = th.follow >= 0 && followed ? FOLLOW_ZOOM : 1.0f;
+    th.zoom += (wanted - th.zoom) * ZOOM_EASE;
+    if (std::fabs(th.zoom - wanted) < 0.01f)
+        th.zoom = wanted;
+    if (followed) {
+        th.viewX += (followed->leftX() + 16 - th.viewX) * ZOOM_EASE * 2;
+        th.viewY += (followed->topY() + 16 - th.viewY) * ZOOM_EASE * 2;
+    }
+    const int w = static_cast<int>(App::screenWidth / th.zoom + 0.5f), h = static_cast<int>(App::screenHeight / th.zoom + 0.5f);
+    th.viewArea = {std::clamp(static_cast<int>(th.viewX) - w / 2, 0, App::screenWidth - w),
+        std::clamp(static_cast<int>(th.viewY) - h / 2, 0, App::screenHeight - h), w, h};
+    if (th.zoom <= 1.0f) {
+        th.viewArea = {0, 0, App::screenWidth, App::screenHeight};
+        th.zoomCopy.reset();    //(not zoomed: its memory back)
+        return;
+    }
+    //(the part copied first: stretching it in place would draw over what's still to be read)
+    SDL_Surface* screenNow = blitdest;
+    if (!th.zoomCopy || th.zoomCopy->format != screenNow->format)
+        th.zoomCopy = SdlSurfacePtr(SDL_CreateSurface(App::screenWidth, App::screenHeight, screenNow->format));
+    if (!th.zoomCopy)
+        return;
+    SDL_Rect at {0, 0, w, h};
+    SDL_BlitSurface(screenNow, &th.viewArea, th.zoomCopy.get(), &at);
+    SDL_BlitSurfaceScaled(th.zoomCopy.get(), &at, screenNow, nullptr, SDL_SCALEMODE_NEAREST);
+}
+
+// A point of the match where the zoomed view shows it
+SDL_Point inView(const Theater& th, int x, int y)
+{
+    return {(x - th.viewArea.x) * App::screenWidth / th.viewArea.w, (y - th.viewArea.y) * App::screenHeight / th.viewArea.h};
+}
+} // namespace
+
 void GameplayState::drawReplayOverlay()
 {
     if (!replay::playing())
@@ -948,16 +1020,29 @@ void GameplayState::drawReplayOverlay()
     const replay::PlaybackStatus& status = replay::playbackStatus();
     const bool finished = status.finished;
     layout();
+    zoomOnFollowed(th);
+    //(the scores as they are, over the zoomed picture: not zoomed with it)
+    if (th.scoresAfterZoom)
+        drawScoreboard(iScoreTextOffset);
+    //A screenshot: the match as shown (zoomed, its scores), not the theater's bar and buttons
+    if (th.shot) {
+        th.shot = false;
+        const std::string path = gfx_take_screenshot();
+        th.toast = path.empty() ? "The screenshot couldn't be saved" : "Screenshot saved";
+        th.toastFrames = 90;
+        showUi();
+    }
 
-    //The followed player: their name over them, an arrow in their color
+    //The followed player: their name over them, an arrow in their color (where the zoomed view has them)
     if (th.follow >= 0) {
         for (const CPlayer* player : g_sim.players) {
             if (player->getGlobalID() != th.follow)
                 continue;
             //(with the screen's shake, like the player under it)
-            const int cx = player->leftX() + 16 + x_shake;
+            const SDL_Point head = inView(th, player->leftX() + 16 + x_shake, player->topY() + y_shake);
+            const int cx = head.x;
             const SDL_Color c = slotColor(th.follow);
-            const int ay = std::max(22, player->topY() - 14) + y_shake;
+            const int ay = std::max(22, head.y - 14);
             prompts::art(cx - 8, ay, {
                 "########",
                 "#cccccc#",

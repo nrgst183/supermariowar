@@ -179,7 +179,9 @@ void GameplayState::drawEverything(short iCountDownState, short iScoreTextOffset
     drawFrontLayer();
 
     drawSpotlights();
-    drawScoreboard(iScoreTextOffset);
+    //(the theater zoomed in on a player: it draws the scores over the zoomed picture, not zoomed)
+    if (!theaterDrawsScores())
+        drawScoreboard(iScoreTextOffset);
     drawWindMeter();
     drawOutOfScreenIndicators();
     drawCountdown();

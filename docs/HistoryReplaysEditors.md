@@ -57,7 +57,8 @@ works.
 | scrub (the playhead follows, faster the further it's pushed) | left stick | | click or drag on the meter |
 | rewind / fast forward (held) | LT / RT | Shift+Left / Shift+Right | |
 | slower / faster (1/4x to 8x) | d-pad down / up | Down / Up | the clock button (right click: slower) |
-| follow a player (their name, the buttons they hold) | X | F | the camera button |
+| follow a player (their name, the buttons they hold; the view zooms in on them, the scores stay as they are) | X | F | the camera button |
+| screenshot (the match as shown, without the theater's bar), saved in `screenshots` in the settings folder (on the Xbox, `T:\screenshots`) | right stick click | F12, Insert | |
 | hide the bar | Y | H | the eye button |
 | the controls | Back | F1 | the ? block |
 | leave | B (asks first: A leaves, B stays) | Escape | the warp pipe |
@@ -103,7 +104,8 @@ it changes; so do the players who aren't building.
 | B | Delete | right button | erase, the same way |
 | X | Space | middle button | the palette |
 | Y | Shift | | the layer (1, 2 behind the players; 3, 4 in front) |
-| RB | Backspace, Ctrl+Z | | undo your last stroke (a rectangle, fill or paste: all of it) |
+| RB | Backspace, Ctrl+Z | | undo your last stroke (a rectangle, fill or paste: all of it); hold it to keep undoing. It goes back as far as you like, to how the map started |
+| LT / RT | Page Up / Page Down | | the palette's tab before / after (with the palette shut: it opens) |
 | LB + Up | Tab | | building to playing (you spawn where your hand is), and back (the cursor where your character is) |
 | Start | Escape | | the pause menu (click a row, or right-click to resume) |
 

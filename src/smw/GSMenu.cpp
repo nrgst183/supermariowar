@@ -1195,7 +1195,7 @@ bool MenuState::PollMenuEvents()
                 }
             }
 
-            if (event.key.key == SDLK_INSERT) {
+            if (event.key.key == SDLK_INSERT || event.key.key == SDLK_F12) {
                 gfx_take_screenshot();
             }
 #ifdef _DEBUG

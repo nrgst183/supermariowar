@@ -91,7 +91,7 @@ int tinyWidth(const std::string& s, int scale = 2);
 
 // ---- the controllers
 
-enum Button { A, B, X, Y, LB, RB, BACK, START, UP, DOWN, LEFT, RIGHT, BUTTON_COUNT };
+enum Button { A, B, X, Y, LB, RB, BACK, START, UP, DOWN, LEFT, RIGHT, RSTICK, BUTTON_COUNT };
 
 struct PadState {
     SDL_JoystickID id = 0;    // the controller's (its joystick instance ID)

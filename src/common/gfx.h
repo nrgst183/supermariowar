@@ -57,7 +57,7 @@ bool gfx_setvsync(bool enabled);
 float gfx_refreshrate();
 void gfx_settitle(const char*);
 void gfx_show_catched_error(const std::string&);
-void gfx_take_screenshot();
+std::string gfx_take_screenshot();    // the screen to a PNG in the settings folder's "screenshots": its path ("": failed)
 bool gfx_save_screenshot(const std::string& path);
 
 void gfx_close();

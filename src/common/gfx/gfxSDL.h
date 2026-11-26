@@ -18,7 +18,7 @@ public:
     bool isFullScreen() const;
     void setTitle(const char*) const;
     void showErrorBox(const char*) const;
-    void takeScreenshot() const;
+    std::string takeScreenshot() const;
     bool saveScreenshot(const std::string& path) const;
     bool setVSync(bool enabled) const;
     float refreshRate() const;

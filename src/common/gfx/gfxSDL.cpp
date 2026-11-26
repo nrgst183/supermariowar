@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <filesystem>
 #include <iomanip>
 #include <sstream>
 #include <cstdio>
@@ -239,24 +240,31 @@ bool GraphicsSDL::saveScreenshot(const std::string& path) const
     return true;
 }
 
-void GraphicsSDL::takeScreenshot() const
+// The screen as it is now, a PNG in the settings folder's "screenshots" (written there on any
+// machine: the data folder can be read-only, the Xbox's is the disc); its path, "" if it failed
+std::string GraphicsSDL::takeScreenshot() const
 {
     using std::chrono::system_clock;
 
     // NOTE: %F and %T don't work on Windows
-    constexpr const char* path_format = "screenshots/%Y-%m-%d_%H%M%S.png";
-
     const std::time_t now = system_clock::to_time_t(system_clock::now());
-    std::ostringstream path_ss;
-    path_ss << std::put_time(std::localtime(&now), path_format);
-    const std::string path = convertPath(path_ss.str());
+    std::ostringstream name;
+    name << std::put_time(std::localtime(&now), "%Y-%m-%d_%H%M%S");
+    const std::string dir = GetHomeDirectory() + "screenshots/";
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    //(two in the same second: _2, _3...)
+    std::string path = dir + name.str() + ".png";
+    for (int k = 2; std::filesystem::exists(path, ec) && k < 100; k++)
+        path = dir + name.str() + "_" + std::to_string(k) + ".png";
 
     if (!IMG_SavePNG(sdl_screen_surface, path.c_str())) {  // SDL3: true on success
         fprintf(stderr, "[gfx] Couldn't write the screenshot to file: %s\n", SDL_GetError());
-        return;
+        return {};
     }
 
     printf("[gfx] Screenshot saved to file: %s\n", path.c_str());
+    return path;
 }
 
 void GraphicsSDL::eventToScreen(SDL_Event& event) const

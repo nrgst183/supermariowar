@@ -2,6 +2,7 @@
 
 #include "GameMode.h"
 #include "map.h"
+#include "SimArena.h"
 
 #include <cstdint>
 
@@ -13,8 +14,9 @@ constexpr int PLATFORM_SETTINGS = 7;        // a kind's settings at most (width,
 constexpr int PLATFORM_MAX_W = 8, PLATFORM_MAX_H = 4;    // a platform's size, at most
 constexpr int HAZARD_TYPES = 8;             // MapHazardType
 constexpr int HAZARD_SETTINGS = 4;          // a hazard type's settings at most (length, speed, way...)
-constexpr int MAP_MAKER_UNDO = 48;          // the edits kept to undo (all the builders', the oldest go)
-constexpr int MAP_MAKER_BULK = 8;           // the rectangles, fills and pastes kept to undo (a layer each)
+constexpr int MAP_MAKER_UNDO = 8;           // a tick's edits, staged (then packed into the history: GameplayEdit.cpp)
+constexpr int MAP_MAKER_BULK = 6;           // a tick's rectangles, fills and pastes (a paste: a layer each, the blocks)
+constexpr size_t MAP_MAKER_HISTORY_BYTES = 256u << 10;    // the history to undo: all of it, unless it gets this big
 constexpr int CLIP_W = 10, CLIP_H = 8;      // the copy tool's: as much as it copies
 constexpr int MAP_CELLS = MAPWIDTH * MAPHEIGHT;
 
@@ -125,10 +127,12 @@ public:
     short hazardCount = 0;
     MapMakerPlatform platforms[MADE_PLATFORMS] {};    // the platforms made (the map's own stay as they are)
     short platformCount = 0;
-    MapMakerEdit edits[MAP_MAKER_UNDO] {};    // the edits to undo, the oldest first
+    MapMakerEdit edits[MAP_MAKER_UNDO] {};    // this tick's edits, staged (the history has the ones before)
     short editCount = 0;
-    MapMakerBulk bulks[MAP_MAKER_BULK] {};    // the rectangles and fills to undo, the oldest first
+    MapMakerBulk bulks[MAP_MAKER_BULK] {};    // this tick's rectangles and fills, staged
     short bulkCount = 0;
+    sim::vector<uint8_t> history;             // every edit since the match started, packed (only what it changed),
+                                              // the oldest first: undone as far back as it goes
     bool edited = false;                      // the map differs from its file
     bool started = false;                     // the first tick's done (the builders started building)
     short background = -1;                    // the background chosen (its place in the backgrounds' list; -1: the map's)

@@ -579,8 +579,10 @@ void GameplayState::handleInput()
             } else if (event.key.key == SDLK_TAB) {
                 if (!matchedit::allowed())    //(the Map Maker: Tab switches building and playing)
                     PlayNextMusicTrack();
-            } else if (event.key.key == SDLK_INSERT) {
-                gfx_take_screenshot();
+            } else if (event.key.key == SDLK_INSERT || event.key.key == SDLK_F12) {
+                //(a replay's: the theater's, the match's picture without its bar: theaterEvent)
+                if (!replay::playing())
+                    gfx_take_screenshot();
             }
 #ifdef _DEBUG
             else if (rollback::NetGame::instance().inMatch() || replay::playing()) {
