@@ -1155,7 +1155,9 @@ void GameplayState::render(float alpha)
     const bool debugOverlayOn = prof::on();
     const SDL_Rect dialogs {124, 166, 392, 208};
     const SDL_Rect debugOverlay {0, 0, 360, App::screenHeight};
-    const bool restored = frozen && s_pausedPictureValid && (s_pausedPictureShown
+    //(the Map Maker's controls sheet, up or just shut: bigger than the dialogs' place, all of it put back)
+    const bool wholeScreen = matchedit::sheetCoversScreen();
+    const bool restored = frozen && s_pausedPictureValid && (s_pausedPictureShown && !wholeScreen
         ? gfx_copyrect(s_pausedPicture.getSurface(), blitdest, dialogs)
             && (!(debugOverlayOn || s_debugOverlayWasOn) || gfx_copyrect(s_pausedPicture.getSurface(), blitdest, debugOverlay))
         : gfx_copypixels(s_pausedPicture.getSurface(), blitdest));

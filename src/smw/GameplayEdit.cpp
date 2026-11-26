@@ -159,7 +159,7 @@ int s_tabStep[SLOTS] {};           // the triggers (Page Up/Down): the palette's
 int s_recentStep[SLOTS] {};        // LB+Left/Right, Q/E, the mouse's wheel: the recent brush before (-1) or after (1)
 bool s_pickPressed[SLOTS] {};      // LB+Down, R, Ctrl+click: the brush of what's under the cursor
 bool s_grabPressed[SLOTS] {};      // LB+B, G, Ctrl+right click: what's under the cursor picked up (to move it)
-bool s_lbChord[SLOTS][4] {};       // (LB with Left, Right, Down, B held last tick: each a press once)
+bool s_lbChord[SLOTS][5] {};       // (LB with Left, Right, Down, B held last tick: each a press once)
 bool s_clearPending = false;       // the pause menu's Clear map: the host's command, sent next tick
 bool s_triggerHeld[SLOTS][2] {};   // (a trigger pressed in: one step until it's let go)
 bool s_pausePressed[SLOTS] {};     // building: the pause (a pad's Start), by input device
@@ -176,6 +176,12 @@ std::string s_savedNote;           // "Saved as ...", shown on the pause screen 
 Uint64 s_savedAt = 0;
 bool s_savedThisPause = false;     // saved since the pause screen opened (nothing's changed since)
 bool s_clearArmed = false;         // Clear map pressed once: pressed again, it clears
+bool s_helpOpen = false;           // the controls sheet (F1, the pause menu's Controls): every control on a page
+bool s_helpToggle = false;         // F1 pressed
+std::string s_toast;               // a short message over the toolbar ("Undo", "Copied Brick"...), a moment
+Uint64 s_toastAt = 0;
+bool s_carrying[SLOTS] {};         // a builder's picked-up part, not put down yet (its cursor: a dashed frame)
+constexpr int TOOLBAR_H = 42;      // the toolbar: the part in hand, the recent ones, the tools, the layers
 int s_scriptByte[SLOTS] {-1, -1, -1, -1};    // --at-role matchedit: the bytes it plays
 TilesetTile s_shown[MAPWIDTH][MAPHEIGHT][MAPLAYERS];    // the map the layer pictures show
 bool s_shownValid = false;
@@ -321,8 +327,17 @@ int pageCount()
 // The palette's tabs (X goes through them): the tiles (every tileset: Y goes through them), then the
 // other pages, a tab each
 constexpr int PALETTE_TABS = 1 + EXTRA_PAGES;
+constexpr int CYCLE_TABS = PALETTE_TABS - 1;    // X goes round these: the tools, the last, are on the toolbar instead
 const char* const TAB_NAMES[PALETTE_TABS] = {"Tiles", "Blocks", "?", "Items", "Warps", "Hazards", "Moving", "Backdrop", "Music",
     "Types", "Spawns", "Animated", "Weather", "Goals", "Tools"};
+// The tabs in groups (next to each other, as X goes): a group's name along the top, its pages beside it
+// when it's open
+struct TabGroup {
+    const char* name;
+    int first, count;
+};
+const TabGroup TAB_GROUPS[] = {{"Tiles", 0, 1}, {"Blocks", 1, 2}, {"Items", 3, 1}, {"Warps", 4, 1}, {"Hazards", 5, 2},
+    {"Scene", 7, 2}, {"Rules", 9, 2}, {"More", 11, 3}};
 
 // The mouse's commands, in its builder's byte: left and right at once (not a d-pad's, and the keys'
 // are let go of one of them), and a number in the rest: MOUSE_STEP.. a step of the cursor (a cell any
@@ -356,12 +371,14 @@ uint8_t mouseStepByte(int dx, int dy, bool paint, bool erase)
 // The mouse's jumps: up and down at once (the keys' are let go of both, as left and right), the rest a
 // number: 0..19 the cursor to that column, 20..34 to that row (the mouse's cell at once, a tick an
 // axis, not a cell a tick). Not 0xFC and up: the host's rights commands
+// After them, 35..39 a tool, 40..43 a layer (the toolbar's, clicked)
 constexpr int JUMP_ROWS_AT = MAPWIDTH, JUMPS = MAPWIDTH + MAPHEIGHT;
-static_assert(JUMPS <= 45, "the jumps fit the bytes with up and down");
+constexpr int JUMP_TOOL_AT = JUMPS, JUMP_LAYER_AT = JUMP_TOOL_AT + TOOLS, JUMP_COUNT = JUMP_LAYER_AT + MAPLAYERS;
+static_assert(JUMP_COUNT <= 45, "the jumps fit the bytes with up and down");
 
 bool jumpByte(uint8_t byte)
 {
-    return (byte & 0x0C) == 0x0C && (byte & 3) != 3 && byte < 0xF0 && (byte & 3) + 3 * (byte >> 4) < JUMPS;
+    return (byte & 0x0C) == 0x0C && (byte & 3) != 3 && byte < 0xF0 && (byte & 3) + 3 * (byte >> 4) < JUMP_COUNT;
 }
 
 int jumpOf(uint8_t byte)
@@ -1078,6 +1095,52 @@ void flashCell(int x, int y, int kind)
     if (sim::isResimulating() || x < 0 || y < 0 || s_flashes.size() >= 600)
         return;
     s_flashes.push_back({static_cast<short>(x), static_cast<short>(y), static_cast<uint8_t>(kind), SDL_GetTicks()});
+}
+
+const char* const TOOL_SHORT[TOOLS] = {"Pencil", "Rectangle", "Fill", "Copy", "Paste"};
+
+// ---- The first-time hints: three, one after another, the first time anyone on this computer builds
+// (painting, the parts palette, undo), each gone once it's been done; kept done in the settings folder
+// ("mapmaker_tips.txt": a bit each)
+constexpr int TIPS = 3;
+int s_tipsDone = -1;    // (-1: not read yet)
+
+std::string tipsPath()
+{
+    return GetHomeDirectory() + "mapmaker_tips.txt";
+}
+
+int tipsDone()
+{
+    if (s_tipsDone < 0) {
+        s_tipsDone = 0;
+        if (FILE* f = fopen(tipsPath().c_str(), "r")) {
+            if (fscanf(f, "%d", &s_tipsDone) != 1)
+                s_tipsDone = 0;
+            fclose(f);
+        }
+    }
+    return s_tipsDone;
+}
+
+void tipDone(int tip)
+{
+    if (sim::isResimulating() || (tipsDone() >> tip) & 1)
+        return;
+    s_tipsDone |= 1 << tip;
+    if (FILE* f = fopen(tipsPath().c_str(), "w")) {
+        fprintf(f, "%d\n", s_tipsDone);
+        fclose(f);
+    }
+}
+
+// A short message for this machine's builder, over its toolbar a moment (not while played again)
+void toast(int slot, const std::string& text)
+{
+    if (sim::isResimulating() || !localHuman(slot))
+        return;
+    s_toast = text;
+    s_toastAt = SDL_GetTicks();
 }
 
 // A sound for what a builder did this tick (Mario Maker's: every piece put down makes one): a piece
@@ -2260,7 +2323,15 @@ void builderTick(CGM_MapMaker& m, MapMakerBuilder& b, uint8_t byte, uint8_t prev
     //The mouse's jump: the cursor to the mouse's column or row, at once (on the map)
     if (jumpByte(byte)) {
         const int jump = jumpOf(byte);
-        if (!b.palette) {
+        if (!b.palette && byte != prev) {
+            if (jump >= JUMP_LAYER_AT) {
+                b.layer = static_cast<short>(jump - JUMP_LAYER_AT);
+            } else if (jump >= JUMP_TOOL_AT) {
+                b.tool = static_cast<short>(jump - JUMP_TOOL_AT);
+                b.anchoring = false;
+            }
+        }
+        if (!b.palette && jump < JUMP_TOOL_AT) {
             if (jump < JUMP_ROWS_AT)
                 b.cx = static_cast<short>(jump);
             else
@@ -2356,7 +2427,7 @@ void builderTick(CGM_MapMaker& m, MapMakerBuilder& b, uint8_t byte, uint8_t prev
         //X: the next tab (into the tiles: the brush's tileset); Y on the tiles: the next tileset
         const int tilesets = static_cast<int>(tilesetCount());
         if (pressed(B_PALETTE)) {
-            openTab(b, (tabOfPage(b.page) + 1) % PALETTE_TABS);
+            openTab(b, (tabOfPage(b.page) + 1) % CYCLE_TABS);
         } else if (pressed(B_LAYER) && b.page < tilesets && tilesets > 0) {
             b.page = static_cast<short>((b.page + 1) % tilesets);
             b.px = b.py = b.scrollX = b.scrollY = 0;
@@ -2562,7 +2633,7 @@ const gfxSprite& editorPicture(const char* file)
 
 // The tools' pictures (pixel art, 16 by 16 at twice the size): a pencil, a rectangle, a paint bucket,
 // copy (two pages), paste (a clipboard)
-void drawToolIcon(int tool, int x, int y)
+void drawToolIcon(int tool, int x, int y, int scale = 2)
 {
     static const std::vector<const char*> ART[TOOLS] = {
         {"...........##...", "..........#yy#..", ".........#yyy#..", "........#yyy#...", ".......#yyy#....", "......#yyy#.....",
@@ -2583,7 +2654,7 @@ void drawToolIcon(int tool, int x, int y)
     };
     static const std::vector<prompts::Ink> INKS = {{'#', {0, 0, 0, 255}}, {'w', {248, 248, 248, 255}}, {'y', {248, 200, 40, 255}},
         {'p', {232, 120, 152, 255}}, {'k', {120, 120, 136, 255}}, {'b', {72, 152, 208, 255}}};
-    prompts::art(x, y, ART[tool % TOOLS], INKS, 2);
+    prompts::art(x, y, ART[tool % TOOLS], INKS, scale);
 }
 
 const gfxSprite& hazardsPicture()
@@ -2702,7 +2773,7 @@ Uint64 animClock()
 //  - a press: sparks out from the fingertip, white and the color, shrinking as they go
 //  - still a while: a slow bob, a tap of the finger now and then
 //  - the tag follows the hand a little behind; the hand pops in, a sparkle round it, as building starts
-void drawGlove(int slot, SDL_Rect cell, SDL_Point tip, SDL_Color color, const std::string& label, bool down)
+void drawGlove(int slot, SDL_Rect cell, SDL_Point tip, SDL_Color color, const std::string& label, bool down, bool snap = false)
 {
     const int cx = cell.x, cy = cell.y;
     struct Glove {
@@ -2751,6 +2822,10 @@ void drawGlove(int slot, SDL_Rect cell, SDL_Point tip, SDL_Color color, const st
     const float tagFollow = 1.0f - std::exp(-dt / 0.09f);
     g.x += (tx - g.x) * follow;
     g.y += (ty - g.y) * follow;
+    if (snap) {
+        g.x = tx;    //(the mouse's: on the pointer, exactly)
+        g.y = ty;
+    }
     g.tagX += (g.x - g.tagX) * tagFollow;
     g.tagY += (g.y - g.tagY) * tagFollow;
     g.trail[g.trailAt][0] = g.x;
@@ -2761,7 +2836,7 @@ void drawGlove(int slot, SDL_Rect cell, SDL_Point tip, SDL_Color color, const st
     if (down && !g.down)
         g.pressMs = now;
     g.down = down;
-    const bool idle = !down && now - g.movedMs > 900 && now - g.pressMs > 900;
+    const bool idle = !snap && !down && now - g.movedMs > 900 && now - g.pressMs > 900;
     if (idle && now - g.tapMs > 2600) {
         g.tapMs = now;
         g.dipVel += 9.0f;    //(a tap of the finger, now and then)
@@ -2897,8 +2972,11 @@ struct MouseState {
     std::vector<uint8_t> queue;   // bytes to send first (presses, and let go)
 };
 MouseState s_mouse;
-SDL_Rect s_pauseRowRect[5] {};    // the pause menu's rows and players (the mouse's)
+SDL_Rect s_pauseRowRect[6] {};    // the pause menu's rows and players (the mouse's)
 SDL_Rect s_recentRect[MAP_MAKER_RECENT] {};    // the mouse's builder's recent brushes, drawn by its card (k: k nexts on)
+SDL_Rect s_toolRect[5] {};                     // ... its toolbar's tools, layers, and the whole bar (a click there
+SDL_Rect s_layerRect[4] {};                    // doesn't paint the map under it)
+SDL_Rect s_toolbarRect {};
 int s_recentShown = 0;
 SDL_Rect s_pauseChipRect[SLOTS] {};
 bool s_pauseClick = false, s_pauseRightClick = false, s_pauseMoved = false;
@@ -2952,35 +3030,65 @@ void paletteSelect(int slot, int x, int y, int w, int h, int tipX = -1, int tipY
 
 // A builder's palette: a strip of three rows of the page, at the bottom (the top while its cursor is
 // down there), its page's name in a bar over it
-// The palette's tabs, along its top: the one open in the player's color (a window round it, if they
-// don't all fit)
+// The palette's tabs, along its top, in groups: a group's name a tab; the open group's pages its tabs
+// instead, in a band of the player's color, the open page bright (a window round them, if they don't
+// all fit)
 void drawTabs(int slot, int tab, int y)
 {
     constexpr int PAD = 8, H = 18;
-    int widths[PALETTE_TABS], total = 0;
-    for (int k = 0; k < PALETTE_TABS; k++) {
-        widths[k] = rm->menu_font_small.getWidth(TAB_NAMES[k]) + PAD * 2;
-        total += widths[k] + 2;
+    struct Piece {
+        int tab;            // the tab it opens (a group's: its first)
+        std::string name;
+        int kind;           // 0 a group, 2 a page of the open group, 3 the open group (one page)
+        int w;
+    };
+    std::vector<Piece> pieces;
+    size_t openPiece = 0;
+    for (const TabGroup& g : TAB_GROUPS) {
+        const bool here = tab >= g.first && tab < g.first + g.count;
+        if (here && g.count > 1) {
+            for (int k = 0; k < g.count; k++) {
+                if (g.first + k == tab)
+                    openPiece = pieces.size();
+                pieces.push_back({g.first + k, TAB_NAMES[g.first + k], 2, 0});
+            }
+        } else {
+            if (here)
+                openPiece = pieces.size();
+            pieces.push_back({g.first, g.name, here ? 3 : 0, 0});
+        }
+    }
+    int total = 0;
+    for (Piece& piece : pieces) {
+        piece.w = rm->menu_font_small.getWidth(piece.name.c_str()) + PAD * 2;
+        total += piece.w + 2;
     }
     int x = 4;
     if (total + 8 > App::screenWidth) {
         //(the open one in the middle, as far as the ends allow)
         int before = 0;
-        for (int k = 0; k < tab; k++)
-            before += widths[k] + 2;
-        x = std::clamp(App::screenWidth / 2 - before - widths[tab] / 2, App::screenWidth - 4 - total, 4);
+        for (size_t k = 0; k < openPiece; k++)
+            before += pieces[k].w + 2;
+        x = std::clamp(App::screenWidth / 2 - before - pieces[openPiece].w / 2, App::screenWidth - 4 - total, 4);
     }
     prompts::fill(0, y, App::screenWidth, H, SDL_Color {8, 12, 28, 255});
-    for (int k = 0; k < PALETTE_TABS; k++) {
-        const int w = widths[k];
+    const SDL_Color color = slotColor(slot), groupColor = theme::shade(slotColor(slot), 55);
+    for (const Piece& piece : pieces) {
+        const int w = piece.w;
         if (x + w > 0 && x < App::screenWidth) {
-            const bool open = k == tab;
-            prompts::fill(x, y + (open ? 0 : 3), w, H - (open ? 0 : 3), open ? slotColor(slot) : SDL_Color {40, 52, 88, 255});
+            const bool open = piece.kind == 3 || (piece.kind == 2 && piece.tab == tab);
+            const bool inGroup = piece.kind == 2;
+            const SDL_Color ink = open ? color : inGroup ? groupColor : SDL_Color {40, 52, 88, 255};
+            const int top = open || inGroup ? 0 : 3;
+            prompts::fill(x, y + top, w, H - top, ink);
             if (open)
-                prompts::fill(x, y, w, 2, theme::shade(slotColor(slot), 140));
-            rm->menu_font_small.drawCentered(x + w / 2, y + (open ? 2 : 4), TAB_NAMES[k]);
-            paletteHit(slot, x, y, w, H, 0, 0, k);
+                prompts::fill(x, y, w, 2, theme::shade(color, 140));
+            rm->menu_font_small.drawCentered(x + w / 2, y + (top == 0 ? 2 : 4), piece.name.c_str());
+            paletteHit(slot, x, y, w, H, 0, 0, piece.tab);
         }
+        //(the open group's pages joined: the band unbroken between them)
+        if (piece.kind == 2 && &piece != &pieces.back() && (&piece + 1)->kind == 2)
+            prompts::fill(x + w, y, 2, H, groupColor);
         x += w + 2;
     }
     //(more to the side: an arrow)
@@ -2989,10 +3097,12 @@ void drawTabs(int slot, int tab, int y)
         rm->menu_font_small.drawRightJustified(App::screenWidth - 2, y + 3, ">");
         //(the mouse: the arrows, the tab before and after; the tabs' row wheeled, the same)
         paletteHit(slot, 0, y, 12, H, 0, 0, std::max(0, tab - 1));
-        paletteHit(slot, App::screenWidth - 12, y, 12, H, 0, 0, std::min(PALETTE_TABS - 1, tab + 1));
+        paletteHit(slot, App::screenWidth - 12, y, 12, H, 0, 0, std::min(CYCLE_TABS - 1, tab + 1));
     }
     paletteHit(slot, 0, y, App::screenWidth, H, 0, 0, TAB_WHEEL);
 }
+
+std::string brushName(const MapMakerBuilder& b);
 
 void drawStrip(int slot, const MapMakerBuilder& b)
 {
@@ -3009,6 +3119,12 @@ void drawStrip(int slot, const MapMakerBuilder& b)
     theme::statusBar(0, top, App::screenWidth, 24);
     static const char* const DIRECTIONS[4] = {"up", "right", "down", "left"};
     std::string title = "P" + std::to_string(slot + 1) + "  Items";
+    if (onPage(b, PageItems)) {
+        MapMakerBuilder item = b;
+        item.brush = BrushItem;
+        item.item = static_cast<short>(b.px);
+        title = "P" + std::to_string(slot + 1) + "  " + brushName(item);
+    }
     if (onBlocksPage(b)) {
         bool on = true;
         const short type = blockOfCell(b.px, b.py, on);
@@ -3301,55 +3417,75 @@ short brushPieceIndex(const MapMakerBuilder& b)
 // away from its hand); then its recent brushes, small squares on (LB+Left/Right, Q/E, the wheel)
 void drawBrushCard(int slot, const MapMakerBuilder& b, int barY, bool barAtTop)
 {
-    static const char* const TOOLS_SHORT[TOOLS] = {"Pencil", "Rectangle", "Fill", "Copy", "Paste"};
-    const std::string name = brushName(b);
-    const bool tiles = b.brush == BrushTile;
-    //(under the name only what isn't the usual: a tool but the pencil, the tiles' layer)
-    std::string detail = b.tool % TOOLS != 0 ? std::string(TOOLS_SHORT[b.tool % TOOLS]) : std::string();
-    if (tiles)
-        detail += (detail.empty() ? "" : "  -  ") + std::string("layer ") + std::to_string(b.layer + 1) + (b.layer >= 2 ? " (front)" : "");
-    const int w = std::max(rm->menu_font_small.getWidth(name.c_str()), rm->menu_font_small.getWidth(detail.c_str())) + 56;
-    const int h = 42;
-    const int y = barAtTop ? barY + 26 : barY - h - 2;
-    int x = 4;
-    //(the hand there: the other side)
-    const int hx = b.cx * TILESIZE, hy = b.cy * TILESIZE;
-    if (hx < x + w + 24 && hy + TILESIZE + 30 > y && hy < y + h)
-        x = App::screenWidth - w - 4;
-    prompts::fill(x, y, w, h, SDL_Color {0, 0, 0, 255});
-    prompts::fill(x + 2, y + 2, w - 4, h - 4, SDL_Color {16, 24, 48, 255});
-    prompts::fill(x + 2, y + 2, 4, h - 4, slotColor(slot));
-    drawBrushPiece(b.brush, b.tile, brushPieceIndex(b), x + 10, y + 5);
-    rm->menu_font_small.draw(x + 48, y + (detail.empty() ? 14 : 6), name.c_str());
-    if (!detail.empty())
-        rm->menu_font_small.draw(x + 48, y + 22, detail.c_str());
+    const SDL_Color black {0, 0, 0, 255}, panel {16, 24, 48, 255}, well {8, 12, 28, 255}, dim {110, 120, 150, 255};
+    const int h = TOOLBAR_H, y = barAtTop ? barY + 24 : barY - h;
+    const bool mouseOne = slot == mouseSlot();
+    prompts::fill(0, y, App::screenWidth, h, black);
+    prompts::fill(0, y + 1, App::screenWidth, h - 2, panel);
+    prompts::fill(2, y + 3, 4, h - 6, slotColor(slot));
+    if (mouseOne)
+        s_toolbarRect = {0, y, App::screenWidth, h};
 
-    //(the recent ones, the one in hand first: the others in the order the next goes)
+    //The part in hand: its picture and name (cut short to fit)
+    drawBrushPiece(b.brush, b.tile, brushPieceIndex(b), 10, y + 5);
+    std::string name = brushName(b);
+    if (rm->menu_font_small.getWidth(name.c_str()) > 116) {
+        while (!name.empty() && rm->menu_font_small.getWidth((name + "...").c_str()) > 116)
+            name.pop_back();
+        name += "...";
+    }
+    rm->menu_font_small.draw(46, y + 14, name.c_str());
+
+    //The recent parts: the others, in the order the next goes (numbered for the keys 2..8)
     const int shown = std::min<int>(b.recentCount, MAP_MAKER_RECENT);
-    if (slot == mouseSlot())
+    if (mouseOne)
         s_recentShown = shown;
-    if (shown < 2)
-        return;
-    const int cell = 36;
-    const bool left = x > 4;    //(the card on the right: the strip to its left)
-    const int sx = left ? x - 4 - (shown - 1) * cell : x + w + 4;
-    for (int k = 1; k < shown; k++) {
-        const int cx = sx + (left ? shown - 1 - k : k - 1) * cell;
-        const int cy = y + (h - cell) / 2;
-        prompts::fill(cx, cy, cell - 2, cell, SDL_Color {0, 0, 0, 255});
-        prompts::fill(cx + 1, cy + 1, cell - 4, cell - 2, SDL_Color {16, 24, 48, 255});
+    const bool numbers = s_mouse.active || prompts::lastDevice() == prompts::Device::Keyboard;
+    const int cell = 34, rx = 168;
+    for (int k = 1; k < MAP_MAKER_RECENT; k++) {
+        const int cx = rx + (k - 1) * cell, cy = y + 4;
+        prompts::fill(cx, cy, cell - 2, cell, black);
+        prompts::fill(cx + 1, cy + 1, cell - 4, cell - 2, k < shown ? panel : well);
+        if (k >= shown)
+            continue;
         MapMakerBuilder r = b;
         applyRecent(r, b.recent[k]);
-        drawBrushPiece(r.brush, r.tile, brushPieceIndex(r), cx + 1, cy + 2);
-        if (slot == mouseSlot())
+        drawBrushPiece(r.brush, r.tile, brushPieceIndex(r), cx, cy + 1);
+        if (mouseOne)
             s_recentRect[k] = {cx, cy, cell - 2, cell};
-        //(the keyboard's or the mouse's builder: its number key, 2..8)
-        if (s_mouse.active || prompts::lastDevice() == prompts::Device::Keyboard) {
-            const std::string key = std::to_string(k + 1);
-            prompts::fill(cx + 1, cy + 1, 10, 13, SDL_Color {0, 0, 0, 255});
-            rm->menu_font_small.draw(cx + 2, cy, key.c_str());
+        if (numbers) {
+            prompts::fill(cx + 1, cy + 1, 8, 9, black);
+            prompts::tinyText(cx + 2, cy + 2, std::to_string(k + 1), SDL_Color {248, 248, 248, 255}, 1);
         }
     }
+
+    //The tools: the one in use lit in the player's color
+    const int tx = 412;
+    prompts::tinyText(tx, y + 4, "TOOL", dim, 1);
+    for (int t = 0; t < TOOLS; t++) {
+        const int ix = tx + t * 20;
+        if (t == b.tool % TOOLS)
+            prompts::fill(ix - 2, y + 12, 20, 20, slotColor(slot));
+        drawToolIcon(t, ix, y + 14, 1);
+        if (mouseOne)
+            s_toolRect[t] = {ix - 2, y + 12, 20, 20};
+    }
+
+    //The layers: 1, 2 behind the players, 3, 4 in front; the one in use lit (dim: the brush isn't tiles)
+    const int lx = 520;
+    const bool tiles = b.brush == BrushTile;
+    prompts::tinyText(lx, y + 4, "LAYER", dim, 1);
+    for (int l = 0; l < MAPLAYERS; l++) {
+        const int bx = lx + l * 24 + (l >= 2 ? 10 : 0);
+        const bool on = l == b.layer;
+        prompts::fill(bx, y + 12, 20, 20, black);
+        prompts::fill(bx + 1, y + 13, 18, 18, on ? (tiles ? slotColor(slot) : theme::shade(slotColor(slot), 50)) : well);
+        prompts::tinyText(bx + 8, y + 18, std::to_string(l + 1), on ? SDL_Color {248, 248, 248, 255} : dim, 1);
+        if (mouseOne)
+            s_layerRect[l] = {bx, y + 12, 20, 20};
+    }
+    prompts::tinyText(lx + 4, y + 34, "BACK", dim, 1);
+    prompts::tinyText(lx + 56, y + 34, "FRONT", dim, 1);
 }
 
 std::string s_savedPath;    // the last save's file
@@ -3623,6 +3759,8 @@ void noteEvent(const SDL_Event& event)
         forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_pickPressed[device] = true; });
     } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key == SDLK_G) {
         forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_grabPressed[device] = true; });
+    } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key == SDLK_F1) {
+        s_helpToggle = true;
     } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key == SDLK_T) {
         forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_toolPressed[device] = true; });
     } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key >= SDLK_1 && event.key.key <= SDLK_8
@@ -3759,7 +3897,7 @@ uint8_t mouseByte(int slot, const CGM_MapMaker& m, bool& used)
                     hit = &h;    //(the arrows over the tabs: the smaller)
             }
             if (tabsRow && ms.wheel != 0 && !ms.leftClick) {
-                const int tab = std::clamp(tabOfPage(b.page) + ms.wheel, 0, PALETTE_TABS - 1);
+                const int tab = std::clamp(tabOfPage(b.page) + ms.wheel, 0, CYCLE_TABS - 1);
                 ms.queue = {mouseTabByte(tab)};
                 openTab(b, tab);
                 ms.aimX = -1;
@@ -3790,17 +3928,22 @@ uint8_t mouseByte(int slot, const CGM_MapMaker& m, bool& used)
             //The map: the wheel, the recent brushes
             ms.queue = {commandByte(ms.wheel > 0 ? CMD_RECENT_NEXT : CMD_RECENT_PREV)};
             unforeseen();
-        } else if (ms.leftClick) {
-            //(a recent brush clicked, by the card: on to it, not painting)
-            for (int k = 1; k < s_recentShown; k++) {
+        } else if ((ms.leftClick || ms.rightClick) && inRect(at, s_toolbarRect)) {
+            //(the toolbar clicked: a recent part, a tool, a layer; not painting or erasing the map under it)
+            for (int k = 1; k < s_recentShown && ms.leftClick; k++) {
                 if (!inRect(at, s_recentRect[k]))
                     continue;
                 for (int n = 0; n < k; n++)
                     ms.queue.insert(ms.queue.end(), {commandByte(CMD_RECENT_NEXT), 0});
-                ms.left = false;
-                unforeseen();
-                break;
             }
+            for (int t = 0; t < TOOLS && ms.leftClick; t++)
+                if (inRect(at, s_toolRect[t]))
+                    ms.queue = {jumpTo(JUMP_TOOL_AT + t), 0};
+            for (int l = 0; l < MAPLAYERS && ms.leftClick; l++)
+                if (inRect(at, s_layerRect[l]))
+                    ms.queue = {jumpTo(JUMP_LAYER_AT + l), 0};
+            ms.left = ms.right = false;
+            unforeseen();
         }
     }
     if (b.palette)
@@ -3842,6 +3985,9 @@ uint8_t mouseByte(int slot, const CGM_MapMaker& m, bool& used)
     }
     //The map: the cursor to the cell under the mouse; a button held there, painting (or erasing) on the
     //way after
+    //(over the toolbar: the cursor stays where it is)
+    if (inRect(at, s_toolbarRect) && !ms.left && !ms.right)
+        return 0;
     int cx = std::clamp(ms.x / TILESIZE, 0, MAPWIDTH - 1), cy = std::clamp(ms.y / TILESIZE, 0, MAPHEIGHT - 1);
     //(Shift held as a stroke begins: it keeps to that row or column, whichever the mouse goes along more)
     if (!ms.left && !ms.right) {
@@ -3895,6 +4041,9 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
     CGM_MapMaker* m = mode();
     if (!m || !allowed() || slot < 0 || slot >= SLOTS)
         return gameByte;
+    //(the controls sheet up: this machine's builders still)
+    if (s_helpOpen && building(slot))
+        return 0;
     //The host's rights commands first (one a tick, until the match has them)
     if (slot == m->hostSlot) {
         syncWantedRights();
@@ -3915,8 +4064,8 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
     //(each as pressed)
     {
         const bool lb = s_lbHeld[device & 3];
-        const bool now[4] = {lb && keys.menu_left.fDown, lb && keys.menu_right.fDown, lb && keys.menu_down.fDown,
-            lb && keys.menu_cancel.fDown};
+        const bool now[5] = {lb && keys.menu_left.fDown, lb && keys.menu_right.fDown, lb && keys.menu_down.fDown,
+            lb && keys.menu_cancel.fDown, lb && keys.menu_scrollfast.fDown};
         bool* was = s_lbChord[device & 3];
         if (now[0] && !was[0])
             s_recentStep[device & 3] = -1;
@@ -3926,7 +4075,9 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
             s_pickPressed[device & 3] = true;
         if (now[3] && !was[3])
             s_grabPressed[device & 3] = true;
-        for (int k = 0; k < 4; k++)
+        if (now[4] && !was[4])
+            s_toolPressed[device & 3] = true;
+        for (int k = 0; k < 5; k++)
             was[k] = now[k];
     }
     const bool flip = s_switchPressed[device & 3] || (chord && !s_chordHeld[device & 3]);
@@ -4005,7 +4156,7 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
         if (!b.palette)
             return B_PALETTE;
         if (!b.adjusting)
-            return mouseTabByte((tabOfPage(b.page) + step + PALETTE_TABS) % PALETTE_TABS);
+            return mouseTabByte((tabOfPage(b.page) + step + CYCLE_TABS) % CYCLE_TABS);
     }
     if (s_scriptByte[slot] >= 0) {
         const uint8_t byte = static_cast<uint8_t>(s_scriptByte[slot]);
@@ -4042,7 +4193,7 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
     }
     byte |= keys.menu_select.fDown ? B_PAINT : 0;
     byte |= keys.menu_random.fDown ? B_PALETTE : 0;
-    byte |= keys.menu_scrollfast.fDown && !(s_mouse.active && slot == mouseSlot()) ? B_LAYER : 0;
+    byte |= keys.menu_scrollfast.fDown && !(s_mouse.active && slot == mouseSlot()) && !s_lbHeld[device & 3] ? B_LAYER : 0;
     if (byte == B_DONE)
         byte = B_PALETTE;    //(X and Y together alone: not "done")
     if ((byte & (B_LEFT | B_RIGHT)) == (B_LEFT | B_RIGHT))
@@ -4086,6 +4237,7 @@ void simulate(const InputFrame& input)
         if (slot == m->hostSlot && byte == commandByte(CMD_CLEAR)) {
             if (prev != byte) {
                 clearMap(*m, slot, ++m->builders[slot].stroke);
+                toast(slot, "Map cleared: undo brings it all back");
                 if (!sim::isResimulating())
                     ifSoundOnPlay(rm->sfx_bobombsound);
             }
@@ -4102,7 +4254,40 @@ void simulate(const InputFrame& input)
                 const int stagedBefore = m->editCount + m->bulkCount;
                 const int editsBefore = m->editCount;
                 const MapMakerRecent brushBefore = recentOf(b);
+                const short toolBefore = b.tool, layerBefore = b.layer;
+                const bool paletteBefore = b.palette;
                 builderTick(*m, b, byte, prev);
+                //(the first-time hints: each gone once it's done)
+                if (!sim::isResimulating() && localHuman(slot)) {
+                    if (m->editCount + m->bulkCount > stagedBefore && (mouseButtons(byte) & B_PAINT))
+                        tipDone(0);
+                    if (b.palette && !paletteBefore)
+                        tipDone(1);
+                    if (m->history.size() < historyBefore && m->redo.size() > redoBefore)
+                        tipDone(2);
+                }
+                //(what it did, said a moment over this machine's toolbar)
+                if (!sim::isResimulating() && localHuman(slot)) {
+                    const bool changed = m->editCount + m->bulkCount > stagedBefore;
+                    const int command = mouseCommand(byte) && byte != prev ? byte >> 2 : -1;
+                    const bool newBrush = !sameRecent(brushBefore, recentOf(b));
+                    if (m->history.size() < historyBefore && m->redo.size() > redoBefore) {
+                        toast(slot, "Undo");
+                    } else if (m->redo.size() < redoBefore && m->history.size() > historyBefore) {
+                        toast(slot, "Redo");
+                    } else if (command == CMD_GRAB && changed) {
+                        toast(slot, "Picked up " + brushName(b) + ": paint to put it down");
+                        s_carrying[slot] = true;
+                    } else if (command == CMD_PICK && newBrush) {
+                        toast(slot, "Copied " + brushName(b));
+                    } else if (b.tool != toolBefore) {
+                        toast(slot, std::string("Tool: ") + TOOL_SHORT[b.tool % TOOLS]);
+                    } else if (b.layer != layerBefore) {
+                        toast(slot, "Layer " + std::to_string(b.layer + 1) + (b.layer >= 2 ? ": in front of the players" : ": behind the players"));
+                    }
+                    if (s_carrying[slot] && command != CMD_GRAB && ((changed && (mouseButtons(byte) & B_PAINT)) || newBrush || b.palette))
+                        s_carrying[slot] = false;
+                }
                 //(the cells it changed: a ring each; taken away red (B, a pick up))
                 const bool away = (mouseButtons(byte) & B_ERASE) || (mouseCommand(byte) && (byte >> 2) == CMD_GRAB);
                 for (int k = m->editCount >= editsBefore ? editsBefore : 0; k < m->editCount; k++)
@@ -4279,7 +4464,7 @@ void hostPanelInput(bool left, bool right, bool down, bool select)
 }
 
 namespace {
-enum PauseRow { RowResume, RowRights, RowSave, RowClear, RowQuit, PAUSE_ROWS };
+enum PauseRow { RowResume, RowRights, RowSave, RowClear, RowControls, RowQuit, PAUSE_ROWS };
 
 // A row the local player can use: the rights, Save and Clear are the host's
 bool pauseRowUsable(int row)
@@ -4308,6 +4493,8 @@ void pauseMenuDo(int row, bool left, bool right, bool select)
             s_clearPending = true;
             game_values.flags.pausegame = false;
         }
+    } else if (row == RowControls && select) {
+        s_helpOpen = true;
     } else if (row == RowResume && select) {
         game_values.flags.pausegame = false;
     } else if (row == RowQuit && select) {
@@ -4318,6 +4505,41 @@ void pauseMenuDo(int row, bool left, bool right, bool select)
     }
 }
 } // namespace
+
+bool sheetCoversScreen()
+{
+    static bool wasOpen = false;
+    const bool covers = s_helpOpen || wasOpen;
+    wasOpen = s_helpOpen;
+    return covers;
+}
+
+// The controls sheet's keys (true: it has them this frame)
+bool helpInput()
+{
+    COutputControl* game = game_values.playerInput.outputControls;
+    bool close = s_helpToggle && s_helpOpen;
+    if (s_helpToggle && !s_helpOpen) {
+        s_helpToggle = false;
+        s_helpOpen = true;
+        return true;
+    }
+    s_helpToggle = false;
+    if (!s_helpOpen)
+        return false;
+    for (int d = 0; d < SLOTS; d++) {
+        const COutputControl& keys = s_menuKeys.outputControls[d];
+        close = close || keys.menu_cancel.fPressed || keys.menu_select.fPressed || s_escPressed[d] || s_pausePressed[d];
+        s_escPressed[d] = s_pausePressed[d] = false;
+        game[d].game_cancel.fPressed = false;
+        game[d].game_start.fPressed = false;
+    }
+    close = close || s_pauseClick || s_pauseRightClick;
+    s_pauseClick = s_pauseRightClick = s_pauseMoved = false;
+    if (close)
+        s_helpOpen = false;
+    return true;
+}
 
 void pauseMenuInput()
 {
@@ -4382,12 +4604,93 @@ void pauseMenuPress(int row)
     pauseMenuDo(row, false, false, true);
 }
 
+// The controls sheet (F1; the pause menu's Controls): every control of building, by what it's for, the
+// controller's, the keyboard's and the mouse's side by side
+void drawControlsSheet()
+{
+    using prompts::Pad;
+    struct Row {
+        const char* what;
+        std::vector<Pad> pads;    // one after another with a "+" (from `orFrom` on: a "/"); none: "-"
+        const char* keys;         // key caps, ", " between
+        const char* mouse;
+        int orFrom = 99;
+    };
+    struct Section {
+        const char* title;
+        std::vector<Row> rows;
+    };
+    static const std::vector<Section> SECTIONS = {
+        {"Moving and playing",
+            {{"Move the cursor", {Pad::DPad}, "Arrows", "move it"}, {"Build / play here", {Pad::LB, Pad::Up}, "Tab", "-"},
+                {"Pause, save, clear", {Pad::Start}, "Esc", "-"}}},
+        {"Painting",
+            {{"Paint", {Pad::A}, "Enter", "left button"}, {"Erase", {Pad::B}, "Delete", "right button"},
+                {"Straight line", {}, "-", "Shift + drag"}, {"Next tool", {Pad::LB, Pad::Y}, "T", "click a tool"},
+                {"Layer", {Pad::Y}, "Shift", "Ctrl+wheel"}}},
+        {"Parts",
+            {{"Parts palette", {Pad::X}, "Space", "middle button"}, {"Palette tab", {Pad::LT, Pad::RT}, "PgUp, PgDn", "click a tab", 1},
+                {"Recent part", {Pad::LB, Pad::Left, Pad::Right}, "Q, E, 2-8", "wheel, click", 2},
+                {"Copy what's here", {Pad::LB, Pad::Down}, "R", "Ctrl + left"}, {"Pick up to move", {Pad::LB, Pad::B}, "G", "Ctrl + right"}}},
+        {"Undo and more",
+            {{"Undo (hold: more)", {Pad::RB}, "Bksp, Ctrl+Z", "back button"}, {"Redo (hold: more)", {Pad::LB, Pad::RB}, "Ctrl+Y", "fwd button"},
+                {"Screenshot", {}, "F12", "-"}}},
+    };
+    const SDL_Color head {0, 40, 104, 255}, dark {8, 16, 48, 255};
+    const int x = 20, y = 12, w = 600, h = 456;
+    menupanel::box(x, y, w, h);
+    rm->menu_font_large.drawCentered(App::screenWidth / 2, y + 10, "Map Maker controls");
+    const int colWhat = x + 18, colPad = x + 206, colKeys = x + 330, colMouse = x + 460;
+    int ry = y + 40;
+    prompts::fill(x + 14, ry, w - 28, 16, dark);
+    rm->menu_font_small.draw(colPad, ry + 1, "Controller");
+    rm->menu_font_small.draw(colKeys, ry + 1, "Keyboard");
+    rm->menu_font_small.draw(colMouse, ry + 1, "Mouse");
+    ry += 20;
+    for (const Section& section : SECTIONS) {
+        prompts::fill(x + 14, ry, w - 28, 16, head);
+        rm->menu_font_small.draw(colWhat, ry + 1, section.title);
+        ry += 18;
+        for (const Row& row : section.rows) {
+            rm->menu_font_small.draw(colWhat + 6, ry + 1, row.what);
+            int px = colPad;
+            if (row.pads.empty())
+                rm->menu_font_small.draw(px, ry + 1, "-");
+            for (size_t k = 0; k < row.pads.size(); k++) {
+                if (k > 0) {
+                    const char* join = static_cast<int>(k) >= row.orFrom ? "/" : "+";
+                    rm->menu_font_small.draw(px + 1, ry + 1, join);
+                    px += rm->menu_font_small.getWidth(join) + 4;
+                }
+                px += prompts::drawPad(px, ry, row.pads[k]) + 1;
+            }
+            int kx = colKeys;
+            std::string keys = row.keys;
+            if (keys == "-") {
+                rm->menu_font_small.draw(kx, ry + 1, "-");
+            } else {
+                for (size_t from = 0; from <= keys.size();) {
+                    size_t to = keys.find(", ", from);
+                    if (to == std::string::npos)
+                        to = keys.size();
+                    kx += prompts::drawKey(kx, ry, keys.substr(from, to - from)) + 4;
+                    from = to + 2;
+                }
+            }
+            rm->menu_font_small.draw(colMouse, ry + 1, row.mouse);
+            ry += 18;
+        }
+        ry += 2;
+    }
+    prompts::drawPrompts(App::screenWidth / 2, y + h - 26, {{{prompts::Pad::B}, {"F1"}, "close"}}, 14);
+}
+
 void drawPauseMenu()
 {
     syncWantedRights();
     const CGM_MapMaker* m = mode();
     const bool host = isHostHere();
-    const int x = 90, y = 10, w = 460, h = 458;
+    const int x = 90, y = 40, w = 460, h = 400;
     menupanel::box(x, y, w, h);
     const SDL_Color dark {8, 16, 48, 255};
     const SDL_Color light {248, 248, 248, 255};
@@ -4413,7 +4716,7 @@ void drawPauseMenu()
         const bool usable = pauseRowUsable(row);
         menupanel::row(rx, ry, rw, rh, row == s_menuRow, !usable);
         s_pauseRowRect[row] = {rx, ry, rw, rh};
-        const char* names[PAUSE_ROWS] = {"Resume", "Who builds", "Save map", "Clear map", "Quit"};
+        const char* names[PAUSE_ROWS] = {"Resume", "Who builds", "Save map", "Clear map", "Controls", "Quit"};
         rm->menu_font_large.draw(rx + 14, ry + 7, names[row]);
         if (row == RowRights) {
             //Each player: its color, a hammer if it may build; faded if it may not; a CPU's gray "CPU"
@@ -4473,6 +4776,10 @@ void drawPauseMenu()
                                                                              : "Empties the whole map, to start over.";
         line2 = "Changed your mind? Undo brings it all back.";
         break;
+    case RowControls:
+        line1 = "Every button, key and mouse control, on one page.";
+        line2 = "While building, F1 opens it too.";
+        break;
     default:
         line1 = "Ends the match: back to the map and the rules.";
         line2 = s_savedThisPause ? "Your map is saved." : m && m->edited ? "Save first to keep what you built." : "Nothing's been built yet.";
@@ -4483,29 +4790,8 @@ void drawPauseMenu()
     rm->menu_font_small.drawCentered(App::screenWidth / 2, boxY + 7, line1.c_str());
     rm->menu_font_small.drawCentered(App::screenWidth / 2, boxY + 25, line2.c_str());
 
-    //Building's buttons, under a heading
     using prompts::Pad;
     using prompts::menuKey;
-    const int buildY = boxY + 58;
-    rm->menu_font_small.drawCentered(App::screenWidth / 2, buildY, "While building:");
-    const bool mouse = s_mouse.active;
-    prompts::drawPrompts(App::screenWidth / 2, buildY + 17,
-        {{{Pad::A}, {mouse ? "LMB" : menuKey(prompts::MENU_SELECT)}, "paint"}, {{Pad::B}, {mouse ? "RMB" : "Del"}, "erase"},
-            {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "palette"}}, 14);
-    prompts::drawPrompts(App::screenWidth / 2, buildY + 36,
-        {{{Pad::Y}, {menuKey(prompts::MENU_SCROLL)}, "layer"}, {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::LB, Pad::Up}, {"Tab"}, "play here"}}, 14);
-    prompts::drawPrompts(App::screenWidth / 2, buildY + 55,
-        {{{Pad::LB, Pad::Left, Pad::Right}, mouse ? std::vector<std::string> {"Wheel"} : std::vector<std::string> {"Q", "E"}, "recent"},
-            {{Pad::LB, Pad::Down}, {mouse ? "Ctrl+LMB" : "R"}, "copy"}, {{Pad::LB, Pad::B}, {mouse ? "Ctrl+RMB" : "G"}, "pick up"}}, 14);
-    //(redo; on a computer too: the tool, the recent ones by number, straight lines)
-    std::vector<prompts::Prompt> more {{{Pad::LB, Pad::RB}, {mouse ? "Fwd btn" : "Ctrl+Y"}, "redo"}};
-    if (mouse || prompts::lastDevice() == prompts::Device::Keyboard) {
-        more.push_back({{}, {"T"}, "tool"});
-        more.push_back({{}, {"2-8"}, "by number"});
-        if (mouse)
-            more.push_back({{}, {"Shift+drag"}, "line"});
-    }
-    prompts::drawPrompts(App::screenWidth / 2, buildY + 74, more, 14);
 
     //What the buttons do here
     prompts::fill(x + 18, y + h - 44, w - 36, 1, {0, 40, 104, 255});
@@ -4513,7 +4799,7 @@ void drawPauseMenu()
     std::vector<prompts::Prompt> row {{{Pad::Up, Pad::Down}, {menuKey(prompts::MENU_UP), menuKey(prompts::MENU_DOWN)}, "choose"}};
     if (rights)
         row.push_back({{Pad::Left, Pad::Right}, {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "player"});
-    row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, rights ? "allow / stop" : s_menuRow == RowSave ? "save" : s_menuRow == RowClear ? (s_clearArmed ? "clear it" : "clear") : s_menuRow == RowQuit ? "quit" : "resume"});
+    row.push_back({{Pad::A}, {menuKey(prompts::MENU_SELECT)}, rights ? "allow / stop" : s_menuRow == RowSave ? "save" : s_menuRow == RowClear ? (s_clearArmed ? "clear it" : "clear") : s_menuRow == RowControls ? "open" : s_menuRow == RowQuit ? "quit" : "resume"});
     if (s_menuRow != RowResume && !rights)
         row.push_back({{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "resume"});
     //(too wide (the keys' names): "choose" left out)
@@ -4521,6 +4807,8 @@ void drawPauseMenu()
     if (prompts::promptsWidth(row, 14) > w - 24)
         row.erase(row.begin());
     prompts::drawPromptsLarge(App::screenWidth / 2, y + h - 34, row, 14, w - 24);
+    if (s_helpOpen)
+        drawControlsSheet();
 }
 
 void drawPauseRights(int y, bool withSave)
@@ -4569,6 +4857,9 @@ void GameplayState::updateEditMode()
 {
     //(the online panel has the keys while it's up: its own rows for the rights)
     if (!matchedit::allowed() || onlinePanelOpen())
+        return;
+    //(the controls sheet, while it's up: its keys only)
+    if (matchedit::helpInput())
         return;
     COutputControl* game = game_values.playerInput.outputControls;    // read as the game's keys
 
@@ -4622,6 +4913,7 @@ void GameplayState::drawEditMode()
 {
     if (!mode())
         return;
+    s_toolbarRect = {};    //(drawn again below, if it's up)
     s_drawnFrames++;
     const CGM_MapMaker& m = *mode();
     {
@@ -4671,21 +4963,44 @@ void GameplayState::drawEditMode()
     }
     //(the warps and the hazards, shown while someone builds: the warps, the cannons and the plants in
     //their pipes are not seen in play; the hidden blocks, the race goals and flag bases placed too)
+    //(only where they matter, not all over the map: all of a kind while a builder has its brush (the
+    //hidden blocks: the blocks'), else only near a builder's cursor)
     if (matchedit::active()) {
+        bool allHidden = false, allGoals = false, allHazards = false, allWarps = false;
+        std::vector<SDL_Point> builders;
+        for (int slot = 0; slot < SLOTS; slot++) {
+            if (!building(slot))
+                continue;
+            const MapMakerBuilder& b = m.builders[slot];
+            allHidden = allHidden || b.brush == BrushBlock;
+            allGoals = allGoals || b.brush == BrushModeObject;
+            allHazards = allHazards || b.brush == BrushHazard;
+            allWarps = allWarps || b.brush == BrushWarp;
+            builders.push_back({b.cx, b.cy});
+        }
+        auto nearBuilder = [&](int x, int y) {
+            for (const SDL_Point& c : builders)
+                if (std::abs(x - c.x) <= 4 && std::abs(y - c.y) <= 4)
+                    return true;
+            return false;
+        };
         for (short x = 0; x < MAPWIDTH; x++)
             for (short y = 0; y < MAPHEIGHT; y++)
-                if (g_map->blockat(x, y)->fHidden && g_map->blockat(x, y)->iType >= 0)
+                if (g_map->blockat(x, y)->fHidden && g_map->blockat(x, y)->iType >= 0 && (allHidden || nearBuilder(x, y)))
                     rm->menu_font_small.draw(x * TILESIZE + 2, y * TILESIZE + 2, "H");
         for (int i = 0; i < m.goalCount; i++)
-            drawBrushPiece(BrushModeObject, TilesetTile {}, static_cast<short>(i), m.goals[i][0], m.goals[i][1]);
+            if (allGoals || nearBuilder(m.goals[i][0] / TILESIZE, m.goals[i][1] / TILESIZE))
+                drawBrushPiece(BrushModeObject, TilesetTile {}, static_cast<short>(i), m.goals[i][0], m.goals[i][1]);
         for (int i = 0; i < m.baseCount; i++)
-            drawBrushPiece(BrushModeObject, TilesetTile {}, static_cast<short>(8 + i), m.bases[i][0], m.bases[i][1]);
+            if (allGoals || nearBuilder(m.bases[i][0] / TILESIZE, m.bases[i][1] / TILESIZE))
+                drawBrushPiece(BrushModeObject, TilesetTile {}, static_cast<short>(8 + i), m.bases[i][0], m.bases[i][1]);
         for (int k = 0; k < m.hazardCount; k++)
-            hazardsPicture().draw(m.hazards[k].ix * 16 + 4, m.hazards[k].iy * 16 + 4, {static_cast<int>(m.hazards[k].itype) * 24, 32, 24, 24});
+            if (allHazards || nearBuilder(m.hazards[k].ix / 2, m.hazards[k].iy / 2))
+                hazardsPicture().draw(m.hazards[k].ix * 16 + 4, m.hazards[k].iy * 16 + 4, {static_cast<int>(m.hazards[k].itype) * 24, 32, 24, 24});
         for (short x = 0; x < MAPWIDTH; x++) {
             for (short y = 0; y < MAPHEIGHT; y++) {
                 const Warp* warp = g_map->warp(x, y);
-                if (warp->connection >= 0 && warp->direction >= 0)
+                if (warp->connection >= 0 && warp->direction >= 0 && (allWarps || nearBuilder(x, y)))
                     drawBrushPiece(BrushWarp, TilesetTile {}, static_cast<short>(warp->connection + warp->direction * WARP_CONNECTIONS), x * TILESIZE, y * TILESIZE);
             }
         }
@@ -4717,9 +5032,7 @@ void GameplayState::drawEditMode()
     }
     bool any = false;
     int lowest = 0;
-    int lowestLayer = 1;
     int lowestTool = 0;
-    int lowestBrush = BrushTile;
     for (int slot = 0; slot < SLOTS; slot++) {
         if (!building(slot))
             continue;
@@ -4727,9 +5040,7 @@ void GameplayState::drawEditMode()
         const MapMakerBuilder& b = m.builders[slot];
         if (b.cy >= lowest) {
             lowest = b.cy;
-            lowestLayer = b.layer;
             lowestTool = b.tool;
-            lowestBrush = b.brush;
         }
         //The brush at the cursor, framed in the player's color (pulsing), the player's number on it (the
         //mouse's builder: under the mouse, at once)
@@ -4787,6 +5098,16 @@ void GameplayState::drawEditMode()
         MapMakerBuilder here = b;
         if (!pickBrush(m, here))
             continue;
+        //(what B would take, outlined: its cell, a platform all of it)
+        const SDL_Color amber {248, 184, 48, 255};
+        const int platform = here.brush == BrushPlatform ? platformAt(m, b.cx, b.cy) : -1;
+        if (platform >= 0 && m.platforms[platform].live) {
+            const MovingPlatform* live = m.platforms[platform].live;
+            cellFrame(static_cast<int>(live->centerX()) - live->width() / 2, static_cast<int>(live->centerY()) - live->height() / 2,
+                live->width(), live->height(), amber);
+        } else {
+            cellFrame(b.cx * TILESIZE, b.cy * TILESIZE, TILESIZE, TILESIZE, amber);
+        }
         const std::string name = brushName(here);
         const int w = rm->menu_font_small.getWidth(name.c_str()) + 10, h = 18;
         const int x = std::clamp(b.cx * TILESIZE + TILESIZE / 2 - w / 2, 2, App::screenWidth - w - 2);
@@ -4813,7 +5134,29 @@ void GameplayState::drawEditMode()
         const SDL_Point tip = b.palette ? s_paletteTip[slot]
             : mouseHere ? SDL_Point {std::clamp(s_mouse.x, 0, App::screenWidth - 1), std::clamp(s_mouse.y, 0, App::screenHeight - 1)}
                         : SDL_Point {cell.x + TILESIZE / 2, cell.y + TILESIZE / 2};
-        drawGlove(slot, cell, tip, slotColor(slot), "P" + std::to_string(slot + 1), down);
+        drawGlove(slot, cell, tip, slotColor(slot), "P" + std::to_string(slot + 1), down, mouseHere);
+        if (!b.palette) {
+            const uint8_t was = g_sim.previousInput[slot];
+            if (was != B_UNDO && (mouseButtons(was) & B_ERASE))
+                cellFrame(cell.x + 3, cell.y + 3, TILESIZE - 6, TILESIZE - 6, SDL_Color {232, 64, 48, 255});
+            if (b.tool % TOOLS != 0) {
+                prompts::fill(cell.x + TILESIZE - 2, cell.y - 14, 18, 18, SDL_Color {0, 0, 0, 255});
+                drawToolIcon(b.tool, cell.x + TILESIZE - 1, cell.y - 13, 1);
+            }
+            if (s_carrying[slot]) {
+                //(dashes round the cell, marching)
+                const int phase = static_cast<int>(SDL_GetTicks() / 80) % 8;
+                for (int k = -8; k < TILESIZE + 8; k += 8) {
+                    const int a = std::clamp(k + phase, 0, TILESIZE), e = std::clamp(k + phase + 4, 0, TILESIZE);
+                    if (e <= a)
+                        continue;
+                    prompts::fill(cell.x + a, cell.y - 3, e - a, 2, SDL_Color {248, 248, 248, 255});
+                    prompts::fill(cell.x + a, cell.y + TILESIZE + 1, e - a, 2, SDL_Color {248, 248, 248, 255});
+                    prompts::fill(cell.x - 3, cell.y + a, 2, e - a, SDL_Color {248, 248, 248, 255});
+                    prompts::fill(cell.x + TILESIZE + 1, cell.y + a, 2, e - a, SDL_Color {248, 248, 248, 255});
+                }
+            }
+        }
     }
     //What the builders' buttons do: a bar at the bottom (the top while a cursor is down there), if one
     //of this machine's players builds
@@ -4823,38 +5166,67 @@ void GameplayState::drawEditMode()
         local = local || (building(slot) && localHuman(slot));
         palette = palette || (building(slot) && localHuman(slot) && m.builders[slot].palette);
     }
-    if (!any || !local || palette)
-        return;
     using prompts::Pad;
     using prompts::menuKey;
     const int barY = lowest >= MAPHEIGHT - 3 ? 0 : App::screenHeight - 24;
-    theme::statusBar(0, barY, App::screenWidth, 24);
-    //(this machine's builder's brush card: the first of them)
-    for (int slot = 0; slot < SLOTS; slot++) {
-        if (building(slot) && localHuman(slot)) {
-            drawBrushCard(slot, m.builders[slot], barY, barY == 0);
-            break;
+    const bool barShown = any && local && !palette;
+    if (barShown) {
+        theme::statusBar(0, barY, App::screenWidth, 24);
+        //(this machine's builder's toolbar: the first of them)
+        for (int slot = 0; slot < SLOTS; slot++) {
+            if (building(slot) && localHuman(slot)) {
+                drawBrushCard(slot, m.builders[slot], barY, barY == 0);
+                break;
+            }
         }
+        //(only the main ones; the rest on the controls sheet. The mouse's buttons if it was used last, else
+        //the keys)
+        const bool mouse = s_mouse.active;
+        std::vector<prompts::Prompt> row {{{Pad::A}, {mouse ? "LMB" : menuKey(prompts::MENU_SELECT)}, lowestTool == 1 ? "rectangle" : lowestTool == 2 ? "fill"
+                : lowestTool == 3 ? "copy" : lowestTool == 4 ? "paste" : "paint"},
+            {{Pad::B}, {mouse ? "RMB" : "Del"}, "erase"},
+            {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "parts"},
+            {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::LB, Pad::Up}, {"Tab"}, "play here"},
+            {{Pad::Start}, {"F1"}, "all controls"}};
+        int gap = 14;
+        const int room = App::screenWidth - 8;
+        if (prompts::promptsWidth(row, gap) > room)
+            gap = 8;
+        if (prompts::promptsWidth(row, gap) > room)
+            row[5].label = "help";
+        prompts::drawPrompts(App::screenWidth / 2, barY + 2, row, gap);
     }
-    const std::string layerLabel = "layer " + std::to_string(lowestLayer + 1) + (lowestLayer >= 2 ? " (front)" : "");
-    //(the mouse's buttons if it was used last, else the keys)
-    const bool mouse = s_mouse.active;
-    std::vector<prompts::Prompt> row {{{Pad::A}, {mouse ? "LMB" : menuKey(prompts::MENU_SELECT)}, lowestTool == 1 ? "rectangle" : lowestTool == 2 ? "fill"
-            : lowestTool == 3 ? "copy" : lowestTool == 4 ? "paste" : "paint"},
-        {{Pad::B}, {mouse ? "RMB" : "Del"}, "erase"},
-        {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "palette"},
-        //(the layer only matters to tiles: with another brush, moving things instead)
-        lowestBrush == BrushTile ? prompts::Prompt {{Pad::Y}, {mouse ? "Ctrl+Wheel" : menuKey(prompts::MENU_SCROLL)}, layerLabel}
-                                 : prompts::Prompt {{Pad::LB, Pad::B}, {mouse ? "Ctrl+RMB" : "G"}, "move"},
-        {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::LB, Pad::Up}, {"Tab"}, "play here"}};
-    //(as many as fit: closer together, then "play")
-    int gap = 14;
-    const int room = App::screenWidth - 8;
-    if (prompts::promptsWidth(row, gap) > room)
-        gap = 8;
-    if (prompts::promptsWidth(row, gap) > room)
-        row[5].label = "play";
-    prompts::drawPrompts(App::screenWidth / 2, barY + 2, row, gap);
+    //A first-time hint (the first not done yet), at the top: what to press, for this machine's builder
+    if (barShown && tipsDone() != (1 << TIPS) - 1) {
+        const bool mouse = s_mouse.active;
+        int tip = 0;
+        while ((tipsDone() >> tip) & 1)
+            tip++;
+        const prompts::Prompt hint = tip == 0 ? prompts::Prompt {{Pad::A}, {mouse ? "LMB" : menuKey(prompts::MENU_SELECT)}, "paints (hold it and move: a line)"}
+            : tip == 1 ? prompts::Prompt {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "opens the parts: blocks, items, hazards..."}
+                       : prompts::Prompt {{Pad::RB}, {"Bksp"}, "undoes (as far back as you like)"};
+        const std::string head = "Tip " + std::to_string(tip + 1) + " of " + std::to_string(TIPS) + ":";
+        const int hw = rm->menu_font_small.getWidth(head.c_str());
+        const int w = hw + 10 + prompts::promptsWidth({hint}, 14) + 24, h = 24;
+        const int x = App::screenWidth / 2 - w / 2, y = barY == 0 ? 24 + TOOLBAR_H + 34 : 30;
+        prompts::fill(x, y, w, h, SDL_Color {0, 0, 0, 255});
+        prompts::fill(x + 1, y + 1, w - 2, h - 2, SDL_Color {200, 152, 24, 255});
+        prompts::fill(x + 2, y + 2, w - 4, h - 4, SDL_Color {24, 40, 96, 255});
+        rm->menu_font_small.draw(x + 12, y + 5, head.c_str());
+        prompts::drawPrompts(x + 12 + hw + 10 + prompts::promptsWidth({hint}, 14) / 2, y + 4, {hint}, 14);
+    }
+    //A short message (what was just done), over the toolbar a moment
+    if (!s_toast.empty() && SDL_GetTicks() - s_toastAt < 1600 && !palette) {
+        const int tw = rm->menu_font_small.getWidth(s_toast.c_str()) + 20, th = 20;
+        const int tx = App::screenWidth / 2 - tw / 2;
+        const int ty = !barShown ? App::screenHeight - th - 6 : barY == 0 ? 24 + TOOLBAR_H + 6 : barY - TOOLBAR_H - th - 6;
+        prompts::fill(tx, ty, tw, th, SDL_Color {0, 0, 0, 255});
+        prompts::fill(tx + 1, ty + 1, tw - 2, th - 2, SDL_Color {24, 40, 96, 255});
+        rm->menu_font_small.drawCentered(App::screenWidth / 2, ty + 3, s_toast.c_str());
+    }
+    //The controls sheet over it all (paused: the pause menu draws it)
+    if (s_helpOpen && !game_values.flags.pausegame)
+        matchedit::drawControlsSheet();
 }
 
 // --at-role matchedit: a Map Maker match (started from the menus: MenuAutoTest); player 1 builds (Back) while the others play: a row
@@ -4971,27 +5343,20 @@ bool GameplayState::autoTestEditScript(int f)
         //(the tools, the last page: from the brush's tileset, the pages after it. Four cells up, a
         //rectangle of the tile 3 by 3 (A held across it); then the fill, B in it: it's erased; the undo
         //button: it's back; the pencil again, the cursor where it was)
-        const int toTools = 1 + PageTools;    //(the tabs from the tiles' to the tools')
+        //(the tools: the toolbar's, clicked)
         add({B_UP, 0}, 4);
-        add({B_PALETTE, 0});
-        add({B_PALETTE, 0}, toTools);
-        add({256 + 27});
-        add({B_RIGHT, 0, B_PAINT, 0});
+        add({jumpTo(JUMP_TOOL_AT + 1), 0, 256 + 27});
         add({B_PAINT, B_PAINT | B_RIGHT, B_PAINT, B_PAINT | B_RIGHT, B_PAINT, B_PAINT | B_DOWN, B_PAINT, B_PAINT | B_DOWN, B_PAINT, 0, 256 + 17});
-        add({B_PALETTE, 0});
-        add({B_PALETTE, 0}, toTools);
-        add({B_RIGHT, 0, B_RIGHT, 0, B_PAINT, 0, B_ERASE, 0, 256 + 18});
+        add({jumpTo(JUMP_TOOL_AT + 2), 0, B_ERASE, 0, 256 + 18});
         add({512, 513, 0, 0, 256 + 19});
-        add({B_PALETTE, 0});
-        add({B_PALETTE, 0}, toTools);
-        add({B_PAINT, 0, B_LEFT, 0, B_LEFT, 0, B_DOWN, 0, B_DOWN, 0});
+        add({jumpTo(JUMP_TOOL_AT), 0, B_LEFT, 0, B_LEFT, 0, B_DOWN, 0, B_DOWN, 0});
         add({B_DOWN, 0}, 2);
         //(the old level editor's: each page as a person would use it. The palette opens on the brush's
         //page; X goes on through the pages, round)
         int open = page;
         auto go = [&](int target) {
             add({B_PALETTE, 0});
-            add({B_PALETTE, 0}, (tabOfPage(target) - tabOfPage(open) + PALETTE_TABS) % PALETTE_TABS);
+            add({B_PALETTE, 0}, (tabOfPage(target) - tabOfPage(open) + CYCLE_TABS) % CYCLE_TABS);
         };
         auto extra = [&](int pageOfExtra) { return tilesets + pageOfExtra; };
         //(a type set apart: death, two cells; a no-spawn zone, team 1's, two cells)
@@ -5034,19 +5399,14 @@ bool GameplayState::autoTestEditScript(int f)
         add({B_UP, 0}, 2);
         add({B_PAINT, 0});
         //(copy, 3 by 2; paste, four cells on; the undo button: the paste gone)
-        go(extra(PageTools));
-        add({B_RIGHT, 0}, 3);
-        add({B_PAINT, 0});
+        add({jumpTo(JUMP_TOOL_AT + 3), 0});
         add({B_PAINT, B_PAINT | B_RIGHT, B_PAINT, B_PAINT | B_RIGHT, B_PAINT, B_PAINT | B_DOWN, B_PAINT, 0});
-        go(extra(PageTools));
-        add({B_RIGHT, 0}, 4);
-        add({B_PAINT, 0});
+        add({jumpTo(JUMP_TOOL_AT + 4), 0});
         add({B_RIGHT, 0}, 4);
         add({B_PAINT, 0, 256 + 25});
         add({512, 513, 0, 0, 256 + 26});
         //(back: the pencil; a tile of the brush's tileset, its first: the next steps open there)
-        go(extra(PageTools));
-        add({B_PAINT, 0});
+        add({jumpTo(JUMP_TOOL_AT), 0});
         go(page);
         add({B_PAINT, 0});
         open = page;
@@ -5150,6 +5510,8 @@ bool GameplayState::autoTestEditScript(int f)
         add({600 + 18 + 1 * MAPWIDTH, 906, 906, 906, 548});
         add({537, 541, 0, 0, 0, 538, 541, 541, 0, 0});
         add({539, 542, 0, 0, 0, 0, 0, 0, 0, 0, 545});
+        add({jumpTo(JUMP_TOOL_AT + 2), 0, jumpTo(JUMP_LAYER_AT + 3), 0, 0, 549, jumpTo(JUMP_TOOL_AT), 0, jumpTo(JUMP_LAYER_AT + 1), 0});
+        add({550, 906, 906, 906, 906, 906, 906, 551});
         //(undo, again and again, past everything built: the map as it began, 518 checks)
         add({0, 0, 533});
         add({B_UNDO, 0}, 250);
@@ -5322,6 +5684,41 @@ bool GameplayState::autoTestEditScript(int f)
                 button(byte == 543 ? SDL_BUTTON_X1 : SDL_BUTTON_X2);
             }
             byte = byte == 541 || byte == 542 || byte == 540 || byte == 543 || byte == 544 ? -1 : 0;
+        } else if (byte == 549) {
+            const MapMakerBuilder& b = m->builders[0];
+            printf("tooltest: the tool %d (fill: 2), the layer %d (4: 3)\n", b.tool, b.layer);
+            byte = 0;
+        } else if (byte == 550 || byte == 551) {
+            //(the toolbar's rectangle tool clicked, as the mouse's events: if the toolbar's drawn)
+            static bool clicked = false;
+            const SDL_Rect r = s_toolRect[1];
+            if (byte == 550) {
+                clicked = r.w > 0;
+                for (const SDL_EventType type : {SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_EVENT_MOUSE_BUTTON_UP}) {
+                    if (!clicked)
+                        break;
+                    SDL_Event e {};
+                    e.type = type;
+                    if (type == SDL_EVENT_MOUSE_MOTION) {
+                        e.motion.x = static_cast<float>(r.x + r.w / 2);
+                        e.motion.y = static_cast<float>(r.y + r.h / 2);
+                    } else {
+                        e.button.x = static_cast<float>(r.x + r.w / 2);
+                        e.button.y = static_cast<float>(r.y + r.h / 2);
+                        e.button.button = SDL_BUTTON_LEFT;
+                        e.button.down = type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+                    }
+                    SDL_PushEvent(&e);
+                }
+                byte = -1;
+            } else {
+                const MapMakerBuilder& b = m->builders[0];
+                if (clicked)
+                    printf("toolbartest: the rectangle clicked, the tool %d (1), the map %s\n", b.tool, builtMapHash(*m) == s_markHash ? "unchanged" : "CHANGED");
+                else
+                    printf("toolbartest: skipped (the toolbar wasn't drawn: --at-norender)\n");
+                byte = 0;
+            }
         } else if (byte == 548) {
             const MapMakerBuilder& b = m->builders[0];
             printf("jumptest: the mouse to (18, 1), 3 ticks on the cursor's at (%d, %d): %s\n", b.cx, b.cy,
@@ -5361,7 +5758,7 @@ bool GameplayState::autoTestEditScript(int f)
             SDL_PushEvent(&key);
             byte = 0;
         } else if (byte >= 256) {
-            shot(("e" + std::to_string(byte - 256) + (byte == 257 ? "_building" : byte == 258 ? "_painted" : byte == 259 ? "_palette" : byte == 264 ? "_music_page" : byte == 265 ? "_contents_page" : byte == 266 ? "_warps" : byte == 267 ? "_warps_page" : byte == 268 ? "_hazards_page" : byte == 269 ? "_platforms_page" : byte == 270 ? "_hazards_platforms" : byte == 271 ? "_undo_once" : byte == 272 ? "_undone" : byte == 273 ? "_rect" : byte == 274 ? "_fill_erased" : byte == 275 ? "_rect_undone" : byte == 276 ? "_types" : byte == 277 ? "_spawns" : byte == 278 ? "_animated" : byte == 279 ? "_weather_page" : byte == 280 ? "_blocks_hidden_off" : byte == 281 ? "_paste" : byte == 282 ? "_paste_undone" : byte == 283 ? "_tools_page" : byte == 284 ? "_mouse_drawn" : byte == 285 ? "_mouse_palette" : byte == 286 ? "_mouse_item" : byte == 287 ? "_all_undone" : byte == 288 ? "_recent" : byte == 289 ? "_recent_next" : byte == 290 ? "_picked" : byte == 291 ? "_cleared" : byte == 292 ? "_clear_undone" : "_blocks")).c_str());
+            shot(("e" + std::to_string(byte - 256) + (byte == 257 ? "_building" : byte == 258 ? "_painted" : byte == 259 ? "_palette" : byte == 264 ? "_music_page" : byte == 265 ? "_contents_page" : byte == 266 ? "_warps" : byte == 267 ? "_warps_page" : byte == 268 ? "_hazards_page" : byte == 269 ? "_platforms_page" : byte == 270 ? "_hazards_platforms" : byte == 271 ? "_undo_once" : byte == 272 ? "_undone" : byte == 273 ? "_rect" : byte == 274 ? "_fill_erased" : byte == 275 ? "_rect_undone" : byte == 276 ? "_types" : byte == 277 ? "_spawns" : byte == 278 ? "_animated" : byte == 279 ? "_weather_page" : byte == 280 ? "_blocks_hidden_off" : byte == 281 ? "_paste" : byte == 282 ? "_paste_undone" : byte == 283 ? "_rectangle" : byte == 284 ? "_mouse_drawn" : byte == 285 ? "_mouse_palette" : byte == 286 ? "_mouse_item" : byte == 287 ? "_all_undone" : byte == 288 ? "_recent" : byte == 289 ? "_recent_next" : byte == 290 ? "_picked" : byte == 291 ? "_cleared" : byte == 292 ? "_clear_undone" : "_blocks")).c_str());
             byte = 0;
         }
         if (building(0) && byte >= 0)
@@ -5403,6 +5800,12 @@ bool GameplayState::autoTestEditScript(int f)
     if (f == end + 39 * slow)
         shot("e7a_pause_clear_armed");
     if (f == end + 40 * slow)
+        matchedit::pauseMenuPress(matchedit::RowControls);    //(the controls sheet, over the pause menu)
+    if (f == end + 41 * slow)
+        shot("e7c_controls");
+    if (f == end + 42 * slow)
+        s_helpOpen = false;
+    if (f == end + 43 * slow)
         s_menuRow = matchedit::RowQuit;
     if (f == end + 44 * slow)
         shot("e7b_pause_quit");

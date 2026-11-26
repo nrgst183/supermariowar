@@ -216,6 +216,7 @@ bool rights(int slot);
 bool isHostHere();        // the host's player is at this machine's controls
 // The host's panel (the pause screen, the online panel): a player's right, Save
 void hostPanelInput(bool left, bool right, bool down, bool select);
+bool sheetCoversScreen();    // the controls sheet up, or shut since the last frame: the whole screen drawn again
 void setPanelRow(int row);    // 0 the rights, 1 Save, 2 Clear map, -1 none (the online panel's other row)
 void drawPauseRights(int y, bool withSave);
 }

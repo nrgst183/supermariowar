@@ -106,8 +106,9 @@ it changes; so do the players who aren't building.
 | Y | Shift | Ctrl + wheel | the layer (1, 2 behind the players; 3, 4 in front). While you use the mouse, Shift is for straight lines instead |
 | RB | Backspace, Ctrl+Z | back side button | undo your last stroke (a rectangle, fill or paste: all of it); hold it to keep undoing. It goes back as far as you like, to how the map started |
 | LB + RB | Ctrl+Y, Ctrl+Shift+Z | forward side button | redo what you undid (hold to keep redoing). Changing the map again drops what's left to redo |
-| | T | | the next tool: pencil, rectangle, fill |
-| | 2 - 8 | | the recent part with that number (the numbers are on the strip) |
+| LB + Y | T | click a tool on the toolbar | the next tool: pencil, rectangle, fill (the toolbar: any of the five) |
+| | 2 - 8 | | the recent part with that number (the numbers are on the toolbar) |
+| | F1 | | the controls sheet: every control on one page (also the pause menu's Controls) |
 | LT / RT | Page Up / Page Down | | the palette's tab before / after (with the palette shut: it opens) |
 | LB + Left / Right | Q / E | wheel (over the map), or click one | the recent parts: the one before / after (see below) |
 | LB + Down | R | Ctrl + left button | copy what's under the cursor: it becomes the brush, with its settings (a ? block's contents, a fire bar's length, a platform's path) |
@@ -123,33 +124,42 @@ tilesets and changes a setting; a right click, or a click off the palette, goes 
 keyboard, Escape in the palette goes back instead of pausing. The bars show the mouse's
 buttons after the mouse was used, the keys after a key.
 
-**The palette** (X) has a tab per kind of thing: X goes to the next tab, Y through the
-tilesets on the **Tiles** tab, A takes, B goes back. **Blocks** (all 30; Y: hidden or not; the
+**The palette** (X) has its tabs in groups along the top: **Tiles**, **Blocks** (Blocks, ?),
+**Items**, **Warps**, **Hazards** (Hazards, Moving), **Scene** (Backdrop, Music), **Rules**
+(Types, Spawns) and **More** (Animated, Weather, Goals); the open group shows its pages instead
+of its name. X goes to the next page, Y through the tilesets on the **Tiles** tab, A takes, B
+goes back; its title line names what the cursor (or the mouse) is on. **Blocks** (all 30; Y: hidden or not; the
 on/off blocks set how the map's switches start), **?** (random, one of the game's item sets,
 or a mix: A adds or takes out a powerup), **Items**, **Warps** (a number's warps go to each
 other), **Hazards** and **Moving** platforms (their settings under them: A, then left/right,
 then A), **Backdrop**, **Music**, **Types** (a cell's type set apart from its tiles: solid,
 ice, death...), **Spawns** (no-spawn zones: everyone's, a team's, the items'), **Animated**
 tiles, **Weather** (clouds, ghosts, leaves, snow, fish, rain, bubbles, on each layer),
-**Goals** (race goals, flag bases), and **Tools** (pencil, rectangle, fill, copy, paste).
+**Goals** (race goals, flag bases). The tools (pencil, rectangle, fill, copy, paste) are on the
+toolbar.
 
-The card at the bottom left shows the brush, its layer and the tool. Next to it are the
-**recent parts**: the last 8 brushes you used (from the palette or copied off the map; click
-one to use it), so you
-can switch between a few things without opening the palette. Placing, erasing, undoing and
+**The toolbar** along the bottom (the top while your cursor is down there) shows the part in
+hand, the **recent parts** (the last 8 you used, from the palette or copied off the map; click
+one, or press its number, to use it: a few things without opening the palette), the five tools
+and the four layers (the ones in use lit; click to change). Under it, the bar shows only the main
+buttons and "all controls" (F1, or Start for the pause menu's Controls). A short message over the
+toolbar says what just happened (Undo, Redo, Copied Brick, Picked up Fire bar, Tool: Fill,
+Layer 3, Map cleared). The first time anyone builds on a computer, three hints come up one after
+another (paint, the parts, undo), each gone once it's been done. Placing, erasing, undoing and
 changing the brush each make a sound, and the cells changed flash a ring (white put down, red
 taken away, yellow undone). While you build, a faint grid marks the cells' corners around your
 cursor, and when the cursor rests a moment a label over it names what's under it (what B would
-erase, or LB + Down copy). The card shows the tool only if it isn't the pencil, and the layer only
-for tiles; the bar shows Y (layer) with tiles, else LB + B (move). While someone builds,
-the things play doesn't show are marked on the map: warps, hazards, hidden blocks, race goals
-and flag bases; with the Types or Spawns brush, the map's types or zones.
+erase, or LB + Down copy), outlined. The cursor shows what it's doing: red while erasing, the
+tool's icon by it for anything but the pencil, marching dashes while it carries a picked-up part.
+While someone builds, the things play doesn't show are marked near the builders' cursors: warps,
+hazards, hidden blocks, race goals and flag bases (all of a kind while its part is in hand); with
+the Types or Spawns brush, the map's types or zones.
 
 **The pause menu**: Resume, Who builds (the host: left/right a player, A gives or takes the
 right), Save map (as "*map* made", in the map list from then on; its filters and thumbnail
 made again), Clear map (the host: everything placed goes, tiles, blocks, items, hazards,
 platforms, warps, types and no-spawn zones, but not the backdrop, music or weather; press it
-twice to be sure; one undo brings it all back), Quit. Online the match can't pause: the online
+twice to be sure; one undo brings it all back), Controls (the controls sheet), Quit. Online the match can't pause: the online
 panel (Start) has the rights, Save and Clear map, under the run-ahead.
 
 Building is part of the simulation (a builder's buttons go in its input byte), so it plays
