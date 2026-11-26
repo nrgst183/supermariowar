@@ -1,5 +1,7 @@
 #include "GSSplashScreen.h"
 #include "LoadLog.h"
+#include "LoadScreen.h"
+#include "Platform.h"
 
 #include "CmdArgs.h"
 #include "FileList.h"
@@ -30,6 +32,22 @@ SplashScreenState::SplashScreenState()
 SplashScreenState& SplashScreenState::instance() {
     static SplashScreenState ss;
     return ss;
+}
+
+void SplashScreenState::drawLoadingScreen()
+{
+    SplashScreenState& splash = instance();
+    SDL_FillSurfaceRect(screen, nullptr, 0x0);
+    rm->menu_backdrop.setalpha(255);
+    rm->menu_backdrop.draw(0, 0);
+    rm->menu_smw.setalpha(255);
+    rm->menu_smw.draw(App::screenWidth/2 - (static_cast<short>(rm->menu_smw.getWidth()) >> 1), 30);
+    rm->menu_version.setalpha(255);
+    rm->menu_version.draw(628 - rm->menu_version.getWidth(), 10);
+    if (splash.menu_credits) {
+        splash.menu_credits->setalpha(255);
+        splash.menu_credits->draw(227, 200);
+    }
 }
 
 void SplashScreenState::onLeaveState()
@@ -167,8 +185,21 @@ void SplashScreenState::update()
         rm->backgroundmusic[2] = sfxMusic(musiclist->music(1));
         loadlog::mark("menu music");
 
+        //(a bar and what's loading, drawn as it goes: the loading is in this one frame)
+        loadscreen::begin(drawLoadingScreen);
+        loadscreen::phase("Loading graphics");
         rm->loadAllGraphics();
         loadlog::mark("all graphics");
+        //(low memory, the first boot (or the cache emptied): the matches' sprites converted for the
+        //cache now, under "Loading...", not as the first match starts; they're loaded from it then)
+        if (platform::lowMemory() && !platform::cacheMarked("sprites_prepared_1")) {
+            loadscreen::phase("Loading graphics");
+            gfxSprite::prepareGroup(SpriteGroup::Game);
+            gfxSprite::prepareGroup(SpriteGroup::Shared);
+            platform::markCache("sprites_prepared_1");
+            loadlog::mark("the matches' sprites prepared (first boot)");
+        }
+        loadscreen::phase("Loading sounds");
         rm->LoadGameSounds();
         loadlog::mark("game sounds");
 
@@ -180,9 +211,11 @@ void SplashScreenState::update()
         }
 
         //Read the map filter lists
+        loadscreen::phase("Loading maps");
         maplist->ReadFilters();
         maplist->ApplyFilters(game_values.pfFilters);
         loadlog::mark("map filters");
+        loadscreen::end();
 
         ifSoundOnPlay(rm->sfx_coin);
 

@@ -1,5 +1,6 @@
 #include "gfxSprite.h"
 #include "LoadLog.h"
+#include "LoadScreen.h"
 #include "Platform.h"
 
 #include "gfx.h"
@@ -280,6 +281,14 @@ void gfxSprite::loadGroup(SpriteGroup group)
     }
 }
 
+void gfxSprite::prepareGroup(SpriteGroup group)
+{
+    for (gfxSprite* sprite : groupSprites()) {
+        if (sprite->m_group == group && !sprite->m_picture && sprite->m_source)
+            sprite->m_source->load(true);    //(into the cache; the picture let go at once)
+    }
+}
+
 void gfxSprite::reload() const
 {
     //(the map preview's worker draws sprites too: one load at a time, and not twice)
@@ -428,19 +437,36 @@ SdlSurfacePtr ImageLoader::load(bool compact) const
     //nothing to convert)
     const bool small = compact || m_compact;
     const std::string file = m_path.string();
+    loadscreen::step();    //(the loading screen's bar, while it's up)
     std::string key;
+    const unsigned long long t0 = loadlog::nowNs();
     if (small) {
         key = file + (m_color_key ? std::format("|k{:02x}{:02x}{:02x}", m_color_key->r, m_color_key->g, m_color_key->b) : "|-") +
               (m_alpha ? std::format("|a{}", *m_alpha) : "|-") + (m_changingAlpha ? "|c" : "|-");
-        if (SDL_Surface* cached = platform::loadCompactImage(file, key))
+        if (SDL_Surface* cached = platform::loadCompactImage(file, key)) {
+            loadlog::count("compact images from the cache drive", loadlog::nowNs() - t0);
             return SdlSurfacePtr(cached);
+        }
     }
+    const unsigned long long t1 = loadlog::nowNs();
     SdlSurfacePtr picture = loadImage(m_path, m_color_key, m_alpha, !m_changingAlpha);
+    const unsigned long long t2 = loadlog::nowNs();
+    unsigned long long t3 = t2, t4 = t2;
     if (picture && small) {
         if (SDL_Surface* compacted = platform::compactSurface(picture.get())) {
             picture.reset(compacted);
+            t3 = loadlog::nowNs();
             platform::saveCompactImage(file, key, picture.get());
+            t4 = loadlog::nowNs();
+            loadlog::count("images compacted (16 bits)", t3 - t2);
+            loadlog::count("compact images written to the cache drive", t4 - t3);
         }
+    }
+    //(a slow one by name: where a first load's time goes)
+    if (t4 - t0 > 40000000ull) {
+        const std::string text = std::format("slow image {} ms: {} (cache look {}, load {}, compact {}, save {})", (t4 - t0) / 1000000,
+            file, (t1 - t0) / 1000000, (t2 - t1) / 1000000, (t3 - t2) / 1000000, (t4 - t3) / 1000000);
+        loadlog::note(text.c_str());
     }
     return picture;
 }

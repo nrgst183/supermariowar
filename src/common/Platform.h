@@ -43,6 +43,11 @@ bool settleFpu(unsigned short* x87Found, unsigned int* mxcsrFound);
 /// The modes now, not changed (false where not known)
 bool peekFpu(unsigned short* x87, unsigned int* mxcsr);
 
+/// A marker in the cache drive's folder: work done once into the cache (true where there's no cache to
+/// prepare: not the Xbox). Gone with the cache
+bool cacheMarked(const std::string& name);
+void markCache(const std::string& name);
+
 /// The test's measurements (--at-match everything), since the last call: the lowest free memory,
 /// the frames shown, the images decoded and read from a cache. known: false where not measured
 struct StageStats {

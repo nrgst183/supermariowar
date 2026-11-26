@@ -134,6 +134,14 @@ if(XBOXOG)
 	if(SMW_XBOX_ARGS_FILE)
 		list(APPEND smw_xbox_deploy "smw_args.txt=${SMW_XBOX_ARGS_FILE}" "xboxtest=${PROJECT_SOURCE_DIR}/tests/xbox")
 	endif()
+	# A normal disc: a test disc's arguments left in the disc's folder from before would start its test
+	# (deploying only adds files), so they go, and the disc image is made again
+	set(smw_xbox_disc_dir "${CMAKE_CURRENT_BINARY_DIR}/Build/supermariowar")
+	if(NOT SMW_XBOX_ARGS_FILE AND NOT SMW_XBOX_DETERMINISM_TEST AND EXISTS "${smw_xbox_disc_dir}/smw_args.txt")
+		message(STATUS "Removing a test disc's smw_args.txt from ${smw_xbox_disc_dir}")
+		file(REMOVE "${smw_xbox_disc_dir}/smw_args.txt" "${CMAKE_CURRENT_BINARY_DIR}/XISO/supermariowar.iso")
+		file(REMOVE_RECURSE "${smw_xbox_disc_dir}/xboxtest" "${smw_xbox_disc_dir}/determinism")
+	endif()
 	rxdk_add_xbe(smw
 		TITLE_NAME "Super Mario War"
 		TITLE_ID 0x534D0001

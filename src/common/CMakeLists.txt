@@ -7,6 +7,8 @@ add_library(CommonFiles STATIC
     LoadLog.cpp
     Platform.cpp
     LoadLog.h
+    LoadScreen.cpp
+    LoadScreen.h
     eyecandy.h
     EyecandyStyles.h
     FileIO.cpp

@@ -255,9 +255,23 @@ void SDL_XboxSaveCompactImage(const char* file, const char* key, SDL_Surface* su
         return;
     const CompactHeader header {COMPACT_MAGIC, COMPACT_VERSION, static_cast<Uint32>(sourceSize), surface->w, surface->h,
         static_cast<Uint32>(surface->format), static_cast<Uint32>(surface->blend_mode), surface->alpha_mod};
-    bool ok = sdlx_write(out, &header, sizeof(header));
-    for (int y = 0; ok && y < surface->h; y++)
-        ok = sdlx_write(out, static_cast<const Uint8*>(surface->pixels) + static_cast<size_t>(y) * surface->pitch, row);
+    //(in blocks of 256 KB, not a write a row: each write is a call to the drive, and a tileset's 500
+    //rows took most of a second (a first boot's loading was mostly these); the block bounds the memory)
+    std::vector<Uint8> block;
+    block.reserve(256u << 10);
+    const auto* bytesOf = reinterpret_cast<const Uint8*>(&header);
+    block.insert(block.end(), bytesOf, bytesOf + sizeof(header));
+    bool ok = true;
+    for (int y = 0; ok && y < surface->h; y++) {
+        const Uint8* line = static_cast<const Uint8*>(surface->pixels) + static_cast<size_t>(y) * surface->pitch;
+        if (block.size() + row > block.capacity()) {
+            ok = sdlx_write(out, block.data(), block.size());
+            block.clear();
+        }
+        block.insert(block.end(), line, line + row);
+    }
+    if (ok && !block.empty())
+        ok = sdlx_write(out, block.data(), block.size());
     sdlx_close(out);
     if (ok)
         s_cacheUsed += static_cast<Sint64>(bytes);

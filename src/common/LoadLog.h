@@ -12,6 +12,8 @@ void mark(const char* what);
 // phase's mark. `what` is a literal (kept as a pointer)
 void count(const char* what, unsigned long long ns, unsigned long long bytes = 0);
 unsigned long long nowNs();
+// A line of its own in the log, at once (a slow image, say)
+void note(const char* text);
 
 // A phase timed from here to the end of the scope: "what  12 ms" (nullptr: not timed)
 class Scope {

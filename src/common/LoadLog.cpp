@@ -26,6 +26,12 @@ void write(const std::string& line)
     if (file) {
         fprintf(file, "%s\n", line.c_str());
         fflush(file);
+#ifdef SMW_XBOX
+        //(closed after each line, and opened again for the next: on the Xbox a line only flushed
+        //can still be lost if the console is switched off, or crashes, before its cache is written)
+        fclose(file);
+        file = fopen((GetHomeDirectory() + "loadtimes.txt").c_str(), "a");
+#endif
     }
 }
 
@@ -78,6 +84,11 @@ void writeCounters()
 #endif
 }
 } // namespace
+
+void note(const char* text)
+{
+    write(std::string("      ") + text);
+}
 
 unsigned long long nowNs()
 {

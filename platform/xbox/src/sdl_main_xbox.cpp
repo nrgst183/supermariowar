@@ -139,6 +139,10 @@ int main(void)
             k++;
             continue;
         }
+        if (fileArgs[k] == "--xbox-fresh-cache") {
+            g_sdlx_fresh_cache = true;
+            continue;
+        }
         if (fileArgs[k] == "--xbox-no-audio") {
             g_sdlx_no_audio = true;
             continue;

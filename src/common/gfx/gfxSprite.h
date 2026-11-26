@@ -57,6 +57,9 @@ public:
     static void unloadGroup(SpriteGroup group);
     /// Loads the group's pictures that aren't loaded (a match's, before it starts: not while it runs)
     static void loadGroup(SpriteGroup group);
+    /// The group's pictures that aren't loaded: loaded and let go again, one at a time (into the
+    /// platform's cache: on the Xbox, a first boot's work done before a match, not as it starts)
+    static void prepareGroup(SpriteGroup group);
     /// Moves the sprite to another group (Shared: a menu's sprite the matches use)
     void setGroup(SpriteGroup group);
     /// The picture changed after it was loaded (drawn on): it can't be loaded again, so it's kept

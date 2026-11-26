@@ -414,18 +414,46 @@ char* SDL_GetPrefPath(const char* org, const char* app)
 
 /* ---- Cache drive and game saves ----------------------------------------- */
 
+namespace {
+// A folder's files and folders deleted (--xbox-fresh-cache: a first boot's empty cache)
+void emptyFolder(const std::string& dir)
+{
+    WIN32_FIND_DATAA found;
+    HANDLE find = FindFirstFileA((dir + "*").c_str(), &found);
+    if (find == INVALID_HANDLE_VALUE)
+        return;
+    do {
+        const std::string name = found.cFileName;
+        if (name == "." || name == "..")
+            continue;
+        const std::string path = dir + name;
+        if (found.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            emptyFolder(path + "\\");
+            RemoveDirectoryA(path.c_str());
+        } else {
+            DeleteFileA(path.c_str());
+        }
+    } while (FindNextFileA(find, &found));
+    FindClose(find);
+}
+} // namespace
+
 const char* SDL_XboxGetCachePath(void)
 {
     static const char* path = nullptr;
     if (!path) {
         // Maps Z: to the title's cache partition (keeping what it had when it
         // was this title's last time)
-        if (XMountUtilityDrive(FALSE)) {
+        if (XMountUtilityDrive(g_sdlx_fresh_cache ? TRUE : FALSE)) {
             path = "Z:/";
         } else {
             sdlx_log("[xbox] Couldn't mount the utility drive; the cache goes on T:\n");
             CreateDirectoryA("T:\\cache", NULL);
             path = "T:/cache/";
+        }
+        if (g_sdlx_fresh_cache) {
+            emptyFolder(path[0] == 'Z' ? "Z:\\" : "T:\\cache\\");
+            sdlx_log("[xbox] The cache emptied (--xbox-fresh-cache)\n");
         }
     }
     return path;

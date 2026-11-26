@@ -76,6 +76,21 @@ bool peekFpu(unsigned short* x87, unsigned int* mxcsr)
     return true;
 }
 
+bool cacheMarked(const std::string& name)
+{
+    if (FILE* file = fopen((std::string(SDL_XboxGetCachePath()) + name).c_str(), "rb")) {
+        fclose(file);
+        return true;
+    }
+    return false;
+}
+
+void markCache(const std::string& name)
+{
+    if (FILE* file = fopen((std::string(SDL_XboxGetCachePath()) + name).c_str(), "wb"))
+        fclose(file);
+}
+
 StageStats takeStageStats()
 {
     StageStats s;
@@ -159,6 +174,15 @@ bool settleFpu(unsigned short*, unsigned int*)
 bool peekFpu(unsigned short*, unsigned int*)
 {
     return false;
+}
+
+bool cacheMarked(const std::string&)
+{
+    return true;
+}
+
+void markCache(const std::string&)
+{
 }
 
 StageStats takeStageStats()

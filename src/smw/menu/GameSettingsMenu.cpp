@@ -3,6 +3,7 @@
 #include "FileList.h"
 #include "GameMode.h"
 #include "GameValues.h"
+#include "MapList.h"
 #include "ResourceManager.h"
 #include "path.h"
 #include "ui/MI_MenuPanel.h"
@@ -289,6 +290,15 @@ void UI_GameSettingsMenu::GameModeChanged(short gmID)
 
 void UI_GameSettingsMenu::SetMapMakerSession(bool on)
 {
+    //The Map Maker starts on the level editor's map (ZZleveleditor); the map chosen before comes back
+    //after its session
+    if (on && !m_mapMaker) {
+        m_mapBeforeMapMaker = maplist ? maplist->currentShortmapname() : std::string();
+        miMapField->SetMap("ZZleveleditor", false);
+    } else if (!on && m_mapMaker && !m_mapBeforeMapMaker.empty()) {
+        miMapField->SetMap(m_mapBeforeMapMaker.c_str(), false);
+        m_mapBeforeMapMaker.clear();
+    }
     m_mapMaker = on;
     miModeField->hideItem(game_mode_mapmaker, !on);
     if (on) {

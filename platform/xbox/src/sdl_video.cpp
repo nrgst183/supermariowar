@@ -49,6 +49,7 @@ SdlxProfile g_sdlx_profile;
 bool g_sdlx_overlay = false;
 int g_sdlx_back_buffers = 0;
 bool g_sdlx_no_audio = false;
+bool g_sdlx_fresh_cache = false;
 int g_sdlx_wanted_back_buffers = 1;    // (1: double buffering, 2: triple; the overlay shows it)
 
 namespace {
@@ -696,6 +697,27 @@ void sdlx_fatal(const char* title, const char* message)
             Sleep(1000);
     }
     sdlx_log("[crash] %s: %s\n", title, message);
+    // The report in a file too (T:\crash_report.txt, the settings folder): it outlasts the screen, the
+    // console switched off there (written through, not left in the drive's cache)
+    {
+        char text[4096];
+        MEMORYSTATUS memory;
+        memory.dwLength = sizeof(memory);
+        GlobalMemoryStatus(&memory);
+        int n = snprintf(text, sizeof(text), "%s\r\n%s\r\nDoing: %s\r\nMemory: %.1f MB free\r\nThe log's last lines:\r\n", title, message,
+            sdlx_crash_context(), static_cast<double>(memory.dwAvailPhys) / (1024.0 * 1024.0));
+        const char* lines[16];
+        const int count = sdlx_log_tail(lines, 16);
+        for (int i = 0; i < count && n > 0 && n < static_cast<int>(sizeof(text)); i++)
+            n += snprintf(text + n, sizeof(text) - n, "  %s\r\n", lines[i]);
+        HANDLE file = CreateFileA("T:\\crash_report.txt", GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, NULL);
+        if (file != INVALID_HANDLE_VALUE) {
+            DWORD written = 0;
+            WriteFile(file, text, static_cast<DWORD>(SDL_min(n, static_cast<int>(sizeof(text)) - 1)), &written, NULL);
+            FlushFileBuffers(file);
+            CloseHandle(file);
+        }
+    }
     // Into the screen's memory if the game drew there, else a frame texture; the GPU may still read
     // either (the frame before), which only matters for that frame
     showScreen("The game crashed", 0xFFF05040u, title, message);

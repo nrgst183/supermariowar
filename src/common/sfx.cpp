@@ -1,4 +1,5 @@
 #include "sfx.h"
+#include "LoadScreen.h"
 
 #include <array>
 #include <cstdio>
@@ -254,7 +255,9 @@ bool sfx_canPlayAudio() {
 
 sfxSound::sfxSound(const fs::path& path)
     : m_audio(s_audiosys->openAudio(path))
-{}
+{
+    loadscreen::step();    //(the loading screen's bar, while it's up)
+}
 
 namespace {
 // The sounds played lately, with the tick that played them (online: a rollback doesn't play

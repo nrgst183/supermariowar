@@ -15,6 +15,8 @@ class SplashScreenState : public GameState
         void update() override;
 
         static SplashScreenState& instance();
+        // The splash under the loading screen's bar (LoadScreen.h): the backdrop, the logo, the credits
+        static void drawLoadingScreen();
 
     private:
         void onLeaveState() override;

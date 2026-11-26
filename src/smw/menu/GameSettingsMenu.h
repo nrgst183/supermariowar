@@ -70,6 +70,7 @@ private:
     MI_LobbyMap* miMapOverlay = nullptr;
     OnlineView m_onlineView = OnlineView::Off;
     bool m_mapMaker = false;
+    std::string m_mapBeforeMapMaker;    // the map chosen before the Map Maker's session (back after it)
     std::string m_header = "Single Game";    // the header asked for (the Map Maker's session shows its own)
 
     MI_DialogBox* miGameSettingsExitDialogImage = nullptr;
