@@ -162,6 +162,9 @@ bool s_grabPressed[SLOTS] {};      // LB+B, G, Ctrl+right click: what's under th
 bool s_lbChord[SLOTS][5] {};       // (LB with Left, Right, Down, B held last tick: each a press once)
 bool s_clearPending = false;       // the pause menu's Clear map: the host's command, sent next tick
 bool s_triggerHeld[SLOTS][2] {};   // (a trigger pressed in: one step until it's let go)
+bool s_layerHeld[SLOTS] {};        // the layer button (Y, Shift) held on the map: Up/Down step the layer, not the cursor
+bool s_layerStepped[SLOTS] {};     // ... and stepped it since it went down (let go: no "next" then)
+bool s_layerDir[SLOTS][2] {};      // (Up, Down held last tick with it: a step a press)
 bool s_pausePressed[SLOTS] {};     // building: the pause (a pad's Start), by input device
 bool s_escPressed[SLOTS] {};       // the keyboard's Escape: the pause (the palette open: back), by input device
 bool s_escHeld = false;            // the keyboard's Escape, Delete held (Delete erases; Escape: the palette's back)
@@ -3478,6 +3481,7 @@ void drawLayerButton(int layer, int x, int y)
 // none): which layer it is shows on the map itself. (Its pictures kept between frames: drawn again when
 // the map or the layer changes)
 bool s_layerViewDirty = true;
+bool s_layerViewOn = false;    // drawn this frame (the map's front picture see-through, from the next)
 void drawLayerView(int layer)
 {
     static SDL_Surface* veil = nullptr;
@@ -3513,6 +3517,7 @@ void drawLayerView(int layer)
     }
     SDL_BlitSurface(veil, nullptr, blitdest, nullptr);
     tiles(blitdest, layer);
+    s_layerViewOn = true;
     if (layer < MAPLAYERS - 1)
         SDL_BlitSurface(front, nullptr, blitdest, nullptr);
 }
@@ -3767,9 +3772,16 @@ void reset()
         s_chordHeld[slot] = false;
         s_undoPressed[slot] = false;
         s_scriptByte[slot] = -1;
+        s_layerHeld[slot] = false;
     }
     for (int slot = 0; slot < SLOTS; slot++)
         s_wantPending[slot] = false;
+    //(the map's front picture opaque again: the layer view's see-through ends with the match)
+    for (gfxSprite& front : rm->spr_frontmap) {
+        if (front)
+            SDL_SetSurfaceAlphaMod(front.getSurface(), 255);
+    }
+    s_layerViewDirty = true;
     s_rightsSlot = 1;
     s_pauseRow = 0;
     s_shownValid = false;
@@ -4328,7 +4340,38 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
     }
     byte |= keys.menu_select.fDown ? B_PAINT : 0;
     byte |= keys.menu_random.fDown ? B_PALETTE : 0;
-    byte |= keys.menu_scrollfast.fDown && !(s_mouse.active && slot == mouseSlot()) && !s_lbHeld[device & 3] ? B_LAYER : 0;
+    const bool layerKey = keys.menu_scrollfast.fDown && !(s_mouse.active && slot == mouseSlot()) && !s_lbHeld[device & 3];
+    const MapMakerBuilder& here = m->builders[slot];
+    const int d = device & 3;
+    if (here.palette) {
+        //(the palette's: Y as it was (its pages))
+        s_layerHeld[d] = false;
+        byte |= layerKey ? B_LAYER : 0;
+    } else if (layerKey) {
+        //(on the map, held: Up/Down the layer up or down (1 to 4, no wrapping round), the cursor still)
+        if (!s_layerHeld[d]) {
+            s_layerHeld[d] = true;
+            s_layerStepped[d] = false;
+            s_layerDir[d][0] = keys.menu_up.fDown;
+            s_layerDir[d][1] = keys.menu_down.fDown;
+        }
+        const bool up = keys.menu_up.fDown, down = keys.menu_down.fDown;
+        const int step = up && !s_layerDir[d][0] ? 1 : down && !s_layerDir[d][1] ? -1 : 0;
+        s_layerDir[d][0] = up;
+        s_layerDir[d][1] = down;
+        byte &= ~(B_LEFT | B_RIGHT | B_UP | B_DOWN);
+        if (step != 0) {
+            s_layerStepped[d] = true;
+            const int to = std::clamp(here.layer + step, 0, MAPLAYERS - 1);
+            if (to != here.layer)
+                return jumpTo(JUMP_LAYER_AT + to);
+        }
+    } else if (s_layerHeld[d]) {
+        //(let go: a tap (no step on the way), the next layer, round from 4 to 1)
+        s_layerHeld[d] = false;
+        if (!s_layerStepped[d])
+            byte |= B_LAYER;
+    }
     if (byte == B_DONE)
         byte = B_PALETTE;    //(X and Y together alone: not "done")
     if ((byte & (B_LEFT | B_RIGHT)) == (B_LEFT | B_RIGHT))
@@ -4776,7 +4819,8 @@ void drawControlsSheet()
         {"Painting",
             {{"Paint", {Pad::A}, "Enter", "left button"}, {"Erase", {Pad::B}, "Delete", "right button"},
                 {"Straight line", {}, "-", "Shift + drag"}, {"Next tool", {Pad::LB, Pad::Y}, "T", "click a tool"},
-                {"Layer", {Pad::Y}, "Shift", "Ctrl+wheel"}}},
+                {"Next layer (round)", {Pad::Y}, "Shift", "click Layer"},
+                {"Layer up / down", {Pad::Y, Pad::Up, Pad::Down}, "Shift+Up/Dn", "Ctrl+wheel", 2}}},
         {"Parts",
             {{"Parts palette", {Pad::X}, "Space", "middle button"}, {"Palette tab", {Pad::LT, Pad::RT}, "PgUp, PgDn", "click a tab", 1},
                 {"Recent part", {Pad::LB, Pad::Left, Pad::Right}, "Q, E, 2-8", "wheel, click", 2},
@@ -4827,7 +4871,7 @@ void drawControlsSheet()
                 }
             }
             rm->menu_font_small.draw(colMouse, ry + 1, row.mouse);
-            ry += 18;
+            ry += 17;    //(17: room for every row over the close prompt)
         }
         ry += 2;
     }
@@ -5084,7 +5128,9 @@ void GameplayState::drawEditMode()
             initEyeCandy();
         }
     }
-    //(the layer view: this machine's first builder, tiles in hand: its layer shown on the map)
+    //(the layer view: this machine's first builder, tiles in hand: its layer shown on the map; the front
+    //layers, drawn before this, see-through from the next frame while it's on)
+    s_layerViewOn = false;
     for (int slot = 0; slot < SLOTS; slot++) {
         if (building(slot) && localHuman(slot)) {
             const MapMakerBuilder& b = m.builders[slot];
@@ -5092,6 +5138,10 @@ void GameplayState::drawEditMode()
                 drawLayerView(b.layer);
             break;
         }
+    }
+    for (gfxSprite& front : rm->spr_frontmap) {
+        if (front)
+            SDL_SetSurfaceAlphaMod(front.getSurface(), s_layerViewOn ? 90 : 255);
     }
     //(the types set apart, and the no-spawn zones, shown while a builder has their brush)
     bool showTypes = false, showSpawns = false;
@@ -5720,6 +5770,11 @@ bool GameplayState::autoTestEditScript(int f)
         add({537, 541, 0, 0, 0, 538, 541, 541, 0, 0});
         add({539, 542, 0, 0, 0, 0, 0, 0, 0, 0, 545});
         add({jumpTo(JUMP_TOOL_AT + 2), 0, jumpTo(JUMP_LAYER_AT + 3), 0, 0, 549, jumpTo(JUMP_TOOL_AT), 0, jumpTo(JUMP_LAYER_AT + 1), 0});
+        //(the layer key, as real key events (570..575: Shift, Up, Down, down and up): held, Up twice, Up at
+        //the top (no wrapping), Down: 2 to 3; let go, no "next" (it stepped); tapped twice: 4, then 1 round
+        //(576 prints it; 577: a tick with no scripted byte, the keys read as a person's))
+        add({0, 570, 577, 577, 572, 577, 573, 577, 572, 577, 573, 577, 572, 577, 573, 577, 574, 577, 575, 577, 571, 577, 577, 576});
+        add({570, 577, 577, 571, 577, 577, 576, 570, 577, 577, 571, 577, 577, 576});
         add({550, 906, 906, 906, 906, 906, 906, 551});
         //(undo, again and again, past everything built: the map as it began, 518 checks)
         add({0, 0, 533});
@@ -5971,6 +6026,22 @@ bool GameplayState::autoTestEditScript(int f)
         } else if (byte == 517) {
             printf("keytest: paused %d, quitting %d, building %d\n", game_values.flags.pausegame ? 1 : 0, game_values.flags.exitinggame ? 1 : 0, building(0) ? 1 : 0);
             byte = 0;
+        } else if (byte >= 570 && byte <= 577) {
+            //(the layer key's test: 570/571 Left Shift down/up, 572/573 Up, 574/575 Down; 576 the layer;
+            //577 nothing. No scripted byte: the builder's keys are read as a person's)
+            if (byte == 577) {
+            } else if (byte == 576) {
+                printf("layerkeys: the layer %d\n", m->builders[0].layer + 1);
+            } else {
+                static const SDL_Keycode KEYS[3] = {SDLK_LSHIFT, SDLK_UP, SDLK_DOWN};
+                SDL_Event key {};
+                const bool down = (byte - 570) % 2 == 0;
+                key.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+                key.key.key = KEYS[(byte - 570) / 2];
+                key.key.down = down;
+                SDL_PushEvent(&key);
+            }
+            byte = -1;
         } else if (byte >= 514) {
             //(514 Enter, 515 P, 516 Escape: pressed and let go)
             const SDL_Keycode keys[3] = {SDLK_RETURN, SDLK_P, SDLK_ESCAPE};

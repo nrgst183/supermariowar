@@ -103,7 +103,8 @@ it changes; so do the players who aren't building.
 | A | Enter | left button | paint (held: along the way); with the rectangle, copy or fill: from where it's pressed. Shift held as you start dragging: a straight line (it keeps to the row or column) |
 | B | Delete | right button | erase, the same way |
 | X | Space | middle button | the palette |
-| Y | Shift | Ctrl + wheel | the layer (1, 2 behind the players; 3, 4 in front). While you use the mouse, Shift is for straight lines instead |
+| Y | Shift | click Layer on the toolbar | the next layer, round from 4 to 1 (1, 2 behind the players; 3, 4 in front). While you use the mouse, Shift is for straight lines instead |
+| Y + Up / Down | Shift + Up / Down | Ctrl + wheel | the layer up or down (stops at 1 and 4; the cursor stays put while Y is held) |
 | RB | Backspace, Ctrl+Z | back side button | undo your last stroke (a rectangle, fill or paste: all of it); hold it to keep undoing. It goes back as far as you like, to how the map started |
 | LB + RB | Ctrl+Y, Ctrl+Shift+Z | forward side button | redo what you undid (hold to keep redoing). Changing the map again drops what's left to redo |
 | LB + Y | T | click a tool on the toolbar | the next tool: pencil, rectangle, fill (the toolbar: any of the five) |
@@ -143,8 +144,8 @@ hand, the **recent parts** (the last 8 you used, from the palette or copied off 
 one, or press its number, to use it: a few things without opening the palette), the five tools
 (the one in use lit; click to change) and the layer, a button with its name ("Layer 3"; click
 it for the next). While you hold tiles, the map shows the layer you're on: the rest a little
-darker, your layer bright, and the layers in front of it as faint ghosts over it (three on layer 1,
-none on layer 4). Under it, the bar shows only the main
+darker, the layers in front of yours see-through, your layer bright, and the layers in front of it
+as faint ghosts over it (three on layer 1, none on layer 4). Under it, the bar shows only the main
 buttons and "all controls" (F1, or Start for the pause menu's Controls). A short message over the
 toolbar says what just happened (Undo, Redo, Copied Brick, Picked up Fire bar, Tool: Fill,
 Layer 3, Map cleared). The first time anyone builds on a computer, three hints come up one after
