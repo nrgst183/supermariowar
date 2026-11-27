@@ -32,6 +32,8 @@ class MovingPlatform : public sim::ArenaAllocated
         void draw();
         void draw(short iOffsetX, short iOffsetY);
         void update();
+        // A tick held where it is (the Map Maker's parts window open): no move, no speed (what rides it stays)
+        void hold();
 
 
         void ResetPath();

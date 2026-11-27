@@ -907,8 +907,12 @@ void GameplayState::update_world()
     handleP2PCollisions();
 
     determinism::checkFpu("the start of the world's update");
-    //Move platforms
-    g_map->updatePlatforms();
+    //Move platforms (the Map Maker's parts window open: held still, with the map's moving dangers)
+    const bool frozen = matchedit::motionFrozen();
+    if (frozen)
+        g_map->holdPlatforms();
+    else
+        g_map->updatePlatforms();
     determinism::checkFpu("the platforms");
 
     game_values.flags.playskidsound = false;
@@ -923,10 +927,10 @@ void GameplayState::update_world()
     playSFX();
     determinism::checkFpu("the sounds");
 
-    g_sim.noncolcontainer.update();
-    g_sim.objectcontainer[0].update();
-    g_sim.objectcontainer[1].update();
-    g_sim.objectcontainer[2].update();
+    g_sim.noncolcontainer.update(frozen);
+    g_sim.objectcontainer[0].update(frozen);
+    g_sim.objectcontainer[1].update(frozen);
+    g_sim.objectcontainer[2].update(frozen);
     determinism::checkFpu("the objects' updates");
 
     handleP2ObjCollisions();

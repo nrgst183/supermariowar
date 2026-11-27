@@ -60,6 +60,8 @@ add_library(CommonFiles STATIC
     map/MapReaderConstants.h
     math/Vec2.h
     MapList.cpp
+    MapFavorites.cpp
+    MapFavorites.h
     MapList.h
     MatchTypes.h
     MovingPlatformPaths.h

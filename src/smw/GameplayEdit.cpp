@@ -164,7 +164,9 @@ bool s_clearPending = false;       // the pause menu's Clear map: the host's com
 bool s_triggerHeld[SLOTS][2] {};   // (a trigger pressed in: one step until it's let go)
 bool s_layerHeld[SLOTS] {};        // the layer button (Y, Shift) held on the map: Up/Down step the layer, not the cursor
 bool s_layerStepped[SLOTS] {};     // ... and stepped it since it went down (let go: no "next" then)
-bool s_layerDir[SLOTS][2] {};      // (Up, Down held last tick with it: a step a press)
+bool s_layerDir[SLOTS][2] {};
+bool s_xClosed[SLOTS] {};          // X shut the parts window: held on, it doesn't open it again
+int s_windowStepGap[SLOTS] {};     // (a page step to the window's every other tick: each a press)      // (Up, Down held last tick with it: a step a press)
 bool s_pausePressed[SLOTS] {};     // building: the pause (a pad's Start), by input device
 bool s_escPressed[SLOTS] {};       // the keyboard's Escape: the pause (the palette open: back), by input device
 bool s_escHeld = false;            // the keyboard's Escape, Delete held (Delete erases; Escape: the palette's back)
@@ -2982,7 +2984,9 @@ void drawGlove(int slot, SDL_Rect cell, SDL_Point tip, SDL_Color color, const st
     sparks(g.pressMs, 20.0f, 8);
     sparks(g.appearMs, 30.0f, 12);
 
-    //The tag: the player's name in its color, a little behind the hand
+    //The tag: the player's name in its color, a little behind the hand (none: one builder alone)
+    if (label.empty())
+        return;
     const int w = rm->menu_font_small.getWidth(label.c_str()) + 6;
     const int lx = std::min(static_cast<int>(g.tagX) + 22, App::screenWidth - w);
     const int ly = std::min(static_cast<int>(g.tagY + bob) + 26, App::screenHeight - 16);
@@ -3068,10 +3072,35 @@ int mouseSlot()
     return first;
 }
 
+// One parts window on a machine's screen, however many of its players have theirs open: the first's (by
+// slot), the window's; the others' go to its page and their hands pick in it too (paletteOwner,
+// windowPageStep). Another machine's builders' windows are on their own screens
+int s_windowSlot = -1;          // whose window this frame's is
+bool s_mouseInWindow = false;   // the mouse's builder is in it (its clicks go there)
+std::vector<PaletteHit> s_windowHits;    // its cells this frame (other hands are placed by them)
+bool s_paletteCellShown[SLOTS] {};       // a builder's hand has its cell in the window this frame
+
+// This machine's parts window's builder: its first player (by slot) with theirs open; -1 none
+int paletteOwner(const CGM_MapMaker& m)
+{
+    for (int slot = 0; slot < SLOTS; slot++)
+        if (building(slot) && localHuman(slot) && m.builders[slot].palette)
+            return slot;
+    return -1;
+}
+
+// Whether the window's mouse hits are recorded: its owner's, if the mouse's builder is in it
+bool recordsMouse(int slot)
+{
+    return slot == s_windowSlot ? s_mouseInWindow : slot == mouseSlot();
+}
+
 void paletteHit(int slot, int x, int y, int w, int h, int px, int py, int tab = -1)
 {
-    if (slot == mouseSlot())
+    if (recordsMouse(slot))
         s_paletteHits.push_back({{x, y, w, h}, static_cast<short>(px), static_cast<short>(py), static_cast<short>(tab)});
+    if (slot == s_windowSlot)
+        s_windowHits.push_back({{x, y, w, h}, static_cast<short>(px), static_cast<short>(py), static_cast<short>(tab)});
 }
 
 SDL_Rect s_paletteCell[SLOTS] {};
@@ -3081,10 +3110,11 @@ void paletteSelect(int slot, int x, int y, int w, int h, int tipX = -1, int tipY
 {
     s_paletteCell[slot & 3] = SDL_Rect {x, y, w, h};
     s_paletteTip[slot & 3] = SDL_Point {tipX >= 0 ? tipX : x + w / 2, tipY >= 0 ? tipY : y + h / 2};
+    s_paletteCellShown[slot & 3] = true;
 }
 
-// A builder's palette: a strip of three rows of the page, at the bottom (the top while its cursor is
-// down there), its page's name in a bar over it
+// A builder's palette: a strip of three rows of the page, always at the bottom of the screen (it doesn't
+// move about with the cursor), its page's name in a bar over it
 // The palette's tabs, along its top, in groups: a group's name a tab; the open group's pages its tabs
 // instead, in a band of the player's color, the open page bright (a window round them, if they don't
 // all fit)
@@ -3163,9 +3193,9 @@ void drawStrip(int slot, const MapMakerBuilder& b)
 {
     constexpr int TABS_H = 18;
     const int h = STRIP_ROWS * TILESIZE + 24 + TABS_H;
-    const int stripTop = b.cy >= MAPHEIGHT / 2 ? 0 : App::screenHeight - h;
+    const int stripTop = App::screenHeight - h;
     prompts::fill(0, stripTop, App::screenWidth, h, SDL_Color {16, 24, 48, 255});
-    if (slot == mouseSlot()) {
+    if (recordsMouse(slot)) {
         s_paletteHits.clear();
         s_stripRect = {0, stripTop, App::screenWidth, h};
     }
@@ -3246,7 +3276,7 @@ void drawStrip(int slot, const MapMakerBuilder& b)
               {{Pad::A}, {s_mouse.active ? "LMB" : menuKey(prompts::MENU_SELECT)}, "done"}}
         : std::vector<prompts::Prompt> {{{Pad::LT, Pad::RT}, {"PgUp", "PgDn"}, "tabs"},
               {{Pad::A}, {s_mouse.active ? "LMB" : menuKey(prompts::MENU_SELECT)}, settings ? "change" : onContentsPage(b) && b.py == 1 ? "add/remove" : "take"},
-              {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::B}, {s_mouse.active ? "RMB" : "Esc"}, "back"}};
+              {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::B}, {s_mouse.active ? "RMB" : "Esc"}, "close"}};
     //(Y: on the tiles, the next tileset; on the blocks, hidden or not)
     std::vector<prompts::Prompt> rowY = row;
     if (!b.adjusting && b.page < static_cast<int>(tilesetCount()))
@@ -3577,9 +3607,10 @@ void drawBrushCard(int slot, const MapMakerBuilder& b, int barY, bool barAtTop)
     const int cell = 38, rx = 136;
     for (int k = 1; k < RECENT_SHOWN; k++) {
         const int cx = rx + (k - 1) * cell;
-        square(cx, cell - 2, false, false, k >= shown);
+        //(only the parts there: no row of empty boxes)
         if (k >= shown)
             continue;
+        square(cx, cell - 2, false, false, false);
         MapMakerBuilder r = b;
         applyRecent(r, b.recent[k]);
         drawBrushPiece(r.brush, r.tile, brushPieceIndex(r), cx + 2, y + 6);
@@ -3744,6 +3775,17 @@ bool active()
         if (building(slot))
             return true;
     }
+    return false;
+}
+
+bool motionFrozen()
+{
+    const CGM_MapMaker* m = mode();
+    if (!m)
+        return false;
+    for (int slot = 0; slot < SLOTS; slot++)
+        if (building(slot) && m->builders[slot].palette)
+            return true;
     return false;
 }
 
@@ -4315,6 +4357,19 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
             s_mouse.predValid = false;
         return flip && m->rights[slot] ? static_cast<uint8_t>(gameByte | B_PALETTE) : gameByte;
     }
+    {
+        const int owner = paletteOwner(*m);
+        const MapMakerBuilder& mine = m->builders[slot];
+        if (owner >= 0 && owner != slot && mine.palette && !mine.adjusting && m->builders[owner].page != mine.page) {
+            const int d = device & 3;
+            if ((s_windowStepGap[d] ^= 1) == 0)
+                return 0;
+            const MapMakerBuilder& window = m->builders[owner];
+            if (tabOfPage(window.page) != tabOfPage(mine.page))
+                return mouseTabByte(tabOfPage(window.page));
+            return B_LAYER;    //(the tiles: the next tileset, on to the window's)
+        }
+    }
     if (slot == mouseSlot()) {
         bool used = false;
         const uint8_t byte = mouseByte(slot, *m, used);
@@ -4339,7 +4394,16 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
         byte |= keys.menu_cancel.fDown && !s_lbHeld[device & 3] ? B_ERASE : 0;    //(LB+B: pick up, not erase)
     }
     byte |= keys.menu_select.fDown ? B_PAINT : 0;
-    byte |= keys.menu_random.fDown ? B_PALETTE : 0;
+    //(X: the parts window open; in it, shut (as B), the button that opened it; held on, not again)
+    const int dx = device & 3;
+    if (!keys.menu_random.fDown)
+        s_xClosed[dx] = false;
+    if (keys.menu_random.fDown && m->builders[slot].palette && !m->builders[slot].adjusting) {
+        byte |= B_ERASE;
+        s_xClosed[dx] = true;
+    } else if (keys.menu_random.fDown && !s_xClosed[dx]) {
+        byte |= B_PALETTE;
+    }
     const bool layerKey = keys.menu_scrollfast.fDown && !(s_mouse.active && slot == mouseSlot()) && !s_lbHeld[device & 3];
     const MapMakerBuilder& here = m->builders[slot];
     const int d = device & 3;
@@ -5218,7 +5282,7 @@ void GameplayState::drawEditMode()
     }
     //(a builder of this machine's on the map: the grid round its cursor, marks at the cells' corners, as
     //Mario Maker's; not over the whole map)
-    constexpr int GRID_REACH = 4;
+    constexpr int GRID_REACH = 3;
     std::vector<SDL_Point> cursors;
     for (int slot = 0; slot < SLOTS; slot++)
         if (building(slot) && localHuman(slot) && !m.builders[slot].palette)
@@ -5327,25 +5391,50 @@ void GameplayState::drawEditMode()
         prompts::fill(x + 1, y + 1, w - 2, h - 2, SDL_Color {24, 32, 64, 255});
         rm->menu_font_small.draw(x + 5, y + 2, name.c_str());
     }
-    for (int slot = 0; slot < SLOTS; slot++) {
-        if (building(slot) && m.builders[slot].palette)
-            drawStrip(slot, m.builders[slot]);
+    //(this machine's parts window: its first open one's; the others' hands in it, on their cells, where
+    //they're on its page and in sight)
+    for (bool& shown : s_paletteCellShown)
+        shown = false;
+    s_windowHits.clear();
+    s_windowSlot = paletteOwner(m);
+    if (s_windowSlot >= 0) {
+        const MapMakerBuilder& w = m.builders[s_windowSlot];
+        const int ms = mouseSlot();
+        s_mouseInWindow = ms == s_windowSlot || (ms >= 0 && m.builders[ms].palette && m.builders[ms].page == w.page);
+        drawStrip(s_windowSlot, w);
+        for (int slot = 0; slot < SLOTS; slot++) {
+            const MapMakerBuilder& b = m.builders[slot];
+            if (slot == s_windowSlot || !building(slot) || !localHuman(slot) || !b.palette || b.page != w.page)
+                continue;
+            for (const PaletteHit& hit : s_windowHits) {
+                if (hit.tab == -1 && hit.px == b.px && hit.py == b.py) {
+                    paletteSelect(slot, hit.r.x, hit.r.y, hit.r.w, hit.r.h);
+                    break;
+                }
+            }
+        }
     }
     //(the builders' hands, after it all: over their cells, or their palette's choice; a hand isn't hidden
-    //under another's cell or strip)
+    //under another's cell or strip. Their "P1" tags only when there's more than one)
+    int builders = 0;
+    for (int slot = 0; slot < SLOTS; slot++)
+        builders += building(slot) ? 1 : 0;
     for (int slot = 0; slot < SLOTS; slot++) {
         if (!building(slot))
             continue;
         const MapMakerBuilder& b = m.builders[slot];
         const bool down = (g_sim.previousInput[slot] & (B_PAINT | B_ERASE)) && g_sim.previousInput[slot] != B_UNDO;
         const SDL_Point at = shownCell(slot, b);
+        //(in a parts window: not shown in this one (another machine's, or out of sight): no hand)
+        if (b.palette && !s_paletteCellShown[slot])
+            continue;
         const SDL_Rect cell = b.palette ? s_paletteCell[slot] : SDL_Rect {at.x * TILESIZE, at.y * TILESIZE, TILESIZE, TILESIZE};
         //(the mouse's: its fingertip on the pointer, exactly)
         const bool mouseHere = !b.palette && slot == mouseSlot() && s_mouse.active;
         const SDL_Point tip = b.palette ? s_paletteTip[slot]
             : mouseHere ? SDL_Point {std::clamp(s_mouse.x, 0, App::screenWidth - 1), std::clamp(s_mouse.y, 0, App::screenHeight - 1)}
                         : SDL_Point {cell.x + TILESIZE / 2, cell.y + TILESIZE / 2};
-        drawGlove(slot, cell, tip, slotColor(slot), "P" + std::to_string(slot + 1), down, mouseHere);
+        drawGlove(slot, cell, tip, slotColor(slot), builders > 1 ? "P" + std::to_string(slot + 1) : std::string(), down, mouseHere);
         if (!b.palette) {
             const uint8_t was = g_sim.previousInput[slot];
             if (was != B_UNDO && (mouseButtons(was) & B_ERASE))
@@ -5369,8 +5458,7 @@ void GameplayState::drawEditMode()
             }
         }
     }
-    //What the builders' buttons do: a bar at the bottom (the top while a cursor is down there), if one
-    //of this machine's players builds
+    //What the builders' buttons do: a bar at the bottom, if one of this machine's players builds
     //(not while one's palette is open: it has its own, and the bar would cover its last row)
     bool local = false, palette = false;
     for (int slot = 0; slot < SLOTS; slot++) {
@@ -5379,8 +5467,23 @@ void GameplayState::drawEditMode()
     }
     using prompts::Pad;
     using prompts::menuKey;
-    const int barY = lowest >= MAPHEIGHT - 3 ? 0 : App::screenHeight - 24;
+    //(always at the bottom (the screen's things don't move about); a cursor under it: the bar see-through,
+    //the cells behind it showing: drawn on a layer of its own, put over the map faded)
+    const int barY = App::screenHeight - 24;
     const bool barShown = any && local && !palette;
+    const SDL_Rect barRect {0, barY - TOOLBAR_H, App::screenWidth, App::screenHeight - (barY - TOOLBAR_H)};
+    static SDL_Surface* barLayer = nullptr;
+    SDL_Surface* const screen = blitdest;
+    const bool underBar = lowest * TILESIZE + TILESIZE > barRect.y;
+    if (barShown && underBar && screen && !barLayer)
+        barLayer = SDL_CreateSurface(App::screenWidth, App::screenHeight, SDL_PIXELFORMAT_ARGB8888);
+    const bool seeThrough = barShown && underBar && screen && barLayer;
+    if (seeThrough) {
+        SDL_FillSurfaceRect(barLayer, &barRect, SDL_MapSurfaceRGBA(barLayer, 0, 0, 0, 0));
+        SDL_SetSurfaceBlendMode(barLayer, SDL_BLENDMODE_BLEND);
+        SDL_SetSurfaceAlphaMod(barLayer, 120);
+        blitdest = barLayer;
+    }
     if (barShown) {
         theme::statusBar(0, barY, App::screenWidth, 24);
         //(this machine's builder's toolbar: the first of them)
@@ -5399,13 +5502,21 @@ void GameplayState::drawEditMode()
             {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "parts"},
             {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::LB, Pad::Up}, {"Tab"}, "play here"},
             {{Pad::Start}, {"F1"}, "all controls"}};
+        //(the tips done (paint, the parts, undo: known): only these two, the rest on the controls sheet)
+        if (tipsDone() == (1 << TIPS) - 1)
+            row = {row[4], row[5]};
         int gap = 14;
         const int room = App::screenWidth - 8;
         if (prompts::promptsWidth(row, gap) > room)
             gap = 8;
-        if (prompts::promptsWidth(row, gap) > room)
+        if (prompts::promptsWidth(row, gap) > room && row.size() > 5)
             row[5].label = "help";
         prompts::drawPrompts(App::screenWidth / 2, barY + 2, row, gap);
+    }
+    if (seeThrough) {
+        blitdest = screen;
+        SDL_Rect to = barRect;
+        SDL_BlitSurface(barLayer, &barRect, screen, &to);
     }
     //A first-time hint (the first not done yet), at the top: what to press, for this machine's builder
     if (barShown && tipsDone() != (1 << TIPS) - 1) {

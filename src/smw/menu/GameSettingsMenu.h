@@ -59,6 +59,8 @@ private:
     MI_Button* miSettingsStartButton = nullptr;
     MI_Button* miMapFiltersButton = nullptr;
     MI_Button* miMapThumbnailsButton = nullptr;
+    MI_Button* miMapFavoriteButton = nullptr;     // the map shown starred as a favorite, or not
+    MI_Button* miMapFavoritesButton = nullptr;    // the favorites' thumbnails
 
     MI_Image* miMapFiltersOnImage = nullptr;
 

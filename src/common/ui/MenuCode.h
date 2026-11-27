@@ -140,6 +140,8 @@ enum MenuCodeEnum {
     MENU_CODE_ONLINE_VOTE_REMATCH,     // after an online match: vote for the same match again (NetLobby's REMATCH VOTE)
     MENU_CODE_ONLINE_VOTE_NEXT_MAP,    // ... for the next map
     MENU_CODE_ONLINE_VOTE_CLOSE,       // ... no vote: back to the lobby
+    MENU_CODE_TOGGLE_MAP_FAVORITE,     // game settings: the map shown starred as a favorite, or not (mapfavorites)
+    MENU_CODE_TO_MAP_BROWSER_FAVORITES,  // ... the favorite maps' thumbnails, to choose one
 };
 
 enum class MenuNavDirection : unsigned char {

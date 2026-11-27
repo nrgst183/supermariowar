@@ -501,6 +501,14 @@ void CMap::calculatespawnareas(short iType, bool fUseTempBlocks, bool fIgnoreDea
     }
 }
 
+void CMap::holdPlatforms()
+{
+    for (MovingPlatform* platform : platforms)
+        platform->hold();
+    for (MovingPlatform* platform : tempPlatforms)
+        platform->hold();
+}
+
 void CMap::updatePlatforms()
 {
     for (MovingPlatform* platform : platforms) {

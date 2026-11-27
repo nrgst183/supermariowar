@@ -35,10 +35,35 @@ bool CObjectContainer::addObject(std::unique_ptr<CObject> obj)
 // Objects may add new objects while being updated or drawn. Those are
 // appended to the list and are first processed on the next call, so the
 // number of objects to visit is fixed before the loop starts.
-void CObjectContainer::update() const
+namespace {
+// One of the map's own moving dangers (not a player's, not the mode's)
+bool mapHazard(CObject& object)
 {
-    for (size_t i = 0, count = m_list.size(); i < count; i++)
+    switch (object.getObjectType()) {
+        case object_orbithazard:
+        case object_pathhazard:
+        case object_flamecannon:
+        case object_bulletbillcannon:
+            return true;
+        case object_moving: {
+            const IO_MovingObject& moving = static_cast<IO_MovingObject&>(object);
+            const MovingObjectType type = moving.getMovingObjectType();
+            //(the cannons' Bills are no one's)
+            return type == movingobject_pirhanaplant || (type == movingobject_bulletbill && moving.iPlayerID == -1);
+        }
+        default:
+            return false;
+    }
+}
+} // namespace
+
+void CObjectContainer::update(bool frozenHazards) const
+{
+    for (size_t i = 0, count = m_list.size(); i < count; i++) {
+        if (frozenHazards && mapHazard(*m_list[i]))
+            continue;
         m_list[i]->update();
+    }
 }
 
 void CObjectContainer::draw() const

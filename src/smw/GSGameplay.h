@@ -199,6 +199,9 @@ void drawPauseMenu();
 void pauseMenuPress(int row);
 bool allowed();    // a Map Maker match played here (online too; not a replay, not the determinism test)
 bool active();     // someone is building now
+// A builder has the parts window open: the moving platforms and the map's moving dangers held still till
+// it's shut (the map easier to see while choosing; from the simulation's state: the same everywhere)
+bool motionFrozen();
 bool building(int slot);    // that player builds now
 bool edited();     // this match's map was edited: it differs from its file
 int hostSlot();    // the host's player: it builds always, it gives the rights

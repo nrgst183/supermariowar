@@ -334,6 +334,8 @@ class CMap
     std::array<short, 4>& switches() { return iSwitches; }
 
         void updatePlatforms();
+        // A tick the platforms are held where they are (MovingPlatform::hold)
+        void holdPlatforms();
         void drawPlatforms(short iLayer);
         void drawPlatforms(short iOffsetX, short iOffsetY, short iLayer);
         void resetPlatforms();

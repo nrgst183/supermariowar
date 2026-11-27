@@ -3,6 +3,7 @@
 #include "FileList.h"
 #include "GameMode.h"
 #include "GameValues.h"
+#include "MapFavorites.h"
 #include "MapList.h"
 #include "ResourceManager.h"
 #include "path.h"
@@ -15,8 +16,22 @@
 #include "ui/MI_MapFilterScroll.h"
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
+#include "ui/SmwTheme.h"
 
 namespace {
+// A star (the game's) while the map shown is a favorite: by its name, and on the Favorite button
+class MI_FavoriteStar : public UI_Control {
+public:
+    MI_FavoriteStar(short x, short y)
+        : UI_Control(x, y)
+    {}
+    void Draw() override
+    {
+        if (m_visible && maplist && mapfavorites::isFavorite(maplist->currentShortmapname()))
+            theme::icon(m_pos.x, m_pos.y, theme::Icon::Star);
+    }
+};
+
 const char* g_szAutoFilterNames[NUM_AUTO_FILTERS] {
     "Death Tiles",
     "Warps",
@@ -84,6 +99,13 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     miMapThumbnailsButton = new MI_Button(&rm->spr_selectfield, 430, 266, "Thumbs", 140);
     miMapThumbnailsButton->SetCode(MENU_CODE_TO_MAP_BROWSER_THUMBNAILS);
 
+    //(favorites: the map shown starred or not, a star by its name while it is; then only those, as
+    //thumbnails)
+    miMapFavoriteButton = new MI_Button(&rm->spr_selectfield, 430, 306, "Favorite", 140);
+    miMapFavoriteButton->SetCode(MENU_CODE_TOGGLE_MAP_FAVORITE);
+    miMapFavoritesButton = new MI_Button(&rm->spr_selectfield, 430, 346, "Favorites", 140);
+    miMapFavoritesButton->SetCode(MENU_CODE_TO_MAP_BROWSER_FAVORITES);
+
     miMapFilterScroll = new MI_MapFilterScroll(&rm->menu_plain_field, 120, 72, 400, 9);
     miMapFilterScroll->SetAutoModify(true);
     miMapFilterScroll->setVisible(false);
@@ -118,7 +140,7 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     miGameSettingsExitDialogYesButton->setVisible(false);
     miGameSettingsExitDialogNoButton->setVisible(false);
 
-    AddControl(miSettingsStartButton, miMapThumbnailsButton, miModeField, nullptr, nullptr);
+    AddControl(miSettingsStartButton, miMapFavoritesButton, miModeField, nullptr, nullptr);
     AddControl(miModeField, miSettingsStartButton, miGoalField[0], nullptr, nullptr);
 
     //(one goal field shows, the mode's: up and down go along them to the one shown)
@@ -131,7 +153,9 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     AddControl(miMapField, miGoalField[GAMEMODE_LAST - 1], miModeSettingsButton, nullptr, nullptr);
     AddControl(miModeSettingsButton, miMapField, miMapFiltersButton, nullptr, nullptr);
     AddControl(miMapFiltersButton, miModeSettingsButton, miMapThumbnailsButton, nullptr, nullptr);
-    AddControl(miMapThumbnailsButton, miMapFiltersButton, miSettingsStartButton, nullptr, nullptr);
+    AddControl(miMapThumbnailsButton, miMapFiltersButton, miMapFavoriteButton, nullptr, nullptr);
+    AddControl(miMapFavoriteButton, miMapThumbnailsButton, miMapFavoritesButton, nullptr, nullptr);
+    AddControl(miMapFavoritesButton, miMapFavoriteButton, miSettingsStartButton, nullptr, nullptr);
 
     AddControl(miMapFilterScroll, nullptr, nullptr, nullptr, nullptr);
 
@@ -143,6 +167,8 @@ UI_GameSettingsMenu::UI_GameSettingsMenu()
     AddNonControl(miGameSettingsExitDialogTournamentText);
 
     AddNonControl(miMapFiltersOnImage);
+    AddNonControl(new MI_FavoriteStar(530, 154));    //(by the map's name)
+    AddNonControl(new MI_FavoriteStar(530, 314));    //(on the Favorite button)
 
     AddControl(miGameSettingsExitDialogYesButton, nullptr, nullptr, nullptr, miGameSettingsExitDialogNoButton);
     AddControl(miGameSettingsExitDialogNoButton, nullptr, nullptr, miGameSettingsExitDialogYesButton, nullptr);
@@ -185,6 +211,7 @@ void UI_GameSettingsMenu::SetOnlineView(OnlineView view)
     miModeSettingsButton->SetLocked(on);
     miMapFiltersButton->SetLocked(on);
     miMapThumbnailsButton->SetLocked(on);
+    miMapFavoritesButton->SetLocked(on);    //(choosing from them; starring one is still ours)
 
     miSettingsStartButton->SetName(on ? "Back" : "Start");
     miSettingsStartButton->SetCode(on ? MENU_CODE_ONLINE_SETTINGS_BACK : MENU_CODE_START_GAME);

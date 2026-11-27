@@ -58,7 +58,7 @@ works.
 | rewind / fast forward (held) | LT / RT | Shift+Left / Shift+Right | |
 | slower / faster (1/4x to 8x) | d-pad down / up | Down / Up | the clock button (right click: slower) |
 | follow a player (their name, the buttons they hold; the view zooms in on them, the scores stay as they are) | X | F | the camera button |
-| screenshot (the match as shown, without the theater's bar), saved in `screenshots` in the settings folder (on the Xbox, `T:\screenshots`) | right stick click | F12, Insert | |
+| screenshot (the match as shown, without the theater's bar), saved in `screenshots` in the settings folder | - (on the Xbox, use Cerbios's screenshot) | F12, Insert | |
 | hide the bar | Y | H | the eye button |
 | the controls | Back | F1 | the ? block |
 | leave | B (asks first: A leaves, B stays) | Escape | the warp pipe |
@@ -128,8 +128,12 @@ buttons after the mouse was used, the keys after a key.
 **The palette** (X) has its tabs in groups along the top: **Tiles**, **Blocks** (Blocks, ?),
 **Items**, **Warps**, **Hazards** (Hazards, Moving), **Scene** (Backdrop, Music), **Rules**
 (Types, Spawns) and **More** (Animated, Weather, Goals); the open group shows its pages instead
-of its name. X goes to the next page, Y through the tilesets on the **Tiles** tab, A takes, B
-goes back; its title line names what the cursor (or the mouse) is on. **Blocks** (all 30; Y: hidden or not; the
+of its name. LT / RT (PgUp / PgDn) go along the tabs, Y through the tilesets on the **Tiles**
+tab, A takes, B or X (the button that opened it) shuts it; its title line names what the cursor
+(or the mouse) is on. It's always at the bottom of the screen, and while it's open the moving
+platforms and the map's moving dangers (fire bars, rotodiscs, cannons and their Bullet Bills,
+piranha plants) hold still, so the map is easy to see. On one screen there's only ever one: a
+second player who opens theirs joins the first one's page, both hands picking in it. **Blocks** (all 30; Y: hidden or not; the
 on/off blocks set how the map's switches start), **?** (random, one of the game's item sets,
 or a mix: A adds or takes out a powerup), **Items**, **Warps** (a number's warps go to each
 other), **Hazards** and **Moving** platforms (their settings under them: A, then left/right,

@@ -377,6 +377,14 @@ void MovingPlatform::update()
     setYf(pPath->currentPos0().y);
 }
 
+void MovingPlatform::hold()
+{
+    fOldX = fx;
+    fOldY = fy;
+    fOldVelX = fOldVelY = 0.0f;
+    fVelX = fVelY = 0.0f;
+}
+
 void MovingPlatform::ResetPath()
 {
     pPath->Reset();

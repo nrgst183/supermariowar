@@ -18,7 +18,8 @@
 //   speed               d-pad up / down   Up / Down     the clock button (right click: slower)
 //   follow a player     X                 F             the camera button  (the view zooms in on them)
 //   hide the bar        Y                 H             the eye button
-//   screenshot          R3 (right stick)  F12, Insert   (the picture without the bar: in "screenshots")
+//   screenshot          -                 F12, Insert   (the picture without the bar: in "screenshots";
+//                                                          on the Xbox, Cerbios's own takes them)
 //   the controls        Back              F1            the ? block
 //   leave               B                 Escape        the pipe
 //   jump                                  Home / End    click / drag on the timeline
@@ -522,7 +523,7 @@ void drawHelp()
         {SPEED, "Slower / faster", {Pad::Down, Pad::Up}, {"Down", "Up"}},
         {FOLLOW, "Follow a player", {Pad::X}, {"F"}},
         {HIDE, "Hide the bar", {Pad::Y}, {"H"}},
-        {CONTROL_COUNT, "Screenshot (no bar)", {Pad::RStick}, {"F12"}},
+        {CONTROL_COUNT, "Screenshot (no bar)", {}, {"F12"}},
         {HELP, "These controls", {Pad::Back}, {"F1"}},
         {LEAVE, "Leave", {Pad::B}, {"Esc"}},
         {CONTROL_COUNT, "Jump in the replay", {Pad::LStick}, {}},
@@ -741,8 +742,6 @@ void GameplayState::updateReplay()
         }
         if (padPressed(prompts::X))
             th.followNext = true;
-        if (padPressed(prompts::RSTICK))
-            th.shot = true;
         if (padPressed(prompts::Y))
             th.toggleHide = true;
         if (padPressed(prompts::BACK))

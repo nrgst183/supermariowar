@@ -65,6 +65,6 @@ to copy to the hard disk.
   music are copied there as they are (`snd\`, up to 200 MB, `src/sdl_mixer.cpp`). An editor's graphics also stay loaded after it's left, while the
   game is in its menus, so opening it again is quick; they're freed when a match starts or the other
   editor opens.
-- Press both sticks in (L3 + R3) to show or hide a profiler: frame time split into blitting,
-  filling, the copy to the screen, the swap (vertical blank wait), the rest of the game, and the
-  audio thread's share of the CPU.
+- Press Back + White + Black together to show or hide a profiler (not L3 + R3: Cerbios takes
+  screenshots with that): frame time split into blitting, filling, the copy to the screen, the swap
+  (vertical blank wait), the rest of the game, and the audio thread's share of the CPU.

@@ -5,12 +5,14 @@
 #include "gfx.h"
 #include "GSGameplay.h"
 #include "map.h"
+#include "MapFavorites.h"
 #include "MapList.h"
 #include "path.h"
 #include "ResourceManager.h"
 #include "uimenu.h"
 #include "ui/InputPrompts.h"
 #include "ui/MI_MenuPanel.h"
+#include "ui/SmwTheme.h"
 
 #include <SDL3_image/SDL_image.h>
 
@@ -56,7 +58,8 @@ void MI_MapBrowser::Draw()
     SDL_Rect rSrc = {0, 0, 160, 120};
     SDL_Rect rDst = {0, 0, 160, 120};
 
-    for (short iRow = 0; iRow < 3; iRow++) {
+    //(no maps to show (no favorites yet): only the title, the message and the footer)
+    for (short iRow = 0; iRow < 3 && iMapCount > 0; iRow++) {
         rDst.y = iRow * ROW_H + TOP;
 
         for (short iCol = 0; iCol < 3; iCol++) {
@@ -71,6 +74,8 @@ void MI_MapBrowser::Draw()
                 if (iType == 0) {
                     if (mapListNodes[iRow * 3 + iCol]->pfFilters[game_values.selectedmapfilter])
                         rm->menu_map_filter.draw(rDst.x, rDst.y, {iFilterTagAnimationFrame, 24, 24, 24});
+                } else if (mapfavorites::isFavorite(mapNames[iRow * 3 + iCol])) {
+                    theme::icon(rDst.x + 160 - 20, rDst.y + 4, theme::Icon::Star);
                 }
 
                 rm->menu_font_small.drawChopRight(rDst.x, rDst.y + 122, 165, mapNames[iRow * 3 + iCol].c_str());
@@ -82,24 +87,34 @@ void MI_MapBrowser::Draw()
     rDst.y = iSelectedRow * ROW_H + TOP;
     rDst.x = iSelectedCol * 200 + 40;
 
-    rm->menu_dialog.draw(rDst.x - 16, rDst.y - 16, {0, 0, 176, 148});
-    rm->menu_dialog.draw(rDst.x + 160, rDst.y - 16, {496, 0, 16, 148});
-    rm->menu_dialog.draw(rDst.x - 16, rDst.y + 132, {0, 464, 176, 16});
-    rm->menu_dialog.draw(rDst.x + 160, rDst.y + 132, {496, 464, 16, 16});
+    if (iMapCount > 0) {
+        rm->menu_dialog.draw(rDst.x - 16, rDst.y - 16, {0, 0, 176, 148});
+        rm->menu_dialog.draw(rDst.x + 160, rDst.y - 16, {496, 0, 16, 148});
+        rm->menu_dialog.draw(rDst.x - 16, rDst.y + 132, {0, 464, 176, 16});
+        rm->menu_dialog.draw(rDst.x + 160, rDst.y + 132, {496, 464, 16, 16});
 
-    mapSurfaces[iSelectedRow * 3 + iSelectedCol].draw(rSrc, blitdest, rDst);
+        mapSurfaces[iSelectedRow * 3 + iSelectedCol].draw(rSrc, blitdest, rDst);
 
-    if (iType == 0) {
-        if (mapListNodes[iSelectedRow * 3 + iSelectedCol]->pfFilters[game_values.selectedmapfilter])
-            rm->menu_map_filter.draw(rDst.x, rDst.y, {iFilterTagAnimationFrame, 24, 24, 24});
+        if (iType == 0) {
+            if (mapListNodes[iSelectedRow * 3 + iSelectedCol]->pfFilters[game_values.selectedmapfilter])
+                rm->menu_map_filter.draw(rDst.x, rDst.y, {iFilterTagAnimationFrame, 24, 24, 24});
+        } else if (mapfavorites::isFavorite(mapNames[iSelectedRow * 3 + iSelectedCol])) {
+            theme::icon(rDst.x + 160 - 20, rDst.y + 4, theme::Icon::Star);
+        }
+
+        rm->menu_font_small.drawScrolling(rDst.x, rDst.y + 122, 165, mapNames[iSelectedRow * 3 + iSelectedCol].c_str());
     }
-
-    rm->menu_font_small.drawScrolling(rDst.x, rDst.y + 122, 165, mapNames[iSelectedRow * 3 + iSelectedCol].c_str());
 
     //The title bar, as every menu's: what picking a map does here, and the page (over the top row's
     //frame, which comes up to it)
     UI_Menu::drawTitleBarBack();
-    rm->menu_font_large.drawCentered(320, 5, iType == 0 ? "Maps in this Filter" : "Choose a Map");
+    rm->menu_font_large.drawCentered(320, 5, iType == 0 ? "Maps in this Filter" : iType == FAVORITES ? "Favorite Maps" : "Choose a Map");
+    if (iMapCount <= 0) {
+        //(no favorites yet: how to star one)
+        rm->menu_font_large.drawCentered(320, 200, "No favorite maps yet");
+        rm->menu_font_small.drawCentered(320, 236, "Star a map with Favorite in the game settings,");
+        rm->menu_font_small.drawCentered(320, 254, "or in Thumbs on the map you're on");
+    }
     if (iMapCount > 0) {
         const int pages = (iMapCount + 8) / 9;
         rm->menu_font_small.drawRightJustified(620, 10, "Page " + std::to_string(iPage + 1) + " / " + std::to_string(pages));
@@ -108,9 +123,14 @@ void MI_MapBrowser::Draw()
     //What the buttons do, in the footer (drawn last: the selected map's frame comes down to it)
     using prompts::Pad;
     using prompts::menuKey;
-    menupanel::footer({{{Pad::A}, {menuKey(prompts::MENU_SELECT)}, iType == 0 ? "add / remove" : "choose"},
-                       {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}},
-        iType == 0 ? "Tag the maps that go in the filter" : std::string());
+    if (iType == 0) {
+        menupanel::footer({{{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "add / remove"}, {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}},
+            "Tag the maps that go in the filter");
+    } else {
+        //(X: the map there starred or not, as the game settings' Favorite button)
+        menupanel::footer({{{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "choose"}, {{Pad::X}, {menuKey(prompts::MENU_RANDOM)}, "favorite"},
+                           {{Pad::B}, {menuKey(prompts::MENU_CANCEL)}, "back"}});
+    }
 }
 
 MenuCodeEnum MI_MapBrowser::Modify(bool modify)
@@ -215,6 +235,11 @@ MenuCodeEnum MI_MapBrowser::SendInput(CPlayerInput * playerInput)
         if (playerInput->outputControls[iPlayer].menu_select.fPressed)
             return activate();
 
+        if (playerInput->outputControls[iPlayer].menu_random.fPressed && iType != 0 && iMapCount > 0) {
+            mapfavorites::toggle(mapNames[iSelectedRow * 3 + iSelectedCol]);
+            return MENU_CODE_NONE;
+        }
+
         if (playerInput->outputControls[iPlayer].menu_cancel.fPressed) {
             return MENU_CODE_MAP_BROWSER_EXIT;
         }
@@ -304,6 +329,20 @@ void MI_MapBrowser::Reset(short type)
         iFilterTagAnimationFrame = 72;
 
         iMapCount = maplist->count();
+    } else if (iType == FAVORITES) {
+        //(the favorites, in the map list's order (as Thumbs), the one we're on chosen if it's one)
+        m_favorites.clear();
+        iSelectedIndex = 0;
+        const short all = static_cast<short>(maplist->count());
+        for (short i = 0; i < all; i++) {
+            auto itr = maplist->GetIteratorAt(i, false);
+            if (!mapfavorites::isFavorite(itr->first))
+                continue;
+            if (itr == maplist->GetCurrent())
+                iSelectedIndex = static_cast<short>(m_favorites.size());
+            m_favorites.push_back(itr);
+        }
+        iMapCount = static_cast<short>(m_favorites.size());
     } else {
         iSelectedIndex = maplist->GetCurrent()->second.iFilteredIndex;
         iMapCount = maplist->filteredCount();
@@ -324,7 +363,7 @@ void MI_MapBrowser::LoadPage(short page, bool fUseFilters)
         if (iIndex >= iMapCount)
             return;
 
-        std::map<std::string, MapListNode>::iterator itr = maplist->GetIteratorAt(iIndex, fUseFilters);
+        std::map<std::string, MapListNode>::iterator itr = mapAt(iIndex, fUseFilters);
 
         //See if we already have a thumbnail saved for this map
         const std::string sConvertedPath = mapThumbnailPath((*itr).second.filename);
@@ -349,4 +388,12 @@ void MI_MapBrowser::LoadPage(short page, bool fUseFilters)
         mapNames[iMap] = (*itr).first.c_str();
         mapListItr[iMap] = itr;
     }
+}
+
+// The map at `index` of those this browser shows: the favorites' list, or the map list's
+std::map<std::string, MapListNode>::iterator MI_MapBrowser::mapAt(short index, bool fUseFilters)
+{
+    if (iType == FAVORITES)
+        return m_favorites[static_cast<size_t>(index)];
+    return maplist->GetIteratorAt(index, fUseFilters);
 }

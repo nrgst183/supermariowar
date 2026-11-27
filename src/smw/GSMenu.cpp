@@ -21,6 +21,7 @@
 #include "GameplayStyles.h"
 #include "joystick.h"
 #include "map.h"
+#include "MapFavorites.h"
 #include "MapList.h"
 #include "path.h"
 #include "RandomNumberGenerator.h"
@@ -1935,6 +1936,13 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         mCurrentMenu = mGameSettingsMenu.get();
     } else if (MENU_CODE_TO_MAP_BROWSER_THUMBNAILS == code) {
         mMapFilterEditMenu->miMapBrowser->Reset(1);
+
+        mCurrentMenu = mMapFilterEditMenu.get();
+        mCurrentMenu->ResetMenu();
+    } else if (MENU_CODE_TOGGLE_MAP_FAVORITE == code) {
+        mapfavorites::toggle(maplist->currentShortmapname());
+    } else if (MENU_CODE_TO_MAP_BROWSER_FAVORITES == code) {
+        mMapFilterEditMenu->miMapBrowser->Reset(MI_MapBrowser::FAVORITES);
 
         mCurrentMenu = mMapFilterEditMenu.get();
         mCurrentMenu->ResetMenu();

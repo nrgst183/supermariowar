@@ -30,7 +30,9 @@ public:
     // True if add() would reject a new object.
     bool isFull() const { return m_list.size() + 1 >= m_list.capacity(); }
 
-    void update() const;
+    // frozenHazards: the map's moving dangers held still this tick (fire bars, rotodiscs, flame and
+    // Bullet Bill cannons and their Bills, piranha plants: the Map Maker's parts window open)
+    void update(bool frozenHazards = false) const;
     void draw() const;
 
     void clean();

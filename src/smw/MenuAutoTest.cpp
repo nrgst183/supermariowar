@@ -17,6 +17,7 @@
 #include "editors/EditorInput.h"
 #include "editors/EditorLauncher.h"
 #endif
+#include "MapFavorites.h"
 #include "MapList.h"
 #include "SimulationState.h"
 #include "gamemodes/MiniPipe.h"
@@ -2324,6 +2325,42 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             char name[32];
             snprintf(name, sizeof(name), "m%02d_%02d", mode, phase / 3);
             g_pendingShot = name;
+        }
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role favs: the favorite maps: the game settings; the favorites (none yet); the map starred
+    //(Favorite), the settings and the favorites again; Thumbs, the next map starred with X, its
+    //star; the favorites, two now ("favs:" lines)
+    if (at.shotsRole == "favs" && step == 1) {
+        switch (t) {
+            case 1: return MENU_CODE_TO_LOCAL_LOBBY;
+            case 20: return MENU_CODE_ONLINE_MATCH_SETTINGS;
+            case 40: return MENU_CODE_MATCH_SELECTION_START;
+            case 60: shot("f1_settings"); break;
+            case 65: return MENU_CODE_TO_MAP_BROWSER_FAVORITES;
+            case 80: shot("f2_favorites_none"); break;
+            case 85: return MENU_CODE_MAP_BROWSER_EXIT;
+            case 100: return MENU_CODE_TOGGLE_MAP_FAVORITE;
+            case 110: shot("f3_settings_starred"); break;
+            case 115: return MENU_CODE_TO_MAP_BROWSER_FAVORITES;
+            case 130: shot("f4_favorites_one"); break;
+            case 135: return MENU_CODE_MAP_BROWSER_EXIT;
+            case 150: return MENU_CODE_TO_MAP_BROWSER_THUMBNAILS;
+            case 165: game_values.playerInput.outputControls[0].menu_right.fPressed = true; break;
+            case 175: game_values.playerInput.outputControls[0].menu_random.fPressed = true; break;
+            case 190: shot("f5_thumbs_starred"); break;
+            case 195: return MENU_CODE_MAP_BROWSER_EXIT;
+            case 210: return MENU_CODE_TO_MAP_BROWSER_FAVORITES;
+            case 225:
+                shot("f6_favorites_two");
+                printf("favs: %d favorites\n", static_cast<int>(mapfavorites::count()));
+                break;
+            case 240:
+                step = 1000;
+                t = 0;
+                break;
+            default: break;
         }
         return MENU_CODE_NONE;
     }
