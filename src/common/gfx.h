@@ -46,6 +46,9 @@ void gfx_flipscreen();
 void gfx_flipsurface(SDL_Surface* surface);
 // How much of the screen the picture fills: 1, or less for a TV that crops its edges (overscan)
 void gfx_setscreenscale(float scale);
+// The window's size when not full screen (GraphicsSDL::setWindowSize) and the mouse pointer (setCursorStyle)
+void gfx_setwindowsize(int mode);
+void gfx_setcursorstyle(int style);
 // The pixels of one surface into another of the same size and format, as they are (no key, no
 // blending: a copy of its memory); false if they differ (nothing copied)
 bool gfx_copypixels(SDL_Surface* from, SDL_Surface* to);

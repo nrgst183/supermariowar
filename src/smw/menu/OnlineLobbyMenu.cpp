@@ -108,6 +108,18 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     miDialogNo = new MI_Button(&rm->spr_selectfield, 325, 250, "No", 80, TextAlign::CENTER);
     miDialogNo->SetCode(MENU_CODE_ONLINE_LEAVE_NO);
 
+    // After a match: "Play again?" (NetLobby's REMATCH VOTE), a panel over the team box
+    //(the team box's place, all of it: the choices, then who it waits for or what starts)
+    miVotePanel = new MI_MenuPanel(104, 82, 432, 200, "Play again?");
+    miVotePanel->SetNoteSource([this]() { return m_voteNote; });
+    miVoteRematch = new MI_VoteChoice(128, 124, 384, 136, "Rematch", rollback::NetLobby::VOTE_REMATCH);
+    miVoteRematch->SetCode(MENU_CODE_ONLINE_VOTE_REMATCH);
+    miVoteNext = new MI_VoteChoice(128, 160, 384, 136, "Next map", rollback::NetLobby::VOTE_NEXT_MAP);
+    miVoteNext->SetCode(MENU_CODE_ONLINE_VOTE_NEXT_MAP);
+    miVoteNext->SetValue("The next one");
+    miVoteLine = new MI_HeaderText("", 320, 210);
+    miVoteHint = new MI_Text("Everyone votes - a tie is a rematch", 320, 240, 0, false, TextAlign::CENTER);
+
     AddNonControl(miScene);
 
     // Team page: the selection, and below it the buttons (down from the selection once ready)
@@ -139,6 +151,13 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     miDialogYes->setVisible(false);
     miDialogNo->setVisible(false);
 
+    AddNonControl(miVotePanel);
+    AddNonControl(miVoteLine);
+    AddNonControl(miVoteHint);
+    AddControl(miVoteRematch, nullptr, miVoteNext, nullptr, nullptr);
+    AddControl(miVoteNext, miVoteRematch, nullptr, nullptr, nullptr);
+    ShowVote(false);
+
     setInitialFocus(miTeam);
     SetCancelCode(MENU_CODE_ONLINE_LEAVE);
     ShowPage(Page::Team);
@@ -160,7 +179,7 @@ void UI_OnlineLobbyMenu::RebuildKickItems()
     const rollback::NetLobby* lobby = lobbyOrNull();
     std::string signature;
     if (lobby)
-        for (int p = 1; p < 4; p++)
+        for (int p = 1; p < rollback::net::MAX_PEERS; p++)
             if (lobby->peer(p).present)
                 signature += std::format("{}:{};", p, lobby->peer(p).name);
     if (signature == m_kickSignature)
@@ -170,7 +189,7 @@ void UI_OnlineLobbyMenu::RebuildKickItems()
     miKickWho->clear();
     miKickWho->add("-", -1);
     if (lobby)
-        for (int p = 1; p < 4; p++)
+        for (int p = 1; p < rollback::net::MAX_PEERS; p++)
             if (lobby->peer(p).present)
                 miKickWho->add(std::string(lobby->peer(p).name), static_cast<short>(p));
     miKickWho->setCurrentIndex(0);
@@ -274,6 +293,8 @@ void UI_OnlineLobbyMenu::Sync()
     rollback::NetLobby* lobby = lobbyOrNull();
     if (!lobby)
         return;
+    if (m_dialog == Dialog::Vote)
+        SyncVote();
 
     using Phase = rollback::NetLobby::Phase;
     const Phase phase = lobby->phase();
@@ -391,6 +412,10 @@ void UI_OnlineLobbyMenu::Sync()
     using Tone = MI_LobbyScene::Tone;
     std::string status = lobby->statusText();
     Tone tone = Tone::Info;
+    if (m_dialog == Dialog::Vote && !m_voteStatus.empty()) {
+        status = m_voteStatus;
+        tone = Tone::Good;
+    }
     if (status.empty()) {
         status = m_notice;
         tone = Tone::Warn;
@@ -496,6 +521,8 @@ void UI_OnlineLobbyMenu::Sync()
     std::vector<prompts::Prompt> row;
     if (joining)
         row = {};
+    else if (m_dialog == Dialog::Vote)
+        row = {choose, {{Pad::A}, {menuKey(prompts::MENU_SELECT)}, "vote"}, cancel("lobby")};
     else if (m_dialog != Dialog::None)
         row = {across, select, cancel("no")};
     else if (m_page == Page::Team && m_currentFocus == miTeam)
@@ -587,15 +614,32 @@ void UI_OnlineLobbyMenu::KickSelected()
 void UI_OnlineLobbyMenu::OpenDialog(Dialog dialog)
 {
     const rollback::NetLobby* lobby = lobbyOrNull();
+    if (m_dialog != Dialog::None)
+        CloseDialog();
     m_dialog = dialog;
 
+    if (dialog == Dialog::Vote) {
+        //(its own panel: the choices as the options pages' fields, who voted for each on it)
+        m_voteCountdown = -1;
+        ShowVote(true);
+        RememberCurrent();
+        setInitialFocus(miVoteRematch);
+        SetCancelCode(MENU_CODE_ONLINE_VOTE_CLOSE);
+        ResetMenu();
+        SyncVote();
+        return;
+    }
     if (dialog == Dialog::Kick) {
         miDialogLine1->SetText("Kick this player?");
         miDialogLine2->SetText("They can join again");
     } else {
+        //(the host leaving: the others go on, one of them hosts it then; see NetLobby's HOST MIGRATION)
         const bool host = lobby && lobby->isHost();
-        miDialogLine1->SetText(host ? "Close the lobby?" : "Leave the lobby?");
-        miDialogLine2->SetText(host ? "Everyone in it leaves" : "");
+        bool others = false;
+        for (int p = 1; lobby && p < rollback::net::MAX_PEERS; p++)
+            others |= lobby->peer(p).present;
+        miDialogLine1->SetText("Leave the lobby?");
+        miDialogLine2->SetText(host && others ? "Another player hosts it then" : "");
     }
 
     miDialogImage->setVisible(true);
@@ -611,12 +655,100 @@ void UI_OnlineLobbyMenu::OpenDialog(Dialog dialog)
     ResetMenu();
 }
 
+void UI_OnlineLobbyMenu::ShowVote(bool show)
+{
+    miVotePanel->setVisible(show);
+    miVoteRematch->setVisible(show);
+    miVoteNext->setVisible(show);
+    miVoteLine->setVisible(show);
+    miVoteHint->setVisible(show);
+}
+
+void UI_OnlineLobbyMenu::OpenVote()
+{
+    rollback::NetLobby* lobby = lobbyOrNull();
+    rollback::NetGame& net = rollback::NetGame::instance();
+    //(a single game, not a tournament or a minigame, nor editing together)
+    if (!lobby || !lobby->canVote() || net.editActivity() != 0 || rollback::isEditorModeId(lobby->modeId()) || lobby->modeId() < 0 ||
+        lobby->modeId() >= 1000 || lobby->mapName() == "(minigame)" || net.seriesActive())
+        return;
+    OpenDialog(Dialog::Vote);
+}
+
+// The vote box: who voted for what (and the host's countdown once everyone did)
+void UI_OnlineLobbyMenu::SyncVote()
+{
+    rollback::NetLobby* lobby = lobbyOrNull();
+    if (!lobby || !lobby->canVote()) {
+        CloseDialog();
+        return;
+    }
+    std::string rematch, next, waiting;
+    auto add = [](std::string& list, const std::string& name) { list += (list.empty() ? "" : ", ") + name; };
+    for (int p = 0; p < rollback::net::MAX_PEERS; p++) {
+        if (!lobby->peer(p).present)
+            continue;
+        const std::string name = p == lobby->localPeer() ? std::string("you") : lobby->peer(p).name;
+        const uint8_t v = lobby->vote(p);
+        add(v == rollback::NetLobby::VOTE_REMATCH ? rematch : v == rollback::NetLobby::VOTE_NEXT_MAP ? next : waiting, name);
+    }
+    //(the panel: who voted for each choice, by their players' numbers; its note: who it waits for, or
+    //what starts; the status line, wider: everyone's names)
+    int nRematch = 0, nNext = 0, nWaiting = 0;
+    lobby->voteCount(nRematch, nNext, nWaiting);
+    const bool decided = nWaiting == 0 && nRematch + nNext > 0;
+    const bool nextWins = nNext > nRematch;    //(a tie: the rematch, as VoteDecision has it)
+    miVoteRematch->SetValue(lobby->mapName().empty() ? std::string("The same map") : lobby->mapName());
+    miVoteRematch->SetWinner(decided && !nextWins);
+    miVoteNext->SetWinner(decided && nextWins);
+    m_voteNote = std::to_string(nRematch + nNext) + " of " + std::to_string(nRematch + nNext + nWaiting) + " voted";
+    std::string line;
+    if (m_voteCountdown >= 0)
+        line = std::string(nextWins ? "Next map" : "Rematch") + " in " + std::to_string(m_voteCountdown / 60 + 1) + "...";
+    else if (decided)
+        line = std::string(nextWins ? "Next map" : "Rematch") + " it is!";
+    else
+        line = "Waiting for " + waiting;
+    miVoteLine->SetText(line);
+    std::string who;
+    if (!rematch.empty())
+        who += "Rematch: " + rematch;
+    if (!next.empty())
+        who += std::string(who.empty() ? "" : "  -  ") + "Next map: " + next;
+    //(who it waits for: the panel says so)
+    m_voteStatus = who.empty() ? std::string("The match is over: what next?") : who;
+}
+
+uint8_t UI_OnlineLobbyMenu::VoteDecision()
+{
+    rollback::NetLobby* lobby = lobbyOrNull();
+    if (m_dialog != Dialog::Vote || !lobby || !lobby->isHost() || !lobby->canVote())
+        return rollback::NetLobby::VOTE_NONE;
+    int rematch = 0, next = 0, waiting = 0;
+    lobby->voteCount(rematch, next, waiting);
+    if (waiting > 0 || rematch + next == 0) {
+        m_voteCountdown = -1;
+        return rollback::NetLobby::VOTE_NONE;
+    }
+    //(everyone voted: a moment to see it, then the winner; a tie is a rematch)
+    if (m_voteCountdown < 0)
+        m_voteCountdown = 120;
+    if (m_voteCountdown > 0) {
+        --m_voteCountdown;
+        return rollback::NetLobby::VOTE_NONE;
+    }
+    m_voteCountdown = -1;
+    return next > rematch ? rollback::NetLobby::VOTE_NEXT_MAP : rollback::NetLobby::VOTE_REMATCH;
+}
+
 void UI_OnlineLobbyMenu::CloseDialog()
 {
     if (m_dialog == Dialog::None)
         return;
     m_dialog = Dialog::None;
     m_kickPeer = -1;
+    m_voteCountdown = -1;
+    ShowVote(false);
 
     miDialogImage->setVisible(false);
     miDialogLine1->setVisible(false);

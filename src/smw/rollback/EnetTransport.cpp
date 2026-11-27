@@ -141,8 +141,31 @@ uint16_t EnetTransport::localPort() const
     return m_host->address.port;
 }
 
+namespace {
+uint32_t g_cutUntilMs = 0;
+}
+
+void EnetTransport::cutFor(uint32_t ms)
+{
+    g_cutUntilMs = (monotonicMs() + ms) | 1;
+    printf("netplay: --net-cut-at: the network is dead for %u ms\n", ms);
+}
+
+bool EnetTransport::cut()
+{
+    if (g_cutUntilMs == 0)
+        return false;
+    if (static_cast<int32_t>(monotonicMs() - g_cutUntilMs) < 0)
+        return true;
+    g_cutUntilMs = 0;
+    printf("netplay: --net-cut-at: the network is back\n");
+    return false;
+}
+
 void EnetTransport::sendNow(int connection, Channel channel, const uint8_t* data, size_t size)
 {
+    if (cut())
+        return;
     if (connection < 0 || connection >= MAX_CONNECTIONS || !m_peers[connection])
         return;
 
@@ -171,7 +194,8 @@ void EnetTransport::flush()
             }
         }
     }
-    enet_host_flush(m_host);
+    if (!cut())
+        enet_host_flush(m_host);
 }
 
 bool EnetTransport::poll(TransportEvent& event)
@@ -179,6 +203,16 @@ bool EnetTransport::poll(TransportEvent& event)
     if (m_received) {
         enet_packet_destroy(m_received);
         m_received = nullptr;
+    }
+
+    //(a dead network: nothing comes in; what arrived meanwhile is dropped, as if lost on the way)
+    if (cut()) {
+        ENetAddress from;
+        uint8_t junk[2048];
+        ENetBuffer buffer {sizeof(junk), junk};
+        while (enet_socket_receive(m_host->socket, &from, &buffer, 1) > 0) {
+        }
+        return false;
     }
 
     //Delayed packets that are due go out first

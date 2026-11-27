@@ -231,8 +231,18 @@ void GameplayState::handOverToHumans(uint8_t slotMask)
 {
     for (short iPlayer = 0; iPlayer < 4; iPlayer++) {
         const uint8_t bit = static_cast<uint8_t>(1u << iPlayer);
+        if (!(slotMask & bit) || (g_sim.humanTakeover & bit))
+            continue;
+        //(a lost player's slot the CPU took over, and someone came back to it: theirs again; the AI the
+        //CPU played it with stays, idle, for the next time)
+        if (g_sim.cpuTakeover & bit) {
+            g_sim.cpuTakeover &= static_cast<uint8_t>(~bit);
+            g_sim.humanTakeover |= bit;
+            g_sim.playerKeys[iPlayer] = COutputControl {};
+            continue;
+        }
         //(only a CPU player still playing by its input; its keys let go, the human presses their own)
-        if (!(slotMask & bit) || (g_sim.humanTakeover & bit) || (g_sim.cpuTakeover & bit) || game_values.playercontrol[iPlayer] != 2)
+        if (game_values.playercontrol[iPlayer] != 2)
             continue;
         g_sim.humanTakeover |= bit;
         g_sim.playerKeys[iPlayer] = COutputControl {};

@@ -20,6 +20,8 @@ private:
     MI_SelectField<bool>* miPingBarsField;
     MI_SelectField<short>* miOverlayColorsField;
     MI_SelectField<short>* miScreenSizeField;
+    MI_SelectField<short>* miWindowSizeField;     // (null on the Xbox: no window, no mouse)
+    MI_SelectField<short>* miCursorStyleField;
     MI_SelectField<bool>* miTopLayerField;
     MI_SelectField<short>* miFrameRateField;
     MI_SelectField<bool>* miSmoothMotionField;

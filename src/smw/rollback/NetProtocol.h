@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -62,9 +63,21 @@
 namespace rollback::net {
 
 constexpr uint32_t PROTOCOL_MAGIC = 0x52574d53; // "SMWR"
-constexpr uint16_t PROTOCOL_VERSION = 7;    // 4: CPU players play by the host's input; 5: the time sync advantage in 1/64 frames; 6: smaller input packets; 7: the host's pause
+constexpr uint16_t PROTOCOL_VERSION = 8;    // 4: CPU players play by the host's input; 5: the time sync advantage in 1/64 frames; 6: smaller input packets; 7: the host's pause; 8: rejoining, host migration, rematch votes
 
-constexpr int MAX_PEERS = 4;
+// Peer ids are 0..MAX_PEERS-1 (the host is 0), and at most MAX_MEMBERS machines are in a lobby at
+// once. There are more ids than members so that someone who comes back during a match (REJOINING in
+// RollbackSession.h) gets an id that wasn't in it: the ids of the match's lost peers stay lost.
+constexpr int MAX_PEERS = 8;
+constexpr int MAX_MEMBERS = 4;
+
+// A connection per peer id, none of them connected
+inline std::array<int, MAX_PEERS> noConnections()
+{
+    std::array<int, MAX_PEERS> none {};
+    none.fill(-1);
+    return none;
+}
 
 enum class MsgType : uint8_t {
     Hello = 1,
@@ -89,6 +102,8 @@ enum class MsgType : uint8_t {
     Ping = 52,
     Pong = 53,
     RttReport = 54,
+    HostGone = 55,      // joiner -> joiners: we lost the host (HOST MIGRATION in NetLobby.h)
+    Vote = 56,          // joiner -> host: what to play next (REMATCH VOTE in NetLobby.h)
 
     MapBegin = 64,
     MapChunk = 65,
@@ -110,9 +125,10 @@ enum class MsgType : uint8_t {
     LateJoin = 90,     // joiner -> host: let me into the match being played
     LateConfig = 91,   // host -> joiner: u8 match id, u16 + config bytes (none: not now, then str why)
     LateAck = 92,      // joiner -> host: u8 match id, u8 ok, str why not
-    LateTicks = 93,    // host -> joiner: u8 match id, u32 first tick, u16 count, count x (4 input bytes, u8 takeover mask)
+    LateTicks = 93,    // host -> joiner: u8 match id, u32 first tick, u16 count, count x (4 input bytes, u8 takeover mask),
+                       // u32 the ticks the host has confirmed (the joiner has caught up once it has them all)
     JumpIn = 94,       // joiner -> host: u8 match id, u32 the frame it caught up to (S), u16 its round trip (ms)
-    JumpInReply = 95,  // host -> joiner: u8 match id, i8 slot (-1: none free, it watches), u32 J, u32 S,
+    JumpInReply = 95,  // host -> joiner: u8 match id, i8 slot (-1: none free, it watches; -2: not yet, catch up more), u32 J, u32 S,
                        // u8 handovers + (u8 slot, u8 peer, u32 J, u32 S) each
 
     SkinInfo = 100,

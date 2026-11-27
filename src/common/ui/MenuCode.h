@@ -135,6 +135,11 @@ enum MenuCodeEnum {
     MENU_CODE_EDITORS_ACTION,          // the editors menu's own buttons (UI_EditorsMenu::Act)
     MENU_CODE_TO_ONLINE_OPTIONS_MENU,  // Options > Online: nickname, run-ahead, port
     MENU_CODE_MAIN_MENU_BACK,          // B on the main menu: to its Exit first (UI_MainMenu::focusExit)
+    MENU_CODE_WINDOW_SIZE_CHANGED,     // Graphics: the window's size (game_values.windowsize)
+    MENU_CODE_CURSOR_STYLE_CHANGED,    // Graphics: the mouse pointer (game_values.cursorstyle)
+    MENU_CODE_ONLINE_VOTE_REMATCH,     // after an online match: vote for the same match again (NetLobby's REMATCH VOTE)
+    MENU_CODE_ONLINE_VOTE_NEXT_MAP,    // ... for the next map
+    MENU_CODE_ONLINE_VOTE_CLOSE,       // ... no vote: back to the lobby
 };
 
 enum class MenuNavDirection : unsigned char {

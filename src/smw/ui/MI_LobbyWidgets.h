@@ -133,6 +133,24 @@ private:
 };
 
 
+/// A choice of the "Play again?" panel (NetLobby's REMATCH VOTE): a select field's pipe, its name
+/// before the divider and a value after it, and at its right end the numbers of the players whose
+/// machine voted for it (the player cards' boxed numbers). Select votes for it.
+class MI_VoteChoice : public MI_Button {
+public:
+    MI_VoteChoice(short x, short y, short width, short indent, std::string name, uint8_t vote);
+
+    void SetValue(std::string value) { m_value = std::move(value); }
+    void SetWinner(bool winner) { m_winner = winner; }
+    void Draw() override;
+
+private:
+    short m_indent;
+    uint8_t m_vote;
+    std::string m_value;
+    bool m_winner = false;    // everyone voted and this one won: it is about to start
+};
+
 /// A small marker for something only the host can change ("Host", "Set by host")
 class MI_LockTag : public UI_Control {
 public:

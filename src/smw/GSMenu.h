@@ -197,6 +197,8 @@ class MenuState : public GameState
         void ReturnToOnlineLobby();
         void ApplyOnlineMatchSelection();
         void StartOnlineMatch();
+        // After an online match (NetLobby's REMATCH VOTE): the host starts what everyone voted for
+        void UpdateOnlineVote();
         void StartOnlineFromSettings();
         void OpenOnlineSettingsView();
         void CloseOnlineSettingsView();

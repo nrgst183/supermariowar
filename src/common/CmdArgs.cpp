@@ -196,6 +196,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-lagtest") at.lagtest = atoi(val.c_str());
             else if (arg == "--at-pause") at.pauseAt = atoi(val.c_str());
             else if (arg == "--at-late-join") at.lateJoin = atoi(val.c_str()) != 0;
+            else if (arg == "--at-migrated-matches") at.migratedMatches = atoi(val.c_str());
             else if (arg == "--at-pause-for") at.pauseFor = atoi(val.c_str());
             else if (arg == "--at-online-panel") at.onlinePanel = atoi(val.c_str()) != 0;
             else if (arg == "--at-realtime") at.realtime = atoi(val.c_str());
@@ -250,6 +251,12 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--net-stats") net.statsInterval = atoi(val.c_str());
             else if (arg == "--net-timeout") net.timeoutMs = atoi(val.c_str());
             else if (arg == "--net-quit-at") net.quitAt = atoi(val.c_str());
+            else if (arg == "--net-cut-at") {
+                net.cutAt = atoi(val.c_str());
+                const size_t comma = val.find(',');
+                net.cutMs = comma == std::string::npos ? 10000 : atoi(val.c_str() + comma + 1);
+            }
+            else if (arg == "--net-reconnect") net.reconnect = atoi(val.c_str());
             else if (arg == "--net-upnp") net.upnp = atoi(val.c_str());
             else if (arg == "--net-sim-latency") net.simLatencyMs = atoi(val.c_str());
             else if (arg == "--net-sim-jitter") net.simJitterMs = atoi(val.c_str());

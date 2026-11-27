@@ -38,7 +38,9 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 - **Rollback netcode** for up to four players: everybody connects directly to each other, no server. Inputs that arrive late are predicted and corrected, so the game stays responsive with lag.
 - **A full online lobby**: pick your character and team, see everyone's ping, add CPU players, and play tournaments, tours and worlds online. Missing maps and custom skins are sent to the players who don't have them.
 - **No port forwarding (usually)**: the host's router is asked to open the port with UPnP, and the lobby shows the address friends join at.
-- If someone drops out, **the CPU takes over** their player and the match goes on.
+- If someone drops out, **the CPU takes over** their player and the match goes on. When their connection comes back they **rejoin by themselves** and get their own player back.
+- **The lobby survives the host leaving**: another player becomes the host and everyone moves over automatically.
+- After a match, everyone votes for a **rematch or the next map**.
 - **LAN games and system link**: games hosted on your network are listed by themselves, with their mode, map, players and connection, and joined with one button, between PCs and Xboxes alike.
 
 See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
@@ -48,11 +50,9 @@ See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 ![The Map Maker: the map being played by four players while it's built, a row of ? blocks just placed, the builder's glove resting on one with its name over it, a fire bar spinning, and the toolbar with the part in hand, the recent parts, the tools and the layers; the palette's Hazards group with a fire bar's length being changed; the controls sheet with every control for the controller, keyboard and mouse; and the world editor with its modes menu open](docs/gfx/fork/map_maker.png)
 
 - **The Map Maker** (**Main menu, Editors, Maps**): build a map *while it's being played*. Start it on this computer or online, set up players and CPUs in the usual lobby, pick a map (or a blank one) and go. Everyone with the right to build gets a glove cursor; the others, CPUs included, keep playing on the map as it changes.
-  - **L + Up** (Tab) switches between building and playing: you spawn where your hand is, and go back to building where your character is. A builder's scoreboard portrait gets a frame in its color and switches between the character and a glove, so you can see who's building.
-  - Made to be easy, as in Mario Maker: a toolbar with the part in hand, your recent parts, the tools and the layers; copy or pick up and move what's on the map; undo and redo as far back as you like; a one-button Clear map; a sound and a flash for every change; and a controls sheet (F1) with every control on one page.
-  - With a mouse, the glove sits on the pointer and the cursor snaps to it: left button paints (Shift: a straight line), right erases, middle opens the palette, the wheel goes through your recent parts, and the toolbar's tools, layers and parts can be clicked.
-  - Everything the old level editor could do: tiles on 4 layers and animated tiles, all 30 blocks (hidden ones, on/off switches, ? blocks with one powerup, an item set or your own mix), items, warps, hazards with their settings, moving platforms of any shape on straight, looping or circular paths, tile types, no-spawn zones, race goals and flag bases, weather, background and music. Pencil, rectangle, fill, copy and paste.
-  - The host gives and takes the right to build, and saves the map from the pause menu. It plays the same online as everything else (rollback included).
+  - **L + Up** (Tab) switches between building and playing.
+  - Works with a controller or a mouse and keyboard; F1 shows the controls.
+  - Has everything the old level editor had.
 - **The world editor** (**Main menu, Editors, Worlds**), with a mouse and keyboard or a controller.
 - **Edit together**: one player hosts a Map Maker game or a world in a lobby, the others find it in Join a Game, online or on one computer; anyone can join in while it's going.
 

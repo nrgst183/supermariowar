@@ -14,7 +14,7 @@ public:
     void flipScreen() const;
     /// Shows `surface` (the screen's size and format) instead of the screen
     void flipSurface(SDL_Surface* surface) const;
-    void changeFullScreen(bool fullcreen) const;
+    void changeFullScreen(bool fullcreen);
     bool isFullScreen() const;
     void setTitle(const char*) const;
     void showErrorBox(const char*) const;
@@ -27,8 +27,19 @@ public:
     void eventToScreen(SDL_Event& event) const;
     void setScreenScale(float scale);
     void windowToScreen(float& x, float& y) const;
+    /// The window's size when not full screen: 0 as the player left it, 1..3 that many times
+    /// 640x480, 4 the largest whole number of times that fits the screen
+    void setWindowSize(int mode);
+    /// The mouse pointer: 0 the system's, 1..3 a high-contrast arrow (white, outlined in black), bigger
+    /// with each step
+    void setCursorStyle(int style);
 
 private:
+    void applyWindowSize();
+    int m_windowSize = 0;
+#ifndef SMW_XBOX
+    SDL_Cursor* m_cursor = nullptr;    // (setCursorStyle's; null: the system's)
+#endif
     float m_screenScale = 1.0f;    // the picture's share of the screen (setScreenScale)
     // Where the picture goes in the 640x480 of the screen
     SDL_FRect pictureRect() const;

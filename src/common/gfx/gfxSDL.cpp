@@ -13,6 +13,7 @@
 #include <sstream>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 
 constexpr int GFX_SCREEN_W = 640;
@@ -150,6 +151,10 @@ bool GraphicsSDL::init(bool fullscreen)
 
 GraphicsSDL::~GraphicsSDL()
 {
+#ifndef SMW_XBOX
+    if (m_cursor)
+        SDL_DestroyCursor(m_cursor);
+#endif
     SDL_DestroyTexture(sdl_screen_texture);
     SDL_DestroySurface(sdl_screen_surface);
     SDL_DestroyRenderer(sdl_renderer);
@@ -223,13 +228,121 @@ bool GraphicsSDL::isFullScreen() const
     return sdl_window && (SDL_GetWindowFlags(sdl_window) & SDL_WINDOW_FULLSCREEN);
 }
 
-void GraphicsSDL::changeFullScreen(bool fullscreen) const
+void GraphicsSDL::changeFullScreen(bool fullscreen)
 {
     if (!SDL_SetWindowFullscreen(sdl_window, fullscreen)) {
         fprintf(stderr, "[gfx] Couldn't toggle fullscreen mode: %s\n", SDL_GetError());
         return;
     }
+#ifndef SMW_XBOX
+    if (!fullscreen) {
+        SDL_SyncWindow(sdl_window);
+        applyWindowSize();    //(back in a window: the size the options ask for)
+    }
+#endif
 }
+
+void GraphicsSDL::setWindowSize(int mode)
+{
+    m_windowSize = std::clamp(mode, 0, 4);
+    applyWindowSize();
+}
+
+void GraphicsSDL::applyWindowSize()
+{
+#ifdef SMW_XBOX
+    //(the Xbox: no window, no mouse)
+}
+
+void GraphicsSDL::setCursorStyle(int)
+{
+}
+#else
+    if (!sdl_window || m_windowSize == 0 || isFullScreen())
+        return;
+    SDL_Rect usable {0, 0, 0, 0};
+    const SDL_DisplayID display = SDL_GetDisplayForWindow(sdl_window);
+    if (!display || !SDL_GetDisplayUsableBounds(display, &usable) || usable.w <= 0 || usable.h <= 0)
+        return;
+    //(the window's borders and title bar take some of the usable area)
+    const int fits = std::max(1, std::min((usable.w - 16) / GFX_SCREEN_W, (usable.h - 48) / GFX_SCREEN_H));
+    const int times = m_windowSize == 4 ? fits : std::min(m_windowSize, fits);
+    SDL_SetWindowSize(sdl_window, GFX_SCREEN_W * times, GFX_SCREEN_H * times);
+    SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED_DISPLAY(display), SDL_WINDOWPOS_CENTERED_DISPLAY(display));
+}
+
+namespace {
+// The arrow of the high-contrast pointer: X its outline (black), . inside it (white); its tip at 0,0
+constexpr const char* CURSOR_ARROW[] = {
+    "X",
+    "XX",
+    "X.X",
+    "X..X",
+    "X...X",
+    "X....X",
+    "X.....X",
+    "X......X",
+    "X.......X",
+    "X........X",
+    "X.........X",
+    "X......XXXXX",
+    "X...X..X",
+    "X..XX..X",
+    "X.X  X..X",
+    "XX   X..X",
+    "X     X..X",
+    "      X..X",
+    "       XX",
+};
+constexpr int CURSOR_ARROW_W = 12;
+constexpr int CURSOR_ARROW_H = static_cast<int>(sizeof(CURSOR_ARROW) / sizeof(CURSOR_ARROW[0]));
+
+char cursorArrowAt(int x, int y)
+{
+    if (y < 0 || y >= CURSOR_ARROW_H || x < 0)
+        return ' ';
+    const char* row = CURSOR_ARROW[y];
+    return x < static_cast<int>(strlen(row)) ? row[x] : ' ';
+}
+}
+
+void GraphicsSDL::setCursorStyle(int style)
+{
+    style = std::clamp(style, 0, 3);
+    SDL_Cursor* made = nullptr;
+    if (style > 0) {
+        //(1: about the system arrow's size, 2 and 3: bigger, for a TV or a big screen)
+        const int scale = style + 1;
+        //With a white rim around the black outline: it stands out on dark and light alike
+        const int w = (CURSOR_ARROW_W + 2) * scale;
+        const int h = (CURSOR_ARROW_H + 2) * scale;
+        if (SDL_Surface* surface = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888)) {
+            SDL_FillSurfaceRect(surface, nullptr, 0);
+            const Uint32 black = SDL_MapSurfaceRGBA(surface, 0, 0, 0, 255);
+            const Uint32 white = SDL_MapSurfaceRGBA(surface, 255, 255, 255, 255);
+            for (int y = -1; y <= CURSOR_ARROW_H; y++) {
+                for (int x = -1; x <= CURSOR_ARROW_W; x++) {
+                    const char c = cursorArrowAt(x, y);
+                    bool draw = c != ' ';
+                    for (int dy = -1; dy <= 1 && !draw; dy++)
+                        for (int dx = -1; dx <= 1 && !draw; dx++)
+                            draw = cursorArrowAt(x + dx, y + dy) == 'X';    //(the rim)
+                    if (draw) {
+                        const SDL_Rect r {(x + 1) * scale, (y + 1) * scale, scale, scale};
+                        SDL_FillSurfaceRect(surface, &r, c == 'X' ? black : white);
+                    }
+                }
+            }
+            made = SDL_CreateColorCursor(surface, scale, scale);
+            SDL_DestroySurface(surface);
+        }
+    }
+    SDL_SetCursor(made ? made : SDL_GetDefaultCursor());
+    if (m_cursor)
+        SDL_DestroyCursor(m_cursor);
+    m_cursor = made;
+}
+#endif
 
 bool GraphicsSDL::saveScreenshot(const std::string& path) const
 {

@@ -25,6 +25,7 @@ struct AutoTestArgs {
     int frames = 3000;
     int speed = 1;           // --at-speed N: a match's ticks N at a time, drawn once (faster runs that still draw)       // max frames per match (Menus: total menu frames)
     int matches = 1;         // quit after this many matches (Tour/World: stages)
+    int migratedMatches = 0; // --at-migrated-matches N: online, a joiner that becomes the host (the host left) plays N more matches
     int start = 0;           // index of the first match in the mode/map cycle
     int seed = 0;            // RNG seed for reproducible runs; 0 = time based
     int cpuLevel = -1;       // CPU difficulty 0-4; -1 = keep the configured one
@@ -91,6 +92,9 @@ struct NetArgs {
     int statsInterval = 300;   // --net-stats N: print statistics every N frames (0: off)
     int timeoutMs = 5000;      // --net-timeout MS: a silent peer is gone after this long
     int quitAt = 0;            // --net-quit-at F: leave the match at frame F (disconnect test)
+    int cutAt = 0;             // --net-cut-at F,MS: at frame F of a match the network goes dead for MS ms, as with a
+    int cutMs = 0;             // pulled cable: nothing goes out or comes in (reconnect test)
+    int reconnect = 1;         // --net-reconnect 0: a lost connection isn't retried, a lost host not replaced (RECONNECTING)
     int upnp = -1;             // --net-upnp 0|1: ask the router to forward the host's port (-1: yes, except with --autotest)
     bool bot = false;          // --net-bot 1: (a joiner, testing) its players are CPU players this machine drives: the AI's
                                // buttons sent as its input, with this machine's latency (--net-sim-latency)

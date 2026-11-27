@@ -186,6 +186,24 @@ void gfx_setscreenscale(float scale)
     gfx.setScreenScale(scale);
 }
 
+void gfx_setwindowsize(int mode)
+{
+#ifdef SMW_XBOX
+    (void)mode;
+#else
+    gfx.setWindowSize(mode);
+#endif
+}
+
+void gfx_setcursorstyle(int style)
+{
+#ifdef SMW_XBOX
+    (void)style;
+#else
+    gfx.setCursorStyle(style);
+#endif
+}
+
 void gfx_eventtoscreen(SDL_Event* event)
 {
     if (event)

@@ -457,8 +457,8 @@ TEST_CASE("Leaving, kicking, a lost peer and the host closing the lobby") {
     CHECK_FALSE(host.lobby->peer(1).present);
     CHECK(hasEvent(c, LobbyEvent::Type::PeerLeft, 1));
 
-    //The host closes the lobby
-    host.lobby->leave("closing", false);
+    //The host ends the lobby for everyone
+    host.lobby->leave("closing", false, true);
     net.step(10);
     CHECK(c.lobby->phase() == NetLobby::Phase::Closed);
     CHECK(c.lobby->statusText() == "The host closed the lobby");
@@ -466,27 +466,87 @@ TEST_CASE("Leaving, kicking, a lost peer and the host closing the lobby") {
     const auto closed = std::find_if(c.gameEvents.begin(), c.gameEvents.end(), [](const LobbyGameEvent& ev) { return ev.type == LobbyGameEvent::Type::Closed; });
     REQUIRE(closed != c.gameEvents.end());
     CHECK(closed->ok);    //a running match would be finished first
+    CHECK(c.lobby->closeCause() == NetLobby::CloseCause::Ended);
 }
 
-TEST_CASE("The host crashing closes the lobby; nobody joins during a match") {
+TEST_CASE("The host leaves: the lowest joiner hosts next, for everyone (HOST MIGRATION)") {
+    LobbyNet net;
+    Node& host = net.add(true);
+    Node& a = net.add(false);
+    net.step(3);
+    Node& b = net.add(false);
+    net.settle();
+    REQUIRE(host.lobby->memberCount() == 3);
+
+    host.lobby->leave("bye", false);
+    net.step(10);
+    for (Node* n : {&a, &b}) {
+        CHECK(n->lobby->phase() == NetLobby::Phase::Closed);
+        CHECK(n->lobby->closeCause() == NetLobby::CloseCause::HostLeft);
+        CHECK(n->lobby->successor() == 1);
+    }
+    CHECK(a.lobby->statusText().find("you host") != std::string::npos);
+    std::string address;
+    uint16_t port = 0;
+    CHECK(b.lobby->peerAddress(1, address, port));
+}
+
+TEST_CASE("The host is lost: the joiners agree on who is still here, then on the next host") {
+    LobbyNet net;
+    Node& host = net.add(true);
+    Node& a = net.add(false);
+    net.step(3);
+    Node& b = net.add(false);
+    net.step(3);
+    Node& c = net.add(false);
+    net.settle();
+    REQUIRE(host.lobby->memberCount() == 4);
+
+    host.transport->crash();
+    net.step(10);
+    for (Node* n : {&a, &b, &c}) {
+        CHECK(n->lobby->phase() == NetLobby::Phase::Closed);
+        CHECK(n->lobby->closeCause() == NetLobby::CloseCause::HostLost);
+        CHECK(n->lobby->successor() == 1);
+    }
+}
+
+TEST_CASE("A joiner alone with a lost host tries to get back in, no new host") {
+    LobbyNet net;
+    Node& host = net.add(true);
+    Node& a = net.add(false);
+    net.settle();
+    host.transport->crash();
+    net.step(10);
+    CHECK(a.lobby->phase() == NetLobby::Phase::Closed);
+    CHECK(a.lobby->closeCause() == NetLobby::CloseCause::HostLost);
+    CHECK(a.lobby->successor() == -1);
+}
+
+TEST_CASE("Joining during a match; the host crashing then hands the lobby on") {
     LobbyNet net;
     Node& host = net.add(true);
     Node& a = net.add(false);
     net.settle();
 
+    //(a match being played can be joined: NetGame's joining a match in progress)
     host.lobby->setPhase(NetLobby::Phase::InMatch);
     Node& late = net.add(false);
     net.settle();
-    CHECK(late.lobby->phase() == NetLobby::Phase::Closed);
-    CHECK(late.lobby->statusText().find("match") != std::string::npos);
+    CHECK(late.lobby->phase() == NetLobby::Phase::Lobby);
+    CHECK(late.lobby->matchBeingPlayed());
 
     host.transport->crash();
-    net.step(5);
-    CHECK(a.lobby->phase() == NetLobby::Phase::Closed);
-    CHECK(a.lobby->statusText() == "Lost the connection to the host");
-    const auto closed = std::find_if(a.gameEvents.begin(), a.gameEvents.end(), [](const LobbyGameEvent& ev) { return ev.type == LobbyGameEvent::Type::Closed; });
-    REQUIRE(closed != a.gameEvents.end());
-    CHECK_FALSE(closed->ok);
+    net.step(10);
+    for (Node* n : {&a, &late}) {
+        CHECK(n->lobby->phase() == NetLobby::Phase::Closed);
+        CHECK(n->lobby->closeCause() == NetLobby::CloseCause::HostLost);
+        CHECK(n->lobby->successor() == 1);
+        const auto closed = std::find_if(n->gameEvents.begin(), n->gameEvents.end(), [](const LobbyGameEvent& ev) { return ev.type == LobbyGameEvent::Type::Closed; });
+        REQUIRE(closed != n->gameEvents.end());
+        CHECK_FALSE(closed->ok);
+    }
+    CHECK(a.lobby->statusText() == "The host is gone: you host the lobby now");
 }
 
 TEST_CASE("A different build or game data is refused at the handshake") {
@@ -979,4 +1039,49 @@ TEST_CASE("Match settings: the host's, unless it lets everyone change them") {
     a.lobby->requestSetting(NetLobby::SETTING_GOAL, 30, "");
     net.step(30);
     CHECK(settingRequests(host) == 3);
+}
+
+TEST_CASE("Rematch votes: after a match, each member's vote reaches everyone; a new match clears them") {
+    LobbyNet net;
+    Node& host = net.add(true);
+    Node& a = net.add(false);
+    net.step(3);
+    Node& b = net.add(false);
+    net.settle();
+
+    //(nothing to vote on before a match)
+    CHECK_FALSE(a.lobby->canVote());
+    for (Node* n : {&host, &a, &b})
+        n->lobby->setRound(1);
+    net.step(10);
+    REQUIRE(a.lobby->canVote());
+
+    a.lobby->setVote(NetLobby::VOTE_REMATCH);
+    host.lobby->setVote(NetLobby::VOTE_NEXT_MAP);
+    net.step(20);
+    int rematch = 0, next = 0, waiting = 0;
+    for (Node* n : {&host, &a, &b}) {
+        CHECK(n->lobby->vote(1) == NetLobby::VOTE_REMATCH);
+        CHECK(n->lobby->vote(0) == NetLobby::VOTE_NEXT_MAP);
+        n->lobby->voteCount(rematch, next, waiting);
+        CHECK(rematch == 1);
+        CHECK(next == 1);
+        CHECK(waiting == 1);
+    }
+    CHECK(a.lobby->peer(1).ready);    //(a vote makes a joiner ready)
+    CHECK(host.lobby->peer(1).ready);
+
+    b.lobby->setVote(NetLobby::VOTE_REMATCH);
+    net.step(20);
+    host.lobby->voteCount(rematch, next, waiting);
+    CHECK(rematch == 2);
+    CHECK(waiting == 0);
+
+    //A vote for another round doesn't count; a new match clears them
+    for (Node* n : {&host, &a, &b})
+        n->lobby->setRound(2);
+    net.step(10);
+    host.lobby->voteCount(rematch, next, waiting);
+    CHECK(rematch + next == 0);
+    CHECK(a.lobby->vote(1) == NetLobby::VOTE_NONE);
 }

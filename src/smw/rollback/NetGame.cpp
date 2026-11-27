@@ -63,12 +63,12 @@ NetGame& NetGame::instance()
 
 bool NetGame::active() const
 {
-    return m_lobby && m_lobby->phase() != NetLobby::Phase::Closed;
+    return reconnecting() || (m_lobby && m_lobby->phase() != NetLobby::Phase::Closed);
 }
 
 bool NetGame::finished() const
 {
-    return m_lobby && m_lobby->phase() == NetLobby::Phase::Closed;
+    return !reconnecting() && m_lobby && m_lobby->phase() == NetLobby::Phase::Closed;
 }
 
 bool NetGame::isHost() const
@@ -163,6 +163,8 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
     }
     shutdown();
     setEditActivity(0, false, {});    //(a new lobby plays matches, unless told otherwise)
+    if (!reconnecting())
+        m_migratedMembers = 0;
 
     //A host's lobby nobody can join has no network at all (no socket: no firewall prompt, and the
     //builds without the network have it too); the network comes when the host opens it
@@ -179,6 +181,8 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
     options.mesh.host = asHost;
     options.mesh.joinHost = joinHost;
     options.mesh.joinPort = joinPort;
+    if (reconnecting())
+        options.mesh.joinTimeoutMs = 5000;    //(another attempt soon after: see RECONNECTING)
     options.mesh.buildId = GIT_REVISION;
     options.mesh.dataHash = simulationDataHash();
     options.name = args.name;
@@ -199,6 +203,10 @@ bool NetGame::open(bool asHost, uint16_t port, const std::string& joinHost, uint
     }
     m_access = asHost ? access : LobbyAccess::Internet;
     m_hostPort = asHost ? port : 0;
+    if (!asHost) {
+        m_joinedHost = joinHost;
+        m_joinedPort = joinPort;
+    }
     if (asHost && args.delay >= 0)
         m_lobby->setInputDelay(args.delay);
 #ifndef NETWORK_DISABLED
@@ -377,6 +385,9 @@ bool NetGame::init(const cmd::NetArgs& args)
 
 void NetGame::leave()
 {
+    if (reconnecting())
+        printf("netplay: no more trying to get back in (we leave)\n");
+    m_reconnect = Reconnect();
     if (!m_lobby)
         return;
     if (inMatch()) {
@@ -429,7 +440,7 @@ void NetGame::pump()
         if (info.name.empty())
             info.name = "Player 1";
         info.members = static_cast<uint8_t>(m_lobby->memberCount());
-        info.maxMembers = static_cast<uint8_t>(net::MAX_PEERS);
+        info.maxMembers = static_cast<uint8_t>(net::MAX_MEMBERS);
         info.inMatch = m_lobby->phase() != NetLobby::Phase::Lobby;
         info.build = GIT_REVISION;
         info.mode = m_lobby->modeName();
@@ -442,6 +453,11 @@ void NetGame::pump()
         lanResponder().answer(info);
     }
 #endif
+    //Host: someone who joins during a match gets an id that isn't one of the match's (a lost peer's
+    //stays lost: REJOINING in RollbackSession.h)
+    if (isHost())
+        m_lobby->mesh().setReservedIds(inMatch() && m_session ? static_cast<uint8_t>(matchPeers() | m_session->lostPeers()) : 0);
+
     LobbyGameEvent event;
     while (m_lobby->poll(event, now))
         handle(event, now);
@@ -450,6 +466,8 @@ void NetGame::pump()
         if (!m_wasClosed) {
             m_wasClosed = true;
             m_closeMs = now;
+            if (!reconnecting())
+                planReconnect(now);
         }
     } else {
         updateSkins(now);
@@ -472,6 +490,225 @@ void NetGame::pump()
 
     m_lobby->update(now);
     m_transport->flush();
+
+    if (reconnecting())
+        updateReconnect(now);
+}
+
+// ---- reconnecting (see RECONNECTING in NetGame.h)
+
+// The lobby just closed: whether, and where, we try to get back in
+void NetGame::planReconnect(uint32_t nowMs)
+{
+    if (!m_lobby || cmd::g_net.reconnect == 0 || m_access == LobbyAccess::Nobody || m_editActivity != 0)
+        return;
+    using Cause = NetLobby::CloseCause;
+    const Cause cause = m_lobby->closeCause();
+    const int successor = m_lobby->successor();
+    using Kind = Reconnect::Kind;
+    if ((cause == Cause::HostLeft || cause == Cause::HostLost) && successor >= 0) {
+        if (successor == localPeer()) {
+            beginReconnect(static_cast<int>(Kind::Rehost), "", m_transport ? m_transport->localPort() : 0, 15000, false,
+                "The host is gone: you host the lobby now", nowMs);
+        } else {
+            std::string host;
+            uint16_t port = 0;
+            if (m_lobby->peerAddress(successor, host, port))
+                beginReconnect(static_cast<int>(Kind::JoinNewHost), host, port, 30000, false, "The host is gone: " + peerName(successor) + " hosts the lobby now",
+                    nowMs);
+        }
+        return;
+    }
+    if ((cause == Cause::HostLost || cause == Cause::Dropped) && !isHost() && !m_joinedHost.empty()) {
+        //(a match was being played: our player back in it, once in)
+        beginReconnect(static_cast<int>(Kind::Rejoin), m_joinedHost, m_joinedPort, 60000, inMatch() || m_lobby->matchBeingPlayed() || m_late != Late::None,
+            cause == Cause::Dropped ? "You were dropped" : "Lost the connection to the host", nowMs);
+    }
+}
+
+void NetGame::beginReconnect(int kind, const std::string& host, uint16_t port, uint32_t forMs, bool joinMatch, const std::string& why, uint32_t nowMs)
+{
+    Reconnect rc;
+    rc.kind = static_cast<Reconnect::Kind>(kind);
+    rc.host = host;
+    rc.port = port;
+    rc.sinceMs = nowMs;
+    rc.untilMs = nowMs + forMs;
+    rc.forMs = forMs;
+    //(the successor needs a moment to open the lobby again; a cut off connection, to come back)
+    rc.nextTryMs = nowMs + (rc.kind == Reconnect::Kind::JoinNewHost ? 1500 : 1000);
+    rc.joinMatch = joinMatch;
+    rc.why = why;
+    //What the lobby had
+    const int local = m_lobby->localPeer();
+    if (local >= 0) {
+        rc.name = m_lobby->peer(local).name;
+        rc.localPlayers = m_lobby->peer(local).localPlayers;
+    }
+    for (int s = 0; s < LOBBY_SLOTS; s++) {
+        const LobbySlot& slot = m_lobby->slot(s);
+        if (slot.kind == SlotKind::Human && slot.peer == local && slot.localIndex < MAX_LOCAL_PLAYERS) {
+            rc.team[slot.localIndex] = slot.team;
+            rc.color[slot.localIndex] = slot.color;
+        }
+        rc.cpuCount += slot.kind == SlotKind::Cpu;
+    }
+    for (int p = 0; p < net::MAX_PEERS; p++)
+        rc.members += p != 0 && m_lobby->peer(p).present;
+    rc.inputDelay = m_lobby->inputDelayIsAuto() ? -1 : m_lobby->inputDelay();
+    rc.everyone = m_lobby->settingsEveryone();
+    rc.modeId = m_lobby->modeId();
+    rc.goal = m_lobby->goal();
+    rc.mapName = m_lobby->mapName();
+    m_reconnect = rc;
+    static const char* kinds[] = {"", "rejoin the host", "host the lobby again", "join the new host"};
+    printf("netplay: %s: trying to %s%s%s\n", why.c_str(), kinds[kind], host.empty() ? "" : (" at " + host + ":" + std::to_string(port)).c_str(),
+        joinMatch ? " (and the match being played)" : "");
+    m_lobby->setStatus(why + ": getting back in...");
+}
+
+// Rejoining from inside a match: it ends here (we're cut off from it), the lobby's join brings us back into it
+void NetGame::endMatchToReconnect()
+{
+    printf("netplay: leaving the match at frame %d to get back in\n", m_session ? m_session->frame() : g_sim.tick);
+    if (m_session)
+        printStats(true);
+    m_session.reset();
+    m_inMatch = false;
+    m_spectating = false;
+    m_late = Late::None;
+    m_waiting = false;
+    FPSLimiter::instance().setTickStretch(1.0f);
+    m_lastMatchError = m_reconnect.why;
+}
+
+void NetGame::updateReconnect(uint32_t nowMs)
+{
+    using Kind = Reconnect::Kind;
+    Reconnect& rc = m_reconnect;
+    if (inMatch()) {
+        //(a match that goes on without the host is played to its end first; a rejoin ends ours: advance())
+        rc.untilMs = nowMs + rc.forMs;
+        rc.nextTryMs = nowMs + (rc.kind == Reconnect::Kind::JoinNewHost ? 1500 : 500);
+        return;
+    }
+
+    //Back in: our players, teams and colors (and the host's settings), then the match being played
+    if (rc.backMs != 0) {
+        restoreAfterReconnect(nowMs);
+        return;
+    }
+
+    const bool attemptUnderWay = rc.nextTryMs == 0 && m_lobby && rc.attempts > 0;
+    if (attemptUnderWay) {
+        const NetLobby::Phase phase = m_lobby->phase();
+        if (phase == NetLobby::Phase::Joining)
+            return;
+        if (phase != NetLobby::Phase::Closed) {
+            rc.backMs = nowMs | 1;
+            printf("netplay: back in the lobby (%s, attempt %d, after %u ms)\n", rc.kind == Kind::Rehost ? "its host now" : "joined", rc.attempts,
+                nowMs - rc.sinceMs);
+            restoreAfterReconnect(nowMs);
+            return;
+        }
+        //(that attempt failed: again in a moment, until the time is up)
+        rc.nextTryMs = nowMs + 1000;
+    }
+    if (static_cast<int32_t>(nowMs - rc.untilMs) >= 0) {
+        printf("netplay: couldn't get back into the lobby (%d attempts)\n", rc.attempts);
+        const std::string text = rc.why + ": couldn't get back into the lobby";
+        m_reconnect = Reconnect();
+        if (m_lobby) {
+            LobbyEvent old;
+            while (m_lobby->pollEvent(old)) {
+            }
+            m_lobby->setStatus(text);
+            m_lobby->addEvent(LobbyEvent::Type::Closed, -1, text);
+        }
+        return;
+    }
+    if (static_cast<int32_t>(nowMs - rc.nextTryMs) < 0)
+        return;
+    //(after a match: the others still get our last inputs first)
+    if (m_session && m_session->state() == RollbackSession::State::Ended && !m_session->drained() && nowMs - m_matchEndMs < 3000)
+        return;
+
+    rc.attempts++;
+    rc.nextTryMs = 0;
+    std::string error;
+    const std::string why = rc.why;
+    const int attempt = rc.attempts;
+    bool ok = false;
+    if (rc.kind == Kind::Rehost) {
+        ok = open(true, rc.port ? rc.port : DEFAULT_LOBBY_PORT, "", 0, LobbyAccess::Internet, error);
+    } else {
+        ok = open(false, 0, rc.host, rc.port, LobbyAccess::Internet, error);
+    }
+    if (!ok) {
+        printf("netplay: attempt %d to get back in failed: %s\n", attempt, error.c_str());
+        rc.nextTryMs = nowMs + 1000;
+        return;
+    }
+    m_lobby->setStatus(why + ": getting back in" + (attempt > 1 ? " (try " + std::to_string(attempt) + ")..." : "..."));
+}
+
+void NetGame::restoreAfterReconnect(uint32_t nowMs)
+{
+    Reconnect& rc = m_reconnect;
+    NetLobby* lobby = m_lobby.get();
+    if (!lobby || lobby->phase() == NetLobby::Phase::Closed) {
+        //(closed again: try again from the start, as long as there is time)
+        rc.backMs = 0;
+        rc.settingsDone = rc.slotsDone = false;
+        rc.nextTryMs = nowMs + 1000;
+        return;
+    }
+    if (!rc.settingsDone) {
+        rc.settingsDone = true;
+        if (!rc.name.empty() && rc.name != lobby->peer(lobby->localPeer()).name)
+            lobby->setName(rc.name);
+        lobby->setLocalPlayers(rc.localPlayers);
+        if (isHost())
+            m_migratedMembers = std::max(1, rc.members);
+        if (isHost()) {
+            //(the lobby's settings, as its host had them; the menus apply the mode, goal and map)
+            lobby->setCpuCount(rc.cpuCount);
+            lobby->setInputDelay(rc.inputDelay);
+            lobby->setSettingsEveryone(rc.everyone);
+            if (rc.modeId >= 0 && rc.modeId < 1000) {
+                m_settingRequests.push_back({lobby->localPeer(), NetLobby::SETTING_MODE, rc.modeId, {}});
+                m_settingRequests.push_back({lobby->localPeer(), NetLobby::SETTING_GOAL, rc.goal, {}});
+                if (!rc.mapName.empty() && rc.mapName != "(minigame)")
+                    m_settingRequests.push_back({lobby->localPeer(), NetLobby::SETTING_MAP, 0, rc.mapName});
+            }
+        }
+    }
+    //Our players' teams and colors, once the host shows our slots
+    if (!rc.slotsDone && lobby->phase() == NetLobby::Phase::Lobby) {
+        bool any = false;
+        for (int s = 0; s < LOBBY_SLOTS; s++) {
+            const LobbySlot& slot = lobby->slot(s);
+            if (slot.kind != SlotKind::Human || slot.peer != lobby->localPeer() || slot.localIndex >= MAX_LOCAL_PLAYERS)
+                continue;
+            any = true;
+            if (slot.team != rc.team[slot.localIndex])
+                lobby->setSlotTeam(s, rc.team[slot.localIndex]);
+            if (slot.color != rc.color[slot.localIndex])
+                lobby->setSlotColor(s, rc.color[slot.localIndex]);
+        }
+        rc.slotsDone = any || rc.localPlayers == 0;
+    }
+    //The match being played (the host says so in its LOBBY_EXTRA): our player back in it
+    if (rc.joinMatch && lobby->phase() == NetLobby::Phase::Lobby && lobby->matchBeingPlayed()) {
+        printf("netplay: back in the lobby during the match: joining it again\n");
+        rc.joinMatch = false;
+        joinMatchInProgress();
+    }
+    //(done once those are; the match's news may take a moment to come)
+    if (rc.slotsDone && (!rc.joinMatch || nowMs - rc.backMs > 4000)) {
+        printf("netplay: reconnected\n");
+        m_reconnect = Reconnect();
+    }
 }
 
 // Skins are cosmetic: announces ours, and when a skin arrives during a match, the sprites are reloaded
@@ -817,7 +1054,9 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
             else if (!checkMatchConfig(m_config, error))
                 error = "can't play it: " + error + " (you can join from the next match)";
             for (const MatchSlot& slot : m_config.slots) {
-                if (error.empty() && slot.peer > 0 && slot.peer != localPeer() && !m_lobby->mesh().peerConnected(slot.peer))
+                //(one that left the lobby is lost in the match: the CPU plays it, or someone who came back)
+                if (error.empty() && slot.peer > 0 && slot.peer != localPeer() && !m_lobby->mesh().peerConnected(slot.peer) &&
+                    m_lobby->peer(slot.peer).present)
                     error = "no connection to " + peerName(slot.peer);
             }
             m_matchId = matchId;
@@ -835,6 +1074,7 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
             }
             m_late = Late::Accepted;
             m_lateTicks.clear();
+            m_lateHostFrame = 0;
             m_lobby->setStatus("Catching up on the match...");
             break;
         }
@@ -869,6 +1109,9 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
                 if (r.ok())
                     m_lateTicks.push_back(tick);
             }
+            const int hostFrame = static_cast<int>(r.u32());
+            if (r.ok())
+                m_lateHostFrame = std::max(m_lateHostFrame, hostFrame);
             if (m_late == Late::Accepted && !m_lateTicks.empty())
                 startLateMatch();
             break;
@@ -899,8 +1142,22 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
                 if (s < INPUT_MAX_PLAYERS)
                     handovers[static_cast<size_t>(s)] = h;
             }
+            std::array<int, net::MAX_PEERS> drops {};
+            drops.fill(-1);
+            const int dropCount = r.u8();
+            for (int k = 0; k < dropCount && r.ok(); k++) {
+                const int p = r.u8();
+                const int frame = static_cast<int>(r.u32());
+                if (p < net::MAX_PEERS)
+                    drops[static_cast<size_t>(p)] = frame;
+            }
             if (!r.ok() || peer != 0 || matchId != m_matchId || m_late != Late::Jumping)
                 break;
+            if (slot == -2) {
+                //(not caught up yet: more of the host's ticks, then ask again)
+                m_late = Late::Watching;
+                break;
+            }
             if (slot < 0) {
                 //(no CPU player to take over: watch it, play from the next match)
                 m_late = Late::Watching;
@@ -909,7 +1166,7 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
                 m_dropNoticeMs = nowMs;
                 break;
             }
-            beginLateSession(slot, from, start, handovers);
+            beginLateSession(slot, from, start, handovers, drops);
             break;
         }
 
@@ -1344,7 +1601,7 @@ void NetGame::hostLateUpdate(uint32_t /*nowMs*/)
         //(at most a few messages a frame: a long match comes in a second or so)
         for (int message = 0; message < 8 && late.sent < confirmed; message++) {
             const int count = std::min(confirmed - late.sent, 240);
-            uint8_t buffer[16 + 240 * 5];
+            uint8_t buffer[20 + 240 * 5];
             net::ByteWriter w(buffer, sizeof(buffer));
             w.u8(static_cast<uint8_t>(net::MsgType::LateTicks));
             w.u8(m_matchId);
@@ -1356,6 +1613,7 @@ void NetGame::hostLateUpdate(uint32_t /*nowMs*/)
                     w.u8(b);
                 w.u8(tick.cpuMask);
             }
+            w.u32(static_cast<uint32_t>(confirmed));
             m_lobby->sendGameMessage(p, w.data(), w.size());
             late.sent += count;
         }
@@ -1368,17 +1626,40 @@ void NetGame::hostJumpIn(int peer, int start, int rttMs, uint32_t nowMs)
 {
     int slot = -1;
     int from = -1;
-    if (inMatch() && m_session) {
-        for (int k = 0; k < INPUT_MAX_PLAYERS && from < 0; k++) {
-            const MatchSlot& s = m_config.slots[static_cast<size_t>(k)];
-            if (s.control != 2 || s.peer > 0 || (g_sim.cpuTakeover >> k) & 1)
-                continue;
-            //(from when it will have caught up: how far behind it is, and the way here and back, in frames)
-            const int lead = (m_session->frame() - start) + rttMs / 16 + 6;
-            from = m_session->handOver(k, peer, start, nowMs, lead);
-            slot = from >= 0 ? k : -1;
+    //(a lost peer of the match whose drop isn't agreed yet: its slots aren't the CPU's yet, nor
+    //could the new peer's session be told when they are; it watches, and plays from the next match)
+    bool undecided = false;
+    for (int p = 0; p < net::MAX_PEERS && m_session; p++)
+        undecided |= ((m_session->lostPeers() >> p) & 1) && m_session->dropFrame(p) < 0;
+    bool tooOld = false;
+    if (inMatch() && m_session && !undecided) {
+        //(from when it will have caught up: how far behind it is, and the way here and back, in frames)
+        const int lead = (m_session->frame() - start) + rttMs / 16 + 6;
+        const std::string name = peerName(peer);
+        //Their own player back, if they were in this match and lost (REJOINING: the same name); else a
+        //CPU player's slot; else a lost player's that the CPU plays
+        for (int pass = 0; pass < 3 && from < 0; pass++) {
+            for (int k = 0; k < INPUT_MAX_PLAYERS && from < 0; k++) {
+                const MatchSlot& s = m_config.slots[static_cast<size_t>(k)];
+                const bool lostPlayer = s.control == 1 && m_session->reclaimable(k);
+                bool wanted = false;
+                if (pass == 0)
+                    wanted = lostPlayer && s.peer >= 0 && m_matchNames[static_cast<size_t>(s.peer)] == name;
+                else if (pass == 1)
+                    wanted = s.control == 2 && s.peer <= 0 && !((g_sim.cpuTakeover >> k) & 1);
+                else
+                    wanted = lostPlayer;
+                if (!wanted)
+                    continue;
+                from = m_session->handOver(k, peer, start, nowMs, lead);
+                slot = from >= 0 ? k : -1;
+                //(it isn't caught up yet: the others no longer have their inputs from where it is)
+                tooOld |= from < 0 && start < m_session->frame() - RollbackSession::INPUT_HISTORY / 4;
+            }
         }
     }
+    if (slot < 0 && tooOld)
+        slot = -2;
     uint8_t buffer[64];
     net::ByteWriter w(buffer, sizeof(buffer));
     w.u8(static_cast<uint8_t>(net::MsgType::JumpInReply));
@@ -1398,11 +1679,22 @@ void NetGame::hostJumpIn(int peer, int start, int rttMs, uint32_t nowMs)
         w.u32(static_cast<uint32_t>(m_session->handoverFrame(k)));
         w.u32(static_cast<uint32_t>(m_session->handoverStart(k)));
     }
+    //(the drops decided so far: the new peer's session counts those peers as gone, see REJOINING)
+    uint8_t drops = 0;
+    for (int p = 0; p < net::MAX_PEERS && m_session; p++)
+        drops += m_session->dropFrame(p) >= 0;
+    w.u8(drops);
+    for (int p = 0; p < net::MAX_PEERS && m_session; p++) {
+        if (m_session->dropFrame(p) < 0)
+            continue;
+        w.u8(static_cast<uint8_t>(p));
+        w.u32(static_cast<uint32_t>(m_session->dropFrame(p)));
+    }
     m_lobby->sendGameMessage(peer, w.data(), w.size());
     if (slot >= 0)
         m_lateJoiners[static_cast<size_t>(peer)].streaming = false;    //(it plays: it gets the inputs from now on)
     printf("netplay: peer %d joins match %d: %s\n", peer, m_matchId,
-        slot >= 0 ? ("player " + std::to_string(slot + 1) + " from frame " + std::to_string(from) + " (it caught up to " + std::to_string(start) + ")").c_str()
+        slot == -2 ? "not caught up yet (it is to try again)" : slot >= 0 ? ("player " + std::to_string(slot + 1) + " from frame " + std::to_string(from) + " (it caught up to " + std::to_string(start) + ")").c_str()
                   : "no CPU player to take over, it watches");
 }
 
@@ -1430,6 +1722,7 @@ void NetGame::startLateMatch()
     FPSLimiter::instance().setTickStretch(1.0f);
     m_late = Late::Watching;
     m_handApplied = 0;
+    m_lobby->setRound(m_matchId);
     m_lobby->setPhase(NetLobby::Phase::InMatch);
     m_timing = Timing();
     m_timing.startMs = monotonicMs();
@@ -1471,7 +1764,7 @@ void NetGame::spectate(Outcome& outcome)
         }
     }
     //Caught up: a player of our own (the host answers with a slot, or none)
-    if (m_lateWantsPlay && have - g_sim.tick <= 2 && g_sim.tick > 0) {
+    if (m_lateWantsPlay && have - g_sim.tick <= 2 && have >= m_lateHostFrame - 2 && g_sim.tick > 0) {
         m_late = Late::Jumping;
         uint8_t buffer[8];
         net::ByteWriter w(buffer, sizeof(buffer));
@@ -1498,7 +1791,8 @@ void NetGame::endMatchHere(Outcome& outcome)
 
 // Joiner: the host gave us a CPU player's slot from frame `from`: our session starts where we
 // caught up to (`start`, where we stopped)
-void NetGame::beginLateSession(int slot, int from, int start, const std::array<SessionConfig::Handover, INPUT_MAX_PLAYERS>& handovers)
+void NetGame::beginLateSession(int slot, int from, int start, const std::array<SessionConfig::Handover, INPUT_MAX_PLAYERS>& handovers,
+    const std::array<int, net::MAX_PEERS>& drops)
 {
     if (g_sim.tick != start || start <= 0 || start > static_cast<int>(m_lateTicks.size())) {
         printf("netplay: ERROR: the host's handover is for frame %d, we're at %d\n", start, g_sim.tick);
@@ -1516,6 +1810,7 @@ void NetGame::beginLateSession(int slot, int from, int start, const std::array<S
     }
     session.handovers = handovers;
     session.handovers[static_cast<size_t>(slot)] = {static_cast<int8_t>(session.localPeer), from, start};
+    session.dropFrames = drops;
     for (int p = 0; p < net::MAX_PEERS; p++) {
         bool inMatch = p == 0;
         for (int k = 0; k < INPUT_MAX_PLAYERS; k++)
@@ -1581,6 +1876,12 @@ bool NetGame::held() const
 NetGame::Outcome NetGame::advance(const InputFrame& localInput)
 {
     Outcome outcome;
+    //(cut off from the match: it ends here, the rejoin brings us back into it; see RECONNECTING)
+    if (m_reconnect.kind == Reconnect::Kind::Rejoin && inMatch()) {
+        endMatchToReconnect();
+        outcome.failed = true;
+        return outcome;
+    }
     //(joined during the match: watching it, or catching up, until we play)
     if (m_spectating && inMatch()) {
         pump();
@@ -1731,6 +2032,10 @@ void NetGame::onSessionFailed()
     m_transport->flush();
     m_lastMatchError = what;
     m_lobby->setStatus(what);
+    //(we were dropped: cut off for a moment; back into the lobby, and into the match: RECONNECTING)
+    if (culprit == localPeer() && !isHost() && cmd::g_net.reconnect != 0 && m_access != LobbyAccess::Nobody && !m_joinedHost.empty() &&
+        !m_series.active)
+        beginReconnect(static_cast<int>(Reconnect::Kind::Rejoin), m_joinedHost, m_joinedPort, 60000, true, "You were dropped from the match", monotonicMs());
 }
 
 NetGame::DropNotice NetGame::dropNotice() const
@@ -1769,13 +2074,14 @@ void NetGame::endSession(const std::string& reason)
 {
     if (!m_lobby || m_lobby->phase() == NetLobby::Phase::Closed)
         return;
-    m_lobby->leave(reason, false);
+    m_lobby->leave(reason, false, true);    //(for everyone: no new host)
     m_transport->flush();
 }
 
 bool NetGame::readyForMatch() const
 {
-    if (!isHost() || m_lobby->phase() != NetLobby::Phase::Lobby || m_lobby->memberCount() < cmd::g_net.peers)
+    const int wanted = hostedAfterMigration() ? migratedMembers() : cmd::g_net.peers;
+    if (!isHost() || m_lobby->phase() != NetLobby::Phase::Lobby || m_lobby->memberCount() < wanted)
         return false;
     std::string why;
     return m_lobby->everyoneReady(why) && m_lobby->pingsMeasured();

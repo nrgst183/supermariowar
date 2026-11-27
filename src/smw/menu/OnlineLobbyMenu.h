@@ -10,6 +10,8 @@ class MI_Image;
 class MI_LobbyButton;
 class MI_LobbyScene;
 class MI_LockTag;
+class MI_MenuPanel;
+class MI_VoteChoice;
 class MI_OnlineTeamSelect;
 class MI_SwitchField;
 class MI_Text;
@@ -28,7 +30,7 @@ template<typename T> class MI_SelectField;
 */
 class UI_OnlineLobbyMenu : public UI_Menu {
 public:
-    enum class Dialog { None, Leave, Kick };
+    enum class Dialog { None, Leave, Kick, Vote };
     enum class Page { Team, Options };
 
     UI_OnlineLobbyMenu();
@@ -54,6 +56,11 @@ public:
     void CloseDialog();
     Dialog dialog() const { return m_dialog; }
     int kickPeer() const { return m_kickPeer; }
+
+    /// After a match: what to play next (NetLobby's REMATCH VOTE), if there is anything to vote on
+    void OpenVote();
+    /// The host: when everyone voted, the choice (VOTE_REMATCH, VOTE_NEXT_MAP) once its countdown ran out
+    uint8_t VoteDecision();
 
     /// The text of the status line right now (for tests and screenshots)
     const std::string& statusLine() const { return m_statusLine; }
@@ -88,9 +95,21 @@ private:
     MI_Button* miDialogYes = nullptr;
     MI_Button* miDialogNo = nullptr;
 
+    // The "Play again?" panel (Dialog::Vote): a panel as the options pages', its two choices as fields
+    MI_MenuPanel* miVotePanel = nullptr;
+    MI_VoteChoice* miVoteRematch = nullptr;
+    MI_VoteChoice* miVoteNext = nullptr;
+    MI_Text* miVoteLine = nullptr;      // who it waits for, or what starts
+    MI_Text* miVoteHint = nullptr;
+    std::string m_voteNote;      // the panel's note: how many voted
+    void ShowVote(bool show);
+
     Dialog m_dialog = Dialog::None;
     Page m_page = Page::Team;
     int m_kickPeer = -1;
+    int m_voteCountdown = -1;    // the host: frames until the voted match starts (-1: not everyone voted)
+    void SyncVote();
+    std::string m_voteStatus;    // who voted for what (the status line while voting)
     std::string m_notice;
     std::string m_statusLine;
 

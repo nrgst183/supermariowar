@@ -116,6 +116,13 @@
 // J rolls back as for any late input. The simulation plays the slot as a
 // human's from J (ISessionCallbacks::handOverSlots).
 //
+// REJOINING. A player who was lost (the CPU plays their slot from its drop frame D) can come back
+// during the same match: they join again (as a new peer: a lost peer's id stays lost), catch up as
+// above, and the host hands them their old slot from a frame J after D. The slot then has three
+// spans: the old peer's inputs up to D, the CPU from D to J, the new peer's from J (and the CPU
+// again from its own drop frame, should it be lost too). A peer that joins during the match learns
+// the drops decided before it came from the host (SessionConfig::dropFrames), not from the reports.
+//
 // LIGHTNESS. Everything is fixed-size: no allocation after construction.
 namespace rollback {
 
@@ -125,7 +132,7 @@ struct SessionConfig {
     // The peer driving each player slot; -1 for CPU players and empty slots
     std::array<int8_t, INPUT_MAX_PLAYERS> slotPeer {{-1, -1, -1, -1}};
     // The transport connection of each remote peer (-1: the peer id isn't in this match)
-    std::array<int, net::MAX_PEERS> peerConnection {{-1, -1, -1, -1}};
+    std::array<int, net::MAX_PEERS> peerConnection = net::noConnections();
 
     int inputDelay = 2;        // ticks between reading local input and simulating it
     int maxPrediction = 8;     // ticks the simulation may run ahead of the confirmed inputs
@@ -148,6 +155,12 @@ struct SessionConfig {
         int start = 0;       // S: the frame its session started at
     };
     std::array<Handover, INPUT_MAX_PLAYERS> handovers {};
+    // The drop frames decided before it joined (see REJOINING), per peer (-1: not lost)
+    std::array<int, net::MAX_PEERS> dropFrames = []() {
+        std::array<int, net::MAX_PEERS> none {};
+        none.fill(-1);
+        return none;
+    }();
 };
 
 class ISessionCallbacks {
@@ -225,11 +238,14 @@ public:
     // The host: hold every peer at the next frame of its input (true), or let go (false)
     void setHold(bool hold);
     // ---- players who join during the match (see JOINING)
-    // The host: hand a CPU slot it drives to `peer`, whose session starts at `start`. The frame it
-    // plays from (J), or -1 if it can't be handed over (not the host's, handed over already, `start`
-    // too old for the input history). `lead`: that many frames later than the next of our input (the
-    // time the new peer needs to catch up: until then the slot is still ours, no one waits for it)
+    // The host: hand a CPU slot it drives to `peer`, whose session starts at `start`; or a lost
+    // peer's slot that the CPU plays (see REJOINING). The frame it plays from (J), or -1 if it can't
+    // be handed over (neither, handed over already, `start` too old for the input history). `lead`:
+    // that many frames later than the next of our input (the time the new peer needs to catch up:
+    // until then the slot is still ours, no one waits for it)
     int handOver(int slot, int peer, int start, uint32_t nowMs, int lead = 0);
+    // A lost peer's slot that the CPU plays and that can be handed to someone who comes back
+    bool reclaimable(int slot) const;
     // The peer that drives a slot from the latest handover on (the slot's peer if none)
     int slotOwner(int slot) const;
     // The frame a slot was handed over at (-1: never), and to whom
@@ -347,6 +363,11 @@ private:
     int knownOf(int peer) const { return peer == m_config.localPeer ? m_localReceived : m_peers[peer].received; }
     // Whose input a slot's is at a frame (a handover: the new peer's from its frame on)
     int ownerAt(int slot, int frame) const { return m_handFrom[slot] >= 0 && frame >= m_handFrom[slot] ? m_handPeer[slot] : m_config.slotPeer[slot]; }
+    // Whether the CPU plays a slot at a frame (a lost peer's: from its drop frame on; until it was
+    // handed to someone who came back, see REJOINING)
+    bool cpuAt(int slot, int frame) const { return (frame >= m_cpuFrom[slot] && frame < m_cpuUntil[slot]) || frame >= m_cpuAgain[slot]; }
+    // The end of a slot's first CPU span: the handover to someone who came back after its drop
+    void updateCpuSpan(int slot);
     void addHandover(int slot, int peer, int from, int start, uint32_t nowMs, int received, int acked);
     InputFrame tickInput(int frame);
     void runTick(bool resimulating);
@@ -405,6 +426,8 @@ private:
     std::array<int, INPUT_MAX_PLAYERS> m_handStart {};                   // started at S)
     uint8_t m_holdSerial = 0;       // its changes, counted (the newest wins)
     std::array<int, INPUT_MAX_PLAYERS> m_cpuFrom {};    // the drop frame of each slot's peer (INT_MAX: none)
+    std::array<int, INPUT_MAX_PLAYERS> m_cpuUntil {};   // ... the CPU plays it until here (INT_MAX: for good; see REJOINING)
+    std::array<int, INPUT_MAX_PLAYERS> m_cpuAgain {};   // the drop frame of the one who came back (INT_MAX: none)
     uint8_t m_dropPacket[3 + (net::MAX_PEERS - 1) * (9 + DROP_RELAY_FRAMES * INPUT_MAX_PLAYERS)] = {};
 };
 

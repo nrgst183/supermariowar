@@ -88,6 +88,10 @@ public:
     void dropPeer(int peer);
     // Host: refuse new joiners with this reason (empty: accept them again)
     void setRefuseJoins(const std::string& reason) { m_refuseJoins = reason; }
+    // Host: peer ids a new joiner doesn't get (bit p), while there are others: the peers of the match
+    // being played, lost ones too (a lost peer's id stays lost for the rest of its match)
+    void setReservedIds(uint8_t mask) { m_reservedIds = mask; }
+
 
     IMeshTransport& transport() { return m_transport; }
 
@@ -121,8 +125,9 @@ private:
     // Joiner
     bool m_sentReady = false;
     int m_hostConnection = -1;
-    std::array<int, net::MAX_PEERS> m_peerConnection {{-1, -1, -1, -1}};
-    std::array<int, net::MAX_PEERS> m_expectedConnection {{-1, -1, -1, -1}};   // joiner: members it connects to
+    std::array<int, net::MAX_PEERS> m_peerConnection = net::noConnections();
+    std::array<int, net::MAX_PEERS> m_expectedConnection = net::noConnections();   // joiner: members it connects to
+    uint8_t m_reservedIds = 0;    // host: ids not to give a new joiner (setReservedIds)
     std::array<uint8_t, 512> m_buffer {};
 };
 

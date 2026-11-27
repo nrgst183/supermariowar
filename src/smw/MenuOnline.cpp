@@ -456,6 +456,7 @@ void MenuState::HandleOnlineEvents()
                     if (net.isHost())
                         ApplyOnlineMatchSelection();
                     mOnlineLobbyMenu->Open();
+                    mOnlineLobbyMenu->OpenVote();
                 }
                 break;
 
@@ -786,6 +787,22 @@ void MenuState::ApplyOnlineMatchSelection()
     game_values.gamemode = gamemodes[mGameSettingsMenu->GetCurrentGameModeID()];
     for (short iMode = 0; iMode < GAMEMODE_LAST; iMode++)
         gamemodes[iMode]->goal = mGameSettingsMenu->miGoalField[iMode]->currentValue();
+}
+
+void MenuState::UpdateOnlineVote()
+{
+    const uint8_t decision = mOnlineLobbyMenu->VoteDecision();
+    if (decision == rollback::NetLobby::VOTE_NONE)
+        return;
+    //(the next map, as the map field's "next": with the filters)
+    if (decision == rollback::NetLobby::VOTE_NEXT_MAP && mOnlineSeriesType == MatchType::SingleGame && !mOnlineMinigame) {
+        maplist->next(true);
+        mGameSettingsMenu->miMapField->LoadCurrentMap();
+        szCurrentMapName = mGameSettingsMenu->miMapField->GetMapName();
+    }
+    printf("online: the vote: %s\n", decision == rollback::NetLobby::VOTE_NEXT_MAP ? "the next map" : "a rematch");
+    mOnlineLobbyMenu->CloseDialog();
+    StartOnlineMatch();
 }
 
 void MenuState::StartOnlineMatch()

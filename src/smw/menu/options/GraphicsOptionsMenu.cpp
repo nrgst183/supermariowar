@@ -21,9 +21,9 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     : UI_Menu()
 {
     //The screen, the style, and (without the Online Options menu) the online rows
-    short rows = 9;
+    short rows = 11;
 #ifdef SMW_XBOX
-    rows--;
+    rows -= 3;    //(no Display, Window Size or Mouse Pointer)
 #endif
 #ifndef SMW_ONLINE_OPTIONS
     rows += 2;
@@ -41,6 +41,22 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miFullscreenField->setCurrentValue(game_values.fullscreen ? 1 : 0);
     miFullscreenField->setItemChangedCode(MENU_CODE_TOGGLE_FULLSCREEN);
     page.add(miFullscreenField, "Play in a window or full screen");
+#endif
+
+#ifdef SMW_XBOX
+    miWindowSizeField = nullptr;
+#else
+    //The game is drawn at 640x480 and scaled to the window: a bigger window, bigger menus and text
+    miWindowSizeField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Window Size", SettingsPage::ROW_W, SettingsPage::LABEL_W);
+    miWindowSizeField->add("Any", 0);
+    miWindowSizeField->add("1x", 1);
+    miWindowSizeField->add("2x", 2);
+    miWindowSizeField->add("3x", 3);
+    miWindowSizeField->add("Fit Screen", 4);
+    miWindowSizeField->setOutputPtr(&game_values.windowsize);
+    miWindowSizeField->setCurrentValue(game_values.windowsize);
+    miWindowSizeField->setItemChangedCode(MENU_CODE_WINDOW_SIZE_CHANGED);
+    page.add(miWindowSizeField, "The window's size: everything scales with it");
 #endif
 
     //The game always ticks at 62.5 Hz; this only sets how often it is drawn
@@ -93,6 +109,21 @@ UI_GraphicsOptionsMenu::UI_GraphicsOptionsMenu()
     miOverlayColorsField->setOutputPtr(&game_values.overlaycolors);
     miOverlayColorsField->setCurrentValue(game_values.overlaycolors);
     page.add(miOverlayColorsField, "Panel colors in the theater and editors");
+
+#ifdef SMW_XBOX
+    miCursorStyleField = nullptr;
+#else
+    //A big, outlined arrow: easy to find on a TV or a big monitor
+    miCursorStyleField = new MI_SelectField<short>(&rm->spr_selectfield, page.x(), page.rowY(), "Mouse Pointer", SettingsPage::ROW_W, SettingsPage::LABEL_W);
+    miCursorStyleField->add("System", 0);
+    miCursorStyleField->add("Contrast", 1);
+    miCursorStyleField->add("Contrast Big", 2);
+    miCursorStyleField->add("Contrast Huge", 3);
+    miCursorStyleField->setOutputPtr(&game_values.cursorstyle);
+    miCursorStyleField->setCurrentValue(game_values.cursorstyle);
+    miCursorStyleField->setItemChangedCode(MENU_CODE_CURSOR_STYLE_CHANGED);
+    page.add(miCursorStyleField, "A high-contrast pointer, in three sizes");
+#endif
 
 #ifdef SMW_ONLINE_OPTIONS
     miPingBarsField = nullptr;

@@ -43,6 +43,8 @@ RollbackSession::RollbackSession(const SessionConfig& config, ITransport& transp
     }
 
     m_cpuFrom.fill(INT_MAX);
+    m_cpuUntil.fill(INT_MAX);
+    m_cpuAgain.fill(INT_MAX);
 
     //Inputs below the input delay are zero on every peer
     m_localReceived = m_config.inputDelay;
@@ -71,6 +73,36 @@ RollbackSession::RollbackSession(const SessionConfig& config, ITransport& transp
         if (h.peer >= 0)
             addHandover(slot, h.peer, h.from, h.start, nowMs, std::max(h.from, start), start);
     }
+    //The drops decided before we joined (see REJOINING): those peers are lost, final
+    for (int p = 0; p < net::MAX_PEERS && p < m_config.peerCount; p++) {
+        const int drop = m_config.dropFrames[p];
+        if (drop < 0 || p == m_config.localPeer)
+            continue;
+        Peer& peer = m_peers[p];
+        peer.lost = true;
+        peer.lostReason = "left";
+        peer.lostKnown = std::max(peer.received, drop);
+        m_lostMask |= static_cast<uint8_t>(1u << p);
+        decideDrop(p, drop);
+    }
+    m_firstWrongFrame = -1;    //(nothing before the start to roll back to: those ticks were the host's)
+    if (m_lostMask & 1)
+        m_holdFrame = -1;
+}
+
+void RollbackSession::updateCpuSpan(int slot)
+{
+    //(a handover after the first drop, to another peer than the slot's own: the CPU until then)
+    m_cpuUntil[slot] = m_cpuFrom[slot] != INT_MAX && m_handFrom[slot] > m_cpuFrom[slot] && m_handPeer[slot] != m_config.slotPeer[slot]
+        ? m_handFrom[slot] : INT_MAX;
+}
+
+bool RollbackSession::reclaimable(int slot) const
+{
+    if (slot < 0 || slot >= INPUT_MAX_PLAYERS || m_handFrom[slot] >= 0 || m_cpuFrom[slot] == INT_MAX)
+        return false;
+    const int owner = m_config.slotPeer[slot];
+    return owner >= 0 && owner < m_config.peerCount && m_peers[owner].lost && m_peers[owner].dropFrame >= 0;
 }
 
 void RollbackSession::addHandover(int slot, int peer, int from, int start, uint32_t nowMs, int received, int acked)
@@ -80,6 +112,7 @@ void RollbackSession::addHandover(int slot, int peer, int from, int start, uint3
     m_handFrom[slot] = from;
     m_handPeer[slot] = peer;
     m_handStart[slot] = start;
+    updateCpuSpan(slot);
     Peer& p = m_peers[peer];
     if (peer != m_config.localPeer && m_config.peerConnection[peer] < 0) {
         //(a new peer of the match: its inputs from J, ours to it from where it starts)
@@ -97,14 +130,18 @@ void RollbackSession::addHandover(int slot, int peer, int from, int start, uint3
 
 int RollbackSession::handOver(int slot, int peer, int start, uint32_t nowMs, int lead)
 {
-    if (m_config.localPeer != 0 || slot < 0 || slot >= INPUT_MAX_PLAYERS || m_handFrom[slot] >= 0 || m_config.slotPeer[slot] != 0 ||
+    if (m_config.localPeer != 0 || slot < 0 || slot >= INPUT_MAX_PLAYERS || m_handFrom[slot] >= 0 ||
+        (m_config.slotPeer[slot] != 0 && !reclaimable(slot)) ||
         peer <= 0 || peer >= m_config.peerCount || m_peers[peer].slotCount > 0 || m_peers[peer].lost || m_state != State::Running)
         return -1;
     //(the others send it their inputs from `start` on: still in their input history)
     if (start > m_frame || start < m_localReceived - INPUT_HISTORY / 2)
         return -1;
-    //The next frame of our input: no packet sent so far has an input of it (see JOINING)
-    const int from = m_localReceived + std::clamp(lead, 0, INPUT_HISTORY / 4);
+    //The next frame of our input: no packet sent so far has an input of it (see JOINING); for a lost
+    //peer's slot, after its drop frame
+    int from = m_localReceived + std::clamp(lead, 0, INPUT_HISTORY / 4);
+    if (m_cpuFrom[slot] != INT_MAX)
+        from = std::max(from, m_cpuFrom[slot] + 1);
     addHandover(slot, peer, from, start, nowMs, from, start);
     return from;
 }
@@ -130,8 +167,14 @@ float RollbackSession::behindFrames(uint32_t nowMs) const
 int RollbackSession::knownFrames(int slot) const
 {
     const int peer = m_config.slotPeer[slot];
-    if (peer < 0 || m_cpuFrom[slot] != INT_MAX)
+    if (peer < 0 || m_cpuAgain[slot] != INT_MAX)
         return ALL_KNOWN;
+    if (m_cpuFrom[slot] != INT_MAX) {
+        if (m_cpuUntil[slot] == INT_MAX)
+            return ALL_KNOWN;
+        //(someone came back to it: theirs from J, see REJOINING)
+        return std::max(m_cpuUntil[slot], knownOf(m_handPeer[slot]));
+    }
     int known = knownOf(peer);
     //(handed over: the old peer's inputs up to J, the new one's from there)
     if (m_handFrom[slot] >= 0 && known >= m_handFrom[slot])
@@ -162,7 +205,7 @@ InputFrame RollbackSession::tickInput(int frame)
 {
     InputFrame in;
     for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
-        if (m_config.slotPeer[slot] < 0 || frame >= m_cpuFrom[slot])
+        if (m_config.slotPeer[slot] < 0 || cpuAt(slot, frame))
             continue;    //nobody's, or a lost peer's slot that the CPU plays: zero
 
         const int known = knownFrames(slot);
@@ -184,14 +227,14 @@ void RollbackSession::runTick(bool resimulating)
     //rollback to before the drop frame undoes the takeover)
     uint8_t cpu = 0;
     for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
-        if (m_frame >= m_cpuFrom[slot])
+        if (cpuAt(slot, m_frame))
             cpu |= static_cast<uint8_t>(1u << slot);
     }
     if (cpu)
         m_callbacks.takeOverSlots(cpu);
     uint8_t human = 0;
     for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
-        if (m_handFrom[slot] >= 0 && m_frame >= m_handFrom[slot] && m_frame < m_cpuFrom[slot])
+        if (m_handFrom[slot] >= 0 && m_frame >= m_handFrom[slot] && !cpuAt(slot, m_frame))
             human |= static_cast<uint8_t>(1u << slot);
     }
     if (human)
@@ -710,7 +753,7 @@ uint8_t RollbackSession::cpuSlots() const
 {
     uint8_t mask = 0;
     for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
-        if (m_cpuFrom[slot] != INT_MAX)
+        if (cpuAt(slot, std::max(m_frame, 0)))
             mask |= static_cast<uint8_t>(1u << slot);
     }
     return mask;
@@ -765,7 +808,14 @@ void RollbackSession::decideDrop(int p, int frame)
         const int slot = peer.slots[k];
         if (m_handFrom[slot] >= 0 && m_handFrom[slot] <= frame && m_handPeer[slot] != p)
             continue;
-        m_cpuFrom[slot] = frame;
+        //(the one who came back to a lost peer's slot, lost too: the CPU again, see REJOINING)
+        if (m_cpuFrom[slot] != INT_MAX && m_handPeer[slot] == p && m_cpuUntil[slot] != INT_MAX) {
+            m_cpuAgain[slot] = std::max(frame, m_cpuUntil[slot]);
+            continue;
+        }
+        if (m_cpuFrom[slot] == INT_MAX)
+            m_cpuFrom[slot] = frame;
+        updateCpuSpan(slot);
     }
     //Frames from there on were simulated with the human player: again, with the CPU
     if (m_state == State::Running && peer.slotCount > 0 && frame < m_frame && (m_firstWrongFrame < 0 || frame < m_firstWrongFrame))

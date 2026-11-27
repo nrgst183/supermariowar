@@ -20,7 +20,8 @@ constexpr int MIN_DELAY = 0;    // (on a LAN the inputs arrive within a frame: r
 constexpr int MAX_DELAY = 6;
 constexpr uint32_t STATE_INTERVAL_MS = 100;    // at most this often (host)
 
-enum class ByeKind : uint8_t { Leave = 0, Close = 1, Kick = 2 };
+enum class ByeKind : uint8_t { Leave = 0, Close = 1, Kick = 2, HostLeave = 3 };
+constexpr uint32_t HOST_GONE_WAIT_MS = 6000;    // (the others notice it at their own time: their timeouts)
 
 std::string cleanName(const std::string& name)
 {
@@ -262,11 +263,46 @@ void NetLobby::clearReady()
     }
 }
 
+void NetLobby::setVote(uint8_t vote)
+{
+    if (localPeer() < 0 || vote > VOTE_NEXT_MAP || m_phase != Phase::Lobby)
+        return;
+    m_votes[static_cast<size_t>(localPeer())] = vote;
+    m_voteRound = m_round;
+    if (isHost()) {
+        markDirty();
+        return;
+    }
+    if (vote != VOTE_NONE)
+        setReady(true);
+    ByteWriter w(m_buffer.data(), m_buffer.size());
+    w.u8(static_cast<uint8_t>(MsgType::Vote));
+    w.u8(m_round);
+    w.u8(vote);
+    sendTo(0, w);
+}
+
+void NetLobby::voteCount(int& rematch, int& nextMap, int& waiting) const
+{
+    rematch = nextMap = waiting = 0;
+    for (int p = 0; p < net::MAX_PEERS; p++) {
+        if (!m_peers[static_cast<size_t>(p)].present)
+            continue;
+        const uint8_t v = m_votes[static_cast<size_t>(p)];
+        rematch += v == VOTE_REMATCH;
+        nextMap += v == VOTE_NEXT_MAP;
+        waiting += v == VOTE_NONE;
+    }
+}
+
 void NetLobby::setRound(uint8_t round)
 {
     if (round == m_round)
         return;
     m_round = round;
+    //(a new match: the votes were for this one)
+    m_votes.fill(VOTE_NONE);
+    m_voteRound = round;
     if (isHost()) {
         for (int p = 1; p < net::MAX_PEERS; p++)
             m_peers[static_cast<size_t>(p)].ready = m_readyFlag[static_cast<size_t>(p)] && m_readyRound[static_cast<size_t>(p)] == m_round;
@@ -562,28 +598,33 @@ void NetLobby::sendGameMessage(int peer, const uint8_t* data, size_t size)
         m_mesh.send(peer, Channel::Reliable, data, size);
 }
 
-void NetLobby::leave(const std::string& reason, bool abortMatch)
+void NetLobby::leave(const std::string& reason, bool abortMatch, bool endForEveryone)
 {
     if (m_phase == Phase::Closed)
         return;
     ByteWriter w(m_buffer.data(), m_buffer.size());
     w.u8(static_cast<uint8_t>(MsgType::Bye));
-    w.u8(static_cast<uint8_t>(isHost() && !abortMatch ? ByeKind::Close : ByeKind::Leave));
+    //(the host: the others go on without it, unless it ends the lobby: HOST MIGRATION)
+    (void)abortMatch;
+    w.u8(static_cast<uint8_t>(isHost() ? (endForEveryone ? ByeKind::Close : ByeKind::HostLeave) : ByeKind::Leave));
     w.str(reason);
     sendToAll(w);
     for (int p = 0; p < net::MAX_PEERS; p++)
         m_mesh.dropPeer(p);
     printf("netplay: leaving the lobby (%s)\n", reason.c_str());
     m_phase = Phase::Closed;
+    m_closeCause = CloseCause::Left;
     m_status = isHost() ? "You closed the lobby" : "You left the lobby";
     cancelMapTransfers();
     addEvent(LobbyEvent::Type::Closed, -1, m_status);
 }
 
-void NetLobby::close(const std::string& reason, LobbyGameEvent& event, bool finishMatch)
+void NetLobby::close(const std::string& reason, LobbyGameEvent& event, bool finishMatch, CloseCause cause)
 {
     printf("netplay: the lobby closed: %s\n", reason.c_str());
     m_phase = Phase::Closed;
+    m_closeCause = cause;
+    m_hostGoneMs = 0;
     m_status = reason;
     cancelMapTransfers();
     addEvent(LobbyEvent::Type::Closed, -1, reason);
@@ -797,6 +838,17 @@ void NetLobby::sendLobbyState()
     extra.str(m_mapRef);
     extra.u64(m_mapHash);
     extra.u8(m_phase == Phase::InMatch ? 1 : 0);    //(a match is being played: it can be joined)
+    extra.u8(m_round);
+    uint8_t voters = 0;
+    for (int p = 0; p < net::MAX_PEERS; p++)
+        voters += m_votes[static_cast<size_t>(p)] != VOTE_NONE;
+    extra.u8(voters);
+    for (int p = 0; p < net::MAX_PEERS; p++) {
+        if (m_votes[static_cast<size_t>(p)] == VOTE_NONE)
+            continue;
+        extra.u8(static_cast<uint8_t>(p));
+        extra.u8(m_votes[static_cast<size_t>(p)]);
+    }
     sendToAll(extra);
     m_dirty = false;
 }
@@ -1201,11 +1253,19 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
         case MsgType::Bye: {
             const auto kind = static_cast<ByeKind>(r.u8());
             const std::string reason = r.str();
-            if (kind == ByeKind::Leave) {
+            if (kind == ByeKind::Leave || kind == ByeKind::HostLeave) {
                 if (isHost()) {
                     removePeer(peer, "left", false);
                 } else if (fromHost) {
-                    close("The host left the lobby", event, false);
+                    //(everyone got it: no need to agree on who is still here, see HOST MIGRATION)
+                    uint8_t here = 0;
+                    for (int p = 1; p < net::MAX_PEERS; p++)
+                        if (m_peers[static_cast<size_t>(p)].present && (p == localPeer() || m_mesh.peerConnected(p)))
+                            here |= static_cast<uint8_t>(1u << p);
+                    //(someone else must be here too: alone, there's no lobby to go on with)
+                    m_successor = (here & ~(1u << localPeer())) != 0 ? pickSuccessor(here) : -1;
+                    close(m_successor >= 0 ? "The host left: " + hostsNow(m_successor) : "The host left the lobby",
+                        event, false, m_successor >= 0 ? CloseCause::HostLeft : CloseCause::Ended);
                     return true;
                 }
                 event = LobbyGameEvent();
@@ -1216,11 +1276,28 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
             }
             if (!fromHost || isHost())
                 break;
-            if (kind == ByeKind::Kick)
-                close("You were removed from the lobby (" + reason + ")", event, false);
+            if (kind == ByeKind::Kick && reason == "was removed by the host")
+                close("You were removed from the lobby (" + reason + ")", event, false, CloseCause::Kicked);
+            else if (kind == ByeKind::Kick)
+                close("You were dropped (" + reason + ")", event, false, CloseCause::Dropped);
             else
-                close("The host closed the lobby", event, true);
+                close("The host closed the lobby", event, true, CloseCause::Ended);
             return true;
+        }
+        case MsgType::Vote: {
+            const uint8_t round = r.u8();
+            const uint8_t vote = r.u8();
+            if (!r.ok() || !isHost() || peer <= 0 || peer >= net::MAX_PEERS || round != m_round || vote > VOTE_NEXT_MAP)
+                break;
+            m_votes[static_cast<size_t>(peer)] = vote;
+            markDirty();
+            break;
+        }
+        case MsgType::HostGone: {
+            //(a joiner lost the host; maybe before we do)
+            if (!isHost() && peer > 0 && peer < net::MAX_PEERS)
+                m_hostGoneFrom |= static_cast<uint8_t>(1u << peer);
+            break;
         }
         case MsgType::MapBegin:
             if (fromHost && !isHost())
@@ -1250,6 +1327,22 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
                     }
                     const uint8_t playing = r.u8();
                     m_matchBeingPlayed = r.ok() && playing != 0;
+                    //(the votes, ours as the host knows it: our own counts until it arrived there)
+                    const uint8_t round = r.u8();
+                    const int voters = r.u8();
+                    std::array<uint8_t, net::MAX_PEERS> votes {};
+                    for (int k = 0; k < voters && r.ok(); k++) {
+                        const int p = r.u8();
+                        const uint8_t v = r.u8();
+                        if (p < net::MAX_PEERS)
+                            votes[static_cast<size_t>(p)] = v;
+                    }
+                    if (r.ok() && round == m_round) {
+                        const uint8_t mine = localPeer() >= 0 ? m_votes[static_cast<size_t>(localPeer())] : VOTE_NONE;
+                        m_votes = votes;
+                        if (localPeer() >= 0)
+                            m_votes[static_cast<size_t>(localPeer())] = mine;
+                    }
                 }
             }
             break;
@@ -1258,7 +1351,7 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
             const uint8_t what = r.u8();
             const int number = r.i16();
             const std::string text = r.str();
-            if (!r.ok() || !isHost() || !m_settingsEveryone || m_phase != Phase::Lobby || !m_peers[static_cast<size_t>(peer & 3)].present)
+            if (!r.ok() || !isHost() || !m_settingsEveryone || m_phase != Phase::Lobby || peer < 0 || peer >= net::MAX_PEERS || !m_peers[static_cast<size_t>(peer)].present)
                 break;
             if (what < SETTING_MODE || what > SETTING_MAP)
                 break;
@@ -1332,7 +1425,16 @@ bool NetLobby::handleMesh(const NetMesh::Event& me, LobbyGameEvent& event, uint3
 
         case Type::PeerLost:
             if (!isHost() && me.peer == 0) {
-                close("Lost the connection to the host", event, false);
+                if (m_phase == Phase::Joining) {
+                    close("Lost the connection to the host", event, false, CloseCause::CouldNotJoin);
+                    return true;
+                }
+                onHostGone(nowMs);
+                //(a running match goes on without it at once; the lobby moves on once the others agree)
+                event = LobbyGameEvent();
+                event.type = LobbyGameEvent::Type::PeerGone;
+                event.peer = 0;
+                event.text = "lost the connection";
                 return true;
             }
             m_rtt[static_cast<size_t>(me.peer)] = RttEstimate();
@@ -1409,11 +1511,86 @@ bool NetLobby::poll(LobbyGameEvent& event, uint32_t nowMs)
         if (m_phase == Phase::Closed)
             return false;
     }
+    if (m_hostGoneMs != 0)
+        return updateHostGone(event, nowMs);
     if (m_mesh.state() == NetMesh::State::Failed) {
-        close(m_mesh.error().empty() ? "Lost the connection" : "Could not join: " + m_mesh.error(), event, false);
+        const bool joining = m_phase == Phase::Joining;
+        close(m_mesh.error().empty() ? "Lost the connection" : (joining ? "Could not join: " : "") + m_mesh.error(), event, false,
+            joining ? CloseCause::CouldNotJoin : CloseCause::HostLost);
         return true;
     }
     return false;
+}
+
+// ---- host migration (see HOST MIGRATION)
+
+void NetLobby::onHostGone(uint32_t nowMs)
+{
+    if (m_hostGoneMs != 0 || isHost())
+        return;
+    m_hostGoneMs = nowMs | 1;
+    m_status = "Lost the host: checking who is still here...";
+    const uint8_t message = static_cast<uint8_t>(MsgType::HostGone);
+    for (int p = 1; p < net::MAX_PEERS; p++) {
+        if (p != localPeer() && m_mesh.peerConnected(p))
+            m_mesh.send(p, Channel::Reliable, &message, 1);
+    }
+    printf("netplay: lost the host: waiting for the others to say so too\n");
+}
+
+int NetLobby::pickSuccessor(uint8_t stillHere) const
+{
+    //(the lowest id: every one of them picks the same)
+    for (int p = 1; p < net::MAX_PEERS; p++) {
+        if ((stillHere >> p) & 1)
+            return p;
+    }
+    return -1;
+}
+
+bool NetLobby::updateHostGone(LobbyGameEvent& event, uint32_t nowMs)
+{
+    //The joiners we still reach, and whether each of them lost the host too
+    uint8_t reached = 0;
+    for (int p = 1; p < net::MAX_PEERS; p++) {
+        if (p != localPeer() && m_mesh.peerConnected(p) && m_peers[static_cast<size_t>(p)].present)
+            reached |= static_cast<uint8_t>(1u << p);
+    }
+    const uint8_t agreed = reached & m_hostGoneFrom;
+    if (agreed != reached && static_cast<int32_t>(nowMs - m_hostGoneMs) < static_cast<int32_t>(HOST_GONE_WAIT_MS))
+        return false;
+    if (agreed == 0) {
+        //Nobody else lost it: we were cut off (or were alone with it); the host may still be there
+        m_successor = -1;
+        printf("netplay: lost the host, and no one else did: trying to get back in\n");
+        close("Lost the connection to the host", event, false, CloseCause::HostLost);
+        return true;
+    }
+    m_successor = pickSuccessor(static_cast<uint8_t>(agreed | (1u << localPeer())));
+    printf("netplay: the host is gone for everyone here (mask %02x): peer %d hosts the lobby next\n", agreed, m_successor);
+    close("The host is gone: " + hostsNow(m_successor), event, false, CloseCause::HostLost);
+    return true;
+}
+
+std::string NetLobby::hostsNow(int peer) const
+{
+    if (peer == localPeer())
+        return "you host the lobby now";
+    const std::string name = peer >= 0 && peer < net::MAX_PEERS && !m_peers[static_cast<size_t>(peer)].name.empty() ? m_peers[static_cast<size_t>(peer)].name
+                                                                                                                 : defaultName(peer);
+    return name + " hosts the lobby now";
+}
+
+bool NetLobby::peerAddress(int peer, std::string& host, uint16_t& port) const
+{
+    const int connection = m_mesh.connectionOf(peer);
+    uint32_t ip = 0;
+    if (connection < 0 || !const_cast<NetMesh&>(m_mesh).transport().address(connection, ip, port))
+        return false;
+    //(enet keeps it in network byte order)
+    const auto* b = reinterpret_cast<const uint8_t*>(&ip);
+    host = std::to_string(b[0]) + "." + std::to_string(b[1]) + "." + std::to_string(b[2]) + "." + std::to_string(b[3]);
+    return true;
 }
 
 void NetLobby::update(uint32_t nowMs)

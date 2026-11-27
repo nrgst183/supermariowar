@@ -8,6 +8,7 @@
 #include "RollbackSession.h"
 #include "Snapshot.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <deque>
@@ -46,6 +47,17 @@ namespace rollback {
 // sim::ResimulationScope when re-simulating) and for checksums
 // (peerChecksum).
 //
+// RECONNECTING. A lost connection doesn't throw us out (pump()):
+//  - REJOIN: a joiner cut off from the host (or dropped by it, or by its match) tries to get back
+//    into the same lobby, at the host's address, for a minute; back in, it gets its name, players,
+//    teams and colors again, and joins the match being played (RollbackSession's REJOINING: its
+//    own player back from the CPU).
+//  - HOST MIGRATION: when the host is gone for every joiner (NetLobby's HOST MIGRATION), the
+//    successor opens the lobby again at its own address, with the lobby's settings (mode, goal, map,
+//    CPU players, input delay, who may change them), and the others join it there. A running match
+//    is played to its end first.
+// Meanwhile active() stays true and reconnecting() says so; the lobby being joined shows it.
+//
 // MATCH END (the irreversible part): after each tick, matchEndRequested()
 // tells the session whether the new state asks to leave the match (the
 // screen faded out for the end of the game, five seconds after game over,
@@ -79,6 +91,11 @@ public:
     // The lobby ended (lobby()->statusText() says why), until the next host()/join()
     bool finished() const;
     bool isHost() const;
+    // Getting back into the lobby, or into its new host's (see RECONNECTING)
+    bool reconnecting() const { return m_reconnect.kind != Reconnect::Kind::None; }
+    // We host the lobby because its host is gone (see RECONNECTING), and how many were in it then
+    bool hostedAfterMigration() const { return (m_migratedMembers > 0 || m_reconnect.kind == Reconnect::Kind::Rehost) && isHost(); }
+    int migratedMembers() const { return m_reconnect.kind == Reconnect::Kind::Rehost ? std::max(1, m_reconnect.members) : m_migratedMembers; }
     // The lobby (null if none was opened)
     NetLobby* lobby() { return m_lobby.get(); }
     // The host's router (UPnP, PortMapping.h): one line for the lobby screen ("" when nothing to
@@ -272,12 +289,19 @@ private:
     void abortStart(int culprit, const std::string& reason);
     void returnToLobby(const std::string& abortReason);
     void beginMatch();
+    // Reconnecting (see RECONNECTING)
+    void planReconnect(uint32_t nowMs);
+    void beginReconnect(int kind, const std::string& host, uint16_t port, uint32_t forMs, bool joinMatch, const std::string& why, uint32_t nowMs);
+    void updateReconnect(uint32_t nowMs);
+    void restoreAfterReconnect(uint32_t nowMs);
+    void endMatchToReconnect();
     // Joining a match in progress
     void hostLateUpdate(uint32_t nowMs);
     void hostJumpIn(int peer, int start, int rttMs, uint32_t nowMs);
     void startLateMatch();
     void spectate(Outcome& outcome);
-    void beginLateSession(int slot, int from, int start, const std::array<SessionConfig::Handover, INPUT_MAX_PLAYERS>& handovers);
+    void beginLateSession(int slot, int from, int start, const std::array<SessionConfig::Handover, INPUT_MAX_PLAYERS>& handovers,
+        const std::array<int, net::MAX_PEERS>& drops);
     void applyHandovers(uint32_t nowMs);
     void endMatchHere(Outcome& outcome);
     void applyLobbySlots(std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot);
@@ -299,6 +323,39 @@ private:
     void addSeriesEvent(const SeriesEvent& event);
     void applySeriesSlots(std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot);
     void sendSeries(int peer, const net::ByteWriter& w);
+
+    struct Reconnect {
+        enum class Kind : uint8_t { None, Rejoin, Rehost, JoinNewHost };
+        Kind kind = Kind::None;
+        std::string host;          // Rejoin, JoinNewHost: where
+        uint16_t port = 0;         // ... its port; Rehost: our own
+        uint32_t sinceMs = 0;
+        uint32_t untilMs = 0;      // gives up then
+        uint32_t forMs = 0;        // ... that long after our match ended (or after it began, without one)
+        int members = 0;           // how many were in the lobby (Rehost: the ones we wait for)
+        uint32_t nextTryMs = 0;    // the next attempt (0: one is under way)
+        int attempts = 0;
+        bool joinMatch = false;    // back in: join the match being played (our player back)
+        uint32_t backMs = 0;       // when we got back in (0: not yet)
+        bool settingsDone = false;
+        bool slotsDone = false;
+        std::string why;           // what happened (the lobby's line meanwhile)
+        // What the lobby had
+        std::string name;
+        int localPlayers = 1;
+        std::array<uint8_t, MAX_LOCAL_PLAYERS> team {};
+        std::array<uint8_t, MAX_LOCAL_PLAYERS> color {};
+        int cpuCount = 0;
+        int inputDelay = -1;       // -1: automatic
+        bool everyone = false;
+        int modeId = -1;
+        int goal = 0;
+        std::string mapName;
+    };
+    Reconnect m_reconnect;
+    int m_migratedMembers = 0;      // (hostedAfterMigration)
+    std::string m_joinedHost;       // the host's address we joined (REJOIN), and its port
+    uint16_t m_joinedPort = 0;
 
     std::unique_ptr<SwitchableTransport> m_transport;
     LobbyAccess m_access = LobbyAccess::Internet;
@@ -381,6 +438,7 @@ private:
     Late m_late = Late::None;
     std::vector<uint8_t> m_lateConfigBytes;
     std::vector<replay::TickRecord> m_lateTicks;    // the match's confirmed ticks, from the host
+    int m_lateHostFrame = 0;                          // ... how many it had confirmed when it sent the last ones
     bool m_spectating = false;
     bool m_lateWantsPlay = true;
     uint8_t m_handApplied = 0;    // handovers whose player's name and skin are shown

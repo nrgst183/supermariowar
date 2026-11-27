@@ -170,6 +170,8 @@ public:
 #else
     short		screensize = 0;         // the picture on the TV: 0 all of it, 1 95%, 2 90% (a TV crops its edges: overscan)
 #endif
+    short		windowsize = 0;         // in a window: 0 as the player sized it, 1..3 that many times 640x480, 4 the biggest that fits
+    short		cursorstyle = 0;        // the mouse pointer: 0 the system's, 1..3 a high-contrast arrow, bigger with each
     short		overlaycolors = 3;      // the theater's and the editors' colors: 0 night, 1 pipe (green), 2 castle, 3 SMB3 (the status bar's blue, as the menus': the default)
     short		buttonprompts = 2;      // the controller glyphs in the theater and the editors: 0 auto, 1 Xbox, 2 original Xbox (the default)
     bool		teamcolors;

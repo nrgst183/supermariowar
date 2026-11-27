@@ -127,9 +127,13 @@ void NetMesh::onConnected(int connection)
 
 void NetMesh::admit(int connection, uint32_t nowMs)
 {
+    //(at most MAX_MEMBERS machines; the lowest free id, not one of the running match's)
+    int members = 1;
+    for (int p = 1; p < net::MAX_PEERS; p++)
+        members += m_peerConnection[p] >= 0;
     int id = -1;
-    for (int p = 1; p < net::MAX_PEERS && id < 0; p++) {
-        if (m_peerConnection[p] < 0)
+    for (int p = 1; p < net::MAX_PEERS && id < 0 && members < net::MAX_MEMBERS; p++) {
+        if (m_peerConnection[p] < 0 && !((m_reservedIds >> p) & 1))
             id = p;
     }
     if (id < 0) {

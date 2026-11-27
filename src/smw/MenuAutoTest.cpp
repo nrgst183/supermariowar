@@ -56,6 +56,9 @@
 #include <deque>
 #include <set>
 
+// --autotest online: matches the host plays after it took over a lobby whose host left (RECONNECTING)
+static int g_autoTestMigratedMatches = 0;
+
 // main.cpp: --at-perf
 namespace perfstats {
 void reset();
@@ -369,8 +372,18 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
                 net.joinMatchInProgress();
             return MENU_CODE_NONE;
         }
-        if (g_autoTestMatchesDone >= at.matches || !net.lastMatchError().empty() || sawSeries) {
-            //Done, or a peer is gone (disconnect tests): close the lobby
+        //(the host is gone and we host the lobby now: --at-migrated-matches more, with the others who came along)
+        int& migratedMatches = g_autoTestMigratedMatches;
+        if (net.hostedAfterMigration() && migratedMatches == 0 && at.migratedMatches > 0) {
+            migratedMatches = at.migratedMatches;
+            printf("autotest: hosting after the host left: %d more match(es), with %d others\n", migratedMatches, net.migratedMembers() - 1);
+        }
+        if (g_autoTestMatchesDone >= at.matches + migratedMatches || (!net.lastMatchError().empty() && migratedMatches == 0) || sawSeries) {
+            //Done, or a peer is gone (disconnect tests): close the lobby (a lobby we host because its host
+            //left: once the others came along, or after 10 seconds, so that they hear of it too)
+            static int migratedWait = 0;
+            if (net.hostedAfterMigration() && net.lobby() && net.lobby()->memberCount() < net.migratedMembers() && ++migratedWait < 625)
+                return MENU_CODE_NONE;
             if (net.matchDrained())
                 net.endSession(net.lastMatchError().empty() ? "autotest done" : "autotest: a match was aborted");
             return MENU_CODE_NONE;
@@ -379,7 +392,7 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
             return MENU_CODE_NONE;
     }
 
-    if (g_autoTestMatchesDone >= at.matches && !at.everything) {
+    if (g_autoTestMatchesDone >= at.matches + g_autoTestMigratedMatches && !at.everything) {
         //The determinism test: its result; the Xbox shows it until a button is pressed (no console)
         if (determinism::active()) {
             determinism::finish();
@@ -2245,6 +2258,33 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
             case 25: return MENU_CODE_TO_ONLINE_OPTIONS_MENU;
             case 45:
                 shot("p2_online_options");
+                step = 1000;
+                t = 0;
+                break;
+        }
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role vote: the lobby's "Play again?" box after a match (REMATCH VOTE), before and after voting
+    //(--at-role votelive: only opens it, then leaves the game to whoever plays it)
+    if ((at.shotsRole == "vote" || at.shotsRole == "votelive") && step == 1) {
+        rollback::NetGame& net = rollback::NetGame::instance();
+        if (at.shotsRole == "votelive" && t > 30)
+            return MENU_CODE_NONE;
+        switch (t) {
+            case 1: return MENU_CODE_TO_LOCAL_LOBBY;
+            case 20:
+                if (net.lobby()) {
+                    net.lobby()->setCpuCount(2);
+                    net.lobby()->setRound(1);    //(as after a match)
+                }
+                break;
+            case 30: mOnlineLobbyMenu->OpenVote(); break;
+            case 45: shot("v1_vote"); break;
+            case 50: return MENU_CODE_ONLINE_VOTE_NEXT_MAP;
+            case 65:
+                shot("v2_voted");
+                printf("shots: vote: %d, status: %s\n", net.lobby() ? net.lobby()->vote(0) : -1, mOnlineLobbyMenu->statusLine().c_str());
                 step = 1000;
                 t = 0;
                 break;

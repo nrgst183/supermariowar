@@ -32,7 +32,7 @@ std::string waitingNames(const rollback::NetGame& net, uint8_t peers)
 {
     std::string names;
     int count = 0;
-    for (int p = 0; p < 4; p++) {
+    for (int p = 0; p < rollback::net::MAX_PEERS; p++) {
         if (!(peers & (1u << p)))
             continue;
         std::string name = net.lobby() ? net.lobby()->peer(p).name : std::string();
@@ -106,7 +106,7 @@ void drawNetStats(const rollback::NetGame& net)
         int ping;
     };
     std::vector<Item> items;
-    for (int p = 0; p < 4; p++) {
+    for (int p = 0; p < rollback::net::MAX_PEERS; p++) {
         if (p == net.localPeer() || !net.lobby() || !net.lobby()->peer(p).present)
             continue;
         std::string name = net.lobby()->peer(p).name;

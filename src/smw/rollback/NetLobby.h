@@ -104,6 +104,21 @@
 //   InMatch --(the match ended or was aborted)--> Lobby
 //   any --(we left, the host closed the lobby or was lost, we were kicked,
 //          joining failed)--> Closed
+// HOST MIGRATION. A host that leaves (BYE HostLeave) or is lost doesn't end the lobby: the joiner with
+// the lowest peer id among those still here hosts it again, at its own address, and the others join
+// it there (NetGame does that, with what the lobby had: names, players, teams, the settings). Who is
+// still here is agreed first when the host was lost: a joiner that loses it tells the others
+// (HOST_GONE) and waits until each of them that it still reaches has said so too (or a few seconds
+// pass): the ones that did are the lobby without its host. A joiner that no other one says that to
+// was cut off itself, or was alone with the host: it tries to rejoin the host instead (closeCause()
+// HostLost, successor() -1). Only BYE Close (the host ends the lobby for everyone) and a kick end it.
+// A running match goes on meanwhile (LOST PEERS in RollbackSession.h); the move happens after it.
+//
+// REMATCH VOTE. After a match everyone may vote for what comes next: the same match again (a
+// rematch) or the next map. A vote also makes a joiner ready. The host gathers them and shows them to
+// everyone (LOBBY_EXTRA); once every member voted, its game starts the winner (the rematch on a
+// tie). The votes are cleared when a match starts.
+//
 // The host is the authority over the lobby: joiners send it their requests
 // (PEER_INFO, SLOT_REQUEST) and show what it broadcasts (LOBBY_STATE). New
 // joiners are refused while a match is starting or running. Ready flags are
@@ -126,9 +141,12 @@
 //   RTT_REPORT    joiner -> host, every second: u8 connected peer mask,
 //                 u8 n, n x (u8 peer, u16 round trip ms, u16 jitter ms, u8 samples)
 //   BYE           u8 kind, str reason. Leave: the sender leaves the lobby (a
-//                 running match is aborted). Close: the host closes the lobby
-//                 (a running match is finished first). Kick: the host removes
-//                 the receiver.
+//                 running match is aborted). Close: the host ends the lobby for
+//                 everyone (a running match is finished first). Kick: the host
+//                 removes the receiver. HostLeave: the host leaves, the others
+//                 go on with a new host (HOST MIGRATION).
+//   HOST_GONE     joiner -> joiners: the sender lost the host (HOST MIGRATION)
+//   VOTE          joiner -> host: u8 round, u8 vote (0 none, 1 rematch, 2 next map; REMATCH VOTE)
 //   CONFIG        host -> all: u8 match id, u16 size, the match config (MatchConfig.h)
 //   CONFIG_ACK    u8 match id, u8 status (0 ok, 1 refused, 2 the map is
 //                 missing here: send it, 3 the map is missing and map
@@ -148,7 +166,8 @@
 //   LOBBY_EXTRA   host -> all, after every LOBBY_STATE (display only): i16 game mode id (-1: unknown,
 //                 -2: a tournament, tour or world), i16 goal, str goal name ("Kills", "Points"...),
 //                 u8 everyone may change the settings (the host chooses; see settingsEveryone()),
-//                 str the map's reference, u64 its hash (MatchConfig's: for everyone to check they have it)
+//                 str the map's reference, u64 its hash (MatchConfig's: for everyone to check they have it),
+//                 u8 a match is being played, u8 the votes' round, u8 n + n x (u8 peer, u8 vote) (REMATCH VOTE)
 //   SETTINGS_REQUEST  joiner -> host: u8 what (1 mode, 2 goal, 3 map), i16 number (mode id, goal), str text
 //                 (the map's name). Honored only while the host lets everyone change the settings and
 //                 the lobby is idle; the host applies it through its menus (a LobbyGameEvent::SettingsRequest)
@@ -284,6 +303,18 @@ struct LobbyGameEvent {
 class NetLobby {
 public:
     enum class Phase : uint8_t { Joining, Lobby, Starting, InMatch, Closed };
+    // Why the lobby closed (closeCause())
+    enum class CloseCause : uint8_t {
+        None,           // it didn't
+        Left,           // we left (or closed it, as the host)
+        Ended,          // the host ended it for everyone
+        HostLeft,       // the host left: successor() hosts it now (HOST MIGRATION)
+        HostLost,       // the connection to the host is gone: successor() hosts it now, or (-1) the host
+                        // may still be there, try to get back in
+        Kicked,         // the host removed us
+        Dropped,        // the host dropped us (we timed out, or our match dropped us): try to get back in
+        CouldNotJoin,   // joining failed
+    };
 
     struct Options {
         NetMesh::Options mesh;
@@ -312,7 +343,7 @@ public:
     Phase phase() const { return m_phase; }
     bool isHost() const { return m_mesh.isHost(); }
     int localPeer() const { return m_mesh.localPeer(); }
-    const LobbyPeer& peer(int p) const { return m_peers[static_cast<size_t>(p & 3)]; }
+    const LobbyPeer& peer(int p) const { return m_peers[static_cast<size_t>(p >= 0 && p < net::MAX_PEERS ? p : 0)]; }
     const LobbySlot& slot(int s) const { return m_slots[static_cast<size_t>(s & 3)]; }
     int memberCount() const;
     const std::string& modeName() const { return m_modeName; }
@@ -327,6 +358,13 @@ public:
     int inputDelay() const { return m_inputDelay; }
     bool inputDelayIsAuto() const { return m_delayIsAuto; }
     const std::string& statusText() const { return m_status; }
+    CloseCause closeCause() const { return m_closeCause; }
+    // After HostLeft or HostLost: the peer that hosts the lobby next (-1: none; see HOST MIGRATION)
+    int successor() const { return m_successor; }
+    // A peer's address as we reach it ("192.168.1.20" and its port); false if not connected
+    bool peerAddress(int peer, std::string& host, uint16_t& port) const;
+    // The host is gone and the others are agreeing on who is still here
+    bool hostGonePending() const { return m_hostGoneMs != 0; }
     const MapTransferInfo& mapTransfer() const { return m_transferInfo; }
     bool canStart(std::string& why) const;
     // Host: every joiner is ready and connected to every other one (canStart()
@@ -361,6 +399,14 @@ public:
     // Whether the others' skins we lack are downloaded (off: a "?" in their place)
     void setSkinDownloads(bool on) { m_skins.setDownloads(on); }
     void setReady(bool ready);
+    // REMATCH VOTE: what we'd play next (a joiner's vote makes it ready too)
+    enum : uint8_t { VOTE_NONE = 0, VOTE_REMATCH = 1, VOTE_NEXT_MAP = 2 };
+    void setVote(uint8_t vote);
+    uint8_t vote(int peer) const { return peer >= 0 && peer < net::MAX_PEERS ? m_votes[static_cast<size_t>(peer)] : VOTE_NONE; }
+    // Whether there is anything to vote on: back in the lobby after a match
+    bool canVote() const { return m_phase == Phase::Lobby && m_round != 0; }
+    // The votes of the members: for each choice, and how many haven't voted
+    void voteCount(int& rematch, int& nextMap, int& waiting) const;
     void setSlotTeam(int slot, int team);
     void setSlotColor(int slot, int color);
     void addCpu();
@@ -375,7 +421,7 @@ public:
     void requestSetting(uint8_t what, int value, const std::string& text);
     // Leaves (joiner) or closes (host) the lobby. `abortMatch`: a running
     // match is aborted for the others (they go back to the lobby without us)
-    void leave(const std::string& reason, bool abortMatch);
+    void leave(const std::string& reason, bool abortMatch, bool endForEveryone = false);
 
     // ---- for the game (NetGame)
     NetMesh& mesh() { return m_mesh; }
@@ -463,9 +509,14 @@ private:
     void sendPeerInfo();
     void sendLobbyState();
     void sendMapChunks(uint32_t nowMs);
-    void close(const std::string& reason, LobbyGameEvent& event, bool finishMatch);
+    void close(const std::string& reason, LobbyGameEvent& event, bool finishMatch, CloseCause cause);
+    // HOST MIGRATION: the host is gone; who hosts next once the others that are still here agree
+    void onHostGone(uint32_t nowMs);
+    bool updateHostGone(LobbyGameEvent& event, uint32_t nowMs);
+    int pickSuccessor(uint8_t stillHere) const;
     void markDirty() { m_dirty = true; }
     std::string defaultName(int peer) const;
+    std::string hostsNow(int peer) const;    // "Bob hosts the lobby now", "you host..." 
     void sendTo(int peer, const net::ByteWriter& w, Channel channel = Channel::Reliable);
     void sendToAll(const net::ByteWriter& w, Channel channel = Channel::Reliable);
     void updateTransferInfo();
@@ -517,6 +568,12 @@ private:
     size_t m_eventCount = 0;
     std::array<uint8_t, 2048> m_buffer {};
     bool m_matchBeingPlayed = false;    // (a joiner) the host plays a match
+    CloseCause m_closeCause = CloseCause::None;
+    int m_successor = -1;
+    uint32_t m_hostGoneMs = 0;          // when we lost the host (0: we didn't)
+    uint8_t m_hostGoneFrom = 0;         // the joiners that told us they lost it too (bit p)
+    std::array<uint8_t, net::MAX_PEERS> m_votes {};    // REMATCH VOTE: each peer's (VOTE_*)
+    uint8_t m_voteRound = 0;            // ... the round they are for
     bool m_seriesLocked = false;
 };
 

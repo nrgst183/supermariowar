@@ -26,6 +26,10 @@ public:
 
     // Binds to `port` on all interfaces (0: any free port). Null on failure.
     static std::unique_ptr<EnetTransport> create(uint16_t port, const NetConditions& conditions, std::string& error);
+    // Testing (--net-cut-at): for `ms`, every transport of this process neither sends nor receives,
+    // as with a pulled cable; the other end times out
+    static void cutFor(uint32_t ms);
+    static bool cut();
     // This computer's IPv4 address on its network (the one its traffic leaves from), e.g.
     // "192.168.1.20"; empty if there's none (no network)
     static std::string localAddress();

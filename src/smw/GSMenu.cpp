@@ -640,6 +640,7 @@ void MenuState::onEnterState()
         if (onlineNet.isHost())
             ApplyOnlineMatchSelection();
         mOnlineLobbyMenu->Open();
+        mOnlineLobbyMenu->OpenVote();
     } else if (game_values.gamemode->winningteam > -1 && game_values.tournamentwinner == -1 &&
             (((game_values.matchtype == MatchType::SingleGame || game_values.matchtype == MatchType::QuickGame || game_values.matchtype == MatchType::MiniGame || game_values.matchtype == MatchType::Tournament) && game_values.bonuswheel == BonusWheelStyle::EveryGame) || (game_values.matchtype == MatchType::Tour && game_values.tourstops[game_values.tourstopcurrent - 1]->iBonusType))) {
         mBonusWheelMenu->miBonusWheel->Reset(false);
@@ -893,8 +894,10 @@ void MenuState::update()
     if (AppState::Menu == game_values.appstate) {
         if (!cmd::g_net.enabled())
             HandleOnlineEvents();
-        if (mCurrentMenu == mOnlineLobbyMenu.get())
+        if (mCurrentMenu == mOnlineLobbyMenu.get()) {
             mOnlineLobbyMenu->Sync();
+            UpdateOnlineVote();
+        }
         SyncOnlineSettings();
 
         //--replay: plays it once, at startup
@@ -1573,6 +1576,13 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         }
     } else if (MENU_CODE_ONLINE_LEAVE_NO == code) {
         mOnlineLobbyMenu->CloseDialog();
+    } else if (MENU_CODE_ONLINE_VOTE_REMATCH == code || MENU_CODE_ONLINE_VOTE_NEXT_MAP == code || MENU_CODE_ONLINE_VOTE_CLOSE == code) {
+        if (rollback::NetLobby* lobby = rollback::NetGame::instance().lobby())
+            lobby->setVote(MENU_CODE_ONLINE_VOTE_REMATCH == code ? rollback::NetLobby::VOTE_REMATCH
+                : MENU_CODE_ONLINE_VOTE_NEXT_MAP == code    ? rollback::NetLobby::VOTE_NEXT_MAP
+                                                            : rollback::NetLobby::VOTE_NONE);
+        if (MENU_CODE_ONLINE_VOTE_CLOSE == code)
+            mOnlineLobbyMenu->CloseDialog();
     } else if (MENU_CODE_BACK_TO_MATCH_SELECTION_MENU == code) {
         mCurrentMenu = mMatchSelectionMenu.get();
         iUnlockMinigameOptionIndex = 0;
@@ -1730,6 +1740,10 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
             mCurrentMenu = mTeamSelectMenu.get();
             mCurrentMenu->ResetMenu();
         }
+    } else if (MENU_CODE_WINDOW_SIZE_CHANGED == code) {
+        gfx_setwindowsize(game_values.windowsize);
+    } else if (MENU_CODE_CURSOR_STYLE_CHANGED == code) {
+        gfx_setcursorstyle(game_values.cursorstyle);
     } else if (MENU_CODE_SCREEN_SIZE_CHANGED == code) {
         gfx_setscreenscale(game_values.screensize == 2 ? 0.90f : game_values.screensize == 1 ? 0.95f : 1.0f);
     } else if (MENU_CODE_SOUND_VOLUME_CHANGED == code) {

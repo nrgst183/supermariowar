@@ -689,6 +689,48 @@ void MI_OnlineTeamSelect::Draw()
 }
 
 
+// ---- MI_VoteChoice
+
+MI_VoteChoice::MI_VoteChoice(short x, short y, short width, short indent, std::string name, uint8_t vote)
+    : MI_Button(&rm->spr_selectfield, x, y, std::move(name), width, TextAlign::LEFT)
+    , m_indent(indent)
+    , m_vote(vote)
+{}
+
+void MI_VoteChoice::Draw()
+{
+    if (!m_visible)
+        return;
+    //(the select fields' pipe, with their divider: MI_SelectField)
+    const short row = fSelected ? 32 : 0;
+    rm->spr_selectfield.draw(m_pos.x, m_pos.y, {0, row, static_cast<short>(m_indent - 16), 32});
+    rm->spr_selectfield.draw(m_pos.x + m_indent - 16, m_pos.y, {0, static_cast<short>(fSelected ? 96 : 64), 32, 32});
+    rm->spr_selectfield.draw(m_pos.x + m_indent + 16, m_pos.y, {static_cast<short>(528 - iWidth + m_indent), row, static_cast<short>(iWidth - m_indent - 16), 32});
+    rm->menu_font_large.drawScrolling(m_pos.x + 16, m_pos.y + 5, m_indent - 8, szName.c_str(), fSelected);
+
+    // Who voted for it: their players' numbers, from the right end
+    int badges = 0;
+    const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+    const int right = m_pos.x + iWidth - 32;
+    for (int s = 3; lobby && s >= 0; s--) {
+        const rollback::LobbySlot& slot = lobby->slot(s);
+        if (slot.kind != rollback::SlotKind::Human || lobby->vote(slot.peer) != m_vote)
+            continue;
+        rm->spr_menu_boxed_numbers.draw(right - badges * 18, m_pos.y + 8, {static_cast<short>(s * 16), static_cast<short>((slot.color & 3) * 16), 16, 16});
+        ++badges;
+    }
+
+    // The value, in the room the numbers leave (the winner: a crown before it, as the host's card has)
+    int vx = m_pos.x + m_indent + 24;
+    if (m_winner) {
+        theme::crown(vx, m_pos.y + 9);
+        vx += 18;
+    }
+    const int room = right - (badges - 1) * 18 - 8 - vx;
+    rm->menu_font_large.drawScrolling(vx, m_pos.y + 5, std::max(room, 16), m_value.c_str(), fSelected);
+}
+
+
 // ---- MI_LockTag
 
 void MI_LockTag::Draw()

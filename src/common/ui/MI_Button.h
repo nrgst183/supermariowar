@@ -23,6 +23,7 @@ public:
     }
 
     void SetName(std::string name);
+    void SetWidth(short width) { iWidth = width; }
     MenuCodeEnum PressCode() const override {
         return menuCode;
     }

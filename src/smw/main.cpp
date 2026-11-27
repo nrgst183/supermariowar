@@ -603,6 +603,10 @@ void main_game()
         gfx_changefullscreen(true);
         blitdest = screen;
     }
+    //(the window's size, unless a test run keeps it small; and the mouse pointer)
+    if (!cmd::g_autotest.enabled)
+        gfx_setwindowsize(game_values.windowsize);
+    gfx_setcursorstyle(game_values.cursorstyle);
 
     init_spawnlocations();
 

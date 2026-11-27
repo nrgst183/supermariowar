@@ -19,6 +19,9 @@
 #include "WorldTourStop.h"
 #include "NetOverlay.h"
 #include "rollback/NetGame.h"
+#ifndef NETWORK_DISABLED
+#include "rollback/EnetTransport.h"
+#endif
 #include "rollback/Replay.h"
 #include "MatchHistory.h"
 #include "rollback/StateChecksum.h"
@@ -1181,6 +1184,16 @@ void GameplayState::updateNetplay()
     }
 
     const bool quitTest = cmd::g_net.quitAt > 0 && g_sim.tick >= cmd::g_net.quitAt;
+#ifndef NETWORK_DISABLED
+    //(--net-cut-at: the cable pulled, once)
+    {
+        static bool cutDone = false;
+        if (cmd::g_net.cutAt > 0 && !cutDone && g_sim.tick >= cmd::g_net.cutAt) {
+            cutDone = true;
+            rollback::EnetTransport::cutFor(static_cast<uint32_t>(std::max(0, cmd::g_net.cutMs)));
+        }
+    }
+#endif
     if (updateExitPauseDialog(g_sim.countdownState) || quitTest) {
         net.leaveMatch(quitTest ? "--net-quit-at" : "the player left");
         if (quitTest)
