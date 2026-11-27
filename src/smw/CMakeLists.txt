@@ -122,7 +122,25 @@ if(XBOXOG)
 	# A test disc: the game starts the determinism test (src/smw/Determinism.h) with the arguments
 	# of tests/determinism/xbox_args.txt, comparing with the PC's checksums (reference.txt)
 	option(SMW_XBOX_DETERMINISM_TEST "Xbox: a disc that runs the determinism test instead of the game" OFF)
-	set(smw_xbox_deploy "data=${PROJECT_SOURCE_DIR}/data")
+	# The data deployed: a copy with names FATX takes (42 characters at most; the game shows them the
+	# same: platform/xbox/fatx_data.py), made again (what changed) before every deploy. Its old long
+	# names are taken out of the disc's folder too (deploying only adds files).
+	set(smw_xbox_data_src "${PROJECT_SOURCE_DIR}/data")
+	set(smw_xbox_disc_dir "${CMAKE_CURRENT_BINARY_DIR}/Build/supermariowar")
+	find_package(Python3 COMPONENTS Interpreter)
+	if(Python3_Interpreter_FOUND)
+		set(smw_xbox_data "${CMAKE_CURRENT_BINARY_DIR}/xbox_data")
+		add_custom_target(smw-xbox-data
+			COMMAND Python3::Interpreter "${PROJECT_SOURCE_DIR}/platform/xbox/fatx_data.py"
+				"${smw_xbox_data_src}" "${smw_xbox_data}" "${smw_xbox_disc_dir}"
+			COMMENT "Xbox: the game data with FATX names (42 characters at most)"
+			VERBATIM)
+		add_dependencies(smw smw-xbox-data)
+	else()
+		message(WARNING "No Python 3: the Xbox's data is deployed as it is (names over 42 characters won't copy to FATX)")
+		set(smw_xbox_data "${smw_xbox_data_src}")
+	endif()
+	set(smw_xbox_deploy "data=${smw_xbox_data}")
 	if(SMW_XBOX_DETERMINISM_TEST)
 		list(APPEND smw_xbox_deploy
 			"smw_args.txt=${PROJECT_SOURCE_DIR}/tests/determinism/xbox_args.txt"
@@ -136,7 +154,6 @@ if(XBOXOG)
 	endif()
 	# A normal disc: a test disc's arguments left in the disc's folder from before would start its test
 	# (deploying only adds files), so they go, and the disc image is made again
-	set(smw_xbox_disc_dir "${CMAKE_CURRENT_BINARY_DIR}/Build/supermariowar")
 	if(NOT SMW_XBOX_ARGS_FILE AND NOT SMW_XBOX_DETERMINISM_TEST AND EXISTS "${smw_xbox_disc_dir}/smw_args.txt")
 		message(STATUS "Removing a test disc's smw_args.txt from ${smw_xbox_disc_dir}")
 		file(REMOVE "${smw_xbox_disc_dir}/smw_args.txt" "${CMAKE_CURRENT_BINARY_DIR}/XISO/supermariowar.iso")

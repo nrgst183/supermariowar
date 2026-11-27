@@ -332,7 +332,14 @@ std::string NetGame::lanAddress()
     static auto askedAt = std::chrono::steady_clock::time_point();
     const auto now = std::chrono::steady_clock::now();
     if (askedAt == std::chrono::steady_clock::time_point() || now - askedAt > std::chrono::seconds(5)) {
+#ifdef SMW_XBOX
+        //(the Xbox: the address its network has, as the dashboard's settings give it (a static one set
+        //for XLink Kai, say), the one the System Link screen shows; not a socket's guess at the route)
+        char text[32] = {};
+        address = SDL_XboxGetNetworkStatus(text, sizeof(text)) == SDL_XBOX_NETWORK_READY ? std::string(text) : std::string();
+#else
         address = EnetTransport::localAddress();
+#endif
         askedAt = now;
     }
     return address;

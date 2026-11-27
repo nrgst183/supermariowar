@@ -100,22 +100,31 @@ it changes; so do the players who aren't building.
 | Controller | Keyboard | Mouse | |
 |---|---|---|---|
 | D-pad / stick | arrows | move it | the cursor (the glove); held, it speeds up |
-| A | Enter | left button | paint (held: along the way); with the rectangle, copy or fill: from where it's pressed. Shift held as you start dragging: a straight line (it keeps to the row or column) |
+| A | Enter | left button | paint (held: along the way); with the rectangle, copy or fill: from where it's pressed. Shift held as you start dragging: a straight line (it keeps to the row or column). With a hazard in hand, A on one of the same kind on the map: its settings, where it is (see below) |
 | B | Delete | right button | erase, the same way |
-| X | Space | middle button | the palette |
-| Y | Shift | click Layer on the toolbar | the next layer, round from 4 to 1 (1, 2 behind the players; 3, 4 in front). While you use the mouse, Shift is for straight lines instead |
-| Y + Up / Down | Shift + Up / Down | Ctrl + wheel | the layer up or down (stops at 1 and 4; the cursor stays put while Y is held) |
-| RB | Backspace, Ctrl+Z | back side button | undo your last stroke (a rectangle, fill or paste: all of it); hold it to keep undoing. It goes back as far as you like, to how the map started |
-| LB + RB | Ctrl+Y, Ctrl+Shift+Z | forward side button | redo what you undid (hold to keep redoing). Changing the map again drops what's left to redo |
-| LB + Y | T | click a tool on the toolbar | the next tool: pencil, rectangle, fill (the toolbar: any of the five) |
-| | 2 - 8 | | the recent part with that number (the numbers are on the toolbar) |
+| X | Space | middle button | the parts sheet (X or B again: shut) |
+| Y (hold) | T, Shift | click the tool or the layer on the strip | the tool wheel round the hand: a direction chooses, let go takes it. Pencil, rectangle, fill, copy an area, paste; the next layer (1, 2 behind the players; 3, 4 in front); copy what's here; pick up to move |
+| | Shift + Up / Down | Ctrl + wheel | the layer up or down (stops at 1 and 4) |
+| LB / RB | Q / E, 2 - 8 | wheel (over the map), or click one | the recent parts on the strip: the one before / after (the keys: the one with that number) |
+| LT (hold: more) | Backspace, Ctrl+Z | back side button | undo your last stroke (a rectangle, fill or paste: all of it); hold it to keep undoing. It goes back as far as you like, to how the map started |
+| RT (hold: more) | Ctrl+Y, Ctrl+Shift+Z | forward side button | redo what you undid. Changing the map again drops what's left to redo |
+| (wheel) | R | Ctrl + left button | copy what's under the cursor: it becomes the part in hand, with its settings (a ? block's contents, a fire bar's length, a platform's path) |
+| (wheel) | G | Ctrl + right button | pick up what's under the cursor, to move it: it's taken off the map and becomes the part in hand; paint to put it down. Undo puts it back |
+| Back | Tab | | building to playing (you spawn where your hand is), and back (the cursor where your character is) |
+| L3 | H | | the editor's things hidden (the strip, the grid, the markers, the hands): the level alone to look at; again: back |
 | | F1 | | the controls sheet: every control on one page (also the pause menu's Controls) |
-| LT / RT | Page Up / Page Down | | the palette's tab before / after (with the palette shut: it opens) |
-| LB + Left / Right | Q / E | wheel (over the map), or click one | the recent parts: the one before / after (see below) |
-| LB + Down | R | Ctrl + left button | copy what's under the cursor: it becomes the brush, with its settings (a ? block's contents, a fire bar's length, a platform's path) |
-| LB + B | G | Ctrl + right button | pick up what's under the cursor, to move it: it's taken off the map and becomes the brush; paint to put it down (like grabbing a part in Mario Maker). Undo puts it back |
-| LB + Up | Tab | | building to playing (you spawn where your hand is), and back (the cursor where your character is) |
 | Start | Escape | | the pause menu (click a row, or right-click to resume) |
+
+In the parts sheet: LT / RT (Page Up / Page Down) go along its five categories (**Terrain**,
+**Blocks**, **Items**, **Gadgets**, **Level**), LB / RB (Q / E) along the pages of the one open.
+
+While building, the screen is the map's: the scoreboard is off while everyone on the screen
+builds (it's back when one plays), the parts strip is along the top (the part in hand, its name,
+the recent parts, the tool and the layer; see-through while a hand is under it), and the grid
+round the hand shows only while it moves. A first-time tip shows by the hand until it's been
+done. A hazard's settings are changed where it is: with one of its kind in hand, A on it picks it
+up into a panel by it (up / down a setting, left / right its value) and A or B puts it back, one
+stroke for undo.
 
 With the mouse, the glove is on the pointer and the cursor snaps to the cell under it at once (the
 match has it a tick or two later: a jump to its column, then its row); painting, it goes a cell a
@@ -141,28 +150,19 @@ then A), **Backdrop**, **Music**, **Types** (a cell's type set apart from its ti
 ice, death...), **Spawns** (no-spawn zones: everyone's, a team's, the items'), **Animated**
 tiles, **Weather** (clouds, ghosts, leaves, snow, fish, rain, bubbles, on each layer),
 **Goals** (race goals, flag bases). The tools (pencil, rectangle, fill, copy, paste) are on the
-toolbar.
+tool wheel (hold Y), or on the strip for the mouse.
 
-**The toolbar** along the bottom (the top while your cursor is down there) shows the part in
-hand, the **recent parts** (the last 8 you used, from the palette or copied off the map; click
-one, or press its number, to use it: a few things without opening the palette), the five tools
-(the one in use lit; click to change) and the layer, a button with its name ("Layer 3"; click
-it for the next). While you hold tiles, the map shows the layer you're on: the rest a little
-darker, the layers in front of yours see-through, your layer bright, and the layers in front of it
-as faint ghosts over it (three on layer 1, none on layer 4). Under it, the bar shows only the main
-buttons and "all controls" (F1, or Start for the pause menu's Controls). A short message over the
-toolbar says what just happened (Undo, Redo, Copied Brick, Picked up Fire bar, Tool: Fill,
-Layer 3, Map cleared). The first time anyone builds on a computer, three hints come up one after
-another (paint, the parts, undo), each gone once it's been done. Placing, erasing, undoing and
-changing the brush each make a sound, and the cells changed flash a ring (white put down, red
-taken away, yellow undone). While you build, a faint grid marks the cells' corners around your
-cursor, and when the cursor rests a moment a label over it names what's under it (what B would
-erase, or LB + Down copy), outlined. The cursor shows what it's doing: red while erasing, the
-tool's icon by it for anything but the pencil, marching dashes while it carries a picked-up part. A builder's scoreboard portrait, at the top, is framed in its color and shows its character and a
-glove by turns, while it builds.
-While someone builds, the things play doesn't show are marked near the builders' cursors: warps,
-hazards, hidden blocks, race goals and flag bases (all of a kind while its part is in hand); with
-the Types or Spawns brush, the map's types or zones.
+**The parts strip** along the top shows the part in hand and its name, the **recent parts** (the
+last 8 you used, from the sheet or copied off the map; LB / RB, click one, or press its number), and
+at its right the tool and the layer (click either for the next). While you hold tiles, the map
+shows the layer you're on: the rest a little darker, the layers in front of yours see-through,
+your layer bright, and the layers in front of it as faint ghosts over it (three on layer 1, none
+on layer 4). A short message under the strip says what just happened (Undo, Redo, Copied Brick,
+Picked up Fire bar, Tool: Fill, Layer 3, Map cleared). The first time anyone builds on a
+computer, three hints come up by the hand one after another (paint, the parts, undo), each gone
+once it's been done. Placing, erasing, undoing and changing the brush each make a sound, and the
+cells changed flash a ring (white put down, red taken away, yellow undone). While the hand moves,
+a faint grid marks the cells' corners around it; resting a moment, what B would take is outlined.
 
 **The pause menu**: Resume, Who builds (the host: left/right a player, A gives or takes the
 right), Save map (as "*map* made", in the map list from then on; its filters and thumbnail
