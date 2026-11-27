@@ -253,7 +253,8 @@ Alternatively, you can pass these options directly to CMake as `-DFLAGNAME=VALUE
 
 Every push is built for Linux, macOS, Windows (MinGW and MSVC) and the web by GitHub Actions.
 
-- Pushing a version tag, e.g. `git tag v2.1.0 && git push origin v2.1.0`, publishes a GitHub release with the packages of every platform and generated release notes. Tags with a suffix, such as `v2.1.0-beta.1`, are published as pre-releases.
+- To tag a release from GitHub: **Actions**, **Tag release**, **Run workflow**, and enter the version (e.g. `v2.1.0`). It tags the latest commit of the default branch (or the branch or commit you give) and starts the build that publishes the release.
+- Pushing a version tag yourself, e.g. `git tag v2.1.0 && git push origin v2.1.0`, also publishes a GitHub release with the packages of every platform and generated release notes. Tags with a suffix, such as `v2.1.0-beta.1`, are published as pre-releases.
 - Every push to the default branch updates the `continuous` pre-release with the latest build.
 
 ## How to play

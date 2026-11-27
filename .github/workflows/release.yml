@@ -1,0 +1,76 @@
+name: Tag release
+# Tags a release from the Actions tab (Actions, "Tag release", Run workflow): it creates the
+# version tag and starts the Build workflow on it, which builds every platform and publishes
+# the GitHub release (see the "publish" job in runner.yml). The same as pushing the tag
+# yourself, `git tag v2.1.0 && git push origin v2.1.0`.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag, e.g. v2.1.0 (a suffix such as v2.1.0-beta.1 makes a pre-release)'
+        required: true
+        type: string
+      ref:
+        description: 'Branch or commit to tag (empty: the latest commit of the default branch)'
+        required: false
+        type: string
+      message:
+        description: 'Tag message (optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: write   # push the tag
+  actions: write    # start the Build workflow on it
+
+jobs:
+  tag:
+    name: Tag ${{ inputs.version }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ inputs.version }}
+      TARGET: ${{ inputs.ref }}
+      MESSAGE: ${{ inputs.message }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref || github.event.repository.default_branch }}
+
+      - name: Check the version
+        run: |
+          set -euo pipefail
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+(\.[0-9]+)*(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::'$VERSION' is not a version tag: use the form v2.1.0 or v2.1.0-beta.1"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" > /dev/null; then
+            echo "::error::The tag $VERSION already exists"
+            exit 1
+          fi
+          # The game's own version (CMakeLists.txt) should match; a warning, not an error
+          cmake_version="$(sed -n '/^project(/,/)/s/.*VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt | head -n 1)"
+          tag_version="${VERSION#v}"; tag_version="${tag_version%%-*}"
+          if [ -n "$cmake_version" ] && [ "$cmake_version" != "$tag_version" ] && [ "$cmake_version" != "$tag_version.0" ]; then
+            echo "::warning::CMakeLists.txt says version $cmake_version, the tag is $VERSION"
+          fi
+          echo "Tagging $(git rev-parse --short HEAD) ($(git log -1 --format=%s)) as $VERSION"
+
+      - name: Create the tag
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION" -m "${MESSAGE:-Super Mario War $VERSION}"
+          git push origin "refs/tags/$VERSION"
+
+      # A tag pushed with the workflow's token doesn't start other workflows by itself,
+      # so start the build (and with it the release) on the tag here
+      - name: Build and publish the release
+        run: |
+          gh workflow run runner.yml --ref "$VERSION"
+          echo "### $VERSION tagged" >> "$GITHUB_STEP_SUMMARY"
+          echo "The Build workflow is running on it and publishes the release when every platform has built." >> "$GITHUB_STEP_SUMMARY"
+          echo "[Builds](${{ github.server_url }}/${{ github.repository }}/actions/workflows/runner.yml) · [Releases](${{ github.server_url }}/${{ github.repository }}/releases)" >> "$GITHUB_STEP_SUMMARY"
