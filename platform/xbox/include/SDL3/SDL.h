@@ -933,6 +933,12 @@ typedef enum SDL_XboxNetworkStatus {
 } SDL_XboxNetworkStatus;
 // `address` (at least 16 characters) gets the console's address when READY
 SDL_XboxNetworkStatus SDL_XboxGetNetworkStatus(char* address, int size);
+// How the console got its address (the network library's flags): the dashboard's static
+// settings, DHCP, automatic (169.254), PPPoE; "" when it has none yet
+const char* SDL_XboxGetNetworkAddressKind(void);
+// What the game found of the dashboard's network settings as the network started ("static 192.168.1.50,
+// from the dashboard", "the dashboard is set to automatic", "... applied by the game"...); "" if nothing
+const char* SDL_XboxGetNetworkSettingsNote(void);
 // The console's name for system link: the nickname last used on it (the nicknames the
 // games share, XFindFirstNickname), in ASCII (other characters as '?'). 0 (and "") if it
 // has none.

@@ -113,8 +113,14 @@ std::string systemLinkNetworkStatus()
 #ifdef SMW_XBOX
     char address[32];
     switch (SDL_XboxGetNetworkStatus(address, sizeof(address))) {
-        case SDL_XBOX_NETWORK_READY:
-            return std::string("System link: this console is ") + address;
+        case SDL_XBOX_NETWORK_READY: {
+            //(and how it got it: the dashboard's static settings, DHCP...: an XLink Kai setup's check)
+            const std::string kind = SDL_XboxGetNetworkAddressKind();
+            //(not the static address the dashboard has: what the game found of its settings)
+            const std::string note = SDL_XboxGetNetworkSettingsNote();
+            const bool unlike = kind != "static" && !note.empty() && note.rfind("static", 0) == 0;
+            return std::string("System link: this console is ") + address + (kind.empty() ? "" : " (" + kind + ")") + (unlike ? "; " + note : "");
+        }
         case SDL_XBOX_NETWORK_NO_CABLE:
             return "No network cable. Plug in a hub, router or console";
         case SDL_XBOX_NETWORK_PENDING:

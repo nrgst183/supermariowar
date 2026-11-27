@@ -527,6 +527,88 @@ void SDL_XboxEnumerateSaveGames(void (*callback)(void* userdata, const char* nam
 
 /* ---- Network --------------------------------------------------------------- */
 
+// The network library's own (libxnet, not in its headers): the dashboard's saved network settings,
+// a sector of the hard disk's config area, and applying a set of them
+extern "C" {
+struct XNetConfigParams;
+HANDLE WINAPI XNetOpenConfigVolume(void);
+BOOL WINAPI XNetLoadConfigSector(HANDLE volume, DWORD sector, void* data, DWORD size);
+VOID WINAPI XNetCloseConfigVolume(HANDLE volume);
+INT WINAPI XNetConfig(const XNetConfigParams* params, DWORD flags);
+}
+
+namespace {
+// The settings as the library reads them (XnInit): 0x1EC bytes; the address 0x14, the mask 0x18,
+// the gateway 0x1C, the name servers 0x20 and 0x24 (an address 0: DHCP); "XBCP" at 0x1E8 or the
+// library drops them all (DHCP)
+constexpr DWORD CONFIG_SIZE = 0x1EC;
+constexpr DWORD CONFIG_SIGNATURE = 0x58424350;    // "XBCP"
+char g_networkSettings[96] = "";
+
+DWORD dwordAt(const BYTE* data, DWORD offset)
+{
+    DWORD v;
+    memcpy(&v, data + offset, sizeof(v));
+    return v;
+}
+
+std::string addressText(DWORD a)
+{
+    const unsigned char* b = reinterpret_cast<const unsigned char*>(&a);
+    char text[20];
+    snprintf(text, sizeof(text), "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
+    return text;
+}
+
+// The dashboard's static address, if the library didn't take it: read again, and given to the
+// library as it is (its mark put right). What happened: g_networkSettings
+void applyDashboardSettings()
+{
+    const HANDLE volume = XNetOpenConfigVolume();
+    if (volume == INVALID_HANDLE_VALUE) {
+        snprintf(g_networkSettings, sizeof(g_networkSettings), "the dashboard's settings can't be opened");
+        sdlx_log("[xbox] network: %s\n", g_networkSettings);
+        return;
+    }
+    BYTE data[CONFIG_SIZE];
+    memset(data, 0, sizeof(data));
+    const BOOL loaded = XNetLoadConfigSector(volume, 0, data, CONFIG_SIZE);
+    XNetCloseConfigVolume(volume);
+    if (!loaded) {
+        snprintf(g_networkSettings, sizeof(g_networkSettings), "no dashboard settings saved");
+        sdlx_log("[xbox] network: %s\n", g_networkSettings);
+        return;
+    }
+    const DWORD address = dwordAt(data, 0x14), mask = dwordAt(data, 0x18), gateway = dwordAt(data, 0x1C);
+    const DWORD signature = dwordAt(data, 0x1E8);
+    sdlx_log("[xbox] network: the dashboard's settings: address %s mask %s gateway %s, mark %08lx\n", addressText(address).c_str(),
+        addressText(mask).c_str(), addressText(gateway).c_str(), static_cast<unsigned long>(signature));
+    if (address == 0) {
+        snprintf(g_networkSettings, sizeof(g_networkSettings), "the dashboard is set to automatic");
+        return;
+    }
+    //(the library took them: its address static)
+    XNADDR xna;
+    memset(&xna, 0, sizeof(xna));
+    if (XNetGetTitleXnAddr(&xna) & XNET_GET_XNADDR_STATIC) {
+        snprintf(g_networkSettings, sizeof(g_networkSettings), "static %s, from the dashboard", addressText(address).c_str());
+        return;
+    }
+    //(it didn't (a mark it doesn't know, or it couldn't read them as it started): given to it now)
+    const DWORD mark = CONFIG_SIGNATURE;
+    memcpy(data + 0x1E8, &mark, sizeof(mark));
+    const INT result = XNetConfig(reinterpret_cast<const XNetConfigParams*>(data), 0);
+    snprintf(g_networkSettings, sizeof(g_networkSettings), result == 0 ? "static %s, applied by the game" : "static %s couldn't be applied",
+        addressText(address).c_str());
+    sdlx_log("[xbox] network: %s (XNetConfig %d)\n", g_networkSettings, static_cast<int>(result));
+}
+} // namespace
+
+const char* SDL_XboxGetNetworkSettingsNote(void)
+{
+    return g_networkSettings;
+}
+
 int SDL_XboxStartNetwork(void)
 {
     static int started = -1;
@@ -540,6 +622,8 @@ int SDL_XboxStartNetwork(void)
         started = result == 0 ? 1 : 0;
         if (!started)
             sdlx_log("[xbox] The network didn't start (XNetStartup: %d)\n", static_cast<int>(result));
+        else
+            applyDashboardSettings();
     }
     return started;
 }
@@ -652,6 +736,27 @@ SDL_XboxNetworkStatus SDL_XboxGetNetworkStatus(char* address, int size)
         snprintf(address, static_cast<size_t>(size), "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
     }
     return SDL_XBOX_NETWORK_READY;
+}
+
+
+const char* SDL_XboxGetNetworkAddressKind(void)
+{
+    if (!SDL_XboxStartNetwork())
+        return "";
+    XNADDR xna;
+    memset(&xna, 0, sizeof(xna));
+    const DWORD flags = XNetGetTitleXnAddr(&xna);
+    if (flags == XNET_GET_XNADDR_PENDING || (flags & XNET_GET_XNADDR_NONE))
+        return "";
+    if (flags & XNET_GET_XNADDR_STATIC)
+        return "static";
+    if (flags & XNET_GET_XNADDR_DHCP)
+        return "DHCP";
+    if (flags & XNET_GET_XNADDR_AUTO)
+        return "automatic";
+    if (flags & XNET_GET_XNADDR_PPPOE)
+        return "PPPoE";
+    return "";
 }
 
 
