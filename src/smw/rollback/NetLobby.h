@@ -402,7 +402,7 @@ public:
     // REMATCH VOTE: what we'd play next (a joiner's vote makes it ready too)
     enum : uint8_t { VOTE_NONE = 0, VOTE_REMATCH = 1, VOTE_NEXT_MAP = 2 };
     void setVote(uint8_t vote);
-    uint8_t vote(int peer) const { return peer >= 0 && peer < net::MAX_PEERS ? m_votes[static_cast<size_t>(peer)] : VOTE_NONE; }
+    uint8_t vote(int peer) const { return peer >= 0 && peer < net::MAX_PEERS ? m_votes[static_cast<size_t>(peer)] : static_cast<uint8_t>(VOTE_NONE); }
     // Whether there is anything to vote on: back in the lobby after a match
     bool canVote() const { return m_phase == Phase::Lobby && m_round != 0; }
     // The votes of the members: for each choice, and how many haven't voted

@@ -209,7 +209,10 @@ bool EnetTransport::poll(TransportEvent& event)
     if (cut()) {
         ENetAddress from;
         uint8_t junk[2048];
-        ENetBuffer buffer {sizeof(junk), junk};
+        //(by name: ENetBuffer's fields are in another order on Windows than on Unix)
+        ENetBuffer buffer;
+        buffer.data = junk;
+        buffer.dataLength = sizeof(junk);
         while (enet_socket_receive(m_host->socket, &from, &buffer, 1) > 0) {
         }
         return false;

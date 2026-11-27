@@ -1338,7 +1338,7 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
                             votes[static_cast<size_t>(p)] = v;
                     }
                     if (r.ok() && round == m_round) {
-                        const uint8_t mine = localPeer() >= 0 ? m_votes[static_cast<size_t>(localPeer())] : VOTE_NONE;
+                        const uint8_t mine = localPeer() >= 0 ? m_votes[static_cast<size_t>(localPeer())] : static_cast<uint8_t>(VOTE_NONE);
                         m_votes = votes;
                         if (localPeer() >= 0)
                             m_votes[static_cast<size_t>(localPeer())] = mine;
