@@ -91,7 +91,9 @@ PlayerKillType CPlayer::KilledPlayer(CPlayer * killed, PlayerDeathStyle deathsty
             aibench::kills[killer->globalID]++, aibench::styleKills[static_cast<int>(style) & 31]++;
         if (cmd::g_autotest.aiBench && killed->globalID >= 0 && killed->globalID < 4)
             aibench::selfDeaths[killed->globalID]--;   // killed by a player: not a death of its own doing
+        aibench::byPlayer = true;
         killed->die(deathstyle, false, fKillCarriedItem);
+        aibench::byPlayer = false;
     }
 
     return iKillType;

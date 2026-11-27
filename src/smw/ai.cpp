@@ -22,6 +22,7 @@
 #include "objects/powerup/PU_FeatherPowerup.h"
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <cstdio>
 #include <cstdlib> // abs()
@@ -51,6 +52,90 @@ namespace aibench {
 int kills[4] = {};
 int deaths[4] = {};
 int selfDeaths[4] = {};
+int tileDeaths[4] = {};
+int pitDeaths[4] = {};
+int otherDeaths[4] = {};
+int platformDeaths[4] = {};
+bool byPlayer = false;
+int lastThreat[4] = {-1, -1, -1, -1};
+int lastThreatTick[4] = {};
+int hazardDeaths[256] = {};
+char lastThink[4][8][160] = {};
+int lastThinkAt[4] = {};
+
+// A death of its own doing, by its cause: a death tile touching the player, the bottom of the screen,
+// or anything else
+void countDeath(int player, int x, int y)
+{
+    if (byPlayer || player < 0 || player >= 4)
+        return;
+    if (y + PH >= App::screenHeight - 2) {
+        pitDeaths[player]++;
+        return;
+    }
+    for (int cy = (y - 12) / TILESIZE; cy <= (y + PH + 12) / TILESIZE; cy++) {
+        for (int cx = (x - 12) / TILESIZE; cx <= (x + PW + 12) / TILESIZE; cx++) {
+            if (cy < 0 || cy >= MAPHEIGHT)
+                continue;
+            if (g_map->map((cx + MAPWIDTH) % MAPWIDTH, cy) & tile_flag_has_death) {
+                tileDeaths[player]++;
+                static const bool log = getenv("SMW_AIDEATHLOG") != nullptr;
+                if (log) {
+                    printf("aitiledeath: player %d at %d,%d tick %d\n", player, x, y, static_cast<int>(g_sim.tick));
+                    for (int k = 7; k >= 0; k--)
+                        printf("   %s\n", lastThink[player][(lastThinkAt[player] - 1 - k + 64) & 7]);
+                    printf("   column:");
+                    for (int r = 6; r < MAPHEIGHT; r++) {
+                        const int c0 = x / TILESIZE, c1 = (x + PW - 1) / TILESIZE;
+                        printf(" %d:%d/%d%s", r, g_map->map(c0 % MAPWIDTH, r), g_map->map(c1 % MAPWIDTH, r),
+                            g_map->block(static_cast<short>(c0 % MAPWIDTH), static_cast<short>(r)) ? "B" : "");
+                    }
+                    printf(" platforms %d\n", static_cast<int>(g_map->permanentPlatforms().size()));
+                }
+                return;
+            }
+        }
+    }
+    otherDeaths[player]++;
+    for (const MovingPlatform* mp : g_map->permanentPlatforms()) {
+        const int left = static_cast<int>(mp->centerX()) - mp->width() / 2, top = static_cast<int>(mp->centerY()) - mp->height() / 2;
+        for (int py = y - 3; py <= y + PH + 3; py += PH / 2 + 3) {
+            for (int px = x - 3; px <= x + PW + 3; px += PW / 2 + 3) {
+                const int col = (px - left) / TILESIZE, row = (py - top) / TILESIZE;
+                if (px < left || py < top || col >= mp->tileWidth() || row >= mp->tileHeight())
+                    continue;
+                if (tileToFlags(mp->tileTypeAt(col, row)) & tile_flag_has_death) {
+                    platformDeaths[player]++;
+                    return;
+                }
+            }
+        }
+    }
+    const int kind = lastThreat[player] >= 0 && static_cast<int>(g_sim.tick) - lastThreatTick[player] < 62 ? lastThreat[player] : 255;
+    hazardDeaths[kind & 255]++;
+    //(SMW_AIDEATHLOG: a death with no threat seen, what was round it: the objects within 96 pixels)
+    static const bool log = getenv("SMW_AIDEATHLOG") != nullptr;
+    if (log && kind == 255) {
+        printf("aideath: player %d at %d,%d tick %d near:", player, x, y, static_cast<int>(g_sim.tick));
+        for (int c = 0; c < 3; c++) {
+            for (const std::unique_ptr<CObject>& obj : g_sim.objectcontainer[c].list()) {
+                const int dx = obj->x() - x, dy = obj->y() - y;
+                if (dx * dx + dy * dy > 96 * 96)
+                    continue;
+                int t = obj->getObjectType();
+                if (t == object_moving)
+                    t = 100 + static_cast<int>(static_cast<IO_MovingObject*>(obj.get())->getMovingObjectType());
+                printf(" %d@%d,%d", t, dx, dy);
+            }
+        }
+        printf(" tiles:");
+        for (int cy = y / TILESIZE - 1; cy <= (y + PH) / TILESIZE + 1; cy++)
+            for (int cx = x / TILESIZE - 1; cx <= (x + PW) / TILESIZE + 1; cx++)
+                if (cy >= 0 && cy < MAPHEIGHT)
+                    printf(" %d,%d=%d", cx, cy, g_map->map((cx + MAPWIDTH) % MAPWIDTH, cy));
+        printf("\n");
+    }
+}
 int styleKills[32] = {};
 int stuck[4] = {};
 int itemUses[ItemKinds][4] = {};
@@ -86,12 +171,21 @@ void print()
             itemUses[ItemFeather][g], itemUses[ItemLeaf][g], itemUses[ItemPWings][g], itemUses[ItemStatue][g]);
         printf("aibench: air player %d %s flying %d airborne %d\n", g, (cmd::g_autotest.aiLegacyMask & (1 << g)) ? "old" : "new", flyThinks[g], airThinks[g]);
         flyThinks[g] = airThinks[g] = 0;
+        printf("aibench: causes player %d tile %d pit %d other %d platform %d\n", g, tileDeaths[g], pitDeaths[g], otherDeaths[g], platformDeaths[g]);
+        tileDeaths[g] = pitDeaths[g] = otherDeaths[g] = platformDeaths[g] = 0;
         for (int k = 0; k < ItemKinds; k++)
             itemUses[k][g] = 0;
     }
     printf("aibench: nav jump %d/%d drop %d/%d walk %d/%d\n", navReached[0], navTried[0], navReached[1], navTried[1], navReached[2], navTried[2]);
     for (int k = 0; k < 3; k++)
         navTried[k] = navReached[k] = 0;
+    printf("aibench: hazards");
+    for (int k = 0; k < 256; k++) {
+        if (hazardDeaths[k])
+            printf(" %d:%d", k, hazardDeaths[k]);
+        hazardDeaths[k] = 0;
+    }
+    printf("\n");
     printf("aibench: styles");
     for (int k = 0; k < 32; k++) {
         if (styleKills[k])
@@ -113,6 +207,13 @@ bool CPlayerAI::improved() const
 bool CPlayerAI::smarter() const
 {
     return improved() && !(cmd::g_autotest.aiPlainMask & (1 << pPlayer->globalID));
+}
+
+// The safety changes (the cannons' Bullet Bills seen as threats; the careful landing prediction): on
+// unless an AI comparison leaves them out for this player (--at-ai-safe-off)
+bool CPlayerAI::safer() const
+{
+    return smarter() && !(cmd::g_autotest.aiSafeOffMask & (1 << pPlayer->globalID));
 }
 
 // The item modes where the items stay put (coins, eggs, flags, cards, Frenzy's boxes): choosing one by
@@ -253,6 +354,16 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     * 1. Figure out what objects are nearest to us
     ***************************************************/
     GetNearestObjects();
+    if (cmd::g_autotest.aiBench && pPlayer->globalID >= 0 && pPlayer->globalID < 4) {
+        int kind = -1;
+        if (CObject* t = nearestObjects.threat) {
+            kind = t->getObjectType();
+            if (kind == object_moving)
+                kind = 100 + static_cast<int>(static_cast<IO_MovingObject*>(t)->getMovingObjectType());
+        }
+        aibench::lastThreat[pPlayer->globalID] = kind;
+        aibench::lastThreatTick[pPlayer->globalID] = static_cast<int>(g_sim.tick);
+    }
 
     short iTenSeconds = 15 * iDecisionPercentage[game_values.cpudifficulty] / 10;
 
@@ -309,6 +420,11 @@ void CPlayerAI::Think(COutputControl * playerKeys)
     ***************************************************/
 
     Action actionType = ACTION_FIGHT;
+    struct SaveAction {
+        const Action& from;
+        int& to;
+        ~SaveAction() { to = static_cast<int>(from); }
+    } saveAction {actionType, lastAction};
     if (nearestObjects.threat && nearestObjects.threatdistance < 14400 && !pPlayer->isInvincible()) {
         actionType = ACTION_EVADE;
     } else if (nearestObjects.stomp && nearestObjects.stompdistance < 14400) {
@@ -521,6 +637,9 @@ void CPlayerAI::Think(COutputControl * playerKeys)
 
     if (cmd::g_autotest.aiBench && pPlayer->globalID < 4)
         CountBenchmarkStats(playerKeys);
+    static const bool deathLog = getenv("SMW_AIDEATHLOG") != nullptr;
+    if (deathLog && pPlayer->globalID >= 0 && pPlayer->globalID < 4)
+        LogThink(playerKeys);
 }
 
 // Think(): a death tile (or a platform's) under the player, before anything solid: iFallDanger says
@@ -597,24 +716,45 @@ struct LandingState {
     float x, y, vx, vy;
     bool air;
     const std::vector<MovingPlatform*>* platforms;
+    bool careful = false;    // (the newest: platforms moved on as they go, lava and spikes at our feet seen)
+    bool boarding = false;   // (careful) on the way onto a moving platform on purpose: its landing trusted however far
 };
 
-int platformTileAt(const std::vector<MovingPlatform*>& platforms, int x, int y)
+// (careful) how many ticks ahead a moving platform's place is trusted (its velocity now: a path may turn)
+constexpr int PLATFORM_TRUST_TICKS = 12;
+
+// The moving platforms' tiles at x, y `ticks` from now (careful: each moved on by its velocity; else
+// where they are now)
+int platformTileAt(const std::vector<MovingPlatform*>& platforms, int x, int y, int ticks = 0)
 {
     int t = tile_flag_nonsolid;
-    for (MovingPlatform* p : platforms)
-        t |= p->GetTileTypeFromCoord(static_cast<short>(x), static_cast<short>(y));
+    for (MovingPlatform* p : platforms) {
+        const float dx = p->velX() * static_cast<float>(ticks), dy = p->velY() * static_cast<float>(ticks);
+        t |= p->GetTileTypeFromCoord(static_cast<short>(x - static_cast<int>(dx)), static_cast<short>(y - static_cast<int>(dy)));
+    }
     return t;
 }
 
-int predictLanding(const LandingState& p, int dir, bool jump, bool canJump)
+// (careful) the buttons are held until the next think can change them (a think every 4 ticks, and one
+// to spare); after, the CPU brakes as hard as it can (the other way, no jump) until it stands still: a
+// choice is deadly only if even that can't save it, and a landing is safe only once it has stopped on it
+constexpr int HOLD_TICKS = 5;
+
+int predictLanding(const LandingState& p, int dirHeld, bool jumpHeld, bool canJump)
 {
+    const int ahead = p.careful ? 1 : 0;    //(times the tick: the platforms' moves taken into account)
     float x = p.x, y = p.y;
     float vx = p.vx, vy = p.vy;
     bool air = p.air;
     const std::vector<MovingPlatform*>& platforms = *p.platforms;
     const bool edges = ainav::CanCrossEdge(static_cast<int>(p.y), static_cast<int>(p.y));
     for (int t = 0; t < 120; t++) {
+        int dir = dirHeld;
+        bool jump = jumpHeld;
+        if (p.careful && t >= HOLD_TICKS) {
+            dir = vx > 0.3f ? -1 : vx < -0.3f ? 1 : 0;
+            jump = false;
+        }
         if (jump && !air && canJump) {
             vy = -VELJUMP;
             air = true;
@@ -650,9 +790,17 @@ int predictLanding(const LandingState& p, int dir, bool jump, bool canJump)
         if (!air) {
             // Walked off the edge of what we stand on?
             const int feet = static_cast<int>(y) + PH;
-            const int under = tileAt(left, feet) | tileAt(right, feet) | platformTileAt(platforms, left, feet) | platformTileAt(platforms, right, feet);
+            const int pl = platformTileAt(platforms, left, feet, t * ahead), pr = platformTileAt(platforms, right, feet, t * ahead);
+            const int tl = tileAt(left, feet), tr = tileAt(right, feet);
+            const int under = tl | tr | pl | pr;
             if (!(under & (tile_flag_solid | tile_flag_solid_on_top)))
                 air = true;
+            //(careful: walking onto lava or spikes level with the floor is a death too, not a floor)
+            else if (p.careful && pairIsDeadly(tl, tr, kLandingDeath) && !((pl | pr) & (tile_flag_solid | tile_flag_solid_on_top) && !pairIsDeadly(pl, pr, kLandingDeath)))
+                return -1;
+            //(careful: stopped on a safe floor once the buttons are ours again: it stays so)
+            else if (p.careful && t >= HOLD_TICKS && std::fabs(vx) <= 0.3f)
+                return 1;
             continue;
         }
 
@@ -677,14 +825,25 @@ int predictLanding(const LandingState& p, int dir, bool jump, bool canJump)
         if (feetAfter / TILESIZE != (feetBefore - 1) / TILESIZE || feetBefore % TILESIZE == 0) {
             const int row = feetAfter;
             const int tl = tileAt(left, row), tr = tileAt(right, row);
-            const int pl = platformTileAt(platforms, left, row), pr = platformTileAt(platforms, right, row);
+            const int pl = platformTileAt(platforms, left, row, t * ahead), pr = platformTileAt(platforms, right, row, t * ahead);
             const bool floor = ((tl | tr) & (tile_flag_solid | tile_flag_solid_on_top)) != 0;
-            const bool platform = ((pl | pr) & (tile_flag_solid | tile_flag_solid_on_top)) != 0;
+            //(careful: a moving platform far ahead may not be there by then: looked through, unless we're
+            //boarding it)
+            const bool trusted = !p.careful || p.boarding || t <= PLATFORM_TRUST_TICKS;
+            const bool platform = trusted && ((pl | pr) & (tile_flag_solid | tile_flag_solid_on_top)) != 0;
             if (floor || platform) {
                 if (pairIsDeadly(tl, tr, kLandingDeath) && !(platform && !pairIsDeadly(pl, pr, kLandingDeath)))
                     return -1;
                 if (platform && !floor && pairIsDeadly(pl, pr, kLandingDeath))
                     return -1;
+                //(careful: on the map's own floor still moving: on along it, braking, until we stop, walk off
+                //its edge or onto lava)
+                if (p.careful && floor && !platform && !(t >= HOLD_TICKS && std::fabs(vx) <= 0.3f)) {
+                    air = false;
+                    vy = 0.0f;
+                    y = static_cast<float>((feetAfter / TILESIZE) * TILESIZE - PH);
+                    continue;
+                }
                 return 1;
             }
         }
@@ -706,8 +865,11 @@ void CPlayerAI::AvoidDeadlyLanding(COutputControl * playerKeys)
     bool& jump = playerKeys->game_jump.fDown;
     const int dir = right ? 1 : left ? -1 : 0;
     const bool canJump = !pPlayer->lockjump;
+    const bool boarding = navMove == static_cast<short>(ainav::Move::Board) || navMove == static_cast<short>(ainav::Move::Ride);
+    //(the careful prediction where it won comparisons: the fighting modes. In Coins it halved the deaths
+    //but lost coins, holding back from ledges a coin was worth the risk of)
     const LandingState state {static_cast<float>(pPlayer->ix), static_cast<float>(pPlayer->iy), pPlayer->velx, pPlayer->vely,
-                             pPlayer->inair, &g_map->platforms};
+                             pPlayer->inair, &g_map->platforms, safer() && improvedFighting(), boarding};
     if (predictLanding(state, dir, jump, canJump) >= 0)
         return;
 
@@ -1774,4 +1936,18 @@ void CSimpleAI::Think(COutputControl * playerKeys)
         else
             playerKeys->game_jump.fDown = false;
     }
+}
+
+// (SMW_AIDEATHLOG) this think's decision, for the bench's death log
+void CPlayerAI::LogThink(COutputControl* playerKeys)
+{
+    const int dir = playerKeys->game_right.fDown ? 1 : playerKeys->game_left.fDown ? -1 : 0;
+    const LandingState st {static_cast<float>(pPlayer->ix), static_cast<float>(pPlayer->iy), pPlayer->velx, pPlayer->vely,
+                           pPlayer->inair, &g_map->platforms, safer() && improvedFighting()};
+    const int g = pPlayer->globalID;
+    snprintf(aibench::lastThink[g][aibench::lastThinkAt[g]++ & 7], sizeof(aibench::lastThink[0][0]),
+        "tick %d at %d,%d v %.1f,%.1f air %d action %d dir %d jump %d down %d fall %d nav %d/%d predict %d",
+        static_cast<int>(g_sim.tick), pPlayer->ix, pPlayer->iy, pPlayer->velx, pPlayer->vely, pPlayer->inair ? 1 : 0,
+        lastAction, dir, playerKeys->game_jump.fDown ? 1 : 0, playerKeys->game_down.fDown ? 1 : 0, iFallDanger,
+        navActive ? 1 : 0, navMove, predictLanding(st, dir, playerKeys->game_jump.fDown, !pPlayer->lockjump));
 }

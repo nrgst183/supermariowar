@@ -127,11 +127,16 @@ void CResourceManager::loadAllSprites() {
     if (!FileExists(bobombPath))
         bobombPath = convertPath("gfx/packs/modeskins/bobomb.bmp", graphicspack);
 
-    //Just load menu skins for now (just standing right sprite)
-    for (short k = 0; k < MAX_PLAYERS; k++) {
-        spr_shyguy[k] = LoadFullSkin(shyguyPath, k);
-        spr_chocobo[k] = LoadFullSkin(chickenPath, k);
-        spr_bobomb[k] = LoadFullSkin(bobombPath, k);
+    //The modes' skins (Shy Guy, the chicken, the Bob-omb), colored for each team as the players' skins
+    //are: read at full color, outside the groups (in one, low memory reads the picture compacted to 16
+    //bits, whose colors no longer match the palette's exactly: the Xbox showed them green)
+    {
+        const gfxSprite::LoadingGroup none(SpriteGroup::None);
+        for (short k = 0; k < MAX_PLAYERS; k++) {
+            spr_shyguy[k] = LoadFullSkin(shyguyPath, k);
+            spr_chocobo[k] = LoadFullSkin(chickenPath, k);
+            spr_bobomb[k] = LoadFullSkin(bobombPath, k);
+        }
     }
 
     menu_survival = builder("gfx/packs/modeobjects/menu_survival.png").create();

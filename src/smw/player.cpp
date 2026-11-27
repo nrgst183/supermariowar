@@ -224,7 +224,7 @@ void CPlayer::thinkByInput(CPlayerAI& ai, COutputControl& keys, bool& unlockFire
 void CPlayer::die(PlayerDeathStyle deathStyle, bool fTeamRemoved, bool fKillCarriedItem)
 {
     if (cmd::g_autotest.aiBench && state == PlayerState::Ready && !fTeamRemoved && globalID >= 0 && globalID < 4)
-        aibench::deaths[globalID]++, aibench::selfDeaths[globalID]++;
+        aibench::deaths[globalID]++, aibench::selfDeaths[globalID]++, aibench::countDeath(globalID, ix, iy);
 
     //Only show the death gfx if the player is alive when he died
     //If he is spawning or already dead, then don't show anything

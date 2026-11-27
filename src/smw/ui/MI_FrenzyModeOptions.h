@@ -22,6 +22,9 @@ public:
     MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
     // The mouse: its fields and sliders (its own menu's), the wheel scrolls the sliders
     Box FocusBox() const override;
+    //(its fields draw their own focus; the menu's frame round all of it, the page's size, would be drawn
+    //pixel by pixel every frame while it's being changed, which it always is: the lag on the Xbox)
+    bool DrawsFocusFrame() const override { return false; }
     bool PointerHoverInside(short x, short y) override;
     bool PointerClickInside(short x, short y, MenuCodeEnum& code) override;
     bool PointerWheelInside(int dir, MenuCodeEnum& code) override;

@@ -466,7 +466,7 @@ void drawChangingFocus(const UI_Control& control, const UI_Control::Box& v, floa
 void drawMenuFocus(const UI_Control& control, bool modifying)
 {
     const UI_Control::Box b = control.FocusBox();
-    if (b.w <= 0)
+    if (b.w <= 0 || !control.DrawsFocusFrame())
         return;
     const Uint64 ms = SDL_GetTicks();
     const float wave = 0.5f + 0.5f * std::sin(static_cast<float>(ms % 1400) * (6.2831853f / 1400.0f));

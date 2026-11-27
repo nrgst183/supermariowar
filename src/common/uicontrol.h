@@ -62,6 +62,11 @@ public:
     virtual Box FocusBox() const {
         return {};
     }
+    /// Whether the menu draws its focus frame round FocusBox (false: the control shows its own focus,
+    /// and its box is only for the mouse)
+    virtual bool DrawsFocusFrame() const {
+        return true;
+    }
     /// The part of FocusBox that shows its value (a field's: right of its name, between its arrows),
     /// marked while the value is being changed
     virtual Box ValueBox() const {

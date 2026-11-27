@@ -17,6 +17,17 @@ namespace aibench {
 extern int kills[4];
 extern int deaths[4];
 extern int selfDeaths[4];
+extern int tileDeaths[4];      // deaths of its own doing: on a death tile, ...
+extern int pitDeaths[4];       // ... off the bottom of the screen, ...
+extern int otherDeaths[4];     // ... anything else (hazards, the mode's enemies, its own bomb)
+extern int platformDeaths[4];  // ... (of those: touching a moving platform's deadly tile)
+extern bool byPlayer;          // (set while a player's kill is carried out)
+extern int lastThreat[4];      // the nearest threat at the last think (its object type; moving: 100 + its kind), -1 none
+extern int lastThreatTick[4];
+extern char lastThink[4][8][160];  // (SMW_AIDEATHLOG) what the CPU decided at its last 8 thinks
+extern int lastThinkAt[4];
+extern int hazardDeaths[256];  // "other" deaths by the threat that was near (lastThreat within a second)
+void countDeath(int player, int x, int y);
 extern int styleKills[32];
 extern int stuck[4];
 enum ItemUse { ItemFeather, ItemLeaf, ItemPWings, ItemStatue, ItemKinds };
@@ -171,8 +182,11 @@ protected:
     bool improved() const;
     bool improvedFighting() const;
     bool smarter() const;
+    bool safer() const;    // the safety changes: the cannons' Bullet Bills seen, the careful landing (--at-ai-safe-off)
     bool smarterItems() const;    // the item modes where going for the items by the way there helps
     bool NeedsPathToItem(int x, int y) const;
+    int lastAction = 0;    // (the bench's death log) the last think's action
+    void LogThink(COutputControl* playerKeys);
     bool measuredPaths = false;    // this think's goals are measured by the way there (ainav::MeasureFrom)    // the newest changes (on unless an A/B test leaves this player plain: --at-ai-plain)
 
     CPlayer * pPlayer = nullptr;

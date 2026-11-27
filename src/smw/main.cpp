@@ -223,7 +223,7 @@ bool inMatch()
     //(the menus too, for --at-role menuperf, which reports a screen at a time; otherwise the match
     //alone: its loading, in the menu, is not the match)
     const GameState* state = GameStateManager::instance().currentState;
-    const bool menus = cmd::g_autotest.shotsRole == "menuperf";
+    const bool menus = cmd::g_autotest.shotsRole == "menuperf" || cmd::g_autotest.shotsRole == "modeperf";
     return cmd::g_autotest.enabled && cmd::g_autotest.perf && (state == &GameplayState::instance() || (menus && state == &MenuState::instance()));
 }
 

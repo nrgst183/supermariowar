@@ -90,6 +90,10 @@ void MapReader1600::read_tiles(CMap& map, BinaryFile& mapfile)
 
             for (short k = MAPLAYERS - 1; k >= 0; k--) {
                 TilesetTile * tile = &map.mapdata[i][j][k];
+                //(an empty layer has no type: its column and row are whatever was there before, a tile
+                //of the classic tileset that made the whole of Inertia solid on top)
+                if (tile->iID == TILESETNONE)
+                    continue;
                 TileType type = g_tilesetmanager->classicTileset()->tileType(tile->iCol, tile->iRow);
                 if (type != TileType::NonSolid) {
                     map.mapdatatop[i][j] = type;

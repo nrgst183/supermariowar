@@ -2328,6 +2328,32 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         return MENU_CODE_NONE;
     }
 
+    //--at-role modeperf (with --at-perf 1): a mode's options page measured over 240 ticks while the
+    //cursor goes down it a row at a time (Classic's, then Item Frenzy's long one; "perf:" lines, the
+    //map: menu:mode<k>)
+    if (at.shotsRole == "modeperf" && step == 1) {
+        static const int MODES[] = {game_mode_classic, game_mode_frenzy};
+        constexpr int HOLD = 260;
+        const int index = (t - 1) / HOLD;
+        const int phase = (t - 1) % HOLD;
+        if (index >= static_cast<int>(sizeof(MODES) / sizeof(MODES[0]))) {
+            step = 1000;
+            t = 0;
+            return MENU_CODE_NONE;
+        }
+        if (phase == 0) {
+            mCurrentMenu = mModeOptionsMenu->GetOptionsMenu(MODES[index]);
+            mCurrentMenu->ResetMenu();
+        }
+        if (phase >= 20 && phase % 12 == 0)
+            game_values.playerInput.outputControls[0].menu_down.fPressed = true;
+        if (phase == 20)
+            perfstats::reset();
+        if (phase == HOLD - 1)
+            perfstats::report("menu:mode" + std::to_string(MODES[index]), -1);
+        return MENU_CODE_NONE;
+    }
+
     //--at-role optmenus: the options menus, the online menu, the team selection
     if (at.shotsRole == "optmenus" && step == 1) {
         static const MenuCodeEnum MENUS[] = {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU, MENU_CODE_TO_TEAM_OPTIONS_MENU,

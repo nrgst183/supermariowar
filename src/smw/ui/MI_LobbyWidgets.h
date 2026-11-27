@@ -74,6 +74,9 @@ public:
     /// next skin (the wheel too); your card clicked, ready (again: not ready). Setting a CPU's skin: the
     /// CPU's
     Box FocusBox() const override;
+    //(its own cursor and the players' cards show what's chosen; a frame round all of it, as wide as the
+    //screen, would show only as a line across it)
+    bool DrawsFocusFrame() const override { return false; }
     bool PointerHoverInside(short x, short y) override;
     bool PointerClickInside(short x, short y, MenuCodeEnum& code) override;
     bool PointerWheelInside(int dir, MenuCodeEnum& code) override;

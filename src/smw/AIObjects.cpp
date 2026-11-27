@@ -221,6 +221,12 @@ void CPlayerAI::ScanMiddleLayerObjects()
                     continue;
 
                 DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
+            } else if (movingobject_bulletbill == movingtype && safer()) {
+                //(a cannon's: the map's own, no one's (its player and team -1), out to hit everyone; the
+                //players' Bullet Bills are in the third list)
+                if (fInvincible)
+                    continue;
+                DistanceToObject(movingobject, &nearestObjects.threat, &nearestObjects.threatdistance, &nearestObjects.threatwrap);
             } else if (movingobject_pirhanaplant == movingtype) {
                 MO_PirhanaPlant * plant = static_cast<MO_PirhanaPlant*>(movingobject);
                 if (plant->state > 0)
