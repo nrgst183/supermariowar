@@ -14,6 +14,8 @@ class MI_Image;
 
 class MI_BonusWheel : public UI_Control {
 public:
+    // The mouse: the wheel and its Continue (a click: as A, it stops the wheel, then goes on)
+    Box FocusBox() const override;
     MI_BonusWheel(short x, short y);
     virtual ~MI_BonusWheel();
 

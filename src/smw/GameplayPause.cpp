@@ -31,9 +31,18 @@ void drawExitPauseDialog()
         ~Restore() { x_shake = x; y_shake = y; }
     } restore {shakeX, shakeY};
 
-    if (game_values.flags.pausegame && matchedit::allowed()) {
+    const bool pausedByHost = rollback::NetGame::instance().inMatch() && !rollback::NetGame::instance().isHost();
+    if (game_values.flags.pausegame && matchedit::allowed() && !pausedByHost) {
         //(the Map Maker: its own pause menu)
         matchedit::drawPauseMenu();
+    } else if (game_values.flags.pausegame && pausedByHost) {
+        //(online, paused by the host: everyone stands still until the host goes on)
+        rollback::NetGame& net = rollback::NetGame::instance();
+        menupanel::dialogBox(170, 172, 300, 128);
+        rm->menu_font_large.drawCentered(App::screenWidth / 2, 194, "Paused");
+        const std::string host = net.lobby() ? net.lobby()->peer(0).name : std::string();
+        rm->menu_font_small.drawCentered(App::screenWidth / 2, 232, (host.empty() ? std::string("by the host") : "by " + host).c_str());
+        rm->menu_font_small.drawCentered(App::screenWidth / 2, 256, "The host resumes the match");
     } else if (game_values.flags.pausegame) {
         const bool mapMaker = false;
         menupanel::dialogBox(mapMaker ? 130 : 190, 172, mapMaker ? 380 : 260, mapMaker ? 196 : 128);
@@ -225,7 +234,17 @@ bool updateExitPauseDialog(short iCountDownState) // true on exit
                         changeRunAhead(1);
                     continue;
                 }
-                if (playerKeys->game_start.fPressed && !game_values.flags.exitinggame && !game_values.flags.showscoreboard) {
+                //(the host: Start pauses everyone, and again goes on; the Map Maker's host has its own pause menu)
+                if (playerKeys->game_start.fPressed && rollback::NetGame::instance().isHost() && !matchedit::allowed() &&
+                    !game_values.flags.exitinggame && !game_values.flags.showscoreboard) {
+                    game_values.flags.pausegame = !game_values.flags.pausegame;
+                    if (game_values.flags.pausegame && rm->sfx_flyingsound.isPlaying())
+                        rm->sfx_flyingsound.stop();
+                    ifSoundOnPlay(rm->sfx_pause);
+                    continue;
+                }
+                if (playerKeys->game_start.fPressed && !game_values.flags.pausegame && !game_values.flags.exitinggame &&
+                    !game_values.flags.showscoreboard) {
                     s_onlinePanel = true;
                     ifSoundOnPlay(rm->sfx_pause);
                     continue;

@@ -83,19 +83,20 @@ int NetGame::localPeer() const
 
 bool NetGame::isLocalSlot(int slot) const
 {
-    return m_session && m_session->config().slotPeer[static_cast<size_t>(slot)] == m_session->config().localPeer;
+    return m_session && m_session->slotOwner(slot) == m_session->config().localPeer;
 }
 
 int NetGame::slotPeer(int slot) const
 {
-    return m_session ? m_session->config().slotPeer[static_cast<size_t>(slot)] : -1;
+    return m_session ? m_session->slotOwner(slot) : -1;
 }
 
 std::string NetGame::slotPlayerName(int slot) const
 {
     if (slot < 0 || slot >= INPUT_MAX_PLAYERS)
         return {};
-    const int peer = m_config.slots[static_cast<size_t>(slot)].peer;
+    //(a CPU's player that someone who joined plays: theirs)
+    const int peer = m_session && m_session->handoverFrame(slot) >= 0 ? m_session->slotOwner(slot) : m_config.slots[static_cast<size_t>(slot)].peer;
     if (peer < 0 || peer >= net::MAX_PEERS)
         return {};
     return m_matchNames[static_cast<size_t>(peer)];
@@ -653,7 +654,7 @@ void NetGame::handle(const LobbyGameEvent& event, uint32_t nowMs)
                 //The host closed the lobby after this match; or it is gone, and
                 //the match goes on without it. (Removed from the lobby: the
                 //others' PEER_DROP report, which comes first, ends our match.)
-                if (!event.ok && event.text.rfind("You were removed", 0) != 0)
+                if (m_session && !event.ok && event.text.rfind("You were removed", 0) != 0)
                     m_session->onPeerDisconnected(0, nowMs, "left the lobby");
                 m_closeAfterMatch = event.text;
             }
@@ -740,7 +741,7 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
             if (!r.ok() || matchId != m_matchId)
                 break;
             const std::string& text = reason;    //a whole sentence, e.g. "Player 3 timed out"
-            if (inMatch()) {
+            if (inMatch() && m_session) {
                 //In a running match: the sender can't go on and leaves it; we go on without it
                 m_session->onPeerDisconnected(peer, nowMs, "left the match");
             } else if (m_lobby->phase() == NetLobby::Phase::Starting) {
@@ -769,6 +770,149 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
             break;
         }
 
+        // ---- joining a match in progress
+        case net::MsgType::LateJoin: {
+            //(the host: a joiner asks to join the match being played; it gets the config, then the
+            //match's confirmed ticks to catch up on)
+            if (!isHost() || peer <= 0 || peer >= net::MAX_PEERS)
+                break;
+            uint8_t buffer[1024];
+            net::ByteWriter w(buffer, sizeof(buffer));
+            w.u8(static_cast<uint8_t>(net::MsgType::LateConfig));
+            w.u8(m_matchId);
+            const std::vector<uint8_t> bytes = m_config.serialize();
+            const char* why = !inMatch() ? "the match is over" : m_series.active ? "a tournament, tour or world can't be joined while it's played"
+                            : !replay::recordedTicks() ? "the host isn't recording the match" : bytes.size() > 900 ? "the match config is too big" : nullptr;
+            if (why) {
+                w.u16(0);
+                w.str(why);
+            } else {
+                w.u16(static_cast<uint16_t>(bytes.size()));
+                w.bytes(bytes.data(), bytes.size());
+                m_lateJoiners[static_cast<size_t>(peer)] = LateJoiner();
+            }
+            m_lobby->sendGameMessage(peer, w.data(), w.size());
+            printf("netplay: peer %d asks to join match %d: %s\n", peer, m_matchId, why ? why : "sending the config");
+            break;
+        }
+
+        case net::MsgType::LateConfig: {
+            const uint8_t matchId = r.u8();
+            const uint16_t length = r.u16();
+            if (!r.ok() || peer != 0 || isHost() || m_late != Late::Asked)
+                break;
+            if (length == 0) {
+                const std::string why = r.str();
+                m_late = Late::None;
+                m_lobby->setStatus("Can't join the match now: " + why);
+                break;
+            }
+            const uint8_t* bytes = r.bytes(length);
+            if (!r.ok())
+                break;
+            m_lateConfigBytes.assign(bytes, bytes + length);
+            std::string error;
+            if (!m_config.deserialize(bytes, length))
+                error = "the match config is malformed (another game version?)";
+            else if (!checkMatchConfig(m_config, error))
+                error = "can't play it: " + error + " (you can join from the next match)";
+            for (const MatchSlot& slot : m_config.slots) {
+                if (error.empty() && slot.peer > 0 && slot.peer != localPeer() && !m_lobby->mesh().peerConnected(slot.peer))
+                    error = "no connection to " + peerName(slot.peer);
+            }
+            m_matchId = matchId;
+            uint8_t buffer[256];
+            net::ByteWriter w(buffer, sizeof(buffer));
+            w.u8(static_cast<uint8_t>(net::MsgType::LateAck));
+            w.u8(matchId);
+            w.u8(error.empty() ? 1 : 0);
+            w.str(error);
+            m_lobby->sendGameMessage(0, w.data(), w.size());
+            if (!error.empty()) {
+                m_late = Late::None;
+                m_lobby->setStatus("Can't join the match: " + error);
+                break;
+            }
+            m_late = Late::Accepted;
+            m_lateTicks.clear();
+            m_lobby->setStatus("Catching up on the match...");
+            break;
+        }
+
+        case net::MsgType::LateAck: {
+            const uint8_t matchId = r.u8();
+            const bool ok = r.u8() != 0;
+            const std::string why = r.str();
+            if (!r.ok() || !isHost() || peer <= 0 || peer >= net::MAX_PEERS || matchId != m_matchId || !inMatch())
+                break;
+            m_lateJoiners[static_cast<size_t>(peer)].streaming = ok;
+            m_lateJoiners[static_cast<size_t>(peer)].sent = 0;
+            if (!ok)
+                printf("netplay: peer %d can't join match %d: %s\n", peer, m_matchId, why.c_str());
+            break;
+        }
+
+        case net::MsgType::LateTicks: {
+            const uint8_t matchId = r.u8();
+            const int first = static_cast<int>(r.u32());
+            const int count = r.u16();
+            if (!r.ok() || peer != 0 || matchId != m_matchId || (m_late != Late::Accepted && m_late != Late::Watching && m_late != Late::Jumping))
+                break;
+            //(in order, reliable: anything else is old)
+            if (first != static_cast<int>(m_lateTicks.size()))
+                break;
+            for (int k = 0; k < count && r.ok(); k++) {
+                replay::TickRecord tick;
+                for (uint8_t& b : tick.input.players)
+                    b = r.u8();
+                tick.cpuMask = r.u8();
+                if (r.ok())
+                    m_lateTicks.push_back(tick);
+            }
+            if (m_late == Late::Accepted && !m_lateTicks.empty())
+                startLateMatch();
+            break;
+        }
+
+        case net::MsgType::JumpIn: {
+            const uint8_t matchId = r.u8();
+            const int start = static_cast<int>(r.u32());
+            const int rttMs = r.u16();
+            if (r.ok() && isHost() && peer > 0 && peer < net::MAX_PEERS && matchId == m_matchId)
+                hostJumpIn(peer, start, rttMs, nowMs);
+            break;
+        }
+
+        case net::MsgType::JumpInReply: {
+            const uint8_t matchId = r.u8();
+            const int slot = r.i8();
+            const int from = static_cast<int>(r.u32());
+            const int start = static_cast<int>(r.u32());
+            const int count = r.u8();
+            std::array<SessionConfig::Handover, INPUT_MAX_PLAYERS> handovers {};
+            for (int k = 0; k < count && r.ok(); k++) {
+                const int s = r.u8();
+                SessionConfig::Handover h;
+                h.peer = r.i8();
+                h.from = static_cast<int>(r.u32());
+                h.start = static_cast<int>(r.u32());
+                if (s < INPUT_MAX_PLAYERS)
+                    handovers[static_cast<size_t>(s)] = h;
+            }
+            if (!r.ok() || peer != 0 || matchId != m_matchId || m_late != Late::Jumping)
+                break;
+            if (slot < 0) {
+                //(no CPU player to take over: watch it, play from the next match)
+                m_late = Late::Watching;
+                m_lateWantsPlay = false;
+                m_dropNotice = "No free player: watching until the next match";
+                m_dropNoticeMs = nowMs;
+                break;
+            }
+            beginLateSession(slot, from, start, handovers);
+            break;
+        }
+
         case net::MsgType::EditStart:
         case net::MsgType::EditData:
             if (m_editHandler)
@@ -786,6 +930,9 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
 
 uint8_t NetGame::matchPeers() const
 {
+    //(watching a match we joined: no session yet, only the host's)
+    if (inMatch() && !m_session)
+        return 1;
     if (inMatch()) {
         uint8_t mask = 0;
         for (int p = 0; p < net::MAX_PEERS; p++) {
@@ -1123,16 +1270,324 @@ void NetGame::beginMatch()
 
     m_session = std::make_unique<RollbackSession>(session, *m_transport, *this, monotonicMs());
     m_inMatch = true;
+    m_spectating = false;
+    m_late = Late::None;
+    m_handApplied = 0;
+    m_lateJoiners = {};
     m_timing = Timing();
     m_timing.startMs = monotonicMs();
     m_timing.lastStatsMs = m_timing.startMs;
 }
 
+// ---- joining a match in progress (RollbackSession's JOINING)
+
+void NetGame::joinMatchInProgress()
+{
+    if (!m_lobby || isHost() || inMatch() || !m_lobby->matchBeingPlayed() || m_lobby->phase() != NetLobby::Phase::Lobby || m_late != Late::None)
+        return;
+    m_late = Late::Asked;
+    m_lateWantsPlay = true;
+    const uint8_t message = static_cast<uint8_t>(net::MsgType::LateJoin);
+    m_lobby->sendGameMessage(0, &message, 1);
+    m_lobby->setStatus("Asking to join the match...");
+    printf("netplay: asking to join the match in progress\n");
+}
+
+bool NetGame::slotHandedOver(int slot) const
+{
+    return m_session && inMatch() && m_session->handoverFrame(slot) >= 0;
+}
+
+std::string NetGame::matchSkinPath(int slot) const
+{
+    if (!m_lobby || slot < 0 || slot >= INPUT_MAX_PLAYERS)
+        return {};
+    if (m_session && m_session->handoverFrame(slot) >= 0)
+        return m_lobby->peerSkinPath(m_session->slotOwner(slot), 0);
+    const MatchSlot& s = m_config.slots[static_cast<size_t>(slot)];
+    if (s.control != 1 || s.peer < 0)
+        return {};
+    //(a peer's players are its slots in order: the how many-th of them this one is)
+    int index = 0;
+    for (int k = 0; k < slot; k++)
+        index += m_config.slots[static_cast<size_t>(k)].control == 1 && m_config.slots[static_cast<size_t>(k)].peer == s.peer;
+    return m_lobby->peerSkinPath(s.peer, index);
+}
+
+void NetGame::handOverSlots(uint8_t slotMask)
+{
+    GameplayState::instance().handOverToHumans(slotMask);
+}
+
+int NetGame::connectionOf(int peer)
+{
+    if (!m_lobby || peer < 0 || peer >= net::MAX_PEERS || !m_lobby->mesh().peerConnected(peer))
+        return -1;
+    return m_lobby->mesh().peerConnections()[static_cast<size_t>(peer)];
+}
+
+// The host: the match's confirmed ticks to each joiner catching up
+void NetGame::hostLateUpdate(uint32_t /*nowMs*/)
+{
+    const std::vector<replay::TickRecord>* ticks = replay::recordedTicks();
+    if (!ticks || !m_session)
+        return;
+    const int confirmed = std::min({m_session->confirmedFrame(), m_session->frame(), static_cast<int>(ticks->size())});
+    for (int p = 1; p < net::MAX_PEERS; p++) {
+        LateJoiner& late = m_lateJoiners[static_cast<size_t>(p)];
+        if (!late.streaming)
+            continue;
+        if (!m_lobby->peer(p).present) {
+            late = LateJoiner();
+            continue;
+        }
+        //(at most a few messages a frame: a long match comes in a second or so)
+        for (int message = 0; message < 8 && late.sent < confirmed; message++) {
+            const int count = std::min(confirmed - late.sent, 240);
+            uint8_t buffer[16 + 240 * 5];
+            net::ByteWriter w(buffer, sizeof(buffer));
+            w.u8(static_cast<uint8_t>(net::MsgType::LateTicks));
+            w.u8(m_matchId);
+            w.u32(static_cast<uint32_t>(late.sent));
+            w.u16(static_cast<uint16_t>(count));
+            for (int k = 0; k < count; k++) {
+                const replay::TickRecord& tick = (*ticks)[static_cast<size_t>(late.sent + k)];
+                for (uint8_t b : tick.input.players)
+                    w.u8(b);
+                w.u8(tick.cpuMask);
+            }
+            m_lobby->sendGameMessage(p, w.data(), w.size());
+            late.sent += count;
+        }
+    }
+}
+
+// The host: a joiner caught up to frame `start` and wants to play: a CPU player's slot from the
+// next frame of our input, or none (it watches)
+void NetGame::hostJumpIn(int peer, int start, int rttMs, uint32_t nowMs)
+{
+    int slot = -1;
+    int from = -1;
+    if (inMatch() && m_session) {
+        for (int k = 0; k < INPUT_MAX_PLAYERS && from < 0; k++) {
+            const MatchSlot& s = m_config.slots[static_cast<size_t>(k)];
+            if (s.control != 2 || s.peer > 0 || (g_sim.cpuTakeover >> k) & 1)
+                continue;
+            //(from when it will have caught up: how far behind it is, and the way here and back, in frames)
+            const int lead = (m_session->frame() - start) + rttMs / 16 + 6;
+            from = m_session->handOver(k, peer, start, nowMs, lead);
+            slot = from >= 0 ? k : -1;
+        }
+    }
+    uint8_t buffer[64];
+    net::ByteWriter w(buffer, sizeof(buffer));
+    w.u8(static_cast<uint8_t>(net::MsgType::JumpInReply));
+    w.u8(m_matchId);
+    w.i8(static_cast<int8_t>(slot));
+    w.u32(static_cast<uint32_t>(std::max(0, from)));
+    w.u32(static_cast<uint32_t>(start));
+    uint8_t count = 0;
+    for (int k = 0; k < INPUT_MAX_PLAYERS && m_session; k++)
+        count += m_session->handoverFrame(k) >= 0;
+    w.u8(count);
+    for (int k = 0; k < INPUT_MAX_PLAYERS && m_session; k++) {
+        if (m_session->handoverFrame(k) < 0)
+            continue;
+        w.u8(static_cast<uint8_t>(k));
+        w.i8(static_cast<int8_t>(m_session->slotOwner(k)));
+        w.u32(static_cast<uint32_t>(m_session->handoverFrame(k)));
+        w.u32(static_cast<uint32_t>(m_session->handoverStart(k)));
+    }
+    m_lobby->sendGameMessage(peer, w.data(), w.size());
+    if (slot >= 0)
+        m_lateJoiners[static_cast<size_t>(peer)].streaming = false;    //(it plays: it gets the inputs from now on)
+    printf("netplay: peer %d joins match %d: %s\n", peer, m_matchId,
+        slot >= 0 ? ("player " + std::to_string(slot + 1) + " from frame " + std::to_string(from) + " (it caught up to " + std::to_string(start) + ")").c_str()
+                  : "no CPU player to take over, it watches");
+}
+
+// Joiner: the first of the match's ticks came: start it as the others did, and catch up (spectate)
+void NetGame::startLateMatch()
+{
+    for (int p = 0; p < net::MAX_PEERS; p++)
+        m_matchNames[static_cast<size_t>(p)] = peerName(p);
+    std::array<std::string, INPUT_MAX_PLAYERS> names;
+    std::array<std::string, INPUT_MAX_PLAYERS> skins;
+    m_inMatch = true;    //(the skins: the match's players', matchSkinPath)
+    m_spectating = true;
+    m_session.reset();
+    for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
+        const MatchSlot& slot = m_config.slots[static_cast<size_t>(k)];
+        if (slot.control == 0)
+            continue;
+        names[static_cast<size_t>(k)] = slot.peer >= 0 && slot.control == 1 ? m_matchNames[static_cast<size_t>(slot.peer)] : "CPU";
+        skins[static_cast<size_t>(k)] = matchSkinPath(k);
+    }
+    printf("netplay: match %d in progress: catching up (%zu ticks so far)\n", m_matchId, m_lateTicks.size());
+    replay::beginOnline(m_lateConfigBytes, names, skins);
+    startConfiguredMatch(m_config);
+    GameplayState::instance().correction().reset();
+    FPSLimiter::instance().setTickStretch(1.0f);
+    m_late = Late::Watching;
+    m_handApplied = 0;
+    m_lobby->setPhase(NetLobby::Phase::InMatch);
+    m_timing = Timing();
+    m_timing.startMs = monotonicMs();
+    m_timing.lastStatsMs = m_timing.startMs;
+    m_lobby->setStatus("");
+}
+
+// Joiner, watching: the confirmed ticks the host sent (far behind: many at once, silently); caught
+// up, it asks for a player
+void NetGame::spectate(Outcome& outcome)
+{
+    const int have = static_cast<int>(m_lateTicks.size());
+    //(the host's match ended, and we've had all of its ticks: it ended here too, or never will)
+    if (!m_lobby->matchBeingPlayed() && have - g_sim.tick <= 0) {
+        endMatchHere(outcome);
+        return;
+    }
+    if (m_late == Late::Jumping)
+        return;    //(waiting for the host's answer, at the frame we told it)
+    const int behind = have - g_sim.tick;
+    const int run = behind > 12 ? std::min(behind, 2000) : std::min(behind, 1);
+    for (int k = 0; k < run; k++) {
+        const replay::TickRecord& tick = m_lateTicks[static_cast<size_t>(g_sim.tick)];
+        if (tick.cpuMask & 0x0F & ~g_sim.cpuTakeover)
+            GameplayState::instance().takeOverByCpu(tick.cpuMask & 0x0F);
+        if ((tick.cpuMask >> 4) & ~g_sim.humanTakeover)
+            GameplayState::instance().handOverToHumans(static_cast<uint8_t>(tick.cpuMask >> 4));
+        if (behind - k > 3) {
+            sim::ResimulationScope scope;    //(caught up silently: not seen nor heard)
+            GameplayState::instance().advanceTick(tick.input);
+        } else {
+            sim::detail::shownTick = g_sim.tick;
+            GameplayState::instance().advanceTick(tick.input);
+        }
+        outcome.ticks++;
+        if (matchEndRequested()) {
+            endMatchHere(outcome);
+            return;
+        }
+    }
+    //Caught up: a player of our own (the host answers with a slot, or none)
+    if (m_lateWantsPlay && have - g_sim.tick <= 2 && g_sim.tick > 0) {
+        m_late = Late::Jumping;
+        uint8_t buffer[8];
+        net::ByteWriter w(buffer, sizeof(buffer));
+        w.u8(static_cast<uint8_t>(net::MsgType::JumpIn));
+        w.u8(m_matchId);
+        w.u32(static_cast<uint32_t>(g_sim.tick));
+        w.u16(static_cast<uint16_t>(std::clamp(m_lobby->peer(0).pingMs, 0, 2000)));    //(our round trip to the host)
+        m_lobby->sendGameMessage(0, w.data(), w.size());
+        printf("netplay: caught up to frame %d of match %d, asking for a player\n", g_sim.tick, m_matchId);
+    }
+}
+
+// The match ended where we watched it (the host's ticks reached its end)
+void NetGame::endMatchHere(Outcome& outcome)
+{
+    printf("netplay: match %d ended at frame %d (watched)\n", m_matchId, g_sim.tick);
+    outcome.ended = true;
+    m_inMatch = false;
+    m_spectating = false;
+    m_late = Late::None;
+    m_matchEndMs = monotonicMs();
+    returnToLobby("");
+}
+
+// Joiner: the host gave us a CPU player's slot from frame `from`: our session starts where we
+// caught up to (`start`, where we stopped)
+void NetGame::beginLateSession(int slot, int from, int start, const std::array<SessionConfig::Handover, INPUT_MAX_PLAYERS>& handovers)
+{
+    if (g_sim.tick != start || start <= 0 || start > static_cast<int>(m_lateTicks.size())) {
+        printf("netplay: ERROR: the host's handover is for frame %d, we're at %d\n", start, g_sim.tick);
+        m_late = Late::Watching;
+        m_lateWantsPlay = false;
+        return;
+    }
+    SessionConfig session;
+    session.peerCount = net::MAX_PEERS;
+    session.localPeer = m_lobby->localPeer();
+    const std::array<int, net::MAX_PEERS> connections = m_lobby->mesh().peerConnections();
+    for (int k = 0; k < INPUT_MAX_PLAYERS; k++) {
+        const MatchSlot& s = m_config.slots[static_cast<size_t>(k)];
+        session.slotPeer[static_cast<size_t>(k)] = s.control == 2 ? (s.peer > 0 ? s.peer : 0) : s.peer;
+    }
+    session.handovers = handovers;
+    session.handovers[static_cast<size_t>(slot)] = {static_cast<int8_t>(session.localPeer), from, start};
+    for (int p = 0; p < net::MAX_PEERS; p++) {
+        bool inMatch = p == 0;
+        for (int k = 0; k < INPUT_MAX_PLAYERS; k++)
+            inMatch |= session.slotPeer[static_cast<size_t>(k)] == p || session.handovers[static_cast<size_t>(k)].peer == p;
+        if (p != session.localPeer && inMatch)
+            session.peerConnection[static_cast<size_t>(p)] = connections[static_cast<size_t>(p)];
+    }
+    session.inputDelay = m_config.inputDelay;
+    session.maxPrediction = MAX_PREDICTION;
+    session.skipThreshold = 3.0f;
+    session.checksumInterval = std::max(0, cmd::g_net.checksumInterval);
+    session.timeoutMs = static_cast<uint32_t>(std::max(500, cmd::g_net.timeoutMs));
+    session.matchId = m_matchId;
+    session.startFrame = start;
+    session.startInput = m_lateTicks[static_cast<size_t>(start - 1)].input;
+    m_session = std::make_unique<RollbackSession>(session, *m_transport, *this, monotonicMs());
+    m_spectating = false;
+    m_late = Late::Playing;
+    m_lateTicks.clear();
+    printf("netplay: playing match %d as player %d from frame %d (caught up to %d)\n", m_matchId, slot + 1, from, start);
+}
+
+// Every peer: the players who joined during the match, shown with their names and skins
+void NetGame::applyHandovers(uint32_t nowMs)
+{
+    for (int k = 0; k < INPUT_MAX_PLAYERS && m_session; k++) {
+        const uint8_t bit = static_cast<uint8_t>(1u << k);
+        if (m_session->handoverFrame(k) < 0 || (m_handApplied & bit))
+            continue;
+        m_handApplied |= bit;
+        const int peer = m_session->slotOwner(k);
+        if (peer < 0 || peer >= net::MAX_PEERS)
+            continue;
+        //(the config stays as the match started: it goes to the next one who joins)
+        m_matchNames[static_cast<size_t>(peer)] = peerName(peer);
+        loadMatchSkin(k, game_values.colorids[k]);
+        m_dropNotice = peerName(peer) + " joined - takes over player " + std::to_string(k + 1);
+        m_dropNoticeMs = nowMs;
+        const std::string skin = matchSkinPath(k);
+        printf("netplay: %s plays player %d from frame %d (skin: %s)\n", peerName(peer).c_str(), k + 1, m_session->handoverFrame(k),
+            skin.empty() ? "the default" : skin.c_str());
+    }
+}
+
 // ---- the match
+
+void NetGame::setPaused(bool paused)
+{
+    if (m_session && isHost() && inMatch())
+        m_session->setHold(paused);
+}
+
+int NetGame::holdFrame() const
+{
+    return m_session && inMatch() ? m_session->holdFrame() : -1;
+}
+
+bool NetGame::held() const
+{
+    return m_session && inMatch() && m_session->held();
+}
 
 NetGame::Outcome NetGame::advance(const InputFrame& localInput)
 {
     Outcome outcome;
+    //(joined during the match: watching it, or catching up, until we play)
+    if (m_spectating && inMatch()) {
+        pump();
+        if (inMatch())
+            spectate(outcome);
+        return outcome;
+    }
     if (!m_session || !inMatch())
         return outcome;
 
@@ -1142,6 +1597,23 @@ NetGame::Outcome NetGame::advance(const InputFrame& localInput)
         return outcome;
     const uint32_t now = monotonicMs();
     const FrameResult result = m_session->advanceFrame(localInput, now);
+    //(joined during the match, still behind the others: a few more ticks, to catch up)
+    FrameResult extra;
+    for (int k = 0; k < 5 && m_session->config().startFrame > 0 && m_session->behindFrames(now) > 1.5f && result.ticks > 0; k++) {
+        extra = m_session->advanceFrame(localInput, now);
+        if (extra.ticks == 0)
+            break;
+    }
+    if (isHost())
+        hostLateUpdate(now);
+    applyHandovers(now);
+    {
+        static bool wasHeld = false;
+        if (m_session->held() != wasHeld) {
+            wasHeld = m_session->held();
+            printf(wasHeld ? "netplay: held by the host's pause at frame %d\n" : "netplay: the host's pause ended at frame %d\n", m_session->frame());
+        }
+    }
     updateLostPeers(now);
     m_transport->flush();
 
@@ -1346,7 +1818,7 @@ int NetGame::peerPingMs(int peer) const
 {
     if (peer < 0 || peer >= net::MAX_PEERS || peer == localPeer())
         return -1;
-    if (inMatch()) {
+    if (inMatch() && m_session) {
         if (m_session->config().peerConnection[static_cast<size_t>(peer)] < 0)
             return -1;
         return static_cast<int>(m_session->stats().peers[static_cast<size_t>(peer)].rttMs + 0.5f);
@@ -1356,8 +1828,10 @@ int NetGame::peerPingMs(int peer) const
 
 int NetGame::inputDelay() const
 {
-    if (inMatch())
+    if (inMatch() && m_session)
         return m_session->config().inputDelay;
+    if (inMatch())
+        return m_config.inputDelay;
     return m_lobby ? m_lobby->inputDelay() : 0;
 }
 

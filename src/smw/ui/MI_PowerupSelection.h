@@ -22,6 +22,12 @@ public:
     MenuCodeEnum Modify(bool modify) override;
     bool ChangingValue() const override;    //(its own menu's)
     MenuCodeEnum SendInput(CPlayerInput* playerInput) override;
+    // The mouse: its fields and sliders (its own menu's), the wheel scrolls the sliders
+    Box FocusBox() const override;
+    bool PointerHoverInside(short x, short y) override;
+    bool PointerClickInside(short x, short y, MenuCodeEnum& code) override;
+    bool PointerWheelInside(int dir, MenuCodeEnum& code) override;
+
 
     void Update() override;
     void Draw() override;
@@ -42,6 +48,8 @@ private:
 
     // TODO: Ownership of most members gets passed to this menu
     std::unique_ptr<UI_Menu> mMenu;
+    MenuCodeEnum handleCode(MenuCodeEnum ret);    // what its menu's code does (the keys' or the mouse's)
+    void syncToFocus();                           // the rows shown follow the focus (the mouse moved it)
 
     MI_SelectField<PowerupDropRateStyle>* miOverride = nullptr;
     MI_SelectField<short>* miPreset = nullptr;

@@ -404,6 +404,10 @@ public:
     void sendMatchAbort(uint8_t matchId, int culprit, const std::string& reason);
     // A series message (NetSeries.h) to a peer, or to everyone (-1). Reliable.
     void sendGameMessage(int peer, const uint8_t* data, size_t size);
+    // A joiner: the host's match is being played (it can be joined); the host: its own
+    bool matchBeingPlayed() const { return isHost() ? m_phase == Phase::InMatch : m_matchBeingPlayed; }
+    // The skin file of a peer's player (its localIndex-th), "" if none or not here
+    std::string peerSkinPath(int peer, int localIndex) const;
     // Host: a series (tournament, tour, world) runs: new joiners are refused
     // between its matches too
     void setSeriesLocked(bool locked);
@@ -512,6 +516,7 @@ private:
     size_t m_eventHead = 0;
     size_t m_eventCount = 0;
     std::array<uint8_t, 2048> m_buffer {};
+    bool m_matchBeingPlayed = false;    // (a joiner) the host plays a match
     bool m_seriesLocked = false;
 };
 

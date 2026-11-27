@@ -96,6 +96,26 @@
 //    in the reports (idle()); its drop frames are at or after its end.
 // When every other peer is lost, the last one plays on against the CPUs.
 //
+// PAUSE: THE HOST STOPS EVERYONE. The host (peer 0) can hold the match at a
+// frame H: no peer runs a tick past it until the host lets go. H is the next
+// frame of the host's own input, and the hold travels in every input packet
+// the host sends (with a counter, so an old packet can't undo a newer
+// change): any peer that has the host's input for H knows of the hold, so no
+// peer confirms H without it. A peer that ran past H on predicted input rolls
+// back to H. Letting go needs no agreement: nobody is past H.
+//
+// JOINING DURING THE MATCH. Someone who joins while the match is played
+// first catches up on the match's confirmed inputs (NetGame), then the host
+// hands it the slot of a CPU player that the host drives, from a frame J:
+// the next frame of the host's own input. As with the pause, the handover
+// travels in every input packet the host sends from then on, so no peer
+// confirms J without knowing it, and from J on the slot's input is the new
+// peer's (the host's bytes for it are ignored). The new peer's own session
+// starts at the frame S it caught up to (SessionConfig::startFrame); the
+// others send it their inputs from S on. A peer that predicted the slot past
+// J rolls back as for any late input. The simulation plays the slot as a
+// human's from J (ISessionCallbacks::handOverSlots).
+//
 // LIGHTNESS. Everything is fixed-size: no allocation after construction.
 namespace rollback {
 
@@ -116,6 +136,18 @@ struct SessionConfig {
     // a skipped tick is a visible hitch.
     float skipThreshold = 1.0f;
     uint8_t matchId = 0;
+
+    // A peer that joined during the match (see JOINING): the frame its session starts at (its
+    // state is that frame's), and the input of the frame before (what the prediction repeats)
+    int startFrame = 0;
+    InputFrame startInput {};
+    // The handovers known when the session starts (a joiner's own, and earlier ones)
+    struct Handover {
+        int8_t peer = -1;    // -1: none
+        int from = 0;        // J: the new peer's inputs from this frame on
+        int start = 0;       // S: the frame its session started at
+    };
+    std::array<Handover, INPUT_MAX_PLAYERS> handovers {};
 };
 
 class ISessionCallbacks {
@@ -136,6 +168,11 @@ public:
     // PEERS): the CPU plays these slots (bit s) from this tick on. Must be
     // part of the simulation (rolled back with it) and harmless when repeated.
     virtual void takeOverSlots(uint8_t /*slotMask*/) {}
+    // Called before every tick from a handover's frame on (see JOINING): players who joined the
+    // match play these CPU slots (bit s) from this tick on. Part of the simulation, like the above
+    virtual void handOverSlots(uint8_t /*slotMask*/) {}
+    // The transport connection of a peer that joined during the match (-1: none yet)
+    virtual int connectionOf(int /*peer*/) { return -1; }
 
     // A frame's state is confirmed; `sum` is its checksum (the "netsum:" lines)
     virtual void onConfirmedChecksum(int /*frame*/, uint64_t /*sum*/) {}
@@ -147,6 +184,7 @@ enum class StallReason : uint8_t {
     None,
     WaitingForInputs,   // too far ahead of the confirmed inputs
     TimeSync,           // letting slower peers catch up
+    Held,               // the host paused the match (see PAUSE)
     Barrier,            // waiting until an irreversible event is confirmed
     Ended,              // the match is over (or failed)
 };
@@ -182,6 +220,29 @@ public:
     void idle(uint32_t nowMs);
     // Every peer has acknowledged all local inputs up to the end
     bool drained() const;
+
+    // ---- the host's pause (see PAUSE)
+    // The host: hold every peer at the next frame of its input (true), or let go (false)
+    void setHold(bool hold);
+    // ---- players who join during the match (see JOINING)
+    // The host: hand a CPU slot it drives to `peer`, whose session starts at `start`. The frame it
+    // plays from (J), or -1 if it can't be handed over (not the host's, handed over already, `start`
+    // too old for the input history). `lead`: that many frames later than the next of our input (the
+    // time the new peer needs to catch up: until then the slot is still ours, no one waits for it)
+    int handOver(int slot, int peer, int start, uint32_t nowMs, int lead = 0);
+    // The peer that drives a slot from the latest handover on (the slot's peer if none)
+    int slotOwner(int slot) const;
+    // The frame a slot was handed over at (-1: never), and to whom
+    int handoverFrame(int slot) const { return slot >= 0 && slot < INPUT_MAX_PLAYERS ? m_handFrom[slot] : -1; }
+    int handoverStart(int slot) const { return slot >= 0 && slot < INPUT_MAX_PLAYERS ? m_handStart[slot] : 0; }
+    // How many frames we run behind the furthest ahead peer (0: not behind): a peer that joined
+    // runs extra ticks to catch up
+    float behindFrames(uint32_t nowMs) const;
+
+    // The frame every peer is held at (-1: none)
+    int holdFrame() const { return m_holdFrame; }
+    // Held: at the hold frame, not ticking
+    bool held() const { return m_holdFrame >= 0 && m_frame >= m_holdFrame; }
 
     State state() const { return m_state; }
     int frame() const { return m_frame; }
@@ -283,6 +344,10 @@ private:
     // without a connection aren't in the match)
     bool isRemote(int peer) const { return peer >= 0 && peer < m_config.peerCount && peer != m_config.localPeer && m_config.peerConnection[peer] >= 0; }
     int knownFrames(int slot) const;
+    int knownOf(int peer) const { return peer == m_config.localPeer ? m_localReceived : m_peers[peer].received; }
+    // Whose input a slot's is at a frame (a handover: the new peer's from its frame on)
+    int ownerAt(int slot, int frame) const { return m_handFrom[slot] >= 0 && frame >= m_handFrom[slot] ? m_handPeer[slot] : m_config.slotPeer[slot]; }
+    void addHandover(int slot, int peer, int from, int start, uint32_t nowMs, int received, int acked);
     InputFrame tickInput(int frame);
     void runTick(bool resimulating);
     void rollbackIfNeeded(FrameResult& result);
@@ -326,7 +391,7 @@ private:
     std::array<ChecksumEntry, CHECKSUM_HISTORY> m_checksums {};
     int m_lastFinalizedChecksum = 0;
 
-    uint8_t m_packet[net::INPUT_HEADER_SIZE + net::MAX_INPUT_FRAMES_PER_PACKET * INPUT_MAX_PLAYERS] = {};
+    uint8_t m_packet[net::INPUT_HEADER_SIZE + 1 + INPUT_MAX_PLAYERS * 10 + net::MAX_INPUT_FRAMES_PER_PACKET * INPUT_MAX_PLAYERS] = {};
 
     int m_failedPeer = -1;
     const char* m_failReason = "";
@@ -334,6 +399,11 @@ private:
 
     uint8_t m_lostMask = 0;
     bool m_dropDirty = false;       // our report changed: send it
+    int m_holdFrame = -1;           // the host's pause: no tick past this frame (-1: none)
+    std::array<int, INPUT_MAX_PLAYERS> m_handFrom {{-1, -1, -1, -1}};    // handovers (see JOINING): from frame J,
+    std::array<int, INPUT_MAX_PLAYERS> m_handPeer {{-1, -1, -1, -1}};    // this peer drives the slot (whose session
+    std::array<int, INPUT_MAX_PLAYERS> m_handStart {};                   // started at S)
+    uint8_t m_holdSerial = 0;       // its changes, counted (the newest wins)
     std::array<int, INPUT_MAX_PLAYERS> m_cpuFrom {};    // the drop frame of each slot's peer (INT_MAX: none)
     uint8_t m_dropPacket[3 + (net::MAX_PEERS - 1) * (9 + DROP_RELAY_FRAMES * INPUT_MAX_PLAYERS)] = {};
 };

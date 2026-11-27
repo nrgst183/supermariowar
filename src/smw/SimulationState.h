@@ -97,6 +97,7 @@ struct SimulationState {
     COutputControl playerKeys[4] {};
     uint8_t previousInput[4] {};
     uint8_t cpuTakeover = 0;
+    uint8_t humanTakeover = 0;    // online: the CPU slots (bit s) a player who joined the match took over
 
     int tick = 0;
     int gameoverTick = -1;

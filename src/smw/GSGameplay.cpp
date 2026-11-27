@@ -123,6 +123,7 @@ double g_autoTestSlowestLoadMs = 0;
 std::string g_autoTestSlowestLoadMap;
 static int autoTestFrames = 0;
 static int autoTestOverFrames = 0;
+static bool s_dialogCursor = false;    // the pointer shown for the pause or quit dialog (the mouse on it)
 
 namespace {
 // --at-humans: random but plausible input for the "human" players, made
@@ -612,6 +613,12 @@ void GameplayState::handleInput()
     const bool mapMaker = matchedit::allowed();
     if (mapMaker)
         matchedit::beginFrame();
+    //(the pointer shown for a dialog: hidden again once it's gone, but where the Map Maker has it)
+    if (s_dialogCursor && !game_values.flags.exitinggame && !game_values.flags.pausegame) {
+        s_dialogCursor = false;
+        if (!mapMaker)
+            SDL_HideCursor();
+    }
 
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -761,6 +768,39 @@ void GameplayState::handleInput()
                 g_fAutoTest = !g_fAutoTest;
             }
 #endif
+            break;
+        }
+
+        //The mouse on the match's dialogs: Quit the match? (Yes / No pointed at, clicked; a right
+        //click: No) and the pause box (clicked: on with the match; online, the host's)
+        case SDL_EVENT_MOUSE_MOTION:
+        case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+            const bool exitDialog = game_values.flags.exitinggame;
+            const bool pauseBox = game_values.flags.pausegame && !matchedit::allowed() && !replay::playing() &&
+                                  (!rollback::NetGame::instance().inMatch() || rollback::NetGame::instance().isHost());
+            if (!exitDialog && !pauseBox)
+                break;
+            SDL_ShowCursor();
+            s_dialogCursor = true;
+            const bool click = event.type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+            const float mx = click ? event.button.x : event.motion.x;
+            const float my = click ? event.button.y : event.motion.y;
+            COutputControl& keys = game_values.playerInput.outputControls[0];
+            if (exitDialog) {
+                //(menupanel::dialogChoice(320, 252): two 84 by 30 buttons, 12 apart)
+                const bool onYes = mx >= 230 && mx < 314 && my >= 252 && my < 282;
+                const bool onNo = mx >= 326 && mx < 410 && my >= 252 && my < 282;
+                if (onYes || onNo)
+                    game_values.flags.exityes = onYes;
+                if (click && event.button.button == SDL_BUTTON_RIGHT) {
+                    game_values.flags.exityes = false;
+                    keys.menu_select.fPressed = true;
+                } else if (click && (onYes || onNo)) {
+                    keys.menu_select.fPressed = true;
+                }
+            } else if (click && mx >= 190 && mx < 450 && my >= 172 && my < 300) {
+                game_values.flags.pausegame = false;
+            }
             break;
         }
 
@@ -1109,7 +1149,7 @@ void GameplayState::autoTestDecideSeriesMatch()
 
 // One frame of an online match (see rollback/NetGame.h). The session decides
 // how many ticks run: usually one, none while it waits for the other peers,
-// more after a rollback. The pause dialog is disabled online; leaving the
+// more after a rollback. The host's pause holds everyone (RollbackSession's PAUSE); leaving the
 // match disconnects.
 void GameplayState::updateNetplay()
 {
@@ -1121,6 +1161,24 @@ void GameplayState::updateNetplay()
         return;
     }
     updateEditMode();    //(the Map Maker: Back builds)
+
+    //The host's pause holds every peer (the host's pause flag is the hold; the others show it while held)
+    if (net.isHost())
+        net.setPaused(game_values.flags.pausegame && !game_values.gamemode->gameover);
+    else
+        game_values.flags.pausegame = net.held();
+    if (cmd::g_autotest.enabled && cmd::g_autotest.pauseAt > 0 && net.isHost()) {
+        //(--at-pause F: the host pauses at tick F for --at-pause-for frames, then goes on)
+        static int pausedFrames = -1;
+        if (pausedFrames < 0 && g_sim.tick >= cmd::g_autotest.pauseAt) {
+            pausedFrames = 0;
+            game_values.flags.pausegame = true;
+            printf("pausetest: the host pauses at tick %d\n", g_sim.tick);
+        } else if (pausedFrames >= 0 && game_values.flags.pausegame && ++pausedFrames >= cmd::g_autotest.pauseFor) {
+            game_values.flags.pausegame = false;
+            printf("pausetest: the host goes on at tick %d\n", g_sim.tick);
+        }
+    }
 
     const bool quitTest = cmd::g_net.quitAt > 0 && g_sim.tick >= cmd::g_net.quitAt;
     if (updateExitPauseDialog(g_sim.countdownState) || quitTest) {
@@ -1140,7 +1198,8 @@ void GameplayState::updateNetplay()
     for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
         if (!net.isLocalSlot(slot))
             continue;
-        if (game_values.playercontrol[slot] == 2) {
+        //(a CPU's slot we joined the match to play: our buttons)
+        if (game_values.playercontrol[slot] == 2 && !net.slotHandedOver(slot)) {
             input.players[slot] = cpudriver::next(slot);
             continue;
         }

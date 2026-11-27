@@ -35,6 +35,12 @@ public:
     MenuCodeEnum SendInput(CPlayerInput * playerInput) override;
     bool ChangingValue() const override { return false; }    //(it moves its own way, no value field)
     MenuCodeEnum Modify(bool modify) override;
+    // The mouse: a filter pointed at is chosen (its edit icon, on the right: that), clicked as A; the
+    // wheel goes through them
+    Box FocusBox() const override;
+    bool PointerHoverInside(short x, short y) override;
+    bool PointerClickInside(short x, short y, MenuCodeEnum& code) override;
+    bool PointerWheelInside(int dir, MenuCodeEnum& code) override;
 
     void Add(std::string name, short icon);
 
@@ -42,6 +48,8 @@ public:
     bool MovePrev();
 
 private:
+    MenuCodeEnum activate();                   // A on the chosen filter
+    bool pointAt(short x, short y);            // the filter (and column) under the pointer chosen
 
     std::vector<MFS_ListItem*> items;
     std::vector<MFS_ListItem*>::iterator current;

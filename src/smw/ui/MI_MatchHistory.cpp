@@ -133,20 +133,65 @@ MenuCodeEnum MI_MatchHistory::SendInput(CPlayerInput* playerInput)
             move(-m_lines);
             return MENU_CODE_NONE;
         }
-        if (keys.menu_select.fPressed) {
-            if (m_entries.empty())
-                return MENU_CODE_NONE;
-            const std::string file = selectedReplay();
-            if (file.empty() || !replay::replayExists(file)) {
-                m_message = file.empty() ? "This match has no replay" : "Replay deleted (only the newest 200 are kept)";
-                return MENU_CODE_NONE;
-            }
-            return MENU_CODE_HISTORY_PLAY_REPLAY;
-        }
+        if (keys.menu_select.fPressed)
+            return playSelected();
         if (keys.menu_cancel.fPressed)
             return MENU_CODE_HISTORY_EXIT;
     }
     return MENU_CODE_NONE;
+}
+
+// The selected match's replay (A, a click), or why it can't play
+MenuCodeEnum MI_MatchHistory::playSelected()
+{
+    if (m_entries.empty())
+        return MENU_CODE_NONE;
+    const std::string file = selectedReplay();
+    if (file.empty() || !replay::replayExists(file)) {
+        m_message = file.empty() ? "This match has no replay" : "Replay deleted (only the newest 200 are kept)";
+        return MENU_CODE_NONE;
+    }
+    return MENU_CODE_HISTORY_PLAY_REPLAY;
+}
+
+UI_Control::Box MI_MatchHistory::FocusBox() const
+{
+    return {m_pos.x, 40, m_width, static_cast<short>(m_lines * LINE_H + 20)};
+}
+
+int MI_MatchHistory::lineAt(short x, short y) const
+{
+    const short top = 40 + 10;
+    if (x < m_pos.x + 12 || x >= m_pos.x + m_width - 12 || y < top)
+        return -1;
+    const int line = (y - top) / LINE_H;
+    const int index = m_offset + line;
+    return line < m_lines && index < static_cast<int>(m_entries.size()) ? index : -1;
+}
+
+bool MI_MatchHistory::PointerHoverInside(short x, short y)
+{
+    const int index = lineAt(x, y);
+    if (index >= 0)
+        move(index - m_index);
+    return true;
+}
+
+bool MI_MatchHistory::PointerClickInside(short x, short y, MenuCodeEnum& code)
+{
+    const int index = lineAt(x, y);
+    if (index < 0)
+        return true;
+    move(index - m_index);
+    code = playSelected();
+    return true;
+}
+
+bool MI_MatchHistory::PointerWheelInside(int dir, MenuCodeEnum& code)
+{
+    code = MENU_CODE_NONE;
+    move(dir);
+    return true;
 }
 
 // A panel, in the menus' colors

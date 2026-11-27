@@ -157,6 +157,48 @@ void MI_LanGameList::SetGames(std::vector<Game> games)
     m_scroll = std::clamp(m_scroll, 0, std::max(0, static_cast<int>(m_games.size()) - ROWS));
 }
 
+UI_Control::Box MI_LanGameList::FocusBox() const
+{
+    return {static_cast<short>(PANEL_X), static_cast<short>(PANEL_Y), static_cast<short>(PANEL_W), static_cast<short>(PANEL_H)};
+}
+
+int MI_LanGameList::rowAt(short x, short y) const
+{
+    if (x < ROW_X || x >= ROW_X + ROW_W || y < ROW_Y)
+        return -1;
+    const int i = (y - ROW_Y) / ROW_STEP;
+    if (i >= ROWS || y - ROW_Y - i * ROW_STEP >= ROW_H)
+        return -1;
+    const int game = m_scroll + i;
+    return game < static_cast<int>(m_games.size()) ? game : -1;
+}
+
+bool MI_LanGameList::PointerHoverInside(short x, short y)
+{
+    const int game = rowAt(x, y);
+    if (game >= 0 && game != m_selected)
+        move(game - m_selected);
+    return true;
+}
+
+bool MI_LanGameList::PointerClickInside(short x, short y, MenuCodeEnum& code)
+{
+    const int game = rowAt(x, y);
+    if (game < 0)
+        return true;    //(the panel, between the games: nothing)
+    if (game != m_selected)
+        move(game - m_selected);
+    code = MENU_CODE_SYSTEM_LINK_JOIN;
+    return true;
+}
+
+bool MI_LanGameList::PointerWheelInside(int dir, MenuCodeEnum& code)
+{
+    code = MENU_CODE_NONE;
+    move(dir);
+    return true;
+}
+
 const MI_LanGameList::Game* MI_LanGameList::Selected() const
 {
     return m_games.empty() ? nullptr : &m_games[static_cast<size_t>(m_selected)];

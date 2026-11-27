@@ -24,7 +24,16 @@ public:
 
     void Reset(short type);
 
+    // The mouse: the thumbnails; one pointed at is chosen, clicked as A; the wheel turns the pages
+    Box FocusBox() const override;
+    bool PointerHoverInside(short x, short y) override;
+    bool PointerClickInside(short x, short y, MenuCodeEnum& code) override;
+    bool PointerWheelInside(int dir, MenuCodeEnum& code) override;
+
 private:
+    MenuCodeEnum activate();              // A on the chosen map
+    int cellAt(short x, short y) const;   // the thumbnail under the pointer, 0..8 (-1: none)
+    void choose(int index);               // a map of all of them (its page loaded)
     void LoadPage(short page, bool fUseFilters);
 
     short iPage = 0;

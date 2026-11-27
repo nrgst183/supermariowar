@@ -9,6 +9,7 @@
 #include "ui/MI_SelectField.h"
 #include "ui/MI_Text.h"
 #include "uimenu.h"
+#include <algorithm>
 
 namespace {
 //Rearrange display of powerups
@@ -233,8 +234,11 @@ MenuCodeEnum MI_PowerupSelection::Modify(bool modify)
 
 MenuCodeEnum MI_PowerupSelection::SendInput(CPlayerInput* playerInput)
 {
-    MenuCodeEnum ret = mMenu->SendInput(playerInput);
+    return handleCode(mMenu->SendInput(playerInput));
+}
 
+MenuCodeEnum MI_PowerupSelection::handleCode(MenuCodeEnum ret)
+{
     if (MENU_CODE_CANCEL_INPUT == ret) {
         fModifying = false;
         return MENU_CODE_UNSELECT_ITEM;
@@ -309,6 +313,53 @@ MenuCodeEnum MI_PowerupSelection::SendInput(CPlayerInput* playerInput)
     }
 
     return ret;
+}
+
+UI_Control::Box MI_PowerupSelection::FocusBox() const
+{
+    return {0, m_pos.y, 640, static_cast<short>(440 - m_pos.y)};
+}
+
+void MI_PowerupSelection::syncToFocus()
+{
+    const UI_Control* focus = mMenu->currentFocus();
+    int index = focus == miOverride ? 0 : focus == miPreset ? 1 : -1;
+    for (short i = 0; i < NUM_POWERUPS && index < 0; i++)
+        if (focus == miPowerupSlider[i])
+            index = (i >> 1) + 2;
+    if (index < 0)
+        return;    //(the buttons under the sliders, the dialog: as it was)
+    iIndex = static_cast<short>(index);
+    iOffset = static_cast<short>(std::clamp(index - iTopStop, 0, iBottomStop - iTopStop));
+    SetupPowerupFields();
+    AdjustDisplayArrows();
+}
+
+bool MI_PowerupSelection::PointerHoverInside(short x, short y)
+{
+    mMenu->PointerMove(x, y);
+    syncToFocus();
+    return true;
+}
+
+bool MI_PowerupSelection::PointerClickInside(short x, short y, MenuCodeEnum& code)
+{
+    code = handleCode(mMenu->PointerClick(x, y, false));
+    syncToFocus();
+    return true;
+}
+
+bool MI_PowerupSelection::PointerWheelInside(int dir, MenuCodeEnum& code)
+{
+    //(a row of sliders up or down: the focus to the first one shown, if it scrolled away)
+    code = MENU_CODE_NONE;
+    iOffset = static_cast<short>(std::clamp(iOffset + dir, 0, iBottomStop - iTopStop));
+    SetupPowerupFields();
+    AdjustDisplayArrows();
+    if (mMenu->currentFocus() && !mMenu->currentFocus()->IsVisible() && !mMenu->IsModifying())
+        mMenu->FocusControl(miPowerupSlider[iOffset * 2]);
+    syncToFocus();
+    return true;
 }
 
 void MI_PowerupSelection::Update()

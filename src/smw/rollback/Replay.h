@@ -112,6 +112,9 @@ void beginLocal(const std::string& mapPath);
 void beginOnline(const std::vector<uint8_t>& config, const std::array<std::string, INPUT_MAX_PLAYERS>& names,
     const std::array<std::string, INPUT_MAX_PLAYERS>& skins);
 bool recording();
+// The ticks recorded so far (null: not recording): the host sends a match's confirmed ones to a
+// player who joins it while it's played
+const std::vector<TickRecord>* recordedTicks();
 // Before each simulation tick (GameplayState::advanceTick); online, a rolled
 // back tick is recorded again with its corrected input
 void recordTick(const InputFrame& input);

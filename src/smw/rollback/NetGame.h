@@ -4,6 +4,7 @@
 #include "MatchConfig.h"
 #include "NetLobby.h"
 #include "NetSeries.h"
+#include "Replay.h"
 #include "RollbackSession.h"
 #include "Snapshot.h"
 
@@ -209,6 +210,12 @@ public:
 
     // ---- gameplay
     bool inMatch() const { return m_inMatch; }
+    // The host's pause: every peer stops at the same frame (RollbackSession's PAUSE). The host
+    // pauses and resumes; held() is true on every peer while the match stands still there
+    void setPaused(bool paused);
+    bool held() const;
+    // The frame the host's pause holds at (-1: none): run-ahead stops there
+    int holdFrame() const;
     uint8_t matchId() const { return m_matchId; }
     struct Outcome {
         int ticks = 0;
@@ -221,6 +228,18 @@ public:
     // GameplayState left the match (back to the menus)
     void onMatchLeft();
     bool isLocalSlot(int slot) const;
+    // ---- joining a match in progress (RollbackSession's JOINING)
+    // A joiner in the lobby while a match is played: catch up on it, then play a CPU's player (or
+    // watch, if there's none)
+    void joinMatchInProgress();
+    // Asked to join the match being played, and not in it yet (catching up, or waiting)
+    bool joiningMatch() const { return m_late != Late::None && !m_inMatch; }
+    // Watching the match (caught up on its confirmed inputs; no player of ours)
+    bool spectating() const { return m_inMatch && m_spectating; }
+    // A CPU player's slot that someone who joined the match plays
+    bool slotHandedOver(int slot) const;
+    // The skin file of a slot's player in the match ("": a CPU's, or not here)
+    std::string matchSkinPath(int slot) const;
     // The peer whose inputs drive the slot in the running match (-1: none, a CPU's, or no match)
     int slotPeer(int slot) const;
     // The name of the player of a slot in the current (or last) match: its
@@ -234,6 +253,8 @@ public:
     bool advance(const InputFrame& input, bool resimulating) override;
     uint64_t checksum() override;
     void takeOverSlots(uint8_t slotMask) override;
+    void handOverSlots(uint8_t slotMask) override;
+    int connectionOf(int peer) override;
     void onConfirmedChecksum(int frame, uint64_t sum) override;
     void onDesync(int frame, int peer, uint64_t local, uint64_t remote) override;
 
@@ -251,6 +272,14 @@ private:
     void abortStart(int culprit, const std::string& reason);
     void returnToLobby(const std::string& abortReason);
     void beginMatch();
+    // Joining a match in progress
+    void hostLateUpdate(uint32_t nowMs);
+    void hostJumpIn(int peer, int start, int rttMs, uint32_t nowMs);
+    void startLateMatch();
+    void spectate(Outcome& outcome);
+    void beginLateSession(int slot, int from, int start, const std::array<SessionConfig::Handover, INPUT_MAX_PLAYERS>& handovers);
+    void applyHandovers(uint32_t nowMs);
+    void endMatchHere(Outcome& outcome);
     void applyLobbySlots(std::array<int8_t, INPUT_MAX_PLAYERS>& peerOfSlot);
     void updateMatchInfo(uint32_t nowMs);
     void updateSkins(uint32_t nowMs);
@@ -341,6 +370,20 @@ private:
     uint8_t m_dropsSeen = 0;      // the lost peers whose drop frame was already announced
     std::string m_dropNotice;
     uint32_t m_dropNoticeMs = 0;
+
+    // Joining a match in progress (the host's view of each joiner; ours)
+    struct LateJoiner {
+        bool streaming = false;    // it has the config: the confirmed ticks go to it
+        int sent = 0;              // ticks sent so far
+    };
+    std::array<LateJoiner, net::MAX_PEERS> m_lateJoiners {};
+    enum class Late : uint8_t { None, Asked, Accepted, Watching, Jumping, Playing };
+    Late m_late = Late::None;
+    std::vector<uint8_t> m_lateConfigBytes;
+    std::vector<replay::TickRecord> m_lateTicks;    // the match's confirmed ticks, from the host
+    bool m_spectating = false;
+    bool m_lateWantsPlay = true;
+    uint8_t m_handApplied = 0;    // handovers whose player's name and skin are shown
 
     static constexpr int MAX_PREDICTION = 10;   // frames the match may run ahead of the confirmed inputs
     static constexpr int SNAPSHOT_RING = MAX_PREDICTION + 2;

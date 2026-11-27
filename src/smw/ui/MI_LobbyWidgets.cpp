@@ -315,6 +315,73 @@ void MI_OnlineTeamSelect::changeSkin(int localIndex, int direction, bool random)
     }
 }
 
+UI_Control::Box MI_OnlineTeamSelect::FocusBox() const
+{
+    //(the teams' columns and the players' cards under them)
+    return {0, static_cast<short>(m_pos.y + 24), 640, static_cast<short>(440 - (m_pos.y + 24))};
+}
+
+bool MI_OnlineTeamSelect::PointerHoverInside(short /*x*/, short /*y*/)
+{
+    return true;
+}
+
+bool MI_OnlineTeamSelect::PointerClickInside(short x, short y, MenuCodeEnum& code)
+{
+    code = MENU_CODE_NONE;
+    rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+    if (!lobby || lobby->phase() != rollback::NetLobby::Phase::Lobby || lobby->localPeer() < 0)
+        return true;
+    const int slot = m_cpuEdit >= 0 ? m_cpuEdit : mySlot(0);
+    //The cards: our own clicked, ready (or not ready again)
+    constexpr int CARD_Y = 344;
+    if (y >= CARD_Y - 4) {
+        const int card = x / 160;
+        Info info;
+        if (card >= 0 && card < 4 && gather(card, info) && (info.mine || card == m_cpuEdit)) {
+            if (locked()) {
+                Lock(false);
+            } else {
+                m_cpuEdit = -1;
+                Lock(true);
+            }
+        }
+        return true;
+    }
+    if (slot < 0)
+        return true;
+    //(ready: a click in the teams changes things again, not ready)
+    if (locked())
+        Lock(false);
+    const int team = (x - m_pos.x - 25) / 96;
+    if (x < m_pos.x + 25 || team < 0 || team > 3)
+        return true;
+    if (team == teamOf(slot)) {
+        //(our own player in its column: the next skin)
+        if (m_cpuEdit >= 0)
+            changeCpuSkin(m_cpuEdit, 1, false);
+        else
+            changeSkin(0, 1, false);
+        return true;
+    }
+    for (int step = 0; step < 4 && teamOf(slot) != team; step++)
+        changeTeam(slot, team > teamOf(slot) ? 1 : -1);
+    return true;
+}
+
+bool MI_OnlineTeamSelect::PointerWheelInside(int dir, MenuCodeEnum& code)
+{
+    code = MENU_CODE_NONE;
+    rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+    if (!lobby || lobby->phase() != rollback::NetLobby::Phase::Lobby || lobby->localPeer() < 0 || locked())
+        return true;
+    if (m_cpuEdit >= 0)
+        changeCpuSkin(m_cpuEdit, dir, false);
+    else if (mySlot(0) >= 0)
+        changeSkin(0, dir, false);
+    return true;
+}
+
 MenuCodeEnum MI_OnlineTeamSelect::SendInput(CPlayerInput* playerInput)
 {
     rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();

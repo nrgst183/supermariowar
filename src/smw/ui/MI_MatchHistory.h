@@ -19,6 +19,11 @@ public:
     void Draw() override;
     MenuCodeEnum SendInput(CPlayerInput* playerInput) override;
     MenuCodeEnum Modify(bool modify) override;
+    // The mouse: the list; a match pointed at is chosen, clicked played; the wheel goes through them
+    Box FocusBox() const override;
+    bool PointerHoverInside(short x, short y) override;
+    bool PointerClickInside(short x, short y, MenuCodeEnum& code) override;
+    bool PointerWheelInside(int dir, MenuCodeEnum& code) override;
 
     // The replay file of the selected match ("" if it has none)
     std::string selectedReplay() const;
@@ -27,6 +32,8 @@ public:
 
 private:
     void move(int delta);
+    MenuCodeEnum playSelected();
+    int lineAt(short x, short y) const;    // the match under the pointer (-1: none)
     void drawBox(short x, short y, short w, short h) const;
     void drawDetails(short y) const;
 

@@ -1539,6 +1539,8 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         mOnlineLobbyMenu->ShowPage(UI_OnlineLobbyMenu::Page::Team);
     } else if (MENU_CODE_ONLINE_KICK == code) {
         mOnlineLobbyMenu->KickSelected();
+    } else if (MENU_CODE_ONLINE_JOIN_MATCH == code) {
+        rollback::NetGame::instance().joinMatchInProgress();
     } else if (MENU_CODE_ONLINE_VIEW_SETTINGS == code && InEditorLobby()) {
         JoinLobbyEditing();
     } else if (MENU_CODE_ONLINE_MATCH_SETTINGS == code && InEditorLobby()) {

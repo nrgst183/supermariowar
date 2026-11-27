@@ -7,6 +7,7 @@
 #include "ui/MI_Image.h"
 #include "ui/MI_Text.h"
 
+#include <algorithm>
 #include <cassert>
 
 namespace {
@@ -348,6 +349,28 @@ void UI_Menu::Refresh()
     }
 }
 
+UI_Control* UI_Menu::PointerTarget(short x, short y) const
+{
+    UI_Control* control = ControlAt(x, y);
+    if (!control || !m_currentFocus || control == m_currentFocus)
+        return control;
+    //(the focus's group: the controls linked with it, either way)
+    std::vector<const UI_Control*> group {m_currentFocus};
+    for (size_t at = 0; at < group.size(); at++) {
+        const UI_Control* c = group[at];
+        for (const std::unique_ptr<UI_Control>& other : controls) {
+            bool linked = false;
+            for (int d = 0; d < 4 && !linked; d++) {
+                const auto dir = static_cast<MenuNavDirection>(d);
+                linked = c->neighbor(dir) == other.get() || other->neighbor(dir) == c;
+            }
+            if (linked && std::find(group.begin(), group.end(), other.get()) == group.end())
+                group.push_back(other.get());
+        }
+    }
+    return std::find(group.begin(), group.end(), control) != group.end() ? control : nullptr;
+}
+
 UI_Control* UI_Menu::ControlAt(short x, short y) const
 {
     //(the last drawn is on top)
@@ -371,13 +394,39 @@ void UI_Menu::Focus(UI_Control* control)
     fModifyingItem = m_currentFocus->Select(true);
 }
 
+// The focused control, being changed, with parts of its own (a list, a grid, a menu inside): the
+// pointer moved (what 0), a left click (1), the wheel (2, dir). MENU_CODE_UNSELECT_ITEM: it didn't
+// take it (it has no parts, or the pointer isn't on it)
+MenuCodeEnum UI_Menu::PointerInside(short x, short y, int what, int dir)
+{
+    UI_Control* control = m_currentFocus;
+    if (!control || !fModifyingItem || (what != 2 && !control->Contains(x, y)))
+        return MENU_CODE_UNSELECT_ITEM;
+    if (UI_Menu* inner = control->InnerMenu()) {
+        const MenuCodeEnum code = what == 0 ? inner->PointerMove(x, y) : what == 1 ? inner->PointerClick(x, y, false) : inner->PointerWheel(dir);
+        control->AfterInnerPointer();
+        return code;
+    }
+    MenuCodeEnum code = MENU_CODE_NONE;
+    if (what == 0)
+        return control->PointerHoverInside(x, y) ? MENU_CODE_NONE : MENU_CODE_UNSELECT_ITEM;
+    if (what == 1)
+        return control->PointerClickInside(x, y, code) ? code : MENU_CODE_UNSELECT_ITEM;
+    return control->PointerWheelInside(dir, code) ? code : MENU_CODE_UNSELECT_ITEM;
+}
+
 MenuCodeEnum UI_Menu::PointerMove(short x, short y)
 {
+    //(a control with parts of its own: the pointer to them)
+    if (PointerInside(x, y, 0) != MENU_CODE_UNSELECT_ITEM)
+        return MENU_CODE_NONE;
     //(not while a value is being changed: the pointer may cross other controls on the way to its arrows)
     if (fModifyingItem)
         return MENU_CODE_NONE;
-    if (UI_Control* control = ControlAt(x, y))
+    if (UI_Control* control = PointerTarget(x, y)) {
         Focus(control);
+        PointerInside(x, y, 0);    //(focused, and at once being changed: the part under the pointer)
+    }
     return MENU_CODE_NONE;
 }
 
@@ -393,7 +442,13 @@ MenuCodeEnum UI_Menu::PointerClick(short x, short y, bool right)
         return cancelCode;
     }
 
-    UI_Control* control = ControlAt(x, y);
+    UI_Control* control = PointerTarget(x, y);
+    //(a control with parts of its own, being changed: the click to the part)
+    if (control && control == m_currentFocus) {
+        const MenuCodeEnum inside = PointerInside(x, y, 1);
+        if (inside != MENU_CODE_UNSELECT_ITEM)
+            return inside;
+    }
     if (fModifyingItem && m_currentFocus) {
         //The control being changed: its own click (a value field's arrows); elsewhere: done changing
         if (control == m_currentFocus) {
@@ -410,8 +465,11 @@ MenuCodeEnum UI_Menu::PointerClick(short x, short y, bool right)
         return MENU_CODE_NONE;
 
     Focus(control);
-    if (fModifyingItem)
-        return MENU_CODE_NONE;
+    if (fModifyingItem) {
+        //(at once being changed, as the lists are: the click to the part under it)
+        const MenuCodeEnum inside = PointerInside(x, y, 1);
+        return inside == MENU_CODE_UNSELECT_ITEM ? MENU_CODE_NONE : inside;
+    }
     MenuCodeEnum own = MENU_CODE_NONE;
     if (control->PointerPress(x, y, own))
         return own;
@@ -421,7 +479,8 @@ MenuCodeEnum UI_Menu::PointerClick(short x, short y, bool right)
     const MenuCodeEnum code = control->Modify(true);
     if (MENU_CODE_MODIFY_ACCEPTED == code) {
         fModifyingItem = true;
-        return MENU_CODE_NONE;
+        const MenuCodeEnum inside = PointerInside(x, y, 1);
+        return inside == MENU_CODE_UNSELECT_ITEM ? MENU_CODE_NONE : inside;
     }
     if (MENU_CODE_UNSELECT_ITEM == code)
         return MENU_CODE_NONE;
@@ -430,6 +489,9 @@ MenuCodeEnum UI_Menu::PointerClick(short x, short y, bool right)
 
 MenuCodeEnum UI_Menu::PointerWheel(int dir)
 {
+    const MenuCodeEnum inside = PointerInside(0, 0, 2, dir);
+    if (inside != MENU_CODE_UNSELECT_ITEM)
+        return inside;
     if (!m_currentFocus || !m_currentFocus->CanNudge())
         return MENU_CODE_NONE;
     return m_currentFocus->Nudge(dir);

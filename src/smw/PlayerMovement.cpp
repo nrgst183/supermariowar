@@ -325,7 +325,8 @@ void CPlayer::move()
 {
     //Call the AI if cpu controlled
     if (state == PlayerState::Ready) {
-        if (pPlayerAI) {
+        //(a CPU player that someone who joined the match plays: their buttons, not the AI)
+        if (pPlayerAI && !(g_sim.humanTakeover & (1u << globalID))) {
             //Calculate movement every 4th frame (speed up optimization)
             if (game_values.cputurn == globalID) {
                 //Playing by input, its machine thought before the tick (CpuDriver.h)

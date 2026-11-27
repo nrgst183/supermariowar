@@ -25,6 +25,12 @@ void MI_PowerupSlider::PlaceArrows()
     miModifyImageRight->SetPosition(m_pos.x + m_width - 12, m_pos.y + 4);
 }
 
+void MI_PowerupSlider::trackRange(int& x0, int& x1) const
+{
+    x0 = m_pos.x + 60;
+    x1 = m_pos.x + m_width - 46;
+}
+
 void MI_PowerupSlider::Draw()
 {
     if (!m_visible)

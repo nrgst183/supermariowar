@@ -34,6 +34,9 @@ struct AutoTestArgs {
     bool shotTicks = false;  // --at-shot-every counts simulation ticks instead of drawn frames
     bool resim = false;      // run every gameplay tick as a re-simulation (side effects suppressed)
     int runahead = 0;        // --at-runahead N: run-ahead ticks online, -1 Auto (the setting isn't used in auto-play)
+    bool lateJoin = false;   // --at-late-join 1: (a joiner) a match being played when it joins: join it
+    int pauseAt = 0;         // --at-pause F: online, the host pauses everyone at tick F ...
+    int pauseFor = 120;      // --at-pause-for N: ... for N frames ("pausetest:" lines)
     int lagtest = 0;         // --at-lagtest N: online, the first local player stands still, then jumps, N times: how many
                              // frames until the jump is on the screen (input delay, run-ahead; "lagtest:" lines)
     bool onlinePanel = false;   // --at-online-panel 1: the online panel (pause button, online) open in the matches

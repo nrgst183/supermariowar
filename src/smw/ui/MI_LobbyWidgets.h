@@ -70,6 +70,13 @@ public:
     void Draw() override;
     MenuCodeEnum SendInput(CPlayerInput* playerInput) override;
     MenuCodeEnum Modify(bool modify) override;
+    /// The mouse (player 1's): a team's column clicked, your player goes there; your player clicked, its
+    /// next skin (the wheel too); your card clicked, ready (again: not ready). Setting a CPU's skin: the
+    /// CPU's
+    Box FocusBox() const override;
+    bool PointerHoverInside(short x, short y) override;
+    bool PointerClickInside(short x, short y, MenuCodeEnum& code) override;
+    bool PointerWheelInside(int dir, MenuCodeEnum& code) override;
 
     /// The screen was opened: nobody is locked
     void Reset();

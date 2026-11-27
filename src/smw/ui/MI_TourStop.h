@@ -14,6 +14,8 @@ template<typename T> class MI_SelectField;
 
 class MI_TourStop : public UI_Control {
 public:
+    // The mouse: its Start button (a click: as A)
+    Box FocusBox() const override;
     MI_TourStop(short x, short y, bool fWorld);
 
     MenuCodeEnum Modify(bool fModify) override;

@@ -12,6 +12,10 @@ struct COutputControl;
 
 class MI_World : public UI_Control {
 public:
+    // The mouse: the map; your player clicked, as A (its stage); elsewhere, a step that way
+    Box FocusBox() const override;
+    bool PointerHoverInside(short x, short y) override;
+    bool PointerClickInside(short x, short y, MenuCodeEnum& code) override;
     MI_World();
 
     void Update() override;
@@ -34,6 +38,7 @@ public:
     }
 
 private:
+    int m_mouseKey = 0;    // a click's key for the next input: 1 up, 2 down, 3 left, 4 right, 5 A
     MenuCodeEnum InitGame(short iStage, short iPlayer, bool fNeedAiControl);
 
     void RestartDrawCycleIfNeeded();

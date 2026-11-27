@@ -39,6 +39,11 @@ public:
     void Update() override;
     void Draw() override;
     MenuCodeEnum SendInput(CPlayerInput* playerInput) override;
+    // The mouse: the panel; a game pointed at is chosen, clicked joined; the wheel scrolls
+    Box FocusBox() const override;
+    bool PointerHoverInside(short x, short y) override;
+    bool PointerClickInside(short x, short y, MenuCodeEnum& code) override;
+    bool PointerWheelInside(int dir, MenuCodeEnum& code) override;
 
     /// The games found now (the chosen one stays chosen while it's there)
     void SetGames(std::vector<Game> games);
@@ -64,6 +69,7 @@ private:
     MenuCodeEnum m_backCode = MENU_CODE_TO_MAIN_MENU;
 
     void move(int direction);
+    int rowAt(short x, short y) const;    // the game under the pointer (-1: none)
     void drawRow(int x, int y, const Game& game, bool selected) const;
     void drawEmpty() const;
 };

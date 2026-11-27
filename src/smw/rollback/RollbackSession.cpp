@@ -51,6 +51,80 @@ RollbackSession::RollbackSession(const SessionConfig& config, ITransport& transp
         peer.acked = m_config.inputDelay;
         peer.lastReceiveMs = nowMs;
     }
+
+    //A peer that joined during the match (see JOINING): from the frame it caught up to
+    const int start = std::max(0, m_config.startFrame);
+    if (start > 0) {
+        m_frame = start;
+        m_localReceived = start + m_config.inputDelay;
+        for (Peer& peer : m_peers) {
+            peer.received = start;
+            peer.acked = start;
+        }
+        for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++)
+            input(start - 1, slot) = used(start - 1, slot) = m_config.startInput.players[slot];
+        const int interval = std::max(1, m_config.checksumInterval);
+        m_lastFinalizedChecksum = start / interval * interval;
+    }
+    for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
+        const SessionConfig::Handover& h = m_config.handovers[slot];
+        if (h.peer >= 0)
+            addHandover(slot, h.peer, h.from, h.start, nowMs, std::max(h.from, start), start);
+    }
+}
+
+void RollbackSession::addHandover(int slot, int peer, int from, int start, uint32_t nowMs, int received, int acked)
+{
+    if (slot < 0 || slot >= INPUT_MAX_PLAYERS || m_handFrom[slot] >= 0 || peer < 0 || peer >= m_config.peerCount)
+        return;
+    m_handFrom[slot] = from;
+    m_handPeer[slot] = peer;
+    m_handStart[slot] = start;
+    Peer& p = m_peers[peer];
+    if (peer != m_config.localPeer && m_config.peerConnection[peer] < 0) {
+        //(a new peer of the match: its inputs from J, ours to it from where it starts)
+        m_config.peerConnection[peer] = m_callbacks.connectionOf(peer);
+        p = Peer();
+        p.received = received;
+        p.acked = acked;
+        p.lastReceiveMs = nowMs;
+    }
+    for (int k = 0; k < p.slotCount; k++)
+        if (p.slots[k] == slot)
+            return;
+    p.slots[p.slotCount++] = slot;
+}
+
+int RollbackSession::handOver(int slot, int peer, int start, uint32_t nowMs, int lead)
+{
+    if (m_config.localPeer != 0 || slot < 0 || slot >= INPUT_MAX_PLAYERS || m_handFrom[slot] >= 0 || m_config.slotPeer[slot] != 0 ||
+        peer <= 0 || peer >= m_config.peerCount || m_peers[peer].slotCount > 0 || m_peers[peer].lost || m_state != State::Running)
+        return -1;
+    //(the others send it their inputs from `start` on: still in their input history)
+    if (start > m_frame || start < m_localReceived - INPUT_HISTORY / 2)
+        return -1;
+    //The next frame of our input: no packet sent so far has an input of it (see JOINING)
+    const int from = m_localReceived + std::clamp(lead, 0, INPUT_HISTORY / 4);
+    addHandover(slot, peer, from, start, nowMs, from, start);
+    return from;
+}
+
+int RollbackSession::slotOwner(int slot) const
+{
+    if (slot < 0 || slot >= INPUT_MAX_PLAYERS)
+        return -1;
+    return m_handFrom[slot] >= 0 ? m_handPeer[slot] : m_config.slotPeer[slot];
+}
+
+float RollbackSession::behindFrames(uint32_t nowMs) const
+{
+    //(the latest reports, not the averages: a peer that just joined is far behind at once)
+    float behind = 0.0f;
+    for (int p = 0; p < m_config.peerCount; p++) {
+        if (isRemote(p) && !m_peers[p].lost && m_peers[p].echoTime != 0)
+            behind = std::max(behind, -localAdvantage(m_peers[p], nowMs));
+    }
+    return behind;
 }
 
 int RollbackSession::knownFrames(int slot) const
@@ -58,9 +132,11 @@ int RollbackSession::knownFrames(int slot) const
     const int peer = m_config.slotPeer[slot];
     if (peer < 0 || m_cpuFrom[slot] != INT_MAX)
         return ALL_KNOWN;
-    if (peer == m_config.localPeer)
-        return m_localReceived;
-    return m_peers[peer].received;
+    int known = knownOf(peer);
+    //(handed over: the old peer's inputs up to J, the new one's from there)
+    if (m_handFrom[slot] >= 0 && known >= m_handFrom[slot])
+        known = std::max(m_handFrom[slot], knownOf(m_handPeer[slot]));
+    return known;
 }
 
 int RollbackSession::confirmedFrame() const
@@ -113,6 +189,13 @@ void RollbackSession::runTick(bool resimulating)
     }
     if (cpu)
         m_callbacks.takeOverSlots(cpu);
+    uint8_t human = 0;
+    for (int slot = 0; slot < INPUT_MAX_PLAYERS; slot++) {
+        if (m_handFrom[slot] >= 0 && m_frame >= m_handFrom[slot] && m_frame < m_cpuFrom[slot])
+            human |= static_cast<uint8_t>(1u << slot);
+    }
+    if (human)
+        m_callbacks.handOverSlots(human);
 
     m_atBarrier = m_callbacks.advance(in, resimulating);
     m_frame++;
@@ -211,7 +294,18 @@ FrameResult RollbackSession::advanceFrame(const InputFrame& localInput, uint32_t
     rollbackIfNeeded(result);
     result.ticks = result.resimulated;
 
-    if (m_atBarrier) {
+    //(the host's pause: past its frame on a guess, back to it; there, no ticks)
+    if (m_holdFrame >= 0 && m_frame > m_holdFrame) {
+        m_callbacks.loadState(m_holdFrame);
+        m_frame = m_holdFrame;
+        m_atBarrier = false;
+        if (m_firstWrongFrame > m_holdFrame)
+            m_firstWrongFrame = -1;
+    }
+
+    if (held()) {
+        result.stalled = StallReason::Held;
+    } else if (m_atBarrier) {
         if (confirmedFrame() >= m_frame) {
             //Every peer agrees: the event happens at this frame
             m_state = State::Ended;
@@ -236,8 +330,10 @@ FrameResult RollbackSession::advanceFrame(const InputFrame& localInput, uint32_t
         const int inputFrame = m_frame + m_config.inputDelay;
         if (m_localReceived == inputFrame) {
             const Peer& local = m_peers[m_config.localPeer];
-            for (int i = 0; i < local.slotCount; i++)
-                input(inputFrame, local.slots[i]) = localInput.players[local.slots[i]];
+            for (int i = 0; i < local.slotCount; i++) {
+                if (ownerAt(local.slots[i], inputFrame) == m_config.localPeer)
+                    input(inputFrame, local.slots[i]) = localInput.players[local.slots[i]];
+            }
             m_localReceived++;
         }
 
@@ -246,8 +342,9 @@ FrameResult RollbackSession::advanceFrame(const InputFrame& localInput, uint32_t
         result.ticks++;
     }
 
-    //Measured at the same frame as the advantage sent to the peers
-    updateTimeSync(nowMs);
+    //Measured at the same frame as the advantage sent to the peers (not while held: nobody moves)
+    if (!held())
+        updateTimeSync(nowMs);
     sendInputs(nowMs);
     finalizeChecksums();
     return result;
@@ -261,6 +358,15 @@ void RollbackSession::idle(uint32_t nowMs)
         updateDrops();
         sendInputs(nowMs);
     }
+}
+
+void RollbackSession::setHold(bool hold)
+{
+    if (m_config.localPeer != 0 || (hold == (m_holdFrame >= 0)))
+        return;
+    //(the next frame of our input: no packet sent so far has an input of it)
+    m_holdFrame = hold ? m_localReceived : -1;
+    m_holdSerial++;
 }
 
 bool RollbackSession::drained() const
@@ -320,6 +426,23 @@ void RollbackSession::sendInputs(uint32_t nowMs)
         w.u16(sendTime);
         w.u16(peer.echoTime);
         w.u16(static_cast<uint16_t>(std::min<uint32_t>(hold, 0xffff)));
+        //(the host's pause: its counter and frame; others send nothing of it)
+        const bool host = m_config.localPeer == 0;
+        w.u8(host ? m_holdSerial : 0);
+        w.i16(static_cast<int16_t>(host && m_holdFrame >= 0 ? std::clamp(m_holdFrame - m_frame, -32767, 32767) : -32768));
+        //(the host's handovers, see JOINING: u8 count, then u8 slot, u8 peer, u32 J, u32 S each)
+        uint8_t handovers = 0;
+        for (int slot = 0; slot < INPUT_MAX_PLAYERS && host; slot++)
+            handovers += m_handFrom[slot] >= 0;
+        w.u8(handovers);
+        for (int slot = 0; slot < INPUT_MAX_PLAYERS && handovers > 0; slot++) {
+            if (m_handFrom[slot] < 0)
+                continue;
+            w.u8(static_cast<uint8_t>(slot));
+            w.u8(static_cast<uint8_t>(m_handPeer[slot]));
+            w.u32(static_cast<uint32_t>(m_handFrom[slot]));
+            w.u32(static_cast<uint32_t>(m_handStart[slot]));
+        }
         if (coded) {
             for (int f = start; f < start + count;) {
                 int run = 1;
@@ -345,6 +468,9 @@ void RollbackSession::sendInputs(uint32_t nowMs)
 
 void RollbackSession::onMessage(int peer, const uint8_t* data, size_t size, uint32_t nowMs)
 {
+    //(a peer that joined during the match, whose connection wasn't known when it was handed a slot)
+    if (peer > 0 && peer < m_config.peerCount && m_config.peerConnection[peer] < 0 && m_peers[peer].slotCount > 0)
+        m_config.peerConnection[peer] = m_callbacks.connectionOf(peer);
     //Nothing counts from a lost peer: what it sent before is all there is
     if (!isRemote(peer) || isLost(peer) || size < 2 || data[1] != m_config.matchId)
         return;
@@ -376,7 +502,26 @@ void RollbackSession::receiveInput(int p, const uint8_t* data, size_t size, uint
     const uint16_t sendTime = r.u16();
     const uint16_t echoTime = r.u16();
     const uint32_t echoHold = r.u16();
+    const uint8_t holdSerial = r.u8();
+    const int holdOffset = r.i16();
     if (!r.ok() || count > net::MAX_INPUT_FRAMES_PER_PACKET)
+        return;
+    //The host's pause, if this is newer (8 bit counter: newer when less than half the range on)
+    if (p == 0 && m_config.localPeer != 0 && static_cast<int8_t>(static_cast<uint8_t>(holdSerial - m_holdSerial)) > 0) {
+        m_holdSerial = holdSerial;
+        m_holdFrame = holdOffset == -32768 ? -1 : remoteFrame + holdOffset;
+    }
+    //The host's handovers (before its inputs: they may be of the handed over slots)
+    const int handovers = r.u8();
+    for (int h = 0; h < handovers && r.ok(); h++) {
+        const int slot = r.u8();
+        const int newPeer = r.u8();
+        const int from = static_cast<int>(r.u32());
+        const int start = static_cast<int>(r.u32());
+        if (r.ok() && p == 0 && slot < INPUT_MAX_PLAYERS && m_handFrom[slot] < 0)
+            addHandover(slot, newPeer, from, start, nowMs, from, start);
+    }
+    if (!r.ok())
         return;
     const size_t slots = static_cast<size_t>(peer.slotCount);
     uint8_t decoded[net::MAX_INPUT_FRAMES_PER_PACKET * INPUT_MAX_PLAYERS];
@@ -438,6 +583,8 @@ void RollbackSession::receiveInput(int p, const uint8_t* data, size_t size, uint
         for (int k = 0; k < peer.slotCount; k++) {
             const int slot = peer.slots[k];
             const uint8_t value = inputs[i * peer.slotCount + k];
+            if (ownerAt(slot, frame) != p)
+                continue;    //(handed over: not this peer's input at this frame)
             input(frame, slot) = value;
             if (frame < m_frame && used(frame, slot) != value && (m_firstWrongFrame < 0 || frame < m_firstWrongFrame))
                 m_firstWrongFrame = frame;
@@ -578,6 +725,8 @@ void RollbackSession::markLost(int p, const char* reason)
     peer.lostReason = reason;
     peer.lostKnown = peer.received;
     m_lostMask |= static_cast<uint8_t>(1u << p);
+    if (p == 0)
+        m_holdFrame = -1;    //(the host gone: its pause with it)
     m_dropDirty = true;
 }
 
@@ -611,8 +760,13 @@ void RollbackSession::decideDrop(int p, int frame)
         return;
     peer.dropFrame = frame;
     peer.received = std::max(peer.received, frame);
-    for (int k = 0; k < peer.slotCount; k++)
-        m_cpuFrom[peer.slots[k]] = frame;
+    for (int k = 0; k < peer.slotCount; k++) {
+        //(a slot it handed over before the drop isn't its own: the new peer's)
+        const int slot = peer.slots[k];
+        if (m_handFrom[slot] >= 0 && m_handFrom[slot] <= frame && m_handPeer[slot] != p)
+            continue;
+        m_cpuFrom[slot] = frame;
+    }
     //Frames from there on were simulated with the human player: again, with the CPU
     if (m_state == State::Running && peer.slotCount > 0 && frame < m_frame && (m_firstWrongFrame < 0 || frame < m_firstWrongFrame))
         m_firstWrongFrame = frame;

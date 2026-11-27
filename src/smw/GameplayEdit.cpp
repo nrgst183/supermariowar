@@ -4895,6 +4895,8 @@ void GameplayState::updateEditMode()
         return;
     COutputControl* game = game_values.playerInput.outputControls;    // read as the game's keys
 
+    if (game_values.flags.pausegame && rollback::NetGame::instance().inMatch() && !rollback::NetGame::instance().isHost())
+        return;    //(online, paused by the host: only the host's menu)
     if (game_values.flags.pausegame) {
         //(its menu has the keys: B or Escape resumes, its Quit quits; not the game's quit key too)
         matchedit::pauseMenuInput();
@@ -4926,7 +4928,8 @@ void GameplayState::updateEditMode()
         game[device].game_start.fPressed = false;
         game[device].game_cancel.fPressed = false;
         const bool escape = s_escPressed[device] && !mode()->builders[slot].palette;
-        if ((s_pausePressed[device] || escape) && !rollback::NetGame::instance().inMatch())
+        //(online: the host's pause stops everyone, RollbackSession's PAUSE)
+        if ((s_pausePressed[device] || escape) && (!rollback::NetGame::instance().inMatch() || rollback::NetGame::instance().isHost()))
             game_values.flags.pausegame = true;
     }
 

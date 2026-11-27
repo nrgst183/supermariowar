@@ -77,6 +77,24 @@ public:
     virtual bool PointerPress(short /*x*/, short /*y*/, MenuCodeEnum& /*code*/) {
         return false;
     }
+    /// A control with a list, grid or menu of its own (the lobby's players, the games found, the map
+    /// thumbnails...), while it has the focus and is being changed: the pointer over a part of it (it
+    /// picks that part; true: it took it), a left click on it (true, and the code to handle), the
+    /// wheel (the same). A control that holds a whole menu gives that instead (InnerMenu), and
+    /// AfterInnerPointer is called after the menu had the mouse
+    virtual bool PointerHoverInside(short /*x*/, short /*y*/) {
+        return false;
+    }
+    virtual bool PointerClickInside(short /*x*/, short /*y*/, MenuCodeEnum& /*code*/) {
+        return false;
+    }
+    virtual bool PointerWheelInside(int /*dir*/, MenuCodeEnum& /*code*/) {
+        return false;
+    }
+    virtual UI_Menu* InnerMenu() const {
+        return nullptr;
+    }
+    virtual void AfterInnerPointer() {}
     bool Contains(short x, short y) const {
         const Box b = FocusBox();
         return b.w > 0 && x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;

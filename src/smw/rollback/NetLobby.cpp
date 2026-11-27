@@ -539,7 +539,10 @@ void NetLobby::setPhase(Phase phase)
         return;
     m_phase = phase;
     if (isHost())
-        m_mesh.setRefuseJoins(phase == Phase::Lobby && !m_seriesLocked ? "" : "a match is in progress, try again in a moment");
+        markDirty();    //(the joiners see whether a match is being played)
+    //(a match being played: they join it, NetGame's joining a match in progress; not while one starts)
+    if (isHost())
+        m_mesh.setRefuseJoins((phase == Phase::Lobby || phase == Phase::InMatch) && !m_seriesLocked ? "" : "a match is in progress, try again in a moment");
     if (phase != Phase::Starting)
         cancelMapTransfers();
 }
@@ -548,7 +551,7 @@ void NetLobby::setSeriesLocked(bool locked)
 {
     m_seriesLocked = locked;
     if (isHost() && m_phase != Phase::Closed)
-        m_mesh.setRefuseJoins(m_phase == Phase::Lobby && !locked ? "" : "a match is in progress, try again in a moment");
+        m_mesh.setRefuseJoins((m_phase == Phase::Lobby || m_phase == Phase::InMatch) && !locked ? "" : "a match is in progress, try again in a moment");
 }
 
 void NetLobby::sendGameMessage(int peer, const uint8_t* data, size_t size)
@@ -793,6 +796,7 @@ void NetLobby::sendLobbyState()
     extra.u8(m_settingsEveryone ? 1 : 0);
     extra.str(m_mapRef);
     extra.u64(m_mapHash);
+    extra.u8(m_phase == Phase::InMatch ? 1 : 0);    //(a match is being played: it can be joined)
     sendToAll(extra);
     m_dirty = false;
 }
@@ -1244,6 +1248,8 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
                         m_mapRef = std::move(mapRef);
                         m_mapHash = mapHash;
                     }
+                    const uint8_t playing = r.u8();
+                    m_matchBeingPlayed = r.ok() && playing != 0;
                 }
             }
             break;
@@ -1478,6 +1484,11 @@ void NetLobby::update(uint32_t nowMs)
         sendLobbyState();
     }
     sendMapChunks(nowMs);
+}
+
+std::string NetLobby::peerSkinPath(int peer, int localIndex) const
+{
+    return peer >= 0 && peer < net::MAX_PEERS ? m_skins.pathOf(peer, localIndex) : std::string();
 }
 
 std::string NetLobby::slotSkinPath(int slot) const

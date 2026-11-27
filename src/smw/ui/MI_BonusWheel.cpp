@@ -34,6 +34,11 @@ MI_BonusWheel::MI_BonusWheel(short x, short y)
 
 MI_BonusWheel::~MI_BonusWheel() = default;
 
+UI_Control::Box MI_BonusWheel::FocusBox() const
+{
+    return {m_pos.x, m_pos.y, 352, 420};
+}
+
 MenuCodeEnum MI_BonusWheel::Modify(bool fModify)
 {
     if (fModify && !fPressedSelect) {

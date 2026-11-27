@@ -737,6 +737,11 @@ bool recording()
     return g_rec.active;
 }
 
+const std::vector<TickRecord>* recordedTicks()
+{
+    return g_rec.active ? &g_rec.replay.ticks : nullptr;
+}
+
 void recordTick(const InputFrame& input)
 {
     if (!g_rec.active)
@@ -748,7 +753,8 @@ void recordTick(const InputFrame& input)
         ticks.resize(tick);
     while (ticks.size() < tick)
         ticks.push_back(ticks.empty() ? TickRecord() : ticks.back());
-    ticks.push_back(TickRecord {input, g_sim.cpuTakeover});
+    //(bits 4-7: the CPU slots players who joined took over)
+    ticks.push_back(TickRecord {input, static_cast<uint8_t>(g_sim.cpuTakeover | (g_sim.humanTakeover << 4))});
     //(the CPUs' buttons of this tick and later come again)
     std::vector<Replay::CpuKeys>& cpu = g_rec.replay.cpuKeys;
     while (!cpu.empty() && cpu.back().tick >= tick)
@@ -1044,8 +1050,10 @@ bool step()
     uint8_t cpuMask = 0;
     if (!nextTick(input, cpuMask))
         return false;
-    if (cpuMask & ~g_sim.cpuTakeover)
-        GameplayState::instance().takeOverByCpu(cpuMask);
+    if (cpuMask & 0x0F & ~g_sim.cpuTakeover)
+        GameplayState::instance().takeOverByCpu(cpuMask & 0x0F);
+    if ((cpuMask >> 4) & ~g_sim.humanTakeover)
+        GameplayState::instance().handOverToHumans(static_cast<uint8_t>(cpuMask >> 4));
     GameplayState::instance().advanceTick(input);
     checkTick();
     g_play.status.finished = g_play.next >= g_play.replay.ticks.size();

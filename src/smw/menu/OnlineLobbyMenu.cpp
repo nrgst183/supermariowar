@@ -372,8 +372,13 @@ void UI_OnlineLobbyMenu::Sync()
         settingsNote = std::string(world ? "World editor" : "Map editor") + (lobby->goal() == 1 && !lobby->isHost() ? ": the host is editing" : "");
         miScene->SetSettingsNote(m_page == Page::Team ? settingsNote : std::string());
         miContinueButton->SetName(lobby->isHost() ? "Start editing" : "Join editing");
+    } else if (!joining && !host && lobby->matchBeingPlayed()) {
+        //(a match is being played: pick a character, then join it)
+        miContinueButton->SetName("Join the match");
+        miContinueButton->SetCode(MENU_CODE_ONLINE_JOIN_MATCH);
     } else if (!joining) {
         miContinueButton->SetName(host ? "Continue" : "Settings");
+        miContinueButton->SetCode(host ? MENU_CODE_ONLINE_MATCH_SETTINGS : MENU_CODE_ONLINE_VIEW_SETTINGS);
     }
     //(the title follows who can join: a local game's options aren't online ones)
     miScene->SetTitle(joining ? "Online" : m_page == Page::Team ? (editing ? "Edit Together" : "Team and Character Selection") : "Lobby Options");
@@ -397,6 +402,10 @@ void UI_OnlineLobbyMenu::Sync()
         status = "Connecting to the host...";
     if (status.empty() && phase == Phase::Starting)
         status = "Starting the match...";
+    if (status.empty() && lobby->matchBeingPlayed() && !host && local >= 0) {
+        status = rollback::NetGame::instance().joiningMatch() ? "Joining the match..." : "A match is being played: pick your character, then Join the match";
+        tone = Tone::Good;
+    }
     if (status.empty() && inLobby && local >= 0 && editing) {
         //(editing together: no teams or ready to wait for)
         const bool on = lobby->goal() == 1;
@@ -448,6 +457,8 @@ void UI_OnlineLobbyMenu::Sync()
         //(the team box: its keys are in the buttons row, the line says who may change the settings)
         if (m_currentFocus == miTeam)
             hint.clear();
+        else if (m_currentFocus == miContinueButton && !host && lobby->matchBeingPlayed())
+            hint = "Take over a CPU player now (or watch, if there's none)";
         else if (m_currentFocus == miContinueButton && editing)
             hint = host ? "Opens the editor; everyone here is asked in" : "Into the host's editor";
         else if (m_currentFocus == miContinueButton && host && inLobby && !canStart)

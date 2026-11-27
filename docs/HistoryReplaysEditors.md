@@ -300,4 +300,7 @@ The others may Save As a copy of their own.
 - `--at-role edux`: the map editor's screens with a controller (a ? block, the zones page,
   F1, the tileset screen's B, move mode's tools, the exit prompt); `--at-role edmouse`: the
   map editor with the mouse; `--at-role mouse`: the menus with the mouse; `--at-role
-  menutour`: a screenshot of every menu
+  menutour`: a screenshot of every menu; `--at-role mouseaudit`: on each menu screen, every control the keys
+  get to must be one the mouse gets to too (it has a box on the screen, nothing else on top of it;
+  `mouseaudit:` lines for any that aren't), and clicks on the lists and grids (the lobby's teams,
+  the map thumbnails, the filters, the item sliders) must do what A does (`mouseclick:` lines)

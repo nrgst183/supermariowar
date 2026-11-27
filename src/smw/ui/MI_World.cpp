@@ -15,6 +15,8 @@
 #include <cmath>
 #include <format>
 #include <string>
+#include <algorithm>
+#include <cstdlib>
 
 MI_World::MI_World()
     : UI_Control(0, 0)
@@ -500,9 +502,46 @@ void MI_World::Draw()
 
 //TODO:: need a way for AI to use world items like keys
 //Also, there is a problem if you put a key into a stage but someone exits before it is collected
+UI_Control::Box MI_World::FocusBox() const
+{
+    return {0, 0, 640, 480};
+}
+
+bool MI_World::PointerHoverInside(short, short)
+{
+    return true;
+}
+
+bool MI_World::PointerClickInside(short x, short y, MenuCodeEnum& code)
+{
+    code = MENU_CODE_NONE;
+    const Vec2s at = g_worldmap.GetPlayerPosition();
+    const int dx = x - (at.x + iMapOffsetX + 16), dy = y - (at.y + iMapOffsetY + 16);
+    if (std::abs(dx) < 20 && std::abs(dy) < 20)
+        m_mouseKey = 5;
+    else if (std::abs(dx) > std::abs(dy))
+        m_mouseKey = dx < 0 ? 3 : 4;
+    else
+        m_mouseKey = dy < 0 ? 1 : 2;
+    return true;
+}
+
 MenuCodeEnum MI_World::SendInput(CPlayerInput * playerInput)
 {
     ensureSurfaces();
+    //(a click: its key, pressed by the controlling team's players here)
+    if (m_mouseKey != 0) {
+        for (short iPlayer = 0; iPlayer < 4; iPlayer++) {
+            if (game_values.playercontrol[iPlayer] != 1 || LookupTeamID(iPlayer) != iControllingTeam)
+                continue;
+            COutputControl& keys = game_values.playerInput.outputControls[iPlayer];
+            CKeyState& key = m_mouseKey == 1 ? keys.menu_up : m_mouseKey == 2 ? keys.menu_down : m_mouseKey == 3 ? keys.menu_left
+                           : m_mouseKey == 4 ? keys.menu_right : keys.menu_select;
+            key.fPressed = true;
+            break;
+        }
+        m_mouseKey = 0;
+    }
     //Don't allow any input while vehicles are moving
     if (g_worldmap.IsVehicleMoving())
         return MENU_CODE_NONE;

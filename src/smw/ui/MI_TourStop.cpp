@@ -65,6 +65,11 @@ MI_TourStop::MI_TourStop(short x, short y, bool fWorld)
     miTourStopMenuHeaderText = std::make_unique<MI_HeaderText>("Tour Stop", 320, 5);
 }
 
+UI_Control::Box MI_TourStop::FocusBox() const
+{
+    return miStartButton ? miStartButton->FocusBox() : Box {};
+}
+
 MenuCodeEnum MI_TourStop::Modify(bool fModify)
 {
     return miStartButton->Modify(fModify);

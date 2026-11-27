@@ -117,6 +117,8 @@ void GameplayState::advanceTick(const InputFrame& input)
 
 int GameplayState::runAheadFrames() const
 {
+    if (rollback::NetGame::instance().spectating())
+        return 0;    //(watching: nothing of ours to show sooner)
     const int setting = cmd::g_autotest.enabled ? cmd::g_autotest.runahead : game_values.runahead;
     return runAheadSetting(setting, rollback::NetGame::instance().inputDelay());
 }
@@ -134,8 +136,14 @@ void GameplayState::leaveRunAhead()
 
 void GameplayState::runAhead(const InputFrame& input)
 {
-    const int frames = runAheadFrames();
-    if (frames <= 0 || aheadShown || game_values.appstate != AppState::Game || game_values.flags.pausegame ||
+    //(online, the host's pause: ahead as far as the frame everyone stops at, so the picture just stops;
+    //offline, paused, not at all)
+    int frames = runAheadFrames();
+    const int hold = rollback::NetGame::instance().holdFrame();
+    if (hold >= 0)
+        frames = std::min(frames, hold - g_sim.tick);
+    const bool pausedHere = game_values.flags.pausegame && !rollback::NetGame::instance().inMatch();
+    if (frames <= 0 || aheadShown || game_values.appstate != AppState::Game || pausedHere ||
         game_values.flags.exitinggame || replay::playing())
         return;
     if (!aheadReal)
@@ -198,7 +206,9 @@ void GameplayState::applyTickInput(const InputFrame& input)
 
         //CPU players play by input too (CpuDriver.h); one that thinks inside the simulation (it took
         //over a human, or an old replay) keeps the keys its AI holds down
-        if (game_values.playercontrol[iPlayer] == 1 && !(g_sim.cpuTakeover & (1u << iPlayer)))
+        //(a CPU player taken over by someone who joined the match: a human's buttons)
+        const bool human = (game_values.playercontrol[iPlayer] == 1 || (g_sim.humanTakeover & (1u << iPlayer))) && !(g_sim.cpuTakeover & (1u << iPlayer));
+        if (human)
             applyInputByte(input.players[iPlayer], g_sim.previousInput[iPlayer], keys);
         else if (cpudriver::playsByInput(iPlayer))
             applyCpuInputByte(input.players[iPlayer], g_sim.previousInput[iPlayer], keys);
@@ -214,6 +224,19 @@ void GameplayState::resetTickInput()
         g_sim.previousInput[iPlayer] = 0;
     }
     g_sim.cpuTakeover = 0;
+    g_sim.humanTakeover = 0;
+}
+
+void GameplayState::handOverToHumans(uint8_t slotMask)
+{
+    for (short iPlayer = 0; iPlayer < 4; iPlayer++) {
+        const uint8_t bit = static_cast<uint8_t>(1u << iPlayer);
+        //(only a CPU player still playing by its input; its keys let go, the human presses their own)
+        if (!(slotMask & bit) || (g_sim.humanTakeover & bit) || (g_sim.cpuTakeover & bit) || game_values.playercontrol[iPlayer] != 2)
+            continue;
+        g_sim.humanTakeover |= bit;
+        g_sim.playerKeys[iPlayer] = COutputControl {};
+    }
 }
 
 void GameplayState::takeOverByCpu(uint8_t slotMask)
@@ -224,6 +247,7 @@ void GameplayState::takeOverByCpu(uint8_t slotMask)
         if (!(slotMask & bit) || (g_sim.cpuTakeover & bit) || game_values.playercontrol[iPlayer] == 0)
             continue;
         g_sim.cpuTakeover |= bit;
+        g_sim.humanTakeover &= static_cast<uint8_t>(~bit);    //(a joiner who left: the CPU again)
         //Let go of the keys the human held; the AI presses its own
         g_sim.playerKeys[iPlayer] = COutputControl {};
 

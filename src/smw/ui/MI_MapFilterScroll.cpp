@@ -62,18 +62,8 @@ MenuCodeEnum MI_MapFilterScroll::SendInput(CPlayerInput* playerInput)
             return MENU_CODE_NONE;
         }
 
-        if (playerInput->outputControls[iPlayer].menu_select.fPressed) {
-            //If the left column is selected, then turn that filter on/off
-            if (iSelectedColumn == 0) {
-                items[iIndex]->fSelected = !items[iIndex]->fSelected;
-                game_values.pfFilters[iIndex] = !game_values.pfFilters[iIndex];
-            } else { //otherwise if the right is selected, go into the details of that filter
-                game_values.selectedmapfilter = iIndex;
-                return MENU_CODE_TO_MAP_FILTER_EDIT;
-            }
-
-            return MENU_CODE_NONE;
-        }
+        if (playerInput->outputControls[iPlayer].menu_select.fPressed)
+            return activate();
 
         if (playerInput->outputControls[iPlayer].menu_cancel.fPressed) {
             return MENU_CODE_MAP_FILTER_EXIT;
@@ -122,6 +112,63 @@ void MI_MapFilterScroll::Draw()
         rm->menu_font_large.drawChopRight(m_pos.x + 52, m_pos.y + 5 + iLine * 32 + 32, iWidth - 104, items[iOffset + iLine]->sName.c_str());
         rm->spr_map_filter_icons.draw(m_pos.x + 28, m_pos.y + 32 + iLine * 32 + 8, {items[iOffset + iLine]->iIcon % 10 * 16, items[iOffset + iLine]->iIcon / 10 * 16, 16, 16});
     }
+}
+
+MenuCodeEnum MI_MapFilterScroll::activate()
+{
+    if (items.empty())
+        return MENU_CODE_NONE;
+    //The left column: that filter on/off; the right: into the details of that filter
+    if (iSelectedColumn == 0) {
+        items[iIndex]->fSelected = !items[iIndex]->fSelected;
+        game_values.pfFilters[iIndex] = !game_values.pfFilters[iIndex];
+        return MENU_CODE_NONE;
+    }
+    game_values.selectedmapfilter = iIndex;
+    return MENU_CODE_TO_MAP_FILTER_EDIT;
+}
+
+UI_Control::Box MI_MapFilterScroll::FocusBox() const
+{
+    return {m_pos.x, m_pos.y, iWidth, static_cast<short>(iNumLines * 32 + 48)};
+}
+
+bool MI_MapFilterScroll::pointAt(short x, short y)
+{
+    if (x < m_pos.x + 16 || x >= m_pos.x + iWidth - 16 || y < m_pos.y + 32)
+        return false;
+    const int line = (y - m_pos.y - 32) / 32;
+    const int index = iOffset + line;
+    if (line >= iNumLines || index >= static_cast<int>(items.size()))
+        return false;
+    for (int guard = 0; guard < 64 && static_cast<int>(iIndex) < index; guard++)
+        MoveNext();
+    for (int guard = 0; guard < 64 && static_cast<int>(iIndex) > index; guard++)
+        MovePrev();
+    iSelectedColumn = index >= NUM_AUTO_FILTERS && x >= m_pos.x + iWidth - 48 ? 1 : 0;
+    return true;
+}
+
+bool MI_MapFilterScroll::PointerHoverInside(short x, short y)
+{
+    pointAt(x, y);
+    return true;
+}
+
+bool MI_MapFilterScroll::PointerClickInside(short x, short y, MenuCodeEnum& code)
+{
+    code = pointAt(x, y) ? activate() : MENU_CODE_NONE;
+    return true;
+}
+
+bool MI_MapFilterScroll::PointerWheelInside(int dir, MenuCodeEnum& code)
+{
+    code = MENU_CODE_NONE;
+    if (dir > 0)
+        MoveNext();
+    else
+        MovePrev();
+    return true;
 }
 
 bool MI_MapFilterScroll::MoveNext()

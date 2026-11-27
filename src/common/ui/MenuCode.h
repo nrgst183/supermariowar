@@ -109,6 +109,7 @@ enum MenuCodeEnum {
     MENU_CODE_ONLINE_LEAVE,             // asks for confirmation
     MENU_CODE_ONLINE_LEAVE_YES,
     MENU_CODE_ONLINE_LEAVE_NO,
+    MENU_CODE_ONLINE_JOIN_MATCH,        // a joiner joins the match being played (NetGame::joinMatchInProgress)
     MENU_CODE_ONLINE_VIEW_SETTINGS,     // a joiner opens the host's match settings (read-only, or live when everyone may change them)
     MENU_CODE_ONLINE_OPTIONS,           // the lobby's options page (players, CPUs, delay, who changes the settings, kick)
     MENU_CODE_ONLINE_OPTIONS_BACK,

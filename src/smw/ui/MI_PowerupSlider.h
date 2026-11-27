@@ -21,6 +21,7 @@ public:
     }
 
 protected:
+    void trackRange(int& x0, int& x1) const override;
     void PlaceArrows();    // its own arrows: in it, not where a slider puts them
     gfxSprite* m_sprPowerup = nullptr;
     short m_powerupIndex = 0;

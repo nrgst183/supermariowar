@@ -62,7 +62,7 @@
 namespace rollback::net {
 
 constexpr uint32_t PROTOCOL_MAGIC = 0x52574d53; // "SMWR"
-constexpr uint16_t PROTOCOL_VERSION = 6;    // 4: CPU players play by the host's input; 5: the time sync advantage in 1/64 frames; 6: smaller input packets
+constexpr uint16_t PROTOCOL_VERSION = 7;    // 4: CPU players play by the host's input; 5: the time sync advantage in 1/64 frames; 6: smaller input packets; 7: the host's pause
 
 constexpr int MAX_PEERS = 4;
 
@@ -106,6 +106,14 @@ enum class MsgType : uint8_t {
     // In this range so that the lobby hands them to NetGame, in any phase
     EditStart = 88,    // host -> joiner: u8 editor (0 map, 1 world): the session is on, join it
     EditData = 89,     // either way: a co-edit message (CoEdit.cpp), reliable or not
+    // Joining a match in progress (NetGame, RollbackSession's JOINING); in this range too
+    LateJoin = 90,     // joiner -> host: let me into the match being played
+    LateConfig = 91,   // host -> joiner: u8 match id, u16 + config bytes (none: not now, then str why)
+    LateAck = 92,      // joiner -> host: u8 match id, u8 ok, str why not
+    LateTicks = 93,    // host -> joiner: u8 match id, u32 first tick, u16 count, count x (4 input bytes, u8 takeover mask)
+    JumpIn = 94,       // joiner -> host: u8 match id, u32 the frame it caught up to (S), u16 its round trip (ms)
+    JumpInReply = 95,  // host -> joiner: u8 match id, i8 slot (-1: none free, it watches), u32 J, u32 S,
+                       // u8 handovers + (u8 slot, u8 peer, u32 J, u32 S) each
 
     SkinInfo = 100,
     SkinRequest = 101,
@@ -119,7 +127,7 @@ enum class MsgType : uint8_t {
 // The series messages are the range [SeriesBegin, SERIES_MSG_END)
 constexpr uint8_t SERIES_MSG_END = 96;
 
-constexpr size_t INPUT_HEADER_SIZE = 19;
+constexpr size_t INPUT_HEADER_SIZE = 22;
 constexpr uint8_t INPUT_RUNS = 0x80;    // in the frame count: the inputs are run-length coded
 constexpr int MAX_INPUT_FRAMES_PER_PACKET = 120;
 

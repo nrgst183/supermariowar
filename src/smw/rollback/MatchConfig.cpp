@@ -344,8 +344,9 @@ void loadMatchSkin(int slot, short color)
 {
     const NetLobby* lobby = NetGame::instance().lobby();
     std::string path = slot >= 0 && slot < INPUT_MAX_PLAYERS ? g_skinOverride[static_cast<size_t>(slot)] : std::string();
+    //(in a match, its own players': the lobby's places change as players join it)
     if (path.empty() && lobby)
-        path = lobby->slotSkinPath(slot);
+        path = NetGame::instance().inMatch() ? NetGame::instance().matchSkinPath(slot) : lobby->slotSkinPath(slot);
     //(a computer player: its random skin)
     if (path.empty()) {
         const short skin = cpuSkin(slot);

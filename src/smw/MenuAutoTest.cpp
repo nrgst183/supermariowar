@@ -1,5 +1,7 @@
 #include "GSMenu.h"
 
+#include <typeinfo>
+
 #include "rollback/NetGame.h"
 
 #include "CmdArgs.h"
@@ -362,6 +364,9 @@ MenuCodeEnum MenuState::AutoTestMenuUpdate()
         if (!net.isHost()) {
             if (net.lobby()->phase() == rollback::NetLobby::Phase::Lobby && !net.lobby()->peer(net.localPeer()).ready)
                 net.lobby()->setReady(true);
+            //(--at-late-join: a match being played: join it)
+            if (at.lateJoin && net.lobby()->matchBeingPlayed() && !net.joiningMatch() && !net.inMatch())
+                net.joinMatchInProgress();
             return MENU_CODE_NONE;
         }
         if (g_autoTestMatchesDone >= at.matches || !net.lastMatchError().empty() || sawSeries) {
@@ -1961,6 +1966,157 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
         if (f == 15) {
             phaseT = 0;
             row++;
+        }
+        return MENU_CODE_NONE;
+    }
+
+    //--at-role mouseaudit: on each menu screen, every control the keys can get to: whether the mouse can
+    //too (it has a box on the screen, and nothing else is on top of the middle of it); "mouseaudit:"
+    //lines for those it can't, and a screenshot of each screen
+    if (at.shotsRole == "mouseaudit" && step == 1) {
+        struct Screen {
+            const char* name;
+            std::vector<MenuCodeEnum> codes;
+            int modeMenu = -1;
+        };
+        static const std::vector<Screen> SCREENS = {
+            {"main", {MENU_CODE_TO_MAIN_MENU}},
+            {"options", {MENU_CODE_TO_OPTIONS_MENU}},
+            {"gameplay", {MENU_CODE_TO_GAMEPLAY_OPTIONS_MENU}},
+            {"team", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_TEAM_OPTIONS_MENU}},
+            {"itemsel", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_POWERUP_SELECTION_MENU}},
+            {"itemset", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_POWERUP_SETTINGS_MENU}},
+            {"weapons", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_PROJECTILES_OPTIONS_MENU}},
+            {"weaplim", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_PROJECTILES_LIMITS_MENU}},
+            {"graphics", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_GRAPHICS_OPTIONS_MENU}},
+            {"eyecandy", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_EYECANDY_OPTIONS_MENU}},
+            {"sound", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_SOUND_OPTIONS_MENU}},
+            {"online", {MENU_CODE_TO_OPTIONS_MENU, MENU_CODE_TO_ONLINE_OPTIONS_MENU}},
+            {"controls", {MENU_CODE_TO_MAIN_MENU, MENU_CODE_TO_CONTROLS_MENU}},
+            {"history", {MENU_CODE_TO_MAIN_MENU, MENU_CODE_TO_HISTORY_MENU}},
+            {"editors", {MENU_CODE_TO_MAIN_MENU, MENU_CODE_TO_EDITORS_MENU}},
+            {"join", {MENU_CODE_TO_MAIN_MENU, MENU_CODE_TO_SYSTEM_LINK_MENU}},
+            {"lobby", {MENU_CODE_TO_MAIN_MENU, MENU_CODE_TO_LOCAL_LOBBY}},
+            {"lobbyopts", {MENU_CODE_ONLINE_OPTIONS}},
+            {"matchtype", {MENU_CODE_ONLINE_OPTIONS_BACK, MENU_CODE_ONLINE_MATCH_SETTINGS}},
+            {"settings", {MENU_CODE_MATCH_SELECTION_START}},
+            {"modesettings", {MENU_CODE_TO_MODE_SETTINGS_MENU}},
+            {"thumbnails", {MENU_CODE_BACK_TO_GAME_SETUP_MENU_FROM_MODE_SETTINGS, MENU_CODE_TO_MAP_BROWSER_THUMBNAILS}},
+            {"filters", {MENU_CODE_MAP_BROWSER_EXIT, MENU_CODE_TO_MAP_FILTERS}},
+            {"filteredit", {MENU_CODE_TO_MAP_FILTER_EDIT}},
+            {"teamselect", {MENU_CODE_TO_MAIN_MENU, MENU_CODE_TO_TEAM_SELECT_MENU}},
+            {"mode00", {}, 0}, {"mode01", {}, 1}, {"mode02", {}, 2}, {"mode03", {}, 3}, {"mode04", {}, 4},
+            {"mode05", {}, 5}, {"mode06", {}, 6}, {"mode07", {}, 7}, {"mode08", {}, 8}, {"mode09", {}, 9},
+            {"mode10", {}, 10}, {"mode11", {}, 11}, {"mode12", {}, 12}, {"mode13", {}, 13}, {"mode14", {}, 14},
+            {"mode15", {}, 15}, {"mode16", {}, 16}, {"mode17", {}, 17}, {"mode18", {}, 18}, {"mode19", {}, 19},
+            {"mode20", {}, 20}, {"mode21", {}, 21}, {"mode22", {}, 22}, {"bosses", {}, GAMEMODE_LAST},
+        };
+        static size_t screen = 0;
+        static int st = 0;
+        if (screen >= SCREENS.size()) {
+            step = 1000;
+            t = 0;
+            return MENU_CODE_NONE;
+        }
+        const Screen& sc = SCREENS[screen];
+        ++st;
+        const int k = (st - 1) / 14;
+        if (sc.modeMenu >= 0 && st == 1) {
+            mCurrentMenu = sc.modeMenu < GAMEMODE_LAST ? mModeOptionsMenu->GetOptionsMenu(static_cast<short>(sc.modeMenu)) : mModeOptionsMenu->GetBossOptionsMenu();
+            mCurrentMenu->ResetMenu();
+        } else if (sc.modeMenu < 0 && (st - 1) % 14 == 0 && k < static_cast<int>(sc.codes.size())) {
+            return sc.codes[static_cast<size_t>(k)];
+        }
+        const int ready = sc.modeMenu >= 0 ? 14 : static_cast<int>(sc.codes.size()) * 14 + 14;
+        if (st == ready) {
+            shot((std::string("ma_") + sc.name).c_str());
+            UI_Menu* menu = mCurrentMenu;
+            const auto& controls = menu->Controls();
+            //(the controls the keys get to: the focused one, and every one some other one leads to)
+            std::vector<const UI_Control*> reachable;
+            if (menu->currentFocus())
+                reachable.push_back(menu->currentFocus());
+            for (const auto& c : controls)
+                for (int d = 0; d < 4; d++)
+                    if (const UI_Control* n = c->neighbor(static_cast<MenuNavDirection>(d)))
+                        reachable.push_back(n);
+            int bad = 0, total = 0;
+            for (size_t i = 0; i < controls.size(); i++) {
+                const UI_Control* c = controls[i].get();
+                if (!c->IsVisible() || c->IsDisabled() || std::find(reachable.begin(), reachable.end(), c) == reachable.end())
+                    continue;
+                //(behind a popup that has the focus: out of the mouse's reach on purpose)
+                const UI_Control::Box cb = c->FocusBox();
+                const short mx = static_cast<short>(cb.x + cb.w / 2), my = static_cast<short>(cb.y + cb.h / 2);
+                const UI_Control* target = cb.w > 0 ? menu->PointerTarget(mx, my) : nullptr;
+                if (cb.w > 0 && c != menu->currentFocus() && ((!target && menu->ControlUnder(mx, my) == c) || target == menu->currentFocus()))
+                    continue;
+                total++;
+                const UI_Control::Box b = c->FocusBox();
+                std::string problem;
+                if (b.w <= 0) {
+                    problem = "no box";
+                } else {
+                    const UI_Control* top = menu->PointerTarget(static_cast<short>(b.x + b.w / 2), static_cast<short>(b.y + b.h / 2));
+                    if (top != c)
+                        problem = std::string("covered by ") + (top ? typeid(*top).name() : "nothing");
+                }
+                if (!problem.empty()) {
+                    bad++;
+                    printf("mouseaudit: %s #%zu %s (box %d %d %d %d): %s\n", sc.name, i, typeid(*c).name(), b.x, b.y, b.w, b.h, problem.c_str());
+                }
+            }
+            printf("mouseaudit: %s: %d of %d controls the mouse can't get to\n", sc.name, bad, total);
+            //(clicks that should do what A does, on the screens with lists and grids of their own)
+            const std::string nm = sc.name;
+            if (nm == "lobby" && rollback::NetGame::instance().lobby()) {
+                const rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+                int mine = -1;
+                for (int s = 0; s < 4; s++)
+                    if (lobby->slot(s).kind == rollback::SlotKind::Human && lobby->slot(s).peer == lobby->localPeer() && lobby->slot(s).localIndex == 0)
+                        mine = s;
+                const int before = mine >= 0 ? lobby->slot(mine).team : -1;
+                const int target = (before + 2) & 3;
+                menu->PointerMove(static_cast<short>(112 + 25 + target * 96 + 40), 150);
+                menu->PointerClick(static_cast<short>(112 + 25 + target * 96 + 40), 150, false);
+                printf("mouseclick: lobby: clicked team %d's column, my player's team %d -> %d\n", target + 1, before + 1,
+                    mine >= 0 ? lobby->slot(mine).team + 1 : 0);
+            } else if (nm == "thumbnails") {
+                const std::string before = maplist->currentShortmapname();
+                menu->PointerMove(240 + 80, 42 + 134 + 60);
+                const MenuCodeEnum code = menu->PointerClick(240 + 80, 42 + 134 + 60, false);
+                printf("mouseclick: thumbnails: clicked the middle map: code %d (exit %d), map %s -> %s\n", code, MENU_CODE_MAP_BROWSER_EXIT,
+                    before.c_str(), maplist->currentShortmapname().c_str());
+            } else if (nm == "filters") {
+                const bool before = game_values.pfFilters[1];
+                menu->PointerMove(320, 72 + 32 + 32 + 16);
+                menu->PointerClick(320, 72 + 32 + 32 + 16, false);
+                printf("mouseclick: filters: clicked the second filter: on %d -> %d\n", before ? 1 : 0, game_values.pfFilters[1] ? 1 : 0);
+                menu->PointerClick(320, 72 + 32 + 32 + 16, false);    //(back as it was)
+            } else if (nm == "itemsel" || nm == "mode15") {
+                //(the first slider, clicked: its next value; the weights change)
+                const bool frenzy = nm == "mode15";
+                auto weights = [&]() {
+                    std::vector<int> w;
+                    for (int k = 0; k < (frenzy ? NUMFRENZYCARDS : NUM_POWERUPS); k++)
+                        w.push_back(frenzy ? game_values.gamemodemenusettings.frenzy.powerupweight[k] : game_values.powerupweights[k]);
+                    return w;
+                };
+                const std::vector<int> before = weights();
+                const short sy = frenzy ? 184 : 144;
+                menu->PointerMove(150, sy);
+                menu->PointerClick(150, sy, false);
+                const std::vector<int> middle = weights();
+                if (middle == before)
+                    menu->PointerClick(240, sy, false);    //(the value there was the one it had: the far end)
+                const std::vector<int> after = weights();
+                int changed = 0;
+                for (size_t k = 0; k < before.size(); k++)
+                    changed += before[k] != after[k];
+                printf("mouseclick: %s: clicked the first slider: %d weight(s) changed\n", nm.c_str(), changed);
+            }
+            screen++;
+            st = 0;
         }
         return MENU_CODE_NONE;
     }

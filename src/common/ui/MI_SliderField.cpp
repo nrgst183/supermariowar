@@ -5,6 +5,7 @@
 #include "ResourceManager.h"
 #include "ui/MI_Image.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace {
@@ -48,6 +49,40 @@ void MI_SliderField::Update()
         m_knob = target;
     else
         m_knob += (target - m_knob) * 0.4f;    //(a few frames: it slides)
+}
+
+void MI_SliderField::trackRange(int& x0, int& x1) const
+{
+    x0 = m_pos.x + m_indent + 26;
+    x1 = m_pos.x + m_indent2 - 14;
+}
+
+// A click on the track (or a little past its ends): the value nearest it
+bool MI_SliderField::setFromTrack(short x, short y, MenuCodeEnum& code)
+{
+    int x0 = 0, x1 = 0;
+    trackRange(x0, x1);
+    if (fDisable || m_items.size() < 2 || x1 <= x0 || y < m_pos.y || y >= m_pos.y + 32 || x < x0 - 14 || x > x1 + 14)
+        return false;
+    const float at = std::clamp(static_cast<float>(x - x0) / static_cast<float>(x1 - x0), 0.0f, 1.0f);
+    const size_t index = static_cast<size_t>(std::lround(at * static_cast<float>(m_items.size() - 1)));
+    code = MENU_CODE_NONE;
+    if (index != m_index && setCurrentIndex(index))
+        code = mcItemChangedCode;
+    return true;
+}
+
+bool MI_SliderField::PointerPress(short x, short y, MenuCodeEnum& code)
+{
+    return setFromTrack(x, y, code);
+}
+
+MenuCodeEnum MI_SliderField::MouseClick(short x, short y)
+{
+    MenuCodeEnum code = MENU_CODE_NONE;
+    if (setFromTrack(x, y, code))
+        return code == MENU_CODE_NONE ? MENU_CODE_CLICKED : code;
+    return MI_SelectField<short>::MouseClick(x, y);
 }
 
 void MI_SliderField::drawTrack(int x0, int x1, int y) const

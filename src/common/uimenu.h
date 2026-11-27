@@ -31,6 +31,15 @@ public:
     UI_Control* initialFocus() const { return m_initialFocus; }
     /// The currently focused element of the menu.
     UI_Control* currentFocus() const { return m_currentFocus; }
+    // Its controls (the mouse audit's, --at-role mouseaudit)
+    const std::vector<std::unique_ptr<UI_Control>>& Controls() const { return controls; }
+    UI_Control* ControlUnder(short x, short y) const { return ControlAt(x, y); }
+    void FocusControl(UI_Control* control) { Focus(control); }
+    // The control under the pointer the mouse may go to: one linked (by the keys' up/down/left/right,
+    // either way) with the focused one; not one under a popup that has the focus (null: none)
+    UI_Control* PointerTarget(short x, short y) const;    // (a control with a menu inside moves its focus: the mouse wheel)
+    // The focused control with parts of its own (UI_Control::PointerHoverInside...): the mouse to them
+    MenuCodeEnum PointerInside(short x, short y, int what, int dir = 0);
 
     void SetCancelCode(MenuCodeEnum code) {
         cancelCode = code;

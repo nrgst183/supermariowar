@@ -6,6 +6,7 @@
 #include "ui/MI_Image.h"
 #ifndef IS_WORLDEDIT
 #include "ui/MI_MenuPanel.h"
+#include <algorithm>
 #endif
 
 
@@ -176,6 +177,56 @@ MenuCodeEnum MI_FrenzyModeOptions::SendInput(CPlayerInput * playerInput)
     }
 
     return ret;
+}
+
+UI_Control::Box MI_FrenzyModeOptions::FocusBox() const
+{
+    return {0, 40, 640, 400};
+}
+
+void MI_FrenzyModeOptions::syncToFocus()
+{
+    const UI_Control* focus = mMenu->currentFocus();
+    int index = focus == miQuantityField ? 0 : focus == miRateField ? 1 : focus == miStoredShellsField ? 2 : -1;
+    for (short i = 0; i < NUMFRENZYCARDS && index < 0; i++)
+        if (focus == miPowerupSlider[i])
+            index = (i >> 1) + 3;
+    if (index < 0)
+        return;
+    iIndex = static_cast<short>(index);
+    iOffset = static_cast<short>(std::clamp(index - iTopStop, 0, iBottomStop - iTopStop));
+    SetupPowerupFields();
+    AdjustDisplayArrows();
+}
+
+bool MI_FrenzyModeOptions::PointerHoverInside(short x, short y)
+{
+    mMenu->PointerMove(x, y);
+    syncToFocus();
+    return true;
+}
+
+bool MI_FrenzyModeOptions::PointerClickInside(short x, short y, MenuCodeEnum& code)
+{
+    code = mMenu->PointerClick(x, y, false);
+    if (code == MENU_CODE_CANCEL_INPUT) {
+        fModifying = false;
+        code = MENU_CODE_UNSELECT_ITEM;
+    }
+    syncToFocus();
+    return true;
+}
+
+bool MI_FrenzyModeOptions::PointerWheelInside(int dir, MenuCodeEnum& code)
+{
+    code = MENU_CODE_NONE;
+    iOffset = static_cast<short>(std::clamp(iOffset + dir, 0, iBottomStop - iTopStop));
+    SetupPowerupFields();
+    AdjustDisplayArrows();
+    if (mMenu->currentFocus() && !mMenu->currentFocus()->IsVisible() && !mMenu->IsModifying())
+        mMenu->FocusControl(miPowerupSlider[iOffset * 2]);
+    syncToFocus();
+    return true;
 }
 
 void MI_FrenzyModeOptions::Update()

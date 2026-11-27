@@ -194,6 +194,9 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--at-resim") at.resim = atoi(val.c_str()) != 0;
             else if (arg == "--at-runahead") at.runahead = atoi(val.c_str());
             else if (arg == "--at-lagtest") at.lagtest = atoi(val.c_str());
+            else if (arg == "--at-pause") at.pauseAt = atoi(val.c_str());
+            else if (arg == "--at-late-join") at.lateJoin = atoi(val.c_str()) != 0;
+            else if (arg == "--at-pause-for") at.pauseFor = atoi(val.c_str());
             else if (arg == "--at-online-panel") at.onlinePanel = atoi(val.c_str()) != 0;
             else if (arg == "--at-realtime") at.realtime = atoi(val.c_str());
             else if (arg == "--at-humans") at.humans = atoi(val.c_str());

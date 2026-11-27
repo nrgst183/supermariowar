@@ -15,6 +15,7 @@
 #include <SDL3_image/SDL_image.h>
 
 #include <string>
+#include <algorithm>
 
 namespace {
 // The grid's rows: between the title bar and the footer, as on the other menus
@@ -211,17 +212,8 @@ MenuCodeEnum MI_MapBrowser::SendInput(CPlayerInput * playerInput)
             return MENU_CODE_NONE;
         }
 
-        if (playerInput->outputControls[iPlayer].menu_select.fPressed) {
-            if (iType == 0) {
-                mapListNodes[iSelectedRow * 3 + iSelectedCol]->pfFilters[game_values.selectedmapfilter] = !mapListNodes[iSelectedRow * 3 + iSelectedCol]->pfFilters[game_values.selectedmapfilter];
-                game_values.fNeedWriteFilters = true;
-            } else {
-                maplist->SetCurrent(mapListItr[iSelectedRow * 3 + iSelectedCol]);
-                return MENU_CODE_MAP_BROWSER_EXIT;
-            }
-
-            return MENU_CODE_NONE;
-        }
+        if (playerInput->outputControls[iPlayer].menu_select.fPressed)
+            return activate();
 
         if (playerInput->outputControls[iPlayer].menu_cancel.fPressed) {
             return MENU_CODE_MAP_BROWSER_EXIT;
@@ -229,6 +221,76 @@ MenuCodeEnum MI_MapBrowser::SendInput(CPlayerInput * playerInput)
     }
 
     return MENU_CODE_NONE;
+}
+
+MenuCodeEnum MI_MapBrowser::activate()
+{
+    if (iMapCount <= 0)
+        return MENU_CODE_NONE;
+    if (iType == 0) {
+        mapListNodes[iSelectedRow * 3 + iSelectedCol]->pfFilters[game_values.selectedmapfilter] = !mapListNodes[iSelectedRow * 3 + iSelectedCol]->pfFilters[game_values.selectedmapfilter];
+        game_values.fNeedWriteFilters = true;
+        return MENU_CODE_NONE;
+    }
+    maplist->SetCurrent(mapListItr[iSelectedRow * 3 + iSelectedCol]);
+    return MENU_CODE_MAP_BROWSER_EXIT;
+}
+
+UI_Control::Box MI_MapBrowser::FocusBox() const
+{
+    return {0, static_cast<short>(TOP - 16), 640, static_cast<short>(ROW_H * 3 + 16)};
+}
+
+int MI_MapBrowser::cellAt(short x, short y) const
+{
+    for (int row = 0; row < 3; row++) {
+        for (int col = 0; col < 3; col++) {
+            const int cx = col * 200 + 40, cy = row * ROW_H + TOP;
+            if (x >= cx && x < cx + 160 && y >= cy && y < cy + 134 && iPage * 9 + row * 3 + col < iMapCount)
+                return row * 3 + col;
+        }
+    }
+    return -1;
+}
+
+void MI_MapBrowser::choose(int index)
+{
+    if (iMapCount <= 0)
+        return;
+    index = std::clamp(index, 0, iMapCount - 1);
+    iSelectedIndex = static_cast<short>(index);
+    iSelectedRow = static_cast<short>((index / 3) % 3);
+    iSelectedCol = static_cast<short>(index % 3);
+    const short page = static_cast<short>(index / 9);
+    if (page != iPage) {
+        iPage = page;
+        LoadPage(iPage, iType == 1);
+    }
+}
+
+bool MI_MapBrowser::PointerHoverInside(short x, short y)
+{
+    const int cell = cellAt(x, y);
+    if (cell >= 0)
+        choose(iPage * 9 + cell);
+    return true;
+}
+
+bool MI_MapBrowser::PointerClickInside(short x, short y, MenuCodeEnum& code)
+{
+    const int cell = cellAt(x, y);
+    if (cell < 0)
+        return true;
+    choose(iPage * 9 + cell);
+    code = activate();
+    return true;
+}
+
+bool MI_MapBrowser::PointerWheelInside(int dir, MenuCodeEnum& code)
+{
+    code = MENU_CODE_NONE;
+    choose(iSelectedIndex + dir * 9);
+    return true;
 }
 
 void MI_MapBrowser::Reset(short type)

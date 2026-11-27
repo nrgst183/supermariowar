@@ -52,7 +52,7 @@ void reset()
 bool playsByInput(int slot)
 {
     return slot >= 0 && slot < INPUT_MAX_PLAYERS && game_values.playercontrol[slot] == 2 && replay::cpuInputs() &&
-           !(g_sim.cpuTakeover & (1u << slot));
+           !(g_sim.cpuTakeover & (1u << slot)) && !(g_sim.humanTakeover & (1u << slot));
 }
 
 uint8_t next(int slot)

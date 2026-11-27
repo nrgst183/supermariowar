@@ -46,6 +46,8 @@ class GameplayState : public GameState
         // that many ticks sooner. The next frame goes back to the real state first.
         int runAheadFrames() const;
         void runAhead(const InputFrame& input);
+        // Online: CPU slots (bit s) that players who joined the match play from this tick on
+        void handOverToHumans(uint8_t slotMask);
         void leaveRunAhead();
         void runRealTick(const InputFrame& input);
 
