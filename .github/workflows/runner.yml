@@ -23,11 +23,6 @@ jobs:
     name: Linux
     uses: ./.github/workflows/build_linux.yml
 
-  build-macos:
-    if: *should-run
-    name: macOS
-    uses: ./.github/workflows/build_macos.yml
-
   build-windows:
     if: *should-run
     name: Windows
@@ -37,11 +32,6 @@ jobs:
     if: *should-run
     name: Web
     uses: ./.github/workflows/build_emcc.yml
-
-  build-android:
-    if: *should-run
-    name: Android
-    uses: ./.github/workflows/build_android.yml
 
   build-xbox:
     if: *should-run
@@ -60,7 +50,7 @@ jobs:
   #  - every push to the default branch refreshes the `continuous` pre-release
   publish:
     name: Publish release
-    needs: [build-linux, build-macos, build-windows, build-emcc, build-xbox, checks]
+    needs: [build-linux, build-windows, build-emcc, build-xbox, checks]
     if: >
       (github.event_name == 'push' && (
         startsWith(github.ref, 'refs/tags/v') ||

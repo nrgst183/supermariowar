@@ -2,7 +2,7 @@
 
 # Super Mario War
 
-![Linux status][build-linux-img] ![Windows status][build-windows-img] ![macOS status][build-macos-img] [![Discord][discord-img]][discord-link]
+![Linux status][build-linux-img] ![Windows status][build-windows-img] [![Discord][discord-img]][discord-link]
 
 Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch game in which players try to beat one another in a variety of gameplay modes. You can play on teams, design your own levels, design your own worlds, and much more!
 
@@ -251,7 +251,7 @@ Alternatively, you can pass these options directly to CMake as `-DFLAGNAME=VALUE
 
 ### Releases
 
-Every push is built for Linux, macOS, Windows (MinGW and MSVC) and the web by GitHub Actions.
+Every push is built for Linux, Windows (MinGW and MSVC), the web and the original Xbox by GitHub Actions.
 
 - To tag a release from GitHub: **Actions**, **Tag release**, **Run workflow**, and enter the version (e.g. `v2.1.0`). It tags the latest commit of the default branch (or the branch or commit you give) and starts the build that publishes the release.
 - Pushing a version tag yourself, e.g. `git tag v2.1.0 && git push origin v2.1.0`, also publishes a GitHub release with the packages of every platform and generated release notes. Tags with a suffix, such as `v2.1.0-beta.1`, are published as pre-releases.
@@ -264,6 +264,5 @@ Please see documentation in the docs/ directory.
 
 [build-linux-img]: https://github.com/mmatyas/supermariowar/actions/workflows/build_linux.yml/badge.svg?branch=master
 [build-windows-img]: https://github.com/mmatyas/supermariowar/actions/workflows/build_windows.yml/badge.svg?branch=master
-[build-macos-img]: https://github.com/mmatyas/supermariowar/actions/workflows/build_macos.yml/badge.svg?branch=master
 [discord-img]: https://img.shields.io/badge/Discord-7389D8?logo=discord&logoColor=white
 [discord-link]: https://discord.gg/SC4uXQB
