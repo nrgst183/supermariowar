@@ -6,8 +6,9 @@
 #include "ui/MI_Image.h"
 #ifndef IS_WORLDEDIT
 #include "ui/MI_MenuPanel.h"
-#include <algorithm>
 #endif
+
+#include <algorithm>
 
 
 /**************************************
