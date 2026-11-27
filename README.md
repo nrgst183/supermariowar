@@ -10,7 +10,7 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 
 - [What's new in this fork](#whats-new-in-this-fork)
   - [Online multiplayer](#online-multiplayer)
-  - [Map Maker and world editor in the game](#map-maker-and-world-editor-in-the-game)
+  - [Integrated Map Editor](#integrated-map-editor)
   - [Theater: replays of every match](#theater-replays-of-every-match)
   - [Improvements](#improvements)
 - [History](#history)
@@ -45,14 +45,12 @@ Super Mario War is a fan-made multiplayer Super Mario Bros. style deathmatch gam
 
 See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 
-### Map Maker and world editor in the game
+### Integrated Map Editor
 
 ![The Map Maker: the map being played by four players while it's built, a row of ? blocks just placed, the builder's glove resting on one with its name over it, a fire bar spinning, and the toolbar with the part in hand, the recent parts, the tools and the layers; the palette's Hazards group with a fire bar's length being changed; the controls sheet with every control for the controller, keyboard and mouse; and the world editor with its modes menu open](docs/gfx/fork/map_maker.png)
 
-- **The Map Maker** (**Main menu, Editors, Maps**): build a map *while it's being played*. Start it on this computer or online, set up players and CPUs in the usual lobby, pick a map (or a blank one) and go. Everyone with the right to build gets a glove cursor; the others, CPUs included, keep playing on the map as it changes.
-  - **L + Up** (Tab) switches between building and playing.
-  - Works with a controller or a mouse and keyboard; F1 shows the controls.
-  - Has everything the old level editor had.
+- **Build a map while it's being played** (**Main menu, Editors, Maps**): pick a map or a blank one, and everyone with the right to build gets a glove cursor while the others, CPUs included, keep playing. It has everything the old level editor had.
+- **L + Up** (Tab) switches between building and playing; it works with a controller or a mouse and keyboard, and F1 shows the controls.
 - **The world editor** (**Main menu, Editors, Worlds**), with a mouse and keyboard or a controller.
 - **Edit together**: one player hosts a Map Maker game or a world in a lobby, the others find it in Join a Game, online or on one computer; anyone can join in while it's going.
 

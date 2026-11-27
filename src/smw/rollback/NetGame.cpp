@@ -657,7 +657,16 @@ void NetGame::restoreAfterReconnect(uint32_t nowMs)
     Reconnect& rc = m_reconnect;
     NetLobby* lobby = m_lobby.get();
     if (!lobby || lobby->phase() == NetLobby::Phase::Closed) {
-        //(closed again: try again from the start, as long as there is time)
+        //(closed on purpose meanwhile: the host ended it, or removed us, or we left: no getting back in)
+        using Cause = NetLobby::CloseCause;
+        const Cause cause = lobby ? lobby->closeCause() : Cause::None;
+        if (cause == Cause::Ended || cause == Cause::Kicked || cause == Cause::Left) {
+            printf("netplay: the lobby we got back into was closed (%s): not trying again\n",
+                cause == Cause::Ended ? "by its host" : cause == Cause::Kicked ? "removed" : "left");
+            m_reconnect = Reconnect();
+            return;
+        }
+        //(lost again: try again from the start, as long as there is time)
         rc.backMs = 0;
         rc.settingsDone = rc.slotsDone = false;
         rc.nextTryMs = nowMs + 1000;
