@@ -116,7 +116,7 @@ void GameplayState::drawScoreboard(short iScoreTextOffset[4])
                         if (player->ownerPlayerID > -1)
                             rm->spr_ownedtags.draw(iScoreOffsetX - 8, iScoreOffsetY - 8, {player->ownerColorOffsetX, 0, 48, 48});
 
-                        //(the Map Maker: a builder's portrait framed in its color, the character and a glove by turns)
+                        //(the Map Maker: a builder's portrait is its cursor's glove)
                         const bool builder = matchedit::building(globalID);
                         if (!builder || !matchedit::drawBuilderPortrait(globalID, iScoreOffsetX, iScoreOffsetY))
                             player->GetScoreboardSprite()->at(iScoreboardSprite).draw(iScoreOffsetX, iScoreOffsetY, {player->iSrcOffsetX, 0, 32, 32});

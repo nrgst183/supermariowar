@@ -85,6 +85,10 @@ struct Ink {
     SDL_Color color;
 };
 void art(int x, int y, const std::vector<const char*>& rows, const std::vector<Ink>& inks, int scale = 2);
+// The editors' cursor (Mario Paint's): a white glove pointing up and left, 13 x 15, its cuff in a
+// player's color; the fingertip at (2, 0). `bent`: the finger bent down (a button held)
+const std::vector<const char*>& gloveArt(bool bent = false);
+std::vector<Ink> gloveInks(SDL_Color cuff);
 // Small capitals and digits (3x5 pixels, times `scale`); returns the width
 int tinyText(int x, int y, const std::string& s, SDL_Color c, int scale = 2);
 int tinyWidth(const std::string& s, int scale = 2);

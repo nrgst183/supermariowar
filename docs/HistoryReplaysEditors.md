@@ -141,7 +141,10 @@ toolbar.
 **The toolbar** along the bottom (the top while your cursor is down there) shows the part in
 hand, the **recent parts** (the last 8 you used, from the palette or copied off the map; click
 one, or press its number, to use it: a few things without opening the palette), the five tools
-and the four layers (the ones in use lit; click to change). Under it, the bar shows only the main
+(the one in use lit; click to change) and the layer, a button with its name ("Layer 3"; click
+it for the next). While you hold tiles, the map shows the layer you're on: the rest a little
+darker, your layer bright, and the layers in front of it as faint ghosts over it (three on layer 1,
+none on layer 4). Under it, the bar shows only the main
 buttons and "all controls" (F1, or Start for the pause menu's Controls). A short message over the
 toolbar says what just happened (Undo, Redo, Copied Brick, Picked up Fire bar, Tool: Fill,
 Layer 3, Map cleared). The first time anyone builds on a computer, three hints come up one after

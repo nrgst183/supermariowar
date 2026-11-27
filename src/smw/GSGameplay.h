@@ -219,8 +219,8 @@ bool isHostHere();        // the host's player is at this machine's controls
 // The host's panel (the pause screen, the online panel): a player's right, Save
 void hostPanelInput(bool left, bool right, bool down, bool select);
 bool sheetCoversScreen();
-// The scoreboard's portrait of a builder (x, y: its 32 by 32): a frame in its color; then by turns the
-// character (false: the caller draws it) and a glove (drawn: true)
+// The scoreboard's portrait of a builder (x, y: its 32 by 32): its cursor's glove, in place of the
+// character (true: drawn)
 bool drawBuilderPortrait(int slot, int x, int y);    // the controls sheet up, or shut since the last frame: the whole screen drawn again
 void setPanelRow(int row);    // 0 the rights, 1 Save, 2 Clear map, -1 none (the online panel's other row)
 void drawPauseRights(int y, bool withSave);

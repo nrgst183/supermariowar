@@ -181,7 +181,7 @@ bool s_helpToggle = false;         // F1 pressed
 std::string s_toast;               // a short message over the toolbar ("Undo", "Copied Brick"...), a moment
 Uint64 s_toastAt = 0;
 bool s_carrying[SLOTS] {};         // a builder's picked-up part, not put down yet (its cursor: a dashed frame)
-constexpr int TOOLBAR_H = 42;      // the toolbar: the part in hand, the recent ones, the tools, the layers
+constexpr int TOOLBAR_H = 44;      // the toolbar: the part in hand, the recent ones, the tools, the layer
 int s_scriptByte[SLOTS] {-1, -1, -1, -1};    // --at-role matchedit: the bytes it plays
 TilesetTile s_shown[MAPWIDTH][MAPHEIGHT][MAPLAYERS];    // the map the layer pictures show
 bool s_shownValid = false;
@@ -2631,30 +2631,102 @@ const gfxSprite& editorPicture(const char* file)
     return picture;
 }
 
-// The tools' pictures (pixel art, 16 by 16 at twice the size): a pencil, a rectangle, a paint bucket,
-// copy (two pages), paste (a clipboard)
-void drawToolIcon(int tool, int x, int y, int scale = 2)
+// A tool's small badge (by a builder's cursor, 16 by 16; `scale` 2: 32 by 32): pixel art as SMB3's sprites
+// are drawn (black outlines, flat colors, white shaded in its sky blue): a pencil, a rectangle, a paint
+// bucket, copy (two pages), paste (a clipboard)
+void drawToolBadge(int tool, int x, int y, int scale = 1)
 {
     static const std::vector<const char*> ART[TOOLS] = {
-        {"...........##...", "..........#yy#..", ".........#yyy#..", "........#yyy#...", ".......#yyy#....", "......#yyy#.....",
-            ".....#yyy#......", "....#yyy#.......", "...#yyy#........", "..#ppy#.........", "..#pp#..........", ".#ww#...........",
-            ".#k#............", "##..............", "................", "................"},
-        {"................", "................", ".##############.", ".#wwwwwwwwwwww#.", ".#w##########w#.", ".#w#........#w#.",
-            ".#w#........#w#.", ".#w#........#w#.", ".#w#........#w#.", ".#w#........#w#.", ".#w#........#w#.", ".#w##########w#.",
-            ".#wwwwwwwwwwww#.", ".##############.", "................", "................"},
-        {"......##........", ".....#ww#.......", "....#w##w#......", "...#w#..#w#.....", "..#w#....#w#....", ".#wwwwwwwwww#...",
-            ".#bbbbbbbbbb#.b.", ".#bbbbbbbbbb#bb.", ".#wwwwwwwwww#bb.", ".#wwwwwwwwww#.b.", "..#wwwwwwww#..b.", "...#wwwwww#.....",
-            "....######......", "................", "................", "................"},
-        {"................", ".#########......", ".#wwwwwww#......", ".#w#####w#......", ".#wwwwwww#####..", ".#w#####w#www#..",
-            ".#wwwwwww####w#.", ".#w#####w#www#..", ".#wwwwwww#####..", ".#########www#..", "....#wwwwwwww#..", "....#w######w#..",
-            "....#wwwwwwww#..", "....##########..", "................", "................"},
-        {"................", ".....######.....", "..###kkkkkk###..", "..#yy######yy#..", "..#yyyyyyyyyy#..", "..#yywwwwwwyy#..",
-            "..#yyw####wyy#..", "..#yywwwwwwyy#..", "..#yyw####wyy#..", "..#yywwwwwwyy#..", "..#yyw####wyy#..", "..#yywwwwwwyy#..",
-            "..#yyyyyyyyyy#..", "..############..", "................", "................"},
+        {"............KKK.", "...........KRRRK", "..........KWRRRK", ".........KSWRRK.", "........KYSSSK..", ".......KYYOSK...",
+            "......KYYOOK....", ".....KYYOOK.....", "....KYYOOK......", "...KTYOOK.......", "...KTTOK........", "..KTTTTK........",
+            "..KKTTK.........", ".KKKKK..........", ".KK.............", "................"},
+        {"................", ".KKKKKKKKKKKKKK.", ".KWWWWWWWWWWWWK.", ".KWWKKKKKKKKSSK.", ".KWWK......KSSK.", ".KWWK......KSSK.",
+            ".KWWK......KSSK.", ".KWWK......KSSK.", ".KWWK......KSSK.", ".KWWK......KSSK.", ".KWWK......KSSK.", ".KWWKKKKKKKKSSK.",
+            ".KWSSSSSSSSSSSK.", ".KKKKKKKKKKKKKK.", "................", "................"},
+        {"................", "....KKKKKK......", "...KS....SK.....", "..KS......SK....", ".KKKKKKKKKKKK...", ".KUUUWUUUUUUK...",
+            ".KUUUUUUUUUUKK..", ".KWWWWWWWWWSKUK.", "..KWWWWWWWSKKUK.", "..KWWWWWWWSK.KUK", "..KWWWWWWWSK.KUK", "...KWWWWWSK..KK.",
+            "...KKKKKKKK.....", "................", "................", "................"},
+        {"KKKKKKKKK.......", "KWWWWWWSK.......", "KWUUUUUSK.......", "KWWWWWWSK.......", "KWUUUKKKKKKKKKK.", "KWWWWKWWWWWWWSK.",
+            "KWUUUKWUUUUUUSK.", "KWWWWKWWWWWWWSK.", "KWUUUKWUUUUUUSK.", "KWWWWKWWWWWWWSK.", "KSSSSKWUUUUUSSK.", "KKKKKKWWWWWWWSK.",
+            ".....KWUUUUUUSK.", ".....KWWWWWWWSK.", ".....KSSSSSSSSK.", ".....KKKKKKKKKK."},
+        {"......KKKK......", "....KKWWWWKK....", ".KKKSWWWWWWSKKK.", ".KYOKKKKKKKKOBK.", ".KYOWWWWWWWSOBK.", ".KYOWUUUUUWSOBK.",
+            ".KYOWWWWWWWSOBK.", ".KYOWUUUUUWSOBK.", ".KYOWWWWWWWSOBK.", ".KYOWUUUWWWSOBK.", ".KYOWWWWWWWSOBK.", ".KYOSSSSSSSSOBK.",
+            ".KYOOOOOOOOOOBK.", ".KBBBBBBBBBBBBK.", "..KKKKKKKKKKKK..", "................"},
     };
-    static const std::vector<prompts::Ink> INKS = {{'#', {0, 0, 0, 255}}, {'w', {248, 248, 248, 255}}, {'y', {248, 200, 40, 255}},
-        {'p', {232, 120, 152, 255}}, {'k', {120, 120, 136, 255}}, {'b', {72, 152, 208, 255}}};
-    prompts::art(x, y, ART[tool % TOOLS], INKS, scale);
+    //(SMB3's colors)
+    static const std::vector<prompts::Ink> INKS = {{'K', {0, 0, 0, 255}}, {'W', {252, 252, 252, 255}}, {'S', {164, 228, 252, 255}},
+        {'U', {0, 120, 248, 255}}, {'Y', {248, 184, 0, 255}}, {'O', {216, 96, 0, 255}}, {'T', {252, 224, 168, 255}},
+        {'R', {216, 40, 0, 255}}, {'B', {136, 64, 0, 255}}};
+    prompts::art(x, y, ART[tool % TOOLS], INKS, std::max(1, scale));
+}
+
+// A tool's picture (32 by 32: the toolbar's, the palette's tools page), made of the game's own sprites: the
+// blocks (their small sizes), the builders' glove, a white arrow; the pencil drawn as the blocks are. The
+// pencil; the rectangle: a box of bricks in a drag's corners; the fill: a patch of bricks the
+// glove touched once; copy: two ? blocks; paste: a ? block put down
+void drawToolIcon(int tool, int x, int y, SDL_Color cuff = {200, 200, 216, 255})
+{
+    const SDL_Color black {0, 0, 0, 255}, white {252, 252, 252, 255};
+    auto question = [&](int bx, int by) { rm->spr_blocks[1].draw(bx, by, {16, 0, 16, 16}); };
+    auto small = [&](int bx, int by) { rm->spr_blocks[2].draw(bx, by, {0, 0, 8, 8}); };
+    auto glove = [&](int gx, int gy) { prompts::art(gx, gy, prompts::gloveArt(), prompts::gloveInks(cuff), 1); };
+    //(a corner of a drag's frame: white, 2 wide, its black edge)
+    auto corner = [&](int cx, int cy, int dx, int dy) {
+        prompts::fill(cx - (dx < 0 ? 6 : 0), cy, 7, 2, white);
+        prompts::fill(cx, cy - (dy < 0 ? 6 : 0), 2, 7, white);
+    };
+    switch (tool % TOOLS) {
+    case 0: {
+        //(the pencil: drawn as the blocks are, in their doubled pixels: black outline, their yellows for its
+        //body, a white shine)
+        static const std::vector<const char*> PENCIL = {"................", "............KKK.", "..........KPPPRK", ".........KPPRRK.", "........KWWSGK..", ".......KWSSGK...", "......KYYMDK....", ".....KYWMDK.....", "....KYYMDK......", "...KYYMDK.......", "..KYYMDK........", ".KTTTUK.........", "KTUK............", "KK..............", "................", "................"};
+        static const std::vector<prompts::Ink> INKS = {{'K', {0, 0, 0, 255}}, {'Y', {247, 212, 0, 255}}, {'M', {203, 151, 0, 255}},
+            {'D', {151, 109, 0, 255}}, {'W', {247, 247, 247, 255}}, {'S', {200, 200, 200, 255}}, {'G', {136, 136, 136, 255}},
+            {'P', {248, 160, 176, 255}}, {'R', {208, 72, 104, 255}}, {'T', {248, 216, 160, 255}}, {'U', {200, 144, 88, 255}}};
+        prompts::art(x, y, PENCIL, INKS, 2);
+        break;
+    }
+    case 1:
+        //(the rectangle: three by three small bricks, a drag's four corners round them)
+        for (int r = 0; r < 3; r++)
+            for (int c = 0; c < 3; c++)
+                small(x + 4 + c * 8, y + 4 + r * 8);
+        corner(x + 1, y + 1, 1, 1);
+        corner(x + 29, y + 1, -1, 1);
+        corner(x + 1, y + 29, 1, -1);
+        corner(x + 29, y + 29, -1, -1);
+        break;
+    case 2: {
+        //(the fill: a round patch of small bricks, the glove pressing in its middle)
+        static const char* const PATCH[4] = {".XX.", "XXXX", "XXXX", ".XX."};
+        for (int r = 0; r < 4; r++)
+            for (int c = 0; c < 4; c++)
+                if (PATCH[r][c] == 'X')
+                    small(x + c * 8, y + r * 8);
+        glove(x + 12, y + 12);
+        break;
+    }
+    case 3:
+        //(copy: a ? block, and the same again)
+        question(x + 2, y + 2);
+        prompts::fill(x + 12, y + 12, 18, 18, black);
+        question(x + 14, y + 14);
+        break;
+    case 4:
+        //(paste: a white arrow down, a ? block where it points)
+        prompts::fill(x + 12, y + 1, 8, 10, black);
+        prompts::fill(x + 6, y + 9, 20, 4, black);
+        prompts::fill(x + 8, y + 13, 16, 2, black);
+        prompts::fill(x + 10, y + 15, 12, 2, black);
+        prompts::fill(x + 12, y + 17, 8, 2, black);
+        prompts::fill(x + 14, y + 2, 4, 9, white);
+        prompts::fill(x + 8, y + 10, 16, 2, white);
+        prompts::fill(x + 10, y + 12, 12, 2, white);
+        prompts::fill(x + 12, y + 14, 8, 2, white);
+        prompts::fill(x + 14, y + 16, 4, 2, white);
+        question(x + 8, y + 16);
+        break;
+    }
 }
 
 const gfxSprite& hazardsPicture()
@@ -2878,35 +2950,15 @@ void drawGlove(int slot, SDL_Rect cell, SDL_Point tip, SDL_Color color, const st
         prompts::fill(fx - 2, static_cast<int>(ty) + 5, 4, 1, theme::shade(color, 45));
     }
 
-    static const std::vector<const char*> GLOVE = {
-        "..##.........",
-        ".#ww#........",
-        ".#ww#........",
-        ".#ww#........",
-        ".#ww####.....",
-        ".#ww#ww####..",
-        "##ww#ww#ww##.",
-        "#w#wwwwwwwgw#",
-        "#ww#wwwwwwww#",
-        "#wwwwwwwwwgw#",
-        ".#wwwwwwwgw#.",
-        "..#wwwwwgg#..",
-        "..#ccccccc#..",
-        "..#CCCCCCC#..",
-        "...#######...",
-    };
-    const std::vector<prompts::Ink> inks = {{'#', {0, 0, 0, 255}}, {'w', {255, 255, 255, 255}}, {'g', {184, 184, 200, 255}}, {'c', color},
-        {'C', theme::shade(color, 70)}};
+    const std::vector<prompts::Ink> inks = prompts::gloveInks(color);
     //(popping in: a size bigger for a moment)
     const bool popping = now - g.appearMs < 90;
     const int scale = popping ? 3 : 2;
     if (g.dip > 0.5f) {
         //(the finger bent: its tip drawn shorter)
-        std::vector<const char*> bent = {"..##.........", ".#ww#........"};
-        bent.insert(bent.end(), GLOVE.begin() + 4, GLOVE.end());
-        prompts::art(fx - 5 * scale / 2, fy - scale / 2 + 4, bent, inks, scale);
+        prompts::art(fx - 5 * scale / 2, fy - scale / 2 + 4, prompts::gloveArt(true), inks, scale);
     } else {
-        prompts::art(fx - 5 * scale / 2, fy - scale / 2, GLOVE, inks, scale);
+        prompts::art(fx - 5 * scale / 2, fy - scale / 2, prompts::gloveArt(), inks, scale);
     }
 
     //Sparks: a press's, eight out from the fingertip (white and the color, shrinking); popping in, a ring
@@ -3288,7 +3340,7 @@ void drawStrip(int slot, const MapMakerBuilder& b)
             const int x = i * TILESIZE, y = rows;
             const SDL_Color ink {248, 248, 248, 255};
             (void)ink;
-            drawToolIcon(i, x, y);
+            drawToolIcon(i, x, y, slotColor(slot));
             paletteHit(slot, x, y, TILESIZE, TILESIZE, i, 0);
             if (i == b.tool)
                 prompts::fill(x + 14, y + 28, 4, 3, SDL_Color {248, 200, 40, 255});
@@ -3413,79 +3465,162 @@ short brushPieceIndex(const MapMakerBuilder& b)
             : static_cast<short>(b.block | (b.blockOn ? 0 : 64) | (b.blockHidden && hideable(b.block) ? 128 : 0)));
 }
 
-// The brush card: a builder's brush (its picture, its name), its layer and tool, by the bar (the side
-// away from its hand); then its recent brushes, small squares on (LB+Left/Right, Q/E, the wheel)
+// The layer button (LAYER_W by 32): the layer in use, "Layer 3" (a click: the next)
+constexpr int LAYER_W = 72;
+void drawLayerButton(int layer, int x, int y)
+{
+    const std::string name = "Layer " + std::to_string(layer + 1);
+    rm->menu_font_small.drawCentered(x + LAYER_W / 2, y + 8, name.c_str());
+}
+
+// The layer view, while a builder has tiles in hand: the map a little darker, the layer in use drawn
+// over it bright, the layers in front of it over that as faint ghosts (on layer 1 three of them, on 4
+// none): which layer it is shows on the map itself. (Its pictures kept between frames: drawn again when
+// the map or the layer changes)
+bool s_layerViewDirty = true;
+void drawLayerView(int layer)
+{
+    static SDL_Surface* veil = nullptr;
+    static SDL_Surface* front = nullptr;
+    static int frontOf = -1;
+    const int w = MAPWIDTH * TILESIZE, h = MAPHEIGHT * TILESIZE;
+    if (!veil) {
+        veil = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
+        front = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
+        if (!veil || !front)
+            return;
+        SDL_FillSurfaceRect(veil, nullptr, SDL_MapSurfaceRGBA(veil, 0, 0, 0, 255));
+        SDL_SetSurfaceBlendMode(veil, SDL_BLENDMODE_BLEND);
+        SDL_SetSurfaceAlphaMod(veil, 110);
+        SDL_SetSurfaceBlendMode(front, SDL_BLENDMODE_BLEND);
+        SDL_SetSurfaceAlphaMod(front, 90);
+    }
+    auto tiles = [](SDL_Surface* target, int l) {
+        for (short x = 0; x < MAPWIDTH; x++) {
+            for (short y = 0; y < MAPHEIGHT; y++) {
+                const TilesetTile& tile = *g_map->tileAt(x, y, static_cast<short>(l));
+                if (tile.iID >= 0)
+                    g_tilesetmanager->Draw(target, tile.iID, DrawSize::Ingame, tile.iCol, tile.iRow, x, y);
+            }
+        }
+    };
+    if (s_layerViewDirty || frontOf != layer) {
+        SDL_FillSurfaceRect(front, nullptr, SDL_MapSurfaceRGBA(front, 0, 0, 0, 0));
+        for (int l = layer + 1; l < MAPLAYERS; l++)
+            tiles(front, l);
+        frontOf = layer;
+        s_layerViewDirty = false;
+    }
+    SDL_BlitSurface(veil, nullptr, blitdest, nullptr);
+    tiles(blitdest, layer);
+    if (layer < MAPLAYERS - 1)
+        SDL_BlitSurface(front, nullptr, blitdest, nullptr);
+}
+
+// The toolbar: a builder's brush (its picture, its name; a tile's layer under it), its recent brushes
+// (LB+Left/Right, Q/E, the wheel, the number keys), its tools and its layer. SMB3's status bar (as the
+// help line under it), every square one of its item cards, the one in use framed in the player's color.
+// The layer: a button, the layer in words; a click, the next (the map shows which: drawLayerView) The mouse: a click picks one, the pointer
+// over a tool or a layer says what it is
+bool s_toolbarTip = false;    // a toolbar tooltip drawn this frame (the short message waits: they'd overlap)
+
 void drawBrushCard(int slot, const MapMakerBuilder& b, int barY, bool barAtTop)
 {
-    const SDL_Color black {0, 0, 0, 255}, panel {16, 24, 48, 255}, well {8, 12, 28, 255}, dim {110, 120, 150, 255};
+    s_toolbarTip = false;
+    static const char* const TOOL_NAMES[TOOLS] = {"Pencil", "Rectangle", "Fill", "Copy", "Paste"};
+    const SDL_Color black {0, 0, 0, 255}, white {252, 252, 252, 255}, sunk {0, 48, 104, 255};
+    const SDL_Color color = slotColor(slot);
     const int h = TOOLBAR_H, y = barAtTop ? barY + 24 : barY - h;
     const bool mouseOne = slot == mouseSlot();
-    prompts::fill(0, y, App::screenWidth, h, black);
-    prompts::fill(0, y + 1, App::screenWidth, h - 2, panel);
-    prompts::fill(2, y + 3, 4, h - 6, slotColor(slot));
+    theme::statusBar(0, y, App::screenWidth, h);
+    prompts::fill(4, y + 6, 4, h - 12, color);
     if (mouseOne)
         s_toolbarRect = {0, y, App::screenWidth, h};
 
-    //The part in hand: its picture and name (cut short to fit)
-    drawBrushPiece(b.brush, b.tile, brushPieceIndex(b), 10, y + 5);
-    std::string name = brushName(b);
-    if (rm->menu_font_small.getWidth(name.c_str()) > 116) {
-        while (!name.empty() && rm->menu_font_small.getWidth((name + "...").c_str()) > 116)
-            name.pop_back();
-        name += "...";
-    }
-    rm->menu_font_small.draw(46, y + 14, name.c_str());
+    //A square of the bar, as SMB3's item cards: black in a white line (its corners cut); the one in use
+    //in the player's color, a thicker line (`dim`: in use, but not for this brush); `empty`: sunk
+    auto square = [&](int x, int w, bool on, bool dim, bool empty) {
+        const int top = y + 4, sh = h - 8;
+        const SDL_Color line = on ? (dim ? theme::shade(color, 60) : color) : empty ? sunk : white;
+        prompts::fill(x + 1, top, w - 2, sh, black);
+        prompts::fill(x, top + 1, w, sh - 2, black);
+        prompts::fill(x + 2, top + 1, w - 4, sh - 2, line);
+        prompts::fill(x + 1, top + 2, w - 2, sh - 4, line);
+        const int in = on ? 3 : 2;
+        prompts::fill(x + in, top + in, w - 2 * in, sh - 2 * in, black);
+    };
+
+    //The part in hand: its picture and name (cut short to fit); a tile's layer under it
+    constexpr int NAME_W = 86;
+    auto cut = [](std::string text) {
+        if (rm->menu_font_small.getWidth(text.c_str()) <= NAME_W)
+            return text;
+        while (!text.empty() && rm->menu_font_small.getWidth((text + "...").c_str()) > NAME_W)
+            text.pop_back();
+        return text + "...";
+    };
+    drawBrushPiece(b.brush, b.tile, brushPieceIndex(b), 11, y + 6);
+    const bool tiles = b.brush == BrushTile;
+    rm->menu_font_small.draw(46, y + 14, cut(brushName(b)).c_str());
 
     //The recent parts: the others, in the order the next goes (numbered for the keys 2..8)
     const int shown = std::min<int>(b.recentCount, MAP_MAKER_RECENT);
     if (mouseOne)
-        s_recentShown = shown;
+        s_recentShown = std::min(shown, MAP_MAKER_RECENT - 1);
     const bool numbers = s_mouse.active || prompts::lastDevice() == prompts::Device::Keyboard;
-    const int cell = 34, rx = 168;
-    for (int k = 1; k < MAP_MAKER_RECENT; k++) {
-        const int cx = rx + (k - 1) * cell, cy = y + 4;
-        prompts::fill(cx, cy, cell - 2, cell, black);
-        prompts::fill(cx + 1, cy + 1, cell - 4, cell - 2, k < shown ? panel : well);
+    constexpr int RECENT_SHOWN = MAP_MAKER_RECENT - 1;    //(the bar's room: six; the keys 2..7, the wheel past them)
+    const int cell = 38, rx = 136;
+    for (int k = 1; k < RECENT_SHOWN; k++) {
+        const int cx = rx + (k - 1) * cell;
+        square(cx, cell - 2, false, false, k >= shown);
         if (k >= shown)
             continue;
         MapMakerBuilder r = b;
         applyRecent(r, b.recent[k]);
-        drawBrushPiece(r.brush, r.tile, brushPieceIndex(r), cx, cy + 1);
+        drawBrushPiece(r.brush, r.tile, brushPieceIndex(r), cx + 2, y + 6);
         if (mouseOne)
-            s_recentRect[k] = {cx, cy, cell - 2, cell};
+            s_recentRect[k] = {cx, y + 4, cell - 2, h - 8};
         if (numbers) {
-            prompts::fill(cx + 1, cy + 1, 8, 9, black);
-            prompts::tinyText(cx + 2, cy + 2, std::to_string(k + 1), SDL_Color {248, 248, 248, 255}, 1);
+            const std::string key = std::to_string(k + 1);
+            prompts::fill(cx + 2, y + 6, 10, 13, black);
+            rm->menu_font_small.draw(cx + 3, y + 5, key.c_str());
         }
     }
 
-    //The tools: the one in use lit in the player's color
-    const int tx = 412;
-    prompts::tinyText(tx, y + 4, "TOOL", dim, 1);
+    //The tools: their pictures at a tile's size, the one in use lit
+    const int tx = rx + (RECENT_SHOWN - 1) * cell + 3, tw = cell;
     for (int t = 0; t < TOOLS; t++) {
-        const int ix = tx + t * 20;
-        if (t == b.tool % TOOLS)
-            prompts::fill(ix - 2, y + 12, 20, 20, slotColor(slot));
-        drawToolIcon(t, ix, y + 14, 1);
+        const int ix = tx + t * tw;
+        square(ix, tw - 2, t == b.tool % TOOLS, false, false);
+        drawToolIcon(t, ix + 2, y + 6, color);
         if (mouseOne)
-            s_toolRect[t] = {ix - 2, y + 12, 20, 20};
+            s_toolRect[t] = {ix, y + 4, tw - 2, h - 8};
     }
 
-    //The layers: 1, 2 behind the players, 3, 4 in front; the one in use lit (dim: the brush isn't tiles)
-    const int lx = 520;
-    const bool tiles = b.brush == BrushTile;
-    prompts::tinyText(lx, y + 4, "LAYER", dim, 1);
-    for (int l = 0; l < MAPLAYERS; l++) {
-        const int bx = lx + l * 24 + (l >= 2 ? 10 : 0);
-        const bool on = l == b.layer;
-        prompts::fill(bx, y + 12, 20, 20, black);
-        prompts::fill(bx + 1, y + 13, 18, 18, on ? (tiles ? slotColor(slot) : theme::shade(slotColor(slot), 50)) : well);
-        prompts::tinyText(bx + 8, y + 18, std::to_string(l + 1), on ? SDL_Color {248, 248, 248, 255} : dim, 1);
-        if (mouseOne)
-            s_layerRect[l] = {bx, y + 12, 20, 20};
+    //The layer: a button with its name (dimmer: the brush isn't tiles); a click goes to the next (as the
+    //layer key)
+    const int lx = tx + TOOLS * tw + 3;
+    square(lx, LAYER_W + 4, true, !tiles, false);
+    drawLayerButton(b.layer, lx + 2, y + 6);
+    for (int l = 0; l < MAPLAYERS; l++)
+        s_layerRect[l] = {};
+    if (mouseOne)
+        s_layerRect[(b.layer + 1) % MAPLAYERS] = {lx, y + 4, LAYER_W + 4, h - 8};
+
+    //(the mouse over a tool or a layer: what it is, over it; the bar at the top: under it)
+    if (mouseOne && s_mouse.active) {
+        const SDL_Point at {s_mouse.x, s_mouse.y};
+        auto tip = [&](const SDL_Rect& r, const std::string& text) {
+            if (!inRect(at, r))
+                return;
+            theme::tooltip(r.x + r.w / 2, barAtTop ? y + h + 32 : y - 2, text);
+            s_toolbarTip = true;
+        };
+        for (int t = 0; t < TOOLS; t++)
+            tip(s_toolRect[t], TOOL_NAMES[t]);
+        for (int l = 0; l < MAPLAYERS; l++)
+            tip(s_layerRect[l], "Next: layer " + std::to_string(l + 1));
     }
-    prompts::tinyText(lx + 4, y + 34, "BACK", dim, 1);
-    prompts::tinyText(lx + 56, y + 34, "FRONT", dim, 1);
 }
 
 std::string s_savedPath;    // the last save's file
@@ -4283,7 +4418,7 @@ void simulate(const InputFrame& input)
                     } else if (b.tool != toolBefore) {
                         toast(slot, std::string("Tool: ") + TOOL_SHORT[b.tool % TOOLS]);
                     } else if (b.layer != layerBefore) {
-                        toast(slot, "Layer " + std::to_string(b.layer + 1) + (b.layer >= 2 ? ": in front of the players" : ": behind the players"));
+                        toast(slot, "Layer " + std::to_string(b.layer + 1));
                     }
                     if (s_carrying[slot] && command != CMD_GRAB && ((changed && (mouseButtons(byte) & B_PAINT)) || newBrush || b.palette))
                         s_carrying[slot] = false;
@@ -4378,6 +4513,8 @@ void syncVisuals()
             }
         }
     }
+    if (whole || changed)
+        s_layerViewDirty = true;
     if (whole || newBackground) {
         for (int x = 0; x < MAPWIDTH; x++)
             for (int y = 0; y < MAPHEIGHT; y++)
@@ -4506,35 +4643,15 @@ void pauseMenuDo(int row, bool left, bool right, bool select)
 }
 } // namespace
 
-// A builder's scoreboard portrait: framed in its color (not the players' plain card), and by turns its
-// character and a glove as big (its cursor's), a quick flip between them. Only drawn: true while it's
-// the glove's turn (the caller draws the character otherwise)
+// A builder's scoreboard portrait: its cursor's glove (the same one, its cuff in the player's color), in
+// the 32 by 32 the character would have, in place of it
 bool drawBuilderPortrait(int slot, int x, int y)
 {
-    static const std::vector<const char*> GLOVE = {"..##............", ".#ww#...........", ".#www#..........", "..#www#.........",
-        "...#www###......", "....#wwwww##....", "...##wwwwwww#...", "..#ww#wwwwwww#..", "..#wwwwwwwwww#..", "...#wwwwwwwww#..",
-        "....#wwwwwwww#..", ".....#wwwwww#...", "......#cccc#....", "......#cccc#....", ".......####.....", "................"};
-    const SDL_Color color = slotColor(slot), black {0, 0, 0, 255};
-    //(the frame: black, the color, a lighter line inside)
-    prompts::fill(x - 3, y - 3, 38, 38, black);
-    prompts::fill(x - 2, y - 2, 36, 36, color);
-    prompts::fill(x - 1, y - 1, 34, 34, theme::shade(color, 150));
-    prompts::fill(x, y, 32, 32, theme::shade(color, 45));
-    //(the turns: 1.4 s round, a flip (narrowing to a line, widening again) at each change)
-    constexpr Uint64 TURN = 700, FLIP = 120;
-    const Uint64 t = SDL_GetTicks() % (TURN * 2);
-    const bool glove = t >= TURN;
-    const Uint64 intoTurn = t % TURN;
-    const bool flipping = intoTurn < FLIP / 2 || intoTurn > TURN - FLIP / 2;
-    if (flipping) {
-        //(the edge on: a thin line of the color)
-        prompts::fill(x + 14, y + 2, 4, 28, theme::shade(color, 150));
-        return true;
-    }
-    if (!glove)
-        return false;
-    const std::vector<prompts::Ink> inks = {{'#', black}, {'w', {248, 248, 248, 255}}, {'c', color}};
-    prompts::art(x, y, GLOVE, inks, 2);
+    //(a shadow under it, as the characters' sprites stand out from the map: the glove's shape, black, 2 down)
+    const std::vector<prompts::Ink> shadow = {{'#', {0, 0, 0, 255}}, {'w', {0, 0, 0, 255}}, {'g', {0, 0, 0, 255}}, {'c', {0, 0, 0, 255}},
+        {'C', {0, 0, 0, 255}}};
+    prompts::art(x + 5, y + 3, prompts::gloveArt(), shadow, 2);
+    prompts::art(x + 3, y + 1, prompts::gloveArt(), prompts::gloveInks(slotColor(slot)), 2);
     return true;
 }
 
@@ -4967,6 +5084,15 @@ void GameplayState::drawEditMode()
             initEyeCandy();
         }
     }
+    //(the layer view: this machine's first builder, tiles in hand: its layer shown on the map)
+    for (int slot = 0; slot < SLOTS; slot++) {
+        if (building(slot) && localHuman(slot)) {
+            const MapMakerBuilder& b = m.builders[slot];
+            if (b.brush == BrushTile && !b.palette)
+                drawLayerView(b.layer);
+            break;
+        }
+    }
     //(the types set apart, and the no-spawn zones, shown while a builder has their brush)
     bool showTypes = false, showSpawns = false;
     for (int slot = 0; slot < SLOTS; slot++) {
@@ -5176,7 +5302,7 @@ void GameplayState::drawEditMode()
                 cellFrame(cell.x + 3, cell.y + 3, TILESIZE - 6, TILESIZE - 6, SDL_Color {232, 64, 48, 255});
             if (b.tool % TOOLS != 0) {
                 prompts::fill(cell.x + TILESIZE - 2, cell.y - 14, 18, 18, SDL_Color {0, 0, 0, 255});
-                drawToolIcon(b.tool, cell.x + TILESIZE - 1, cell.y - 13, 1);
+                drawToolBadge(b.tool, cell.x + TILESIZE - 1, cell.y - 13, 1);
             }
             if (s_carrying[slot]) {
                 //(dashes round the cell, marching)
@@ -5251,7 +5377,7 @@ void GameplayState::drawEditMode()
         prompts::drawPrompts(x + 12 + hw + 10 + prompts::promptsWidth({hint}, 14) / 2, y + 4, {hint}, 14);
     }
     //A short message (what was just done), over the toolbar a moment
-    if (!s_toast.empty() && SDL_GetTicks() - s_toastAt < 1600 && !palette) {
+    if (!s_toast.empty() && SDL_GetTicks() - s_toastAt < 1600 && !palette && !(barShown && s_toolbarTip)) {
         const int tw = rm->menu_font_small.getWidth(s_toast.c_str()) + 20, th = 20;
         const int tx = App::screenWidth / 2 - tw / 2;
         const int ty = !barShown ? App::screenHeight - th - 6 : barY == 0 ? 24 + TOOLBAR_H + 6 : barY - TOOLBAR_H - th - 6;
@@ -5315,6 +5441,25 @@ bool GameplayState::autoTestEditScript(int f)
                 steps.insert(steps.end(), bytes);
         };
         add({0}, 18);
+        if (cmd::g_autotest.mmDemo == 3) {
+            //(--at-mm-demo 3, the layer button: the mouse onto it (908), its tooltip read, clicked (907 prints
+            //the layer), a tile painted on it a row down; four times round)
+            add({0}, 170);    //(the "Map Maker" title gone first)
+            for (int k = 0; k < MAPLAYERS; k++) {
+                add({908 + k});
+                add({906}, 60);
+                if (k == 0)
+                    add({560});    //(a shot: the layer view, on the layer it started on)
+                add({900, 906, 906, 901, 906, 907});
+                add({906}, 60);
+                add({600 + 6 + k * 2 + 12 * MAPWIDTH});
+                add({906}, 20);
+                add({900, 906, 906, 901});
+                add({906}, 40);
+            }
+            add({0}, 60);
+            return false;
+        }
         if (cmd::g_autotest.mmDemo == 2) {
             //(--at-mm-demo 2, the README's: each part put on its cell (the cursor's jumps; the palette's tabs
             //straight): a spring on the wooden block, a fire bar between the big blocks (its length changed
@@ -5631,7 +5776,18 @@ bool GameplayState::autoTestEditScript(int f)
                     break;
                 }
             };
-            if (byte < 900) {
+            if (byte >= 908 && byte < 908 + MAPLAYERS) {
+                //(the mouse onto the toolbar's layer button: its rectangle, the next layer's)
+                for (const SDL_Rect& r : s_layerRect) {
+                    if (r.w > 0) {
+                        mx = r.x + r.w / 2;
+                        my = r.y + r.h / 2;
+                    }
+                }
+                send(SDL_EVENT_MOUSE_MOTION, 0);
+            } else if (byte == 907) {
+                printf("layertest: layer %d\n", m->builders[0].layer + 1);
+            } else if (byte < 900) {
                 mx = ((byte - 600) % MAPWIDTH) * TILESIZE + TILESIZE / 2;
                 my = ((byte - 600) / MAPWIDTH) * TILESIZE + TILESIZE / 2;
                 send(SDL_EVENT_MOUSE_MOTION, 0);
@@ -5648,10 +5804,7 @@ bool GameplayState::autoTestEditScript(int f)
             byte = -1;
         } else if (byte >= 560 && byte <= 564) {
             //(the README's screenshots: building, the palette; the controls sheet opened, shot, shut)
-            //(the building shot: as the builder's portrait shows its glove (waiting a frame or two for it))
-            if (byte == 560 && (SDL_GetTicks() % 1400 < 780 || SDL_GetTicks() % 1400 > 1320))
-                step--;
-            else if (byte == 560)
+            if (byte == 560)
                 shot("s1_building");
             else if (byte == 561)
                 shot("s2_palette");

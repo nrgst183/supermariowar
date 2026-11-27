@@ -254,6 +254,39 @@ void line(int x0, int y0, int x1, int y1, int thickness, SDL_Color c)
 
 // ---- pixel art
 
+const std::vector<const char*>& gloveArt(bool bent)
+{
+    static const std::vector<const char*> GLOVE = {
+        "..##.........",
+        ".#ww#........",
+        ".#ww#........",
+        ".#ww#........",
+        ".#ww####.....",
+        ".#ww#ww####..",
+        "##ww#ww#ww##.",
+        "#w#wwwwwwwgw#",
+        "#ww#wwwwwwww#",
+        "#wwwwwwwwwgw#",
+        ".#wwwwwwwgw#.",
+        "..#wwwwwgg#..",
+        "..#ccccccc#..",
+        "..#CCCCCCC#..",
+        "...#######...",
+    };
+    static const std::vector<const char*> BENT = [] {
+        std::vector<const char*> rows = {"..##.........", ".#ww#........"};
+        rows.insert(rows.end(), GLOVE.begin() + 4, GLOVE.end());
+        return rows;
+    }();
+    return bent ? BENT : GLOVE;
+}
+
+std::vector<Ink> gloveInks(SDL_Color cuff)
+{
+    const SDL_Color dark {static_cast<Uint8>(cuff.r * 70 / 100), static_cast<Uint8>(cuff.g * 70 / 100), static_cast<Uint8>(cuff.b * 70 / 100), 255};
+    return {{'#', {0, 0, 0, 255}}, {'w', {255, 255, 255, 255}}, {'g', {184, 184, 200, 255}}, {'c', cuff}, {'C', dark}};
+}
+
 void art(int x, int y, const std::vector<const char*>& rows, const std::vector<Ink>& inks, int scale)
 {
     if (rows.empty() || scale <= 0)

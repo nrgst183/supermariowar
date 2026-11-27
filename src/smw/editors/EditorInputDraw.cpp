@@ -63,32 +63,11 @@ void drawArrow(float fx, float fy, SDL_Color color, const std::string& label, in
     g.down = down;
     const bool idle = !down && now - g.movedMs > 700;
     const int bob = idle ? static_cast<int>(((now - g.movedMs) / 350) % 2) * 2 : 0;
-    static const std::vector<const char*> GLOVE = {
-        "..##.........",
-        ".#ww#........",
-        ".#ww#........",
-        ".#ww#........",
-        ".#ww####.....",
-        ".#ww#ww####..",
-        "##ww#ww#ww##.",
-        "#w#wwwwwwwgw#",
-        "#ww#wwwwwwww#",
-        "#wwwwwwwwwgw#",
-        ".#wwwwwwwgw#.",
-        "..#wwwwwgg#..",
-        "..#ccccccc#..",
-        "..#CCCCCCC#..",
-        "...#######...",
-    };
-    const std::vector<prompts::Ink> inks = {{'#', {0, 0, 0, 255}}, {'w', {255, 255, 255, 255}}, {'g', {184, 184, 200, 255}}, {'c', color},
-        {'C', theme::shade(color, 70)}};
     if (down) {
         //(pressing: the finger bent down to the spot, the hand lower)
-        std::vector<const char*> pressed = {"..##.........", ".#ww#........"};
-        pressed.insert(pressed.end(), GLOVE.begin() + 4, GLOVE.end());
-        prompts::art(x0 - 5, y0 + 3, pressed, inks, 2);
+        prompts::art(x0 - 5, y0 + 3, prompts::gloveArt(true), prompts::gloveInks(color), 2);
     } else {
-        prompts::art(x0 - 5, y0 - 1 + bob, GLOVE, inks, 2);
+        prompts::art(x0 - 5, y0 - 1 + bob, prompts::gloveArt(), prompts::gloveInks(color), 2);
     }
     //A press: a burst of short white lines around the fingertip
     if (now - g.pressMs < 180 && g.pressMs > 0) {
