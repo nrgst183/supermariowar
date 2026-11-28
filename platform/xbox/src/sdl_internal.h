@@ -29,6 +29,9 @@ void sdlx_video_shutdown();
 [[noreturn]] void sdlx_leave_to_dashboard();
 // The back buffers wanted: 1 (double buffering), 2 (triple); the disc's --xbox-buffers N (sdl_main_xbox.cpp)
 extern int g_sdlx_wanted_back_buffers;
+// The highest video mode wanted (the disc's --xbox-video 480 / 720 / 1080; 0: the highest the dashboard
+// allows). The game draws 640 x 480 either way; an HD mode shows it scaled up, 4:3 in the middle
+extern int g_sdlx_video_mode;
 extern bool g_sdlx_no_audio;
 extern bool g_sdlx_fresh_cache;    // --xbox-fresh-cache: the cache drive formatted at the start (a first boot; tests)    // --xbox-no-audio: no DirectSound, no mixer thread (tests)
 

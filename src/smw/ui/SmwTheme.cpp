@@ -388,11 +388,12 @@ void signalSmall(int x, int y, int pingMs)
         else if (lit == 1)
             color = {232, 56, 40, 255};
     }
-    fill(x + 1, y, 13, 12, BLACK);
-    fill(x, y + 1, 15, 10, BLACK);
+    //(22 x 17: readable at a glance on the score panel)
+    fill(x + 1, y, 20, 17, BLACK);
+    fill(x, y + 1, 22, 15, BLACK);
     for (int k = 0; k < 4; k++) {
-        const int h = 2 + 2 * k;
-        fill(x + 2 + k * 3, y + 10 - h, 2, h, k < lit ? color : SDL_Color {90, 90, 104, 255});
+        const int h = 3 + 3 * k;
+        fill(x + 2 + k * 5, y + 15 - h, 3, h, k < lit ? color : SDL_Color {90, 90, 104, 255});
     }
 }
 

@@ -139,6 +139,11 @@ int main(void)
             k++;
             continue;
         }
+        if (fileArgs[k] == "--xbox-video" && k + 1 < fileArgs.size()) {
+            g_sdlx_video_mode = atoi(fileArgs[k + 1].c_str());
+            k++;
+            continue;
+        }
         if (fileArgs[k] == "--xbox-fresh-cache") {
             g_sdlx_fresh_cache = true;
             continue;

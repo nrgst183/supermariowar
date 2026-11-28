@@ -102,7 +102,7 @@ void clapperboard(int x, int y);
 
 // A connection's quality: four bars (22 x 16) lit by the ping (gray: not known yet)
 void signal(int x, int y, int pingMs);
-// The same, small (15 x 12): for the score panels
+// The same, smaller (22 x 17): for the score panels
 void signalSmall(int x, int y, int pingMs);
 // A status (16 x 16), with the game's power-ups: a ? block (info), a 1-up (fine), a Bob-omb (a warning),
 // a poison mushroom (a problem)

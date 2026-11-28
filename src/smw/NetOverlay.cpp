@@ -5,6 +5,7 @@
 #include "GameValues.h"
 #include "ResourceManager.h"
 #include "gfx.h"
+#include "GSGameplayInternal.h"
 #include "rollback/NetGame.h"
 #include "rollback/Replay.h"
 #include "ui/InputPrompts.h"
@@ -152,7 +153,9 @@ void drawNetOverlay()
         ~NoShake() { x_shake = x; y_shake = y; }
     } noShake;
 
-    if (game_values.shownetstats)
+    //(the network info only with the online panel up: in play it's in the way; the ping bars on the
+    //score panels say how the connections are)
+    if (game_values.shownetstats && onlinePanelOpen())
         drawNetStats(net);
 
     const rollback::NetGame::DropNotice drop = net.dropNotice();

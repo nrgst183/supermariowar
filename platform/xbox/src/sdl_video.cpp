@@ -50,7 +50,8 @@ bool g_sdlx_overlay = false;
 int g_sdlx_back_buffers = 0;
 bool g_sdlx_no_audio = false;
 bool g_sdlx_fresh_cache = false;
-int g_sdlx_wanted_back_buffers = 1;    // (1: double buffering, 2: triple; the overlay shows it)
+int g_sdlx_wanted_back_buffers = 1;
+int g_sdlx_video_mode = 0;    // (1: double buffering, 2: triple; the overlay shows it)
 
 namespace {
 constexpr int k_screen_w = 640;
@@ -58,6 +59,10 @@ constexpr int k_screen_h = 480;
 
 SDL_Window* g_window = nullptr;
 bool g_device_up = false;
+// The display: its size (the back buffer's), and where the game's 640 x 480 picture goes on it (all of
+// it in 480 lines; 4:3 in the middle of an HD mode)
+int g_out_w = k_screen_w, g_out_h = k_screen_h;
+float g_pic_x = 0, g_pic_y = 0, g_pic_w = k_screen_w, g_pic_h = k_screen_h;
 D3DTexture* g_frame_textures[2] = {nullptr, nullptr};
 D3DTexture* g_frame_textures16[2] = {nullptr, nullptr};    //(a 16-bit frame's: an editor's own screens)
 int g_frame_index = 0;
@@ -92,8 +97,26 @@ bool createDevice(SDL_Renderer* renderer)
 
     D3DPRESENT_PARAMETERS pp;
     ZeroMemory(&pp, sizeof(pp));
-    pp.BackBufferWidth = k_screen_w;
-    pp.BackBufferHeight = k_screen_h;
+    //The mode: the highest the dashboard allows (its HDTV settings), up to --xbox-video's; 480 lines if
+    //none (progressive if 480p is allowed)
+    const DWORD videoFlags = XGetVideoFlags();
+    const bool ntsc = XGetVideoStandard() != XC_VIDEO_STANDARD_PAL_I;
+    const int wanted = g_sdlx_video_mode > 0 ? g_sdlx_video_mode : 1080;
+    struct Mode {
+        int w, h;
+        DWORD flags;
+        const char* name;
+    };
+    Mode modes[3];
+    int modeCount = 0;
+    if (ntsc && wanted >= 1080 && (videoFlags & XC_VIDEO_FLAGS_HDTV_1080i))
+        modes[modeCount++] = {1920, 1080, D3DPRESENTFLAG_INTERLACED | D3DPRESENTFLAG_WIDESCREEN, "1080i"};
+    if (ntsc && wanted >= 720 && (videoFlags & XC_VIDEO_FLAGS_HDTV_720p))
+        modes[modeCount++] = {1280, 720, D3DPRESENTFLAG_PROGRESSIVE | D3DPRESENTFLAG_WIDESCREEN, "720p"};
+    modes[modeCount++] = {k_screen_w, k_screen_h, (videoFlags & XC_VIDEO_FLAGS_HDTV_480p) ? static_cast<DWORD>(D3DPRESENTFLAG_PROGRESSIVE) : 0u,
+        (videoFlags & XC_VIDEO_FLAGS_HDTV_480p) ? "480p" : "480i"};
+    pp.BackBufferWidth = modes[0].w;
+    pp.BackBufferHeight = modes[0].h;
     //(16 bits a pixel, as the original game's screen (SDL 1.2's libSDLx, 16-bit): the front and back
     //buffers in half the memory of the 64 MB; the frame is drawn into them dithered)
     pp.BackBufferFormat = D3DFMT_R5G6B5;
@@ -105,9 +128,7 @@ bool createDevice(SDL_Renderer* renderer)
     pp.Windowed = FALSE;
     pp.EnableAutoDepthStencil = FALSE;
     pp.SwapEffect = D3DSWAPEFFECT_DISCARD;
-    pp.Flags = D3DPRESENTFLAG_LOCKABLE_BACKBUFFER;
-    if (XGetVideoFlags() & XC_VIDEO_FLAGS_HDTV_480p)
-        pp.Flags |= D3DPRESENTFLAG_PROGRESSIVE;
+    pp.Flags = D3DPRESENTFLAG_LOCKABLE_BACKBUFFER | modes[0].flags;
     pp.FullScreen_RefreshRateInHz = static_cast<UINT>(displayRefreshRate());
     pp.FullScreen_PresentationInterval = D3DPRESENT_INTERVAL_ONE;
 
@@ -116,6 +137,17 @@ bool createDevice(SDL_Renderer* renderer)
 
     HRESULT hr = Direct3D_CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, NULL,
         D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &renderer->device);
+    //(an HD mode that can't be had (its buffers' memory, say): the next one down)
+    int mode = 0;
+    while (FAILED(hr) && mode + 1 < modeCount) {
+        sdlx_log("[xbox] No %s (0x%08x): %s\n", modes[mode].name, static_cast<unsigned>(hr), modes[mode + 1].name);
+        mode++;
+        pp.BackBufferWidth = modes[mode].w;
+        pp.BackBufferHeight = modes[mode].h;
+        pp.Flags = D3DPRESENTFLAG_LOCKABLE_BACKBUFFER | modes[mode].flags;
+        hr = Direct3D_CreateDevice(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, NULL,
+            D3DCREATE_HARDWARE_VERTEXPROCESSING, &pp, &renderer->device);
+    }
     if (FAILED(hr)) {
         // Retry without progressive scan
         pp.Flags &= ~D3DPRESENTFLAG_PROGRESSIVE;
@@ -140,11 +172,19 @@ bool createDevice(SDL_Renderer* renderer)
     if (FAILED(hr))
         return SDL_SetError("Direct3D_CreateDevice failed (0x%08x)", static_cast<unsigned>(hr));
     g_device_up = true;
+    //(the picture: 4:3, as tall as the display, in the middle)
+    g_out_w = static_cast<int>(pp.BackBufferWidth);
+    g_out_h = static_cast<int>(pp.BackBufferHeight);
+    g_pic_h = static_cast<float>(g_out_h);
+    g_pic_w = g_out_h == k_screen_h ? static_cast<float>(g_out_w) : static_cast<float>(g_out_h) * 4.0f / 3.0f;
+    g_pic_x = (static_cast<float>(g_out_w) - g_pic_w) * 0.5f;
+    g_pic_y = 0.0f;
+    sdlx_log("[xbox] Video: %d x %d%s\n", g_out_w, g_out_h, (pp.Flags & D3DPRESENTFLAG_INTERLACED) ? " interlaced" : (pp.Flags & D3DPRESENTFLAG_PROGRESSIVE) ? " progressive" : "");
 
     D3DVIEWPORT8 vp;
     ZeroMemory(&vp, sizeof(vp));
-    vp.Width = k_screen_w;
-    vp.Height = k_screen_h;
+    vp.Width = static_cast<DWORD>(g_out_w);
+    vp.Height = static_cast<DWORD>(g_out_h);
     vp.MaxZ = 1.0f;
     D3DDevice_SetViewport(&vp);
 
@@ -184,11 +224,15 @@ SDL_FRect g_dst {0, 0, 0, 0};    // the present's quad (w 0: the whole screen)
 void drawQuad(D3DTexture* texture)
 {
     // One quad over the screen; -0.5 lines the texels up with the pixels. A smaller one (a TV's
-    // overscan, gfx_setscreenscale): the border black, and the picture filtered, not point sampled
-    const bool scaled = g_dst.w > 0 && (g_dst.w < k_screen_w || g_dst.h < k_screen_h);
-    const float x0 = (scaled ? g_dst.x : 0.0f) - 0.5f, y0 = (scaled ? g_dst.y : 0.0f) - 0.5f;
-    const float x1 = (scaled ? g_dst.x + g_dst.w : static_cast<float>(k_screen_w)) - 0.5f;
-    const float y1 = (scaled ? g_dst.y + g_dst.h : static_cast<float>(k_screen_h)) - 0.5f;
+    // overscan, gfx_setscreenscale), or an HD mode's (the 640 x 480 picture scaled up, bars at the
+    // sides): the border black, and the picture filtered, not point sampled
+    const bool hd = g_out_w != k_screen_w || g_out_h != k_screen_h;
+    const bool scaled = hd || (g_dst.w > 0 && (g_dst.w < k_screen_w || g_dst.h < k_screen_h));
+    const bool inset = g_dst.w > 0 && (g_dst.w < k_screen_w || g_dst.h < k_screen_h);
+    const float sx = g_pic_w / static_cast<float>(k_screen_w), sy = g_pic_h / static_cast<float>(k_screen_h);
+    const float x0 = g_pic_x + (inset ? g_dst.x : 0.0f) * sx - 0.5f, y0 = g_pic_y + (inset ? g_dst.y : 0.0f) * sy - 0.5f;
+    const float x1 = g_pic_x + (inset ? g_dst.x + g_dst.w : static_cast<float>(k_screen_w)) * sx - 0.5f;
+    const float y1 = g_pic_y + (inset ? g_dst.y + g_dst.h : static_cast<float>(k_screen_h)) * sy - 0.5f;
     if (scaled) {
         D3DDevice_Clear(0, NULL, D3DCLEAR_TARGET, D3DCOLOR_XRGB(0, 0, 0), 1.0f, 0);
         D3DDevice_SetTextureStageState(0, D3DTSS_MINFILTER, D3DTEXF_LINEAR);
