@@ -374,6 +374,44 @@ TEST_CASE("Slots: local players, CPU players, teams and colors") {
     CHECK(host.lobby->canStart(why));
 }
 
+TEST_CASE("Joiners fill the places left to right, the CPUs move over; a team set up stays") {
+    LobbyNet net;
+    Node& host = net.add(true);
+    net.settle();
+    host.lobby->addCpu();
+    host.lobby->addCpu();
+    CHECK(host.lobby->slot(1).kind == SlotKind::Cpu);
+    CHECK(host.lobby->slot(1).team == 1);
+
+    //A joiner: the second place (green), the CPUs to the third and fourth
+    Node& a = net.add(false);
+    net.settle();
+    net.step(10);
+    CHECK(host.lobby->slot(1).peer == 1);
+    CHECK(host.lobby->slot(1).team == 1);
+    CHECK(host.lobby->slot(1).color == 1);
+    CHECK(host.lobby->slot(2).kind == SlotKind::Cpu);
+    CHECK(host.lobby->slot(2).team == 2);
+    CHECK(host.lobby->slot(3).kind == SlotKind::Cpu);
+    CHECK(host.lobby->slot(3).team == 3);
+    CHECK(a.lobby->slot(1).team == 1);
+
+    //Its second player: a CPU goes (no room), the rest stay in order
+    a.lobby->setLocalPlayers(2);
+    net.step(10);
+    CHECK(host.lobby->slot(2).peer == 1);
+    CHECK(host.lobby->slot(2).team == 2);
+    CHECK(host.lobby->slot(3).kind == SlotKind::Cpu);
+    CHECK(host.lobby->slot(3).team == 3);
+
+    //Teams set up (2 v 2): kept as players come and go
+    host.lobby->setSlotTeam(1, 0);
+    host.lobby->setSlotTeam(3, 2);
+    a.lobby->setLocalPlayers(1);
+    net.step(10);
+    CHECK(host.lobby->slot(1).team == 0);
+}
+
 TEST_CASE("CPUs only: the host may have no players of its own, for a game on its machine") {
     LobbyNet net;
     Node& host = net.add(true);

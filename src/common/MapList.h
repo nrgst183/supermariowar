@@ -36,6 +36,8 @@ public:
         void addWorldMaps();
 
         void add(const char * name);
+        /// A map file from elsewhere (a downloaded one) in the list too, under its short name; that name
+        std::string addFile(const std::string& path);
         bool find(const std::string& name);
         bool findexact(const char * name, bool fWorld);
     bool startswith(char letter);
@@ -81,6 +83,13 @@ public:
                 return node.filename;
         }
         return {};
+    }
+    /// The battle maps' short names and files (the lookups that go by a file, or its contents)
+    std::vector<std::pair<std::string, std::string>> battleMapFiles() const {
+        std::vector<std::pair<std::string, std::string>> list;
+        for (const auto& [key, node] : maps)
+            list.emplace_back(key, node.filename);
+        return list;
     }
     const std::string& currentShortmapname() const {
         return (*outercurrent).first;

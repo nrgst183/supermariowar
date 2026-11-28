@@ -181,6 +181,8 @@ class MenuState : public GameState
         bool mLocalFromLobby = false;   // the match menus (and matches) of a local game from the lobby
         short mLocalTeams = 0;
         void OpenLocalLobby(LobbyOrigin origin = LobbyOrigin::MainMenu);
+        // The players on this machine follow the controllers plugged in (when their number changes)
+        void FollowControllers();
         bool OpenLobby(rollback::LobbyAccess access, LobbyOrigin origin, std::string& error);
         void StartLocalFromLobby();
         // A lobby that edits together (CoEdit.h): Editors > Online > Host opens it; its Start (the host)
@@ -268,6 +270,10 @@ class MenuState : public GameState
         std::string mOnlineShownMap;
         bool mOnlineMapHere = false;
         int mOnlineViewPending = 0;     //Frames during which the lobby's state doesn't override the player's edit
+        uint32_t mOnlineMenuSettingsRevision = 0;    //The host's rules and options last put into our menus
+        uint32_t mOnlineMenuSettingsCheck = 0;
+        bool mOnlineHostOnSettings = false;     //The host on its settings screens, as last followed
+        std::string mOnlineShownHostMap;        //The host's map (its name) the settings view last showed
         std::string mOnlineAppliedKey;  //What the host's menus last published to the lobby
         bool mOnlineSetup = false;      //The host is choosing the match from the lobby (the match menus lead back to it)
         bool mOnlineMinigame = false;   //The host's choice: a minigame instead of a single game

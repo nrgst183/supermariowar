@@ -1,5 +1,6 @@
 #include "MapList.h"
 
+#include <filesystem>
 #include <memory>
 
 #include "FileList.h"
@@ -140,6 +141,17 @@ void MapList::add(const char * name)
     std::string fullName = writablePath(convertPath("maps/") + name);
     MapListNode node(std::move(fullName));
     maps.emplace(stripCreatorAndExt(name), std::move(node));
+}
+
+std::string MapList::addFile(const std::string& path)
+{
+    const std::string name = stripCreatorAndExt(std::filesystem::path(path).filename().string());
+    for (const auto& [key, node] : maps) {
+        if (node.filename == path)
+            return key;
+    }
+    maps.emplace(name, MapListNode(path));
+    return name;
 }
 
 bool MapList::find(const std::string& name)

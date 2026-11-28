@@ -107,7 +107,7 @@ void drawNetStats(const rollback::NetGame& net)
     };
     std::vector<Item> items;
     for (int p = 0; p < rollback::net::MAX_PEERS; p++) {
-        if (p == net.localPeer() || !net.lobby() || !net.lobby()->peer(p).present)
+        if (p == net.localPeer() || !net.lobby() || !net.lobby()->peer(p).present || net.peerLost(p))
             continue;
         std::string name = net.lobby()->peer(p).name;
         if (name.size() > 10)
@@ -156,7 +156,11 @@ void drawNetOverlay()
         drawNetStats(net);
 
     const rollback::NetGame::DropNotice drop = net.dropNotice();
-    if (!drop.text.empty() && drop.ageMs < SHOW_DROP_MS) {
+    if (net.endingMatch()) {
+        //(the host ended it: everyone back to the lobby in a moment)
+        theme::announce(App::screenWidth / 2, 70, net.isHost() ? std::string("Ending the match...") : std::string("The host ended the match"),
+            [](int ix, int iy) { theme::statusIcon(ix + 8, iy + 8, theme::Status::Warn); });
+    } else if (!drop.text.empty() && drop.ageMs < SHOW_DROP_MS) {
         //An announcement: who left (the card: a Bob-omb), the CPU takes over
         theme::announce(App::screenWidth / 2, 70, drop.text, [](int ix, int iy) { theme::statusIcon(ix + 8, iy + 8, theme::Status::Warn); });
     }
@@ -181,7 +185,8 @@ void drawPingMeter(int slot, int x, int y)
         if (!net.inMatch() || !lobby)
             return;
         const rollback::LobbySlot& s = lobby->slot(slot);
-        if (s.kind != rollback::SlotKind::Human || s.peer < 0 || s.peer == net.localPeer() || !lobby->peer(s.peer).present)
+        if (s.kind != rollback::SlotKind::Human || s.peer < 0 || s.peer == net.localPeer() || !lobby->peer(s.peer).present
+            || net.peerLost(s.peer))
             return;
         ping = net.peerPingMs(s.peer);
     }

@@ -218,6 +218,12 @@ void updatePort(int port, const XINPUT_GAMEPAD* pad)
     for (Sint16& axis : axes)
         axis = static_cast<Sint16>(axis & ~0xFF);
 
+    // The in-game reset, Back + Start + both triggers: the game leaves for the dashboard itself, its
+    // sound and GPU stopped first (left running, a BIOS's reset may hang the dashboard it starts)
+    if (buttons[3] && buttons[4] && p.bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] > 0x80
+        && p.bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] > 0x80)
+        sdlx_leave_to_dashboard();
+
     // Back + White + Black together toggle the profiler overlay (not L3 + R3: that's Cerbios's own
     // screenshot; nor what its in-game reset holds, Back + Start + the triggers)
     const bool overlayCombo = buttons[4] && buttons[6] && buttons[7];
@@ -498,6 +504,14 @@ bool SDL_JoystickEventsEnabled(void)
 bool SDL_HasJoystick(void)
 {
     return true;
+}
+
+int SDL_XboxConnectedControllers(void)
+{
+    int count = 0;
+    for (const PortState& state : g_ports)
+        count += state.connected;
+    return count;
 }
 
 SDL_JoystickID* SDL_GetJoysticks(int* count)

@@ -192,6 +192,10 @@ void NetLobby::addMember(int peer)
 
 void NetLobby::rebuildSlots()
 {
+    //(the default layout: each player in the team, and color, of its place, left to right. Kept so as
+    //players come and go: the humans first in the order they joined, the CPUs moved over to the right.
+    //A layout someone has changed (teams set up) is left as it is)
+    const bool byPlace = isHost() && !m_layoutSet;
     m_slots = {};
     int s = 0;
     for (int p = 0; p < net::MAX_PEERS; p++) {
@@ -214,6 +218,23 @@ void NetLobby::rebuildSlots()
         slot.kind = SlotKind::Cpu;
         slot.team = m_cpuTeam[c];
         slot.color = m_cpuColor[c];
+    }
+    if (!byPlace)
+        return;
+    for (int k = 0; k < LOBBY_SLOTS; k++) {
+        LobbySlot& slot = m_slots[static_cast<size_t>(k)];
+        const uint8_t place = static_cast<uint8_t>(k);
+        if (slot.kind == SlotKind::Human) {
+            m_human[static_cast<size_t>(slot.peer)].team[slot.localIndex] = place;
+            m_human[static_cast<size_t>(slot.peer)].color[slot.localIndex] = place;
+        } else if (slot.kind == SlotKind::Cpu) {
+            m_cpuTeam[static_cast<size_t>(k - (s - m_cpuCount))] = place;
+            m_cpuColor[static_cast<size_t>(k - (s - m_cpuCount))] = place;
+        }
+        if (slot.kind != SlotKind::Empty) {
+            slot.team = place;
+            slot.color = place;
+        }
     }
 }
 
@@ -380,6 +401,8 @@ void NetLobby::setSlotTeam(int slot, int team)
         m_slots[static_cast<size_t>(slot)].team = static_cast<uint8_t>(team);    //shown until the host's answer
         return;
     }
+    if (team != slot)
+        m_layoutSet = true;    //(teams set up: the places don't decide them any more)
     if (s.kind == SlotKind::Human) {
         m_human[static_cast<size_t>(s.peer)].team[s.localIndex] = static_cast<uint8_t>(team);
     } else {
@@ -411,6 +434,8 @@ void NetLobby::setSlotColor(int slot, int color)
         m_slots[static_cast<size_t>(slot)].color = static_cast<uint8_t>(color);
         return;
     }
+    if (color != slot)
+        m_layoutSet = true;
     if (s.kind == SlotKind::Human) {
         m_human[static_cast<size_t>(s.peer)].color[s.localIndex] = static_cast<uint8_t>(color);
     } else {
@@ -567,6 +592,29 @@ void NetLobby::setMatchDetail(int modeId, int goal, const std::string& goalName)
         m_goalName = goalName;
         markDirty();
     }
+}
+
+void NetLobby::setCpuSkins(const std::array<std::string, net::MAX_PEERS>& names)
+{
+    if (names != m_cpuSkins) {
+        m_cpuSkins = names;
+        markDirty();
+    }
+}
+
+void NetLobby::setMenuSettings(const std::vector<uint8_t>& bytes)
+{
+    if (bytes != m_menuSettings) {
+        m_menuSettings = bytes;
+        m_menuSettingsRevision++;
+        markDirty();
+    }
+}
+
+const std::string& NetLobby::cpuSkinName(int slot) const
+{
+    static const std::string none;
+    return slot >= 0 && slot < net::MAX_PEERS ? m_cpuSkins[static_cast<size_t>(slot)] : none;
 }
 
 void NetLobby::setPhase(Phase phase)
@@ -849,7 +897,22 @@ void NetLobby::sendLobbyState()
         extra.u8(static_cast<uint8_t>(p));
         extra.u8(m_votes[static_cast<size_t>(p)]);
     }
+    //(after the votes: the CPU players' skins; older builds stop reading before them)
+    extra.u8(static_cast<uint8_t>(m_cpuSkins.size()));
+    for (const std::string& name : m_cpuSkins)
+        extra.str(name);
+    extra.u8(m_hostOnSettings ? 1 : 0);
     sendToAll(extra);
+
+    //(the rules and options: the host's menus, for the others' settings screens)
+    if (!m_menuSettings.empty() && m_menuSettings.size() < 60000) {
+        std::vector<uint8_t> buffer(m_menuSettings.size() + 3);
+        ByteWriter menus(buffer.data(), buffer.size());
+        menus.u8(static_cast<uint8_t>(MsgType::MenuSettings));
+        menus.u16(static_cast<uint16_t>(m_menuSettings.size()));
+        menus.bytes(m_menuSettings.data(), m_menuSettings.size());
+        sendToAll(menus);
+    }
     m_dirty = false;
 }
 
@@ -1343,6 +1406,37 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
                         if (localPeer() >= 0)
                             m_votes[static_cast<size_t>(localPeer())] = mine;
                     }
+                    //(the CPU players' skins: an older host's message ends before them)
+                    if (r.ok()) {
+                        const int skins = r.u8();
+                        std::array<std::string, net::MAX_PEERS> names {};
+                        for (int k = 0; k < skins && r.ok(); k++) {
+                            std::string name = r.str();
+                            if (k < net::MAX_PEERS)
+                                names[static_cast<size_t>(k)] = std::move(name);
+                        }
+                        if (r.ok()) {
+                            m_cpuSkins = std::move(names);
+                            m_cpuSkinsKnown = true;
+                        }
+                        //(then: whether the host is on its settings screens)
+                        const uint8_t onSettings = r.u8();
+                        if (r.ok())
+                            m_hostOnSettings = onSettings != 0;
+                    }
+                }
+            }
+            break;
+
+        case MsgType::MenuSettings:
+            if (fromHost && !isHost()) {
+                const size_t n = r.u16();
+                if (r.ok() && r.remaining() >= n) {
+                    std::vector<uint8_t> bytes(data + (size - r.remaining()), data + (size - r.remaining()) + n);
+                    if (bytes != m_menuSettings) {
+                        m_menuSettings = std::move(bytes);
+                        m_menuSettingsRevision++;
+                    }
                 }
             }
             break;
@@ -1376,6 +1470,7 @@ bool NetLobby::handleMessage(int peer, Channel channel, const uint8_t* data, siz
         case MsgType::ConfigAck:
         case MsgType::Start:
         case MsgType::MatchAbort:
+        case MsgType::MatchEnd:
         case MsgType::Input:
         case MsgType::Checksum:
         case MsgType::PeerDrop:

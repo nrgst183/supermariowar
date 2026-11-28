@@ -477,6 +477,17 @@ void stopOutput()
     }
 }
 
+} // namespace
+
+void sdlx_audio_shutdown()
+{
+    //(the packets queued play out silent: the stream paused, then released)
+    if (g_stream)
+        IDirectSoundStream_Pause(g_stream, DSSTREAMPAUSE_PAUSE);
+    stopOutput();
+}
+
+namespace {
 // (the system's reads, in big blocks: sdlx_open)
 bool readFile(const char* path, std::vector<unsigned char>& out)
 {

@@ -562,6 +562,28 @@ std::string addressText(DWORD a)
 
 // The dashboard's static address, if the library didn't take it: read again, and given to the
 // library as it is (its mark put right). What happened: g_networkSettings
+// The config area's network sectors (8 to 15 of partition 0) as they are, to T:\netconfig.bin: what
+// the dashboard saved, to see (pulled off over FTP: E:\TDATA\534D0001\netconfig.bin)
+BYTE g_configRaw[8 * 512];
+
+void dumpConfigSectors(HANDLE volume)
+{
+    BYTE* raw = g_configRaw;
+    memset(raw, 0, sizeof(raw));
+    for (int k = 0; k < 8; k++) {
+        LARGE_INTEGER at;
+        at.QuadPart = static_cast<LONGLONG>(8 + k) * 512;
+        IO_STATUS_BLOCK io;
+        memset(&io, 0, sizeof(io));
+        NtReadFile(volume, NULL, NULL, NULL, &io, raw + k * 512, 512, &at);
+    }
+    FILE* f = fopen("T:\\netconfig.bin", "wb");
+    if (f) {
+        fwrite(raw, 1, sizeof(g_configRaw), f);
+        fclose(f);
+    }
+}
+
 void applyDashboardSettings()
 {
     const HANDLE volume = XNetOpenConfigVolume();
@@ -570,21 +592,44 @@ void applyDashboardSettings()
         sdlx_log("[xbox] network: %s\n", g_networkSettings);
         return;
     }
+    dumpConfigSectors(volume);
     BYTE data[CONFIG_SIZE];
     memset(data, 0, sizeof(data));
-    const BOOL loaded = XNetLoadConfigSector(volume, 0, data, CONFIG_SIZE);
+    BOOL loaded = XNetLoadConfigSector(volume, 0, data, CONFIG_SIZE);
     XNetCloseConfigVolume(volume);
+    //(the library's checks not met (a dashboard that writes the sector a little otherwise): its data as
+    //it is, if the sector starts as theirs do)
+    if (!loaded && dwordAt(g_configRaw, 0) == 0x79132568) {
+        memcpy(data, g_configRaw + 0xC, CONFIG_SIZE);
+        loaded = TRUE;
+    }
     if (!loaded) {
         snprintf(g_networkSettings, sizeof(g_networkSettings), "no dashboard settings saved");
         sdlx_log("[xbox] network: %s\n", g_networkSettings);
         return;
     }
-    const DWORD address = dwordAt(data, 0x14), mask = dwordAt(data, 0x18), gateway = dwordAt(data, 0x1C);
+    DWORD address = dwordAt(data, 0x14);
+    //The newer dashboards' settings: a second set, "XBV2" at 0x3C, its flags at 0x40 (0x04: a static
+    //address, 0x08: static name servers; the MS dashboard's static setup saves 0x0C), its address, mask,
+    //gateway and name servers from 0x48. The library knows only the first set (0x14..., left all 0 by
+    //the dashboard): the static address saved in the second, it took for DHCP. Copied to the first, it
+    //takes it (the name servers too if they're static)
+    const DWORD tag = dwordAt(data, 0x3C), flags = dwordAt(data, 0x40), address2 = dwordAt(data, 0x48);
+    const bool tagged = tag == 0x58425632 || tag == 0x32564258;
+    if (tagged && (flags & 0x04) && address2 != 0 && address2 != address) {
+        memmove(data + 0x14, data + 0x48, 3 * sizeof(DWORD));
+        if (flags & 0x08)
+            memmove(data + 0x20, data + 0x54, 2 * sizeof(DWORD));
+        address = address2;
+        sdlx_log("[xbox] network: the static address from the dashboard's newer settings\n");
+    }
+    const DWORD mask = dwordAt(data, 0x18), gateway = dwordAt(data, 0x1C);
     const DWORD signature = dwordAt(data, 0x1E8);
     sdlx_log("[xbox] network: the dashboard's settings: address %s mask %s gateway %s, mark %08lx\n", addressText(address).c_str(),
         addressText(mask).c_str(), addressText(gateway).c_str(), static_cast<unsigned long>(signature));
     if (address == 0) {
-        snprintf(g_networkSettings, sizeof(g_networkSettings), "the dashboard is set to automatic");
+        snprintf(g_networkSettings, sizeof(g_networkSettings), "no static address in the saved settings (mark %08lx)",
+            static_cast<unsigned long>(signature));
         return;
     }
     //(the library took them: its address static)
@@ -777,11 +822,24 @@ bool SDL_ShowSimpleMessageBox(SDL_MessageBoxFlags flags, const char* title, cons
 
 /* ---- Xbox ---------------------------------------------------------------- */
 
-void SDL_XboxReturnToDashboard(void)
+void sdlx_leave_to_dashboard()
 {
-    XLaunchNewImage(NULL, NULL);
+    static LONG leaving = 0;
+    if (InterlockedExchange(&leaving, 1) == 0) {
+        sdlx_log("[xbox] Leaving for the dashboard\n");
+        sdlx_audio_shutdown();
+        sdlx_video_shutdown();
+        if (SDL_XboxStartNetwork())
+            XNetCleanup();
+        XLaunchNewImage(NULL, NULL);
+    }
     for (;;)
         Sleep(1000);
+}
+
+void SDL_XboxReturnToDashboard(void)
+{
+    sdlx_leave_to_dashboard();
 }
 
 

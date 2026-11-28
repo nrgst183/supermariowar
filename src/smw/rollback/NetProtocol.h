@@ -90,6 +90,8 @@ enum class MsgType : uint8_t {
     ConfigAck = 17,
     Start = 18,
     MatchAbort = 19,
+    MatchEnd = 20,      // host -> all, in a match: u8 match id, u32 frame: the match ends at that frame (the host
+                        // ended it), everyone back to the lobby
 
     Input = 32,
     Checksum = 33,
@@ -138,6 +140,8 @@ enum class MsgType : uint8_t {
 
     LobbyExtra = 104,
     SettingsRequest = 105,    // joiner -> host (only honored when everyone may change the settings)
+    MenuSettings = 106,       // host -> all, in the lobby: u16 n, n bytes: the rules and options its menus have
+                              // (MatchConfig.h's captureLobbySettings), shown on the others' settings screens
 };
 
 // The series messages are the range [SeriesBegin, SERIES_MSG_END)

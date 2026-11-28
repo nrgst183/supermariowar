@@ -1233,6 +1233,8 @@ void GameplayState::updateNetplay()
         device++;
     }
 
+    if (cmd::g_net.endAt > 0 && net.isHost() && g_sim.tick >= cmd::g_net.endAt)
+        net.endMatchForEveryone();
     const rollback::NetGame::Outcome outcome = net.advance(input);
     lastUpdateTicked = outcome.ticks > 0;
     if (!outcome.ended && !outcome.failed && net.inMatch()) {

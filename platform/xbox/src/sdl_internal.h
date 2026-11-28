@@ -13,8 +13,20 @@ void sdlx_push_event(const SDL_Event& event);
 // finished on the mixer thread, on the game's thread
 void sdlx_mixer_dispatch_callbacks();
 
+// Audio stopped for good (sdl_mixer.cpp): the mixer thread ended, the stream and DirectSound
+// released, so the sound chip isn't left playing into memory the next program (the dashboard) uses
+void sdlx_audio_shutdown();
+
 // Video (sdl_video.cpp)
 void sdlx_video_quit();
+// The GPU's queued work finished and the last frame kept on screen: nothing left for it to do
+// when the next program starts
+void sdlx_video_shutdown();
+
+// Leaving for the dashboard (sdl_core.cpp): the audio, the GPU and the network put to rest first
+// (once), then XLaunchNewImage; an in-game reset's (Back + Start + both triggers, sdl_events.cpp)
+// as well as the game's own exit
+[[noreturn]] void sdlx_leave_to_dashboard();
 // The back buffers wanted: 1 (double buffering), 2 (triple); the disc's --xbox-buffers N (sdl_main_xbox.cpp)
 extern int g_sdlx_wanted_back_buffers;
 extern bool g_sdlx_no_audio;

@@ -94,6 +94,7 @@ struct NetArgs {
     int statsInterval = 300;   // --net-stats N: print statistics every N frames (0: off)
     int timeoutMs = 5000;      // --net-timeout MS: a silent peer is gone after this long
     int quitAt = 0;            // --net-quit-at F: leave the match at frame F (disconnect test)
+    int endAt = 0;             // --net-end-at F: the host ends the match for everyone at frame F (its End the match)
     int cutAt = 0;             // --net-cut-at F,MS: at frame F of a match the network goes dead for MS ms, as with a
     int cutMs = 0;             // pulled cable: nothing goes out or comes in (reconnect test)
     int reconnect = 1;         // --net-reconnect 0: a lost connection isn't retried, a lost host not replaced (RECONNECTING)

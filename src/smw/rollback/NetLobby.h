@@ -351,6 +351,19 @@ public:
     int modeId() const { return m_modeId; }
     int goal() const { return m_goal; }
     const std::string& goalName() const { return m_goalName; }
+    // The computer players' skins, as the host picked them (a skin's name per slot, "" for none: not a
+    // CPU, or its slot's own skin): the same CPU looks the same on every machine (cosmetic only)
+    const std::string& cpuSkinName(int slot) const;
+    bool cpuSkinsKnown() const { return m_cpuSkinsKnown; }    // (false: the host's build doesn't send them)
+    // The host is on its match settings screens (the others' follow it there, and back)
+    bool hostOnSettings() const { return m_hostOnSettings; }
+    void setHostOnSettings(bool on)
+    {
+        if (on != m_hostOnSettings) {
+            m_hostOnSettings = on;
+            markDirty();
+        }
+    }
     // Whether joiners may change the match settings (mode, goal, map) too; else only the host (it chooses)
     bool settingsEveryone() const { return m_settingsEveryone; }
     // Whether we may change them now
@@ -429,6 +442,13 @@ public:
     void setMatchInfo(const std::string& mode, const std::string& map);
     // Host: the mode's id, goal and what the goal counts (shown in the lobby, never played from)
     void setMatchDetail(int modeId, int goal, const std::string& goalName);
+    // Host: the CPU players' skins (cpuSkinName); passed on with the lobby's state
+    void setCpuSkins(const std::array<std::string, net::MAX_PEERS>& names);
+    // Host: the rules and options its menus have (opaque bytes, MatchConfig.h's captureLobbySettings),
+    // passed on when they change. Joiner: the host's, and a count that grows as they come
+    void setMenuSettings(const std::vector<uint8_t>& bytes);
+    const std::vector<uint8_t>& menuSettings() const { return m_menuSettings; }
+    uint32_t menuSettingsRevision() const { return m_menuSettingsRevision; }
     // The game's part of the state machine
     void setPhase(Phase phase);
     // Shows a message (and adds an event)
@@ -530,12 +550,18 @@ private:
     std::array<HumanSettings, net::MAX_PEERS> m_human {};
     int m_cpuCount = 0;
     uint8_t m_cpuTeam[LOBBY_SLOTS] = {};
+    bool m_layoutSet = false;    // host: a team or color set that isn't its place's (rebuildSlots keeps the layout then)
     uint8_t m_cpuColor[LOBBY_SLOTS] = {};
     std::string m_modeName;
     std::string m_mapName;
     int m_modeId = -1;
     int m_goal = 0;
     std::string m_goalName;
+    std::array<std::string, net::MAX_PEERS> m_cpuSkins {};
+    std::vector<uint8_t> m_menuSettings;
+    uint32_t m_menuSettingsRevision = 0;
+    bool m_cpuSkinsKnown = false;
+    bool m_hostOnSettings = false;
     bool m_settingsEveryone = false;
     int m_delayOverride = -1;
     int m_inputDelay = 2;

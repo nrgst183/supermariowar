@@ -52,8 +52,6 @@ struct MapMakerBuilder {
     short platformKind = 0;    // a platform's path, and each kind's settings
     short platformSet[PLATFORM_KINDS][PLATFORM_SETTINGS] {};
     bool adjusting = false;    // the palette: a setting being changed (A, then left/right, then A)
-    bool editing = false;      // a hazard on the map being changed where it is (A on it, one of the same kind in hand)
-    short editRow = 0;         // ... the setting chosen (up / down), changed with left / right; A or B: put back
     short typeBrush = 1;       // the Types page's: 0 the tiles' own, 1..18 a TileType
     short spawnBrush = 0;      // the Spawns page's: 0 no player spawns, 1..4 a team's, 5 the items'
     short tool = 0;            // 0 pencil, 1 rectangle, 2 fill, 3 copy, 4 paste (the tiles; a rectangle, the blocks too)

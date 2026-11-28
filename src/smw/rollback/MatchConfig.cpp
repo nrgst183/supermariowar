@@ -225,6 +225,29 @@ std::vector<uint8_t> captureSimulationSettings()
     return captureSettings();
 }
 
+std::vector<uint8_t> captureLobbySettings()
+{
+    std::vector<uint8_t> bytes(8192);
+    ByteWriter w(bytes.data(), bytes.size());
+    SettingsWriter writer {w};
+    writer(game_values.gamemodemenusettings);
+    visitSimulationSettings(writer, game_values);
+    bytes.resize(w.ok() ? w.size() : 0);
+    return bytes;
+}
+
+bool applyLobbySettings(const std::vector<uint8_t>& bytes)
+{
+    //(the same build writes the same fields: another size isn't ours to read)
+    if (bytes.empty() || bytes.size() != captureLobbySettings().size())
+        return false;
+    ByteReader r(bytes.data(), bytes.size());
+    SettingsReader reader {r};
+    reader(game_values.gamemodemenusettings);
+    visitSimulationSettings(reader, game_values);
+    return r.ok() && r.remaining() == 0;
+}
+
 bool applySimulationSettings(const std::vector<uint8_t>& bytes)
 {
     return bytes.size() == captureSettings().size() && applySettings(bytes);
@@ -296,6 +319,17 @@ short cpuSkin(int slot)
         return -1;
     }
     const short count = static_cast<short>(skinlist->count());
+    //(joining: the host's pick (none: the slot's own skin, as on the host); a skin this machine
+    //doesn't have: one of its own)
+    if (lobby && !lobby->isHost() && lobby->cpuSkinsKnown()) {
+        const std::string& name = lobby->cpuSkinName(slot);
+        if (name.empty())
+            return -1;
+        for (short k = 0; k < count; k++) {
+            if (skinlist->at(static_cast<size_t>(k)).name == name)
+                return k;
+        }
+    }
     //(one picked in the lobby: its own)
     if (g_cpuPicked[s] && g_cpuSkins[s] >= 0 && g_cpuSkins[s] < count)
         return g_cpuSkins[s];
@@ -386,6 +420,54 @@ void lobbyMapCheck(std::string& ref, uint64_t& hash)
         s_hash = fileHash(file);
     }
     hash = s_hash;
+}
+
+std::string localMapName(const std::string& name, const std::string& ref, uint64_t hash)
+{
+    if (!maplist || name.empty())
+        return {};
+    const std::string own = maplist->fileOfShortName(name);
+    if (!own.empty() && (hash == 0 || fileHash(own) == hash))
+        return name;
+    const auto files = maplist->battleMapFiles();
+    //(the file the reference names)
+    if (!ref.empty() && ref[0] != '@') {
+        const std::string path = convertPath(ref);
+        for (const auto& [key, file] : files) {
+            if (file == path && (hash == 0 || fileHash(file) == hash))
+                return key;
+        }
+    }
+    if (hash == 0)
+        return own.empty() ? std::string() : name;
+    //(downloaded: from the host, in an earlier match or this one's start; put in the list to be shown)
+    for (const std::string& dir : mapDownloadDirs()) {
+        const std::string downloaded = findMapByHash(dir, hash);
+        if (!downloaded.empty())
+            return maplist->addFile(downloaded);
+    }
+    //(the same contents under another name: the name after its author's prefix the same, as a console's
+    //shortened names keep it; found once per map)
+    static std::map<uint64_t, std::string> s_found;
+    if (auto it = s_found.find(hash); it != s_found.end())
+        return it->second;
+    auto tail = [](const std::string& s) {
+        const size_t cut = s.find('_');
+        std::string t = cut == std::string::npos ? s : s.substr(cut + 1);
+        for (char& c : t)
+            c = static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
+        return t;
+    };
+    const std::string wanted = tail(name);
+    std::string found;
+    for (const auto& [key, file] : files) {
+        if (tail(key) == wanted && fileHash(file) == hash) {
+            found = key;
+            break;
+        }
+    }
+    s_found[hash] = found;
+    return found;
 }
 
 bool haveMap(const std::string& ref, uint64_t hash)

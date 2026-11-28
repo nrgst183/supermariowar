@@ -180,7 +180,7 @@ void GameplayState::drawEverything(short iCountDownState, short iScoreTextOffset
 
     drawSpotlights();
     //(the theater zoomed in on a player: it draws the scores over the zoomed picture, not zoomed)
-    if (!theaterDrawsScores() && !matchedit::hidesScoreboard())
+    if (!theaterDrawsScores())
         drawScoreboard(iScoreTextOffset);
     drawWindMeter();
     drawOutOfScreenIndicators();

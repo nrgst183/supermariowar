@@ -38,7 +38,7 @@
 // THE MAP MAKER (game_mode_mapmaker): the match is a workshop. Everyone plays the map while the
 // players with the right to build change it, live: a builder's character leaves play (it waits, as
 // after a death) and a cursor of its own paints tiles, blocks and items into g_map, the match's own
-// map. Back (Tab) starts building, the cursor where the character was, and ends it: the character spawns
+// map. L+Up (Tab) starts building, the cursor where the character was, and ends it: the character spawns
 // where the cursor is. The host's player always builds, and gives and takes the others' right (the pause
 // screen; online, the online panel).
 //
@@ -50,8 +50,8 @@
 // pictures follow the map each frame drawn (syncVisuals), a rollback's undoing too.
 //
 // The input byte while building: Left, Right, Up (Jump's bit), Down, B erase (Turbo's), A paint
-// (Powerup's), X palette (bit 6), Y layer (bit 7). Done (Back, Tab: playing, at the cursor): 0xC0 alone.
-// Undo (LT, Backspace or Ctrl+Z): 0x0F alone. While playing, bit 6 (Back, Tab) starts building, the
+// (Powerup's), X palette (bit 6), Y layer (bit 7). Done (L+Up, Tab: playing, at the cursor): 0xC0 alone.
+// Undo (RB, Backspace or Ctrl+Z): 0x0F alone. While playing, bit 6 (L+Up, Tab) starts building, the
 // cursor where the character is. While playing, bit 6 (never a
 // person's) starts building. The host's rights commands: 0xF8 | on << 2 | slot.
 
@@ -60,7 +60,7 @@ namespace {
 constexpr int SLOTS = 4;
 constexpr int BLOCK_TYPES = 15;    // the first row of the blocks' picture (gfx/packs/*/tilesets/blocks.png)
 constexpr int ITEM_TYPES = 6;      // MapItemType: springs, spikes, shoes, throw boxes
-constexpr int STRIP_ROWS = 8;      // the parts sheet: eight rows of the page (the lower part of the screen)
+constexpr int STRIP_ROWS = 3;      // the palette: a strip of the page, three rows of tiles
 
 enum Brush : uint8_t { BrushTile, BrushBlock, BrushItem, BrushWarp, BrushHazard, BrushPlatform, BrushType, BrushSpawn, BrushModeObject };
 
@@ -165,16 +165,7 @@ bool s_triggerHeld[SLOTS][2] {};   // (a trigger pressed in: one step until it's
 bool s_layerHeld[SLOTS] {};        // the layer button (Y, Shift) held on the map: Up/Down step the layer, not the cursor
 bool s_layerStepped[SLOTS] {};     // ... and stepped it since it went down (let go: no "next" then)
 bool s_layerDir[SLOTS][2] {};
-bool s_xClosed[SLOTS] {};
-// The controller's layout: LB / RB the recent parts (in the parts sheet: its pages), LT / RT undo / redo
-// (held: again and again; in the sheet: its categories), Back building / playing, Y held the tool wheel,
-// L3 the screen's things hidden
-bool s_trigDown[SLOTS][2] {};      // LT, RT held in past halfway
-bool s_trigPressed[SLOTS][2] {};   // ... pressed in since the last tick
-bool s_undoKeyHeld[SLOTS] {};      // Backspace held (undo again and again, as LT)
-bool s_wheelOpen[SLOTS] {};        // Y held on the map: the tool wheel round the hand
-int s_wheelSel[SLOTS] = {-1, -1, -1, -1};
-bool s_wheelTestHold = false;      // (the README's screenshots: the wheel kept up for its shot)    // its choice: a direction (0 up, round to 7 up-left), -1 none          // X shut the parts window: held on, it doesn't open it again
+bool s_xClosed[SLOTS] {};          // X shut the parts window: held on, it doesn't open it again
 int s_windowStepGap[SLOTS] {};     // (a page step to the window's every other tick: each a press)      // (Up, Down held last tick with it: a step a press)
 bool s_pausePressed[SLOTS] {};     // building: the pause (a pad's Start), by input device
 bool s_escPressed[SLOTS] {};       // the keyboard's Escape: the pause (the palette open: back), by input device
@@ -352,47 +343,6 @@ struct TabGroup {
 };
 const TabGroup TAB_GROUPS[] = {{"Tiles", 0, 1}, {"Blocks", 1, 2}, {"Items", 3, 1}, {"Warps", 4, 1}, {"Hazards", 5, 2},
     {"Scene", 7, 2}, {"Rules", 9, 2}, {"More", 11, 3}};
-
-// The parts sheet's categories: its tabs in five (LT / RT go along them, LB / RB along a category's
-// pages); the tools, the last tab, are on the tool wheel instead
-struct Category {
-    const char* name;
-    int tabs[5];
-    int count;
-};
-const Category CATEGORIES[] = {{"Terrain", {0, 11}, 2}, {"Blocks", {1, 2}, 2}, {"Items", {3, 13}, 2},
-    {"Gadgets", {4, 5, 6}, 3}, {"Level", {7, 8, 12, 9, 10}, 5}};
-constexpr int CATEGORY_COUNT = static_cast<int>(sizeof(CATEGORIES) / sizeof(CATEGORIES[0]));
-
-int categoryOf(int tab)
-{
-    for (int c = 0; c < CATEGORY_COUNT; c++)
-        for (int k = 0; k < CATEGORIES[c].count; k++)
-            if (CATEGORIES[c].tabs[k] == tab)
-                return c;
-    return 0;
-}
-
-// The first page of the category `step` from the tab's
-int categoryStep(int tab, int step)
-{
-    const int c = (categoryOf(tab) + step + CATEGORY_COUNT) % CATEGORY_COUNT;
-    return CATEGORIES[c].tabs[0];
-}
-
-// The page `step` from the tab, in its category (round)
-int pageStep(int tab, int step)
-{
-    const Category& c = CATEGORIES[categoryOf(tab)];
-    int at = 0;
-    for (int k = 0; k < c.count; k++)
-        if (c.tabs[k] == tab)
-            at = k;
-    return c.tabs[(at + step + c.count) % c.count];
-}
-
-// The tool wheel's items, round it from the top: the five tools, the layer, the eyedropper, pick up
-constexpr int WHEEL_ITEMS = 8, WHEEL_LAYER = 5, WHEEL_PICK = 6, WHEEL_GRAB = 7;
 
 // The mouse's commands, in its builder's byte: left and right at once (not a d-pad's, and the keys'
 // are let go of one of them), and a number in the rest: MOUSE_STEP.. a step of the cursor (a cell any
@@ -2580,42 +2530,6 @@ void builderTick(CGM_MapMaker& m, MapMakerBuilder& b, uint8_t byte, uint8_t prev
         }
         return;
     }
-    //A hazard changed where it is: picked up with its settings (one stroke with its putting back: one
-    //undo); up / down a setting, left / right its value; A or B puts it back (the cursor stays meanwhile)
-    if (b.editing) {
-        const int type = b.hazard % HAZARD_TYPES;
-        int rows = 0;
-        while (rows < HAZARD_SETTINGS && HAZARD_SETTING[type][rows].name)
-            rows++;
-        if (rows > 0) {
-            if (stepped(B_UP))
-                b.editRow = static_cast<short>((b.editRow + rows - 1) % rows);
-            if (stepped(B_DOWN))
-                b.editRow = static_cast<short>((b.editRow + 1) % rows);
-            short& value = b.hazardSet[type][b.editRow % rows];
-            if (stepped(B_LEFT))
-                value = stepSetting(HAZARD_SETTING[type][b.editRow % rows], value, -1);
-            if (stepped(B_RIGHT))
-                value = stepSetting(HAZARD_SETTING[type][b.editRow % rows], value, 1);
-        }
-        if (pressed(B_PAINT) || pressed(B_ERASE) || rows == 0) {
-            b.editing = false;
-            editCell(m, b, slot, true);
-        }
-        return;
-    }
-    if (pressed(B_PAINT) && b.brush == BrushHazard && b.tool % TOOLS == 0 && !b.anchoring) {
-        //(A on a hazard of the kind in hand: its settings, not another one on it)
-        MapMakerBuilder there = b;
-        if (pickBrush(m, there) && there.brush == BrushHazard && there.hazard == b.hazard) {
-            pickBrush(m, b);
-            b.stroke++;
-            editCell(m, b, slot, false);
-            b.editing = true;
-            b.editRow = 0;
-            return;
-        }
-    }
     if (mouse)
         mouseMove(b, mdx, mdy);
     if (stepped(B_LEFT))
@@ -3201,8 +3115,9 @@ void paletteSelect(int slot, int x, int y, int w, int h, int tipX = -1, int tipY
 
 // A builder's palette: a strip of three rows of the page, always at the bottom of the screen (it doesn't
 // move about with the cursor), its page's name in a bar over it
-// The parts sheet's tabs, along its top: the five categories (CATEGORIES), the open one's pages its
-// tabs instead, in a band of the player's color, the open page bright
+// The palette's tabs, along its top, in groups: a group's name a tab; the open group's pages its tabs
+// instead, in a band of the player's color, the open page bright (a window round them, if they don't
+// all fit)
 void drawTabs(int slot, int tab, int y)
 {
     constexpr int PAD = 8, H = 18;
@@ -3214,19 +3129,18 @@ void drawTabs(int slot, int tab, int y)
     };
     std::vector<Piece> pieces;
     size_t openPiece = 0;
-    const int open = categoryOf(tab);
-    for (int c = 0; c < CATEGORY_COUNT; c++) {
-        const Category& g = CATEGORIES[c];
-        if (c == open && g.count > 1) {
+    for (const TabGroup& g : TAB_GROUPS) {
+        const bool here = tab >= g.first && tab < g.first + g.count;
+        if (here && g.count > 1) {
             for (int k = 0; k < g.count; k++) {
-                if (g.tabs[k] == tab)
+                if (g.first + k == tab)
                     openPiece = pieces.size();
-                pieces.push_back({g.tabs[k], TAB_NAMES[g.tabs[k]], 2, 0});
+                pieces.push_back({g.first + k, TAB_NAMES[g.first + k], 2, 0});
             }
         } else {
-            if (c == open)
+            if (here)
                 openPiece = pieces.size();
-            pieces.push_back({g.tabs[0], g.name, c == open ? 3 : 0, 0});
+            pieces.push_back({g.first, g.name, here ? 3 : 0, 0});
         }
     }
     int total = 0;
@@ -3360,9 +3274,9 @@ void drawStrip(int slot, const MapMakerBuilder& b)
         ? std::vector<prompts::Prompt> {{{Pad::Left, Pad::Right}, s_mouse.active ? std::vector<std::string> {"Wheel"}
                   : std::vector<std::string> {menuKey(prompts::MENU_LEFT), menuKey(prompts::MENU_RIGHT)}, "change"},
               {{Pad::A}, {s_mouse.active ? "LMB" : menuKey(prompts::MENU_SELECT)}, "done"}}
-        : std::vector<prompts::Prompt> {{{Pad::LT, Pad::RT}, {"PgUp", "PgDn"}, "category"}, {{Pad::LB, Pad::RB}, {"Q", "E"}, "page"},
+        : std::vector<prompts::Prompt> {{{Pad::LT, Pad::RT}, {"PgUp", "PgDn"}, "tabs"},
               {{Pad::A}, {s_mouse.active ? "LMB" : menuKey(prompts::MENU_SELECT)}, settings ? "change" : onContentsPage(b) && b.py == 1 ? "add/remove" : "take"},
-              {{Pad::B}, {s_mouse.active ? "RMB" : "Esc"}, "close"}};
+              {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::B}, {s_mouse.active ? "RMB" : "Esc"}, "close"}};
     //(Y: on the tiles, the next tileset; on the blocks, hidden or not)
     std::vector<prompts::Prompt> rowY = row;
     if (!b.adjusting && b.page < static_cast<int>(tilesetCount()))
@@ -3643,23 +3557,22 @@ void drawLayerView(int layer)
 // help line under it), every square one of its item cards, the one in use framed in the player's color.
 // The layer: a button, the layer in words; a click, the next (the map shows which: drawLayerView) The mouse: a click picks one, the pointer
 // over a tool or a layer says what it is
-bool s_toolbarTip = false;
-bool s_uiHidden = false;    // L3 (H): the editor's things off the screen, the level alone to look at    // a toolbar tooltip drawn this frame (the short message waits: they'd overlap)
+bool s_toolbarTip = false;    // a toolbar tooltip drawn this frame (the short message waits: they'd overlap)
 
-void drawPartsStrip(int slot, const MapMakerBuilder& b)
+void drawBrushCard(int slot, const MapMakerBuilder& b, int barY, bool barAtTop)
 {
     s_toolbarTip = false;
     static const char* const TOOL_NAMES[TOOLS] = {"Pencil", "Rectangle", "Fill", "Copy", "Paste"};
     const SDL_Color black {0, 0, 0, 255}, white {252, 252, 252, 255}, sunk {0, 48, 104, 255};
     const SDL_Color color = slotColor(slot);
-    const int h = TOOLBAR_H, y = 0;
+    const int h = TOOLBAR_H, y = barAtTop ? barY + 24 : barY - h;
     const bool mouseOne = slot == mouseSlot();
     theme::statusBar(0, y, App::screenWidth, h);
     prompts::fill(4, y + 6, 4, h - 12, color);
     if (mouseOne)
         s_toolbarRect = {0, y, App::screenWidth, h};
 
-    //A card of the strip, as SMB3's item cards: black in a white line (its corners cut); the one in use
+    //A square of the bar, as SMB3's item cards: black in a white line (its corners cut); the one in use
     //in the player's color, a thicker line (`dim`: in use, but not for this brush); `empty`: sunk
     auto square = [&](int x, int w, bool on, bool dim, bool empty) {
         const int top = y + 4, sh = h - 8;
@@ -3672,7 +3585,7 @@ void drawPartsStrip(int slot, const MapMakerBuilder& b)
         prompts::fill(x + in, top + in, w - 2 * in, sh - 2 * in, black);
     };
 
-    //The part in hand, first: its card lit, its name after it (cut short to fit)
+    //The part in hand: its picture and name (cut short to fit); a tile's layer under it
     constexpr int NAME_W = 86;
     auto cut = [](std::string text) {
         if (rm->menu_font_small.getWidth(text.c_str()) <= NAME_W)
@@ -3681,20 +3594,20 @@ void drawPartsStrip(int slot, const MapMakerBuilder& b)
             text.pop_back();
         return text + "...";
     };
-    square(10, 36, true, false, false);
-    drawBrushPiece(b.brush, b.tile, brushPieceIndex(b), 12, y + 6);
+    drawBrushPiece(b.brush, b.tile, brushPieceIndex(b), 11, y + 6);
     const bool tiles = b.brush == BrushTile;
-    rm->menu_font_small.draw(50, y + 14, cut(brushName(b)).c_str());
+    rm->menu_font_small.draw(46, y + 14, cut(brushName(b)).c_str());
 
-    //The recent parts after it, in the order LB / RB (Q / E, the wheel) go through them (numbered for the
-    //keys 2..8); only the ones there
+    //The recent parts: the others, in the order the next goes (numbered for the keys 2..8)
     const int shown = std::min<int>(b.recentCount, MAP_MAKER_RECENT);
     if (mouseOne)
-        s_recentShown = shown;
+        s_recentShown = std::min(shown, MAP_MAKER_RECENT - 1);
     const bool numbers = s_mouse.active || prompts::lastDevice() == prompts::Device::Keyboard;
-    const int cell = 38, rx = 140;
-    for (int k = 1; k < MAP_MAKER_RECENT; k++) {
+    constexpr int RECENT_SHOWN = MAP_MAKER_RECENT - 1;    //(the bar's room: six; the keys 2..7, the wheel past them)
+    const int cell = 38, rx = 136;
+    for (int k = 1; k < RECENT_SHOWN; k++) {
         const int cx = rx + (k - 1) * cell;
+        //(only the parts there: no row of empty boxes)
         if (k >= shown)
             continue;
         square(cx, cell - 2, false, false, false);
@@ -3710,15 +3623,19 @@ void drawPartsStrip(int slot, const MapMakerBuilder& b)
         }
     }
 
-    //At the right: the tool and the layer (the controller's Y wheel changes them; a click, the next)
-    const int tx = App::screenWidth - 4 - (LAYER_W + 4) - 3 - (cell - 2);
-    square(tx, cell - 2, true, false, false);
-    drawToolIcon(b.tool % TOOLS, tx + 2, y + 6, color);
-    for (int t = 0; t < TOOLS; t++)
-        s_toolRect[t] = {};
-    if (mouseOne)
-        s_toolRect[(b.tool + 1) % TOOLS] = {tx, y + 4, cell - 2, h - 8};
-    const int lx = App::screenWidth - 4 - (LAYER_W + 4);
+    //The tools: their pictures at a tile's size, the one in use lit
+    const int tx = rx + (RECENT_SHOWN - 1) * cell + 3, tw = cell;
+    for (int t = 0; t < TOOLS; t++) {
+        const int ix = tx + t * tw;
+        square(ix, tw - 2, t == b.tool % TOOLS, false, false);
+        drawToolIcon(t, ix + 2, y + 6, color);
+        if (mouseOne)
+            s_toolRect[t] = {ix, y + 4, tw - 2, h - 8};
+    }
+
+    //The layer: a button with its name (dimmer: the brush isn't tiles); a click goes to the next (as the
+    //layer key)
+    const int lx = tx + TOOLS * tw + 3;
     square(lx, LAYER_W + 4, true, !tiles, false);
     drawLayerButton(b.layer, lx + 2, y + 6);
     for (int l = 0; l < MAPLAYERS; l++)
@@ -3726,71 +3643,20 @@ void drawPartsStrip(int slot, const MapMakerBuilder& b)
     if (mouseOne)
         s_layerRect[(b.layer + 1) % MAPLAYERS] = {lx, y + 4, LAYER_W + 4, h - 8};
 
-    //(the mouse over the tool or the layer: what a click does, under it)
+    //(the mouse over a tool or a layer: what it is, over it; the bar at the top: under it)
     if (mouseOne && s_mouse.active) {
         const SDL_Point at {s_mouse.x, s_mouse.y};
         auto tip = [&](const SDL_Rect& r, const std::string& text) {
             if (!inRect(at, r))
                 return;
-            theme::tooltip(r.x + r.w / 2, y + h + 32, text);
+            theme::tooltip(r.x + r.w / 2, barAtTop ? y + h + 32 : y - 2, text);
             s_toolbarTip = true;
         };
         for (int t = 0; t < TOOLS; t++)
-            tip(s_toolRect[t], std::string(TOOL_NAMES[b.tool % TOOLS]) + " (next: " + TOOL_NAMES[t] + ")");
+            tip(s_toolRect[t], TOOL_NAMES[t]);
         for (int l = 0; l < MAPLAYERS; l++)
             tip(s_layerRect[l], "Next: layer " + std::to_string(l + 1));
     }
-}
-
-// The tool wheel round a builder's hand (its items: WHEEL_*): cards on a ring, the chosen one lit
-void drawToolWheel(int slot, const MapMakerBuilder& b, int chosen)
-{
-    static const char* const NAMES[WHEEL_ITEMS] = {"Pencil", "Rectangle", "Fill", "Copy an area", "Paste", "Next layer",
-        "Copy what's here", "Pick up to move"};
-    static const std::vector<const char*> DROPPER = {"............KK..", "...........KRRK.", "..........KRRRK.",
-        ".........KKRRK..", "........KGKKK...", ".......KGGK.....", "......KGGK......", ".....KGGK.......", "....KGGK........",
-        "...KCCK.........", "..KCCK..........", "..KCK...........", ".KK.............", "................", "................",
-        "................"};
-    const SDL_Color black {0, 0, 0, 255}, white {252, 252, 252, 255}, color = slotColor(slot);
-    constexpr int RADIUS = 58, CARD = 36;
-    const int cx = std::clamp(b.cx * TILESIZE + TILESIZE / 2, RADIUS + CARD / 2 + 2, App::screenWidth - RADIUS - CARD / 2 - 2);
-    const int cy = std::clamp(b.cy * TILESIZE + TILESIZE / 2, TOOLBAR_H + RADIUS + CARD / 2 + 4, App::screenHeight - RADIUS - CARD / 2 - 22);
-    //(the hub: a dark disc, the player's color round it)
-    prompts::fill(cx - 10, cy - 12, 20, 24, black);
-    prompts::fill(cx - 12, cy - 10, 24, 20, black);
-    prompts::fill(cx - 8, cy - 8, 16, 16, color);
-    for (int k = 0; k < WHEEL_ITEMS; k++) {
-        const float angle = (-90.0f + 45.0f * static_cast<float>(k)) * 3.14159265f / 180.0f;
-        const int x = cx + static_cast<int>(std::lround(std::cos(angle) * RADIUS)) - CARD / 2;
-        const int y = cy + static_cast<int>(std::lround(std::sin(angle) * RADIUS)) - CARD / 2;
-        const bool on = k == chosen;
-        const SDL_Color line = on ? color : white;
-        prompts::fill(x + 1, y, CARD - 2, CARD, black);
-        prompts::fill(x, y + 1, CARD, CARD - 2, black);
-        prompts::fill(x + 2, y + 1, CARD - 4, CARD - 2, line);
-        prompts::fill(x + 1, y + 2, CARD - 2, CARD - 4, line);
-        const int in = on ? 3 : 2;
-        prompts::fill(x + in, y + in, CARD - 2 * in, CARD - 2 * in, black);
-        if (k < TOOLS) {
-            drawToolIcon(k, x + 2, y + 2, color);
-            if (k == b.tool % TOOLS)
-                prompts::fill(x + CARD / 2 - 3, y + CARD - 7, 6, 3, white);    //(the one in hand: a dot)
-        } else if (k == WHEEL_LAYER) {
-            const std::string next = "L" + std::to_string((b.layer + 1) % MAPLAYERS + 1);
-            rm->menu_font_small.drawCentered(x + CARD / 2, y + 10, next.c_str());
-        } else if (k == WHEEL_PICK) {
-            prompts::art(x + 2, y + 2, DROPPER, {{'K', black}, {'R', {216, 40, 0, 255}}, {'G', {164, 228, 252, 255}}, {'C', color}}, 2);
-        } else {
-            prompts::art(x + 5, y + 3, prompts::gloveArt(true), prompts::gloveInks(color), 2);
-        }
-    }
-    //(the chosen one's name, under the wheel)
-    const char* name = chosen >= 0 && chosen < WHEEL_ITEMS ? NAMES[chosen] : "Choose with the stick";
-    const int w = rm->menu_font_small.getWidth(name) + 14;
-    const int ny = cy + RADIUS + CARD / 2 + 4;
-    prompts::fill(cx - w / 2, ny, w, 18, black);
-    prompts::fill(cx - w / 2 + 1, ny + 1, w - 2, 16, SDL_Color {24, 40, 96, 255});
-    rm->menu_font_small.drawCentered(cx, ny + 1, name);
 }
 
 std::string s_savedPath;    // the last save's file
@@ -3918,21 +3784,6 @@ bool active()
             return true;
     }
     return false;
-}
-
-bool hidesScoreboard()
-{
-    if (!mode() || !allowed())
-        return false;
-    bool anyLocal = false;
-    for (int slot = 0; slot < SLOTS; slot++) {
-        if (!localHuman(slot))
-            continue;
-        anyLocal = true;
-        if (!building(slot))
-            return false;
-    }
-    return anyLocal;
 }
 
 bool motionFrozen()
@@ -4091,11 +3942,10 @@ void noteEvent(const SDL_Event& event)
         forDevice(event.gaxis.which, [&](int device) {
             if (event.gaxis.value > 16000 && !s_triggerHeld[device][side]) {
                 s_triggerHeld[device][side] = true;
-                s_trigPressed[device][side] = true;
+                s_tabStep[device] = side ? 1 : -1;
             } else if (event.gaxis.value < 8000) {
                 s_triggerHeld[device][side] = false;
             }
-            s_trigDown[device][side] = s_triggerHeld[device][side];
         });
     } else if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && (event.key.key == SDLK_PAGEUP || event.key.key == SDLK_PAGEDOWN)) {
         forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_tabStep[device] = event.key.key == SDLK_PAGEDOWN ? 1 : -1; });
@@ -4120,19 +3970,23 @@ void noteEvent(const SDL_Event& event)
         //(Ctrl+Y, Ctrl+Shift+Z: redo; the key's own repeat, again)
         forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_redoPressed[device] = true; });
     }
-    //LB / RB: the recent part before / after (in the parts sheet: its page before / after); L3: the
-    //screen's things hidden or shown (H on the keyboard)
-    if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN &&
-        (event.gbutton.button == SDL_GAMEPAD_BUTTON_LEFT_SHOULDER || event.gbutton.button == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
-        const int step = event.gbutton.button == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER ? 1 : -1;
-        forDevice(event.gbutton.which, [&](int device) { s_recentStep[device] = step; });
-    } else if ((event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && event.gbutton.button == SDL_GAMEPAD_BUTTON_LEFT_STICK) ||
-               (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat && event.key.key == SDLK_H)) {
-        s_uiHidden = !s_uiHidden;
+    //The undo button held (RB, Backspace): it undoes again and again
+    if ((event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP) &&
+        event.gbutton.button == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER) {
+        //(LB held: redo instead)
+        const bool down = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
+        forDevice(event.gbutton.which, [&](int device) {
+            if (down && s_lbHeld[device]) {
+                s_redoPressed[device] = s_redoHeld[device] = true;
+            } else if (down) {
+                s_undoPressed[device] = s_undoHeld[device] = true;
+            } else {
+                s_undoHeld[device] = s_redoHeld[device] = false;
+            }
+        });
     } else if ((event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) && !event.key.repeat &&
                event.key.key == SDLK_BACKSPACE) {
-        //(Backspace held: undo again and again)
-        forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_undoKeyHeld[device] = event.type == SDL_EVENT_KEY_DOWN; });
+        forDevice(DEVICE_KEYBOARD_ID, [&](int device) { s_undoHeld[device] = event.type == SDL_EVENT_KEY_DOWN; });
     }
     if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
         const bool down = event.type == SDL_EVENT_KEY_DOWN;
@@ -4141,14 +3995,16 @@ void noteEvent(const SDL_Event& event)
         if (event.key.key == SDLK_DELETE)
             s_deleteHeld = down;
     }
-    //A pad's Back (building / playing) and Start (the pause); the keyboard's Tab (the switch), Escape,
-    //Backspace or Ctrl+Z (undo). Each for the players of its device.
+    //A pad's LB (held: L+Up switches building and playing) and RB (undo); the keyboard's Tab (the
+    //switch), Backspace or Ctrl+Z (undo). Each for the players of its device.
     SDL_JoystickID from = 0;
     bool* flags = nullptr;
     bool on = true;
-    if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && event.gbutton.button == SDL_GAMEPAD_BUTTON_BACK) {
+    if ((event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || event.type == SDL_EVENT_GAMEPAD_BUTTON_UP)
+        && event.gbutton.button == SDL_GAMEPAD_BUTTON_LEFT_SHOULDER) {
         from = event.gbutton.which;
-        flags = s_switchPressed;
+        flags = s_lbHeld;
+        on = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
     } else if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && event.gbutton.button == SDL_GAMEPAD_BUTTON_START) {
         from = event.gbutton.which;
         flags = s_pausePressed;
@@ -4424,21 +4280,6 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
     const bool flip = s_switchPressed[device & 3] || (chord && !s_chordHeld[device & 3]);
     s_chordHeld[device & 3] = chord;
     s_switchPressed[device & 3] = false;
-    {
-        const int d = device & 3;
-        const bool sheet = building(slot) && m->builders[slot].palette;
-        for (int side = 0; side < 2; side++) {
-            if (!s_trigPressed[d][side])
-                continue;
-            s_trigPressed[d][side] = false;
-            if (sheet)
-                s_tabStep[d] = side ? 1 : -1;
-            else
-                (side ? s_redoPressed : s_undoPressed)[d] = true;
-        }
-        s_undoHeld[d] = s_undoKeyHeld[d] || (!sheet && s_trigDown[d][0]);
-        s_redoHeld[d] = !sheet && s_trigDown[d][1];
-    }
     const bool undo = s_undoPressed[device & 3];
     s_undoPressed[device & 3] = false;
     if (undo && building(slot)) {
@@ -4497,15 +4338,11 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
             return commandByte(step > 0 ? CMD_RECENT_NEXT : CMD_RECENT_PREV);
         }
     } else {
-        //(in the parts sheet: LB / RB its page before / after, in the category)
-        const int step = s_recentStep[device & 3];
         s_pickPressed[device & 3] = false;
         s_grabPressed[device & 3] = false;
         s_toolPressed[device & 3] = false;
         s_recentJump[device & 3] = 0;
         s_recentStep[device & 3] = 0;
-        if (step != 0 && building(slot) && m->builders[slot].palette && !m->builders[slot].adjusting)
-            return mouseTabByte(pageStep(tabOfPage(m->builders[slot].page), step));
     }
     //The triggers: the palette's tab before or after (the palette shut: it opens)
     if (s_tabStep[device & 3] != 0 && building(slot)) {
@@ -4516,7 +4353,7 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
         if (!b.palette)
             return B_PALETTE;
         if (!b.adjusting)
-            return mouseTabByte(categoryStep(tabOfPage(b.page), step));
+            return mouseTabByte((tabOfPage(b.page) + step + CYCLE_TABS) % CYCLE_TABS);
     }
     if (s_scriptByte[slot] >= 0) {
         const uint8_t byte = static_cast<uint8_t>(s_scriptByte[slot]);
@@ -4576,44 +4413,14 @@ uint8_t inputByte(int slot, int device, uint8_t gameByte)
         byte |= B_PALETTE;
     }
     const bool layerKey = keys.menu_scrollfast.fDown && !(s_mouse.active && slot == mouseSlot()) && !s_lbHeld[device & 3];
-    const bool keyboard = control && control->iDevice == DEVICE_KEYBOARD_ID;
     const MapMakerBuilder& here = m->builders[slot];
     const int d = device & 3;
     if (here.palette) {
         //(the palette's: Y as it was (its pages))
         s_layerHeld[d] = false;
         byte |= layerKey ? B_LAYER : 0;
-    } else if (layerKey && !keyboard) {
-        //(a pad's Y held on the map: the tool wheel round the hand; a direction chooses, let go takes it;
-        //nothing else while it's up)
-        if (!s_wheelOpen[d]) {
-            s_wheelOpen[d] = true;
-            s_wheelSel[d] = -1;
-        }
-        const int wx = (keys.menu_right.fDown ? 1 : 0) - (keys.menu_left.fDown ? 1 : 0);
-        const int wy = (keys.menu_down.fDown ? 1 : 0) - (keys.menu_up.fDown ? 1 : 0);
-        if (wx != 0 || wy != 0) {
-            static const int WAY[3][3] = {{7, 0, 1}, {6, -1, 2}, {5, 4, 3}};    //(by y, then x: -1..1)
-            s_wheelSel[d] = WAY[wy + 1][wx + 1];
-        }
-        return 0;
-    } else if (s_wheelOpen[d] && s_wheelTestHold) {
-        return 0;
-    } else if (s_wheelOpen[d]) {
-        s_wheelOpen[d] = false;
-        const int chosen = s_wheelSel[d];
-        s_wheelSel[d] = -1;
-        if (chosen >= 0 && chosen < TOOLS)
-            return jumpTo(JUMP_TOOL_AT + chosen);
-        if (chosen == WHEEL_LAYER)
-            return B_LAYER;
-        if (chosen == WHEEL_PICK)
-            return commandByte(CMD_PICK);
-        if (chosen == WHEEL_GRAB)
-            return commandByte(CMD_GRAB);
     } else if (layerKey) {
-        //(the keyboard's Shift held on the map: Up/Down the layer up or down (1 to 4, no wrapping round),
-        //the cursor still)
+        //(on the map, held: Up/Down the layer up or down (1 to 4, no wrapping round), the cursor still)
         if (!s_layerHeld[d]) {
             s_layerHeld[d] = true;
             s_layerStepped[d] = false;
@@ -5079,18 +4886,20 @@ void drawControlsSheet()
     };
     static const std::vector<Section> SECTIONS = {
         {"Moving and playing",
-            {{"Move the cursor", {Pad::DPad}, "Arrows", "move it"}, {"Build / play here", {Pad::Back}, "Tab", "-"},
-                {"Hide the editor", {Pad::LStick}, "H", "-"}, {"Pause, save, clear", {Pad::Start}, "Esc", "-"}}},
+            {{"Move the cursor", {Pad::DPad}, "Arrows", "move it"}, {"Build / play here", {Pad::LB, Pad::Up}, "Tab", "-"},
+                {"Pause, save, clear", {Pad::Start}, "Esc", "-"}}},
         {"Painting",
             {{"Paint", {Pad::A}, "Enter", "left button"}, {"Erase", {Pad::B}, "Delete", "right button"},
-                {"Straight line", {}, "-", "Shift + drag"}, {"Tool wheel (hold)", {Pad::Y}, "T, Shift", "click the strip"},
-                {"Layer up / down", {Pad::Y}, "Shift+Up/Dn", "Ctrl+wheel"}}},
+                {"Straight line", {}, "-", "Shift + drag"}, {"Next tool", {Pad::LB, Pad::Y}, "T", "click a tool"},
+                {"Next layer (round)", {Pad::Y}, "Shift", "click Layer"},
+                {"Layer up / down", {Pad::Y, Pad::Up, Pad::Down}, "Shift+Up/Dn", "Ctrl+wheel", 2}}},
         {"Parts",
-            {{"Parts sheet", {Pad::X}, "Space", "middle button"}, {"Recent part", {Pad::LB, Pad::RB}, "Q, E, 2-8", "wheel, click", 1},
-                {"Sheet: category", {Pad::LT, Pad::RT}, "PgUp, PgDn", "click a tab", 1},
-                {"Copy what's here", {Pad::Y}, "R", "Ctrl + left"}, {"Pick up to move", {Pad::Y}, "G", "Ctrl + right"}}},
+            {{"Parts palette", {Pad::X}, "Space", "middle button"}, {"Palette tab", {Pad::LT, Pad::RT}, "PgUp, PgDn", "click a tab", 1},
+                {"Recent part", {Pad::LB, Pad::Left, Pad::Right}, "Q, E, 2-8", "wheel, click", 2},
+                {"Copy what's here", {Pad::LB, Pad::Down}, "R", "Ctrl + left"}, {"Pick up to move", {Pad::LB, Pad::B}, "G", "Ctrl + right"}}},
         {"Undo and more",
-            {{"Undo (hold: more)", {Pad::LT}, "Bksp, Ctrl+Z", "back button"}, {"Redo (hold: more)", {Pad::RT}, "Ctrl+Y", "fwd button"}}},
+            {{"Undo (hold: more)", {Pad::RB}, "Bksp, Ctrl+Z", "back button"}, {"Redo (hold: more)", {Pad::LB, Pad::RB}, "Ctrl+Y", "fwd button"},
+                {"Screenshot", {}, "F12", "-"}}},
     };
     const SDL_Color head {0, 40, 104, 255}, dark {8, 16, 48, 255};
     const int x = 20, y = 12, w = 600, h = 456;
@@ -5397,7 +5206,7 @@ void GameplayState::drawEditMode()
     for (int slot = 0; slot < SLOTS; slot++) {
         if (building(slot) && localHuman(slot)) {
             const MapMakerBuilder& b = m.builders[slot];
-            if (b.brush == BrushTile && !b.palette && !s_uiHidden)
+            if (b.brush == BrushTile && !b.palette)
                 drawLayerView(b.layer);
             break;
         }
@@ -5439,7 +5248,7 @@ void GameplayState::drawEditMode()
     //their pipes are not seen in play; the hidden blocks, the race goals and flag bases placed too)
     //(only where they matter, not all over the map: all of a kind while a builder has its brush (the
     //hidden blocks: the blocks'), else only near a builder's cursor)
-    if (matchedit::active() && !s_uiHidden) {
+    if (matchedit::active()) {
         bool allHidden = false, allGoals = false, allHazards = false, allWarps = false;
         std::vector<SDL_Point> builders;
         for (int slot = 0; slot < SLOTS; slot++) {
@@ -5454,7 +5263,7 @@ void GameplayState::drawEditMode()
         }
         auto nearBuilder = [&](int x, int y) {
             for (const SDL_Point& c : builders)
-                if (std::abs(x - c.x) <= 2 && std::abs(y - c.y) <= 2)
+                if (std::abs(x - c.x) <= 4 && std::abs(y - c.y) <= 4)
                     return true;
             return false;
         };
@@ -5481,20 +5290,11 @@ void GameplayState::drawEditMode()
     }
     //(a builder of this machine's on the map: the grid round its cursor, marks at the cells' corners, as
     //Mario Maker's; not over the whole map)
-    //(only while the hand moves: gone a second after it stops)
     constexpr int GRID_REACH = 3;
     std::vector<SDL_Point> cursors;
-    static SDL_Point s_gridAt[SLOTS] {};
-    static Uint64 s_gridMoved[SLOTS] {};
-    for (int slot = 0; slot < SLOTS; slot++) {
-        const MapMakerBuilder& b = m.builders[slot];
-        if (s_gridAt[slot].x != b.cx || s_gridAt[slot].y != b.cy) {
-            s_gridAt[slot] = {b.cx, b.cy};
-            s_gridMoved[slot] = SDL_GetTicks();
-        }
-        if (building(slot) && localHuman(slot) && !b.palette && SDL_GetTicks() - s_gridMoved[slot] < 1000 && !s_uiHidden)
-            cursors.push_back({b.cx, b.cy});
-    }
+    for (int slot = 0; slot < SLOTS; slot++)
+        if (building(slot) && localHuman(slot) && !m.builders[slot].palette)
+            cursors.push_back({m.builders[slot].cx, m.builders[slot].cy});
     auto nearCursor = [&](int x, int y) {
         for (const SDL_Point& c : cursors)
             if (x >= c.x - GRID_REACH + 1 && x <= c.x + GRID_REACH && y >= c.y - GRID_REACH + 1 && y <= c.y + GRID_REACH)
@@ -5516,7 +5316,6 @@ void GameplayState::drawEditMode()
     bool any = false;
     int lowest = 0;
     int lowestTool = 0;
-    int highest = MAPHEIGHT;    //(this machine's builders' cursors: the one highest up)
     for (int slot = 0; slot < SLOTS; slot++) {
         if (!building(slot))
             continue;
@@ -5526,8 +5325,6 @@ void GameplayState::drawEditMode()
             lowest = b.cy;
             lowestTool = b.tool;
         }
-        if (localHuman(slot) && !b.palette)
-            highest = std::min<int>(highest, b.cy);
         //The brush at the cursor, framed in the player's color (pulsing), the player's number on it (the
         //mouse's builder: under the mouse, at once)
         const SDL_Point at = shownCell(slot, b);
@@ -5570,8 +5367,8 @@ void GameplayState::drawEditMode()
             cellFrame(f.x * TILESIZE - grow, f.y * TILESIZE - grow, TILESIZE + grow * 2, TILESIZE + grow * 2, FLASH_COLOR[f.kind % 3]);
         }
     }
-    //(what's under a builder's cursor, outlined once the cursor's rested there a moment: what B takes,
-    //the eyedropper copies; not while painting or erasing. Its name: in the parts sheet)
+    //(what's under a builder's cursor, named over it, once the cursor's rested there a moment: what B
+    //takes, the eyedropper copies; not while painting or erasing)
     static int s_restFrames[SLOTS] {};
     static SDL_Point s_restAt[SLOTS] {};
     for (int slot = 0; slot < SLOTS; slot++) {
@@ -5579,7 +5376,7 @@ void GameplayState::drawEditMode()
         const bool moved = s_restAt[slot].x != b.cx || s_restAt[slot].y != b.cy;
         s_restAt[slot] = {b.cx, b.cy};
         s_restFrames[slot] = moved || (g_sim.previousInput[slot] & (B_PAINT | B_ERASE)) ? 0 : std::min(s_restFrames[slot] + 1, 1000);
-        if (!building(slot) || !localHuman(slot) || b.palette || b.anchoring || s_restFrames[slot] < 20 || s_uiHidden)
+        if (!building(slot) || !localHuman(slot) || b.palette || b.anchoring || s_restFrames[slot] < 20)
             continue;
         MapMakerBuilder here = b;
         if (!pickBrush(m, here))
@@ -5594,6 +5391,13 @@ void GameplayState::drawEditMode()
         } else {
             cellFrame(b.cx * TILESIZE, b.cy * TILESIZE, TILESIZE, TILESIZE, amber);
         }
+        const std::string name = brushName(here);
+        const int w = rm->menu_font_small.getWidth(name.c_str()) + 10, h = 18;
+        const int x = std::clamp(b.cx * TILESIZE + TILESIZE / 2 - w / 2, 2, App::screenWidth - w - 2);
+        const int y = b.cy > 0 ? b.cy * TILESIZE - h - 2 : (b.cy + 1) * TILESIZE + 2;
+        prompts::fill(x, y, w, h, SDL_Color {0, 0, 0, 255});
+        prompts::fill(x + 1, y + 1, w - 2, h - 2, SDL_Color {24, 32, 64, 255});
+        rm->menu_font_small.draw(x + 5, y + 2, name.c_str());
     }
     //(this machine's parts window: its first open one's; the others' hands in it, on their cells, where
     //they're on its page and in sight)
@@ -5603,15 +5407,6 @@ void GameplayState::drawEditMode()
     s_windowSlot = paletteOwner(m);
     if (s_windowSlot >= 0) {
         const MapMakerBuilder& w = m.builders[s_windowSlot];
-        //(the map behind it dimmed: it's held still meanwhile, the sheet's what to look at)
-        static SDL_Surface* dim = nullptr;
-        if (!dim && (dim = SDL_CreateSurface(App::screenWidth, App::screenHeight, SDL_PIXELFORMAT_ARGB8888))) {
-            SDL_FillSurfaceRect(dim, nullptr, SDL_MapSurfaceRGBA(dim, 0, 0, 0, 255));
-            SDL_SetSurfaceBlendMode(dim, SDL_BLENDMODE_BLEND);
-            SDL_SetSurfaceAlphaMod(dim, 140);
-        }
-        if (dim && blitdest)
-            SDL_BlitSurface(dim, nullptr, blitdest, nullptr);
         const int ms = mouseSlot();
         s_mouseInWindow = ms == s_windowSlot || (ms >= 0 && m.builders[ms].palette && m.builders[ms].page == w.page);
         drawStrip(s_windowSlot, w);
@@ -5638,11 +5433,8 @@ void GameplayState::drawEditMode()
         const MapMakerBuilder& b = m.builders[slot];
         const bool down = (g_sim.previousInput[slot] & (B_PAINT | B_ERASE)) && g_sim.previousInput[slot] != B_UNDO;
         const SDL_Point at = shownCell(slot, b);
-        //(in a parts window: not shown in this one (another machine's, or out of sight): no hand; the
-        //screen's things hidden (L3): none on the map either)
+        //(in a parts window: not shown in this one (another machine's, or out of sight): no hand)
         if (b.palette && !s_paletteCellShown[slot])
-            continue;
-        if (!b.palette && s_uiHidden)
             continue;
         const SDL_Rect cell = b.palette ? s_paletteCell[slot] : SDL_Rect {at.x * TILESIZE, at.y * TILESIZE, TILESIZE, TILESIZE};
         //(the mouse's: its fingertip on the pointer, exactly)
@@ -5674,36 +5466,8 @@ void GameplayState::drawEditMode()
             }
         }
     }
-    //A hazard being changed where it is: its settings in a panel by it, the one chosen lit
-    for (int slot = 0; slot < SLOTS; slot++) {
-        const MapMakerBuilder& b = m.builders[slot];
-        if (!building(slot) || !localHuman(slot) || !b.editing)
-            continue;
-        const int type = b.hazard % HAZARD_TYPES;
-        std::vector<std::string> lines;
-        for (int r = 0; r < HAZARD_SETTINGS && HAZARD_SETTING[type][r].name; r++)
-            lines.push_back(std::string(HAZARD_SETTING[type][r].name) + ": " + settingText(HAZARD_SETTING[type][r], b.hazardSet[type][r]));
-        int w = rm->menu_font_small.getWidth(HAZARD_NAMES[type]) + 16;
-        for (const std::string& l : lines)
-            w = std::max(w, rm->menu_font_small.getWidth(l.c_str()) + 28);
-        const int h = 26 + 18 * static_cast<int>(lines.size()) + 6;
-        const int x = b.cx * TILESIZE + TILESIZE + 8 + w < App::screenWidth ? b.cx * TILESIZE + TILESIZE + 8 : b.cx * TILESIZE - w - 8;
-        const int y = std::clamp(b.cy * TILESIZE - 8, TOOLBAR_H + 4, App::screenHeight - h - 4);
-        theme::statusFrame(x, y, w, h);
-        rm->menu_font_small.draw(x + 10, y + 7, HAZARD_NAMES[type]);
-        for (size_t r = 0; r < lines.size(); r++) {
-            const int ly = y + 26 + 18 * static_cast<int>(r);
-            if (static_cast<int>(r) == b.editRow % static_cast<int>(lines.size())) {
-                prompts::fill(x + 8, ly - 1, w - 16, 17, slotColor(slot));
-                rm->menu_font_small.draw(x + 10, ly, "<");
-                rm->menu_font_small.drawRightJustified(x + w - 10, ly, ">");
-            }
-            rm->menu_font_small.draw(x + 20, ly, lines[r].c_str());
-        }
-    }
-    //The parts strip at the top, if one of this machine's players builds (not while its parts sheet is
-    //open: that has its own; not with the screen's things hidden, L3). It stays there: a cursor under
-    //it, it's see-through, the cells behind it showing (drawn on a layer of its own, put over faded)
+    //What the builders' buttons do: a bar at the bottom, if one of this machine's players builds
+    //(not while one's palette is open: it has its own, and the bar would cover its last row)
     bool local = false, palette = false;
     for (int slot = 0; slot < SLOTS; slot++) {
         local = local || (building(slot) && localHuman(slot));
@@ -5711,11 +5475,14 @@ void GameplayState::drawEditMode()
     }
     using prompts::Pad;
     using prompts::menuKey;
-    const bool barShown = any && local && !palette && !s_uiHidden;
-    const SDL_Rect barRect {0, 0, App::screenWidth, TOOLBAR_H};
+    //(always at the bottom (the screen's things don't move about); a cursor under it: the bar see-through,
+    //the cells behind it showing: drawn on a layer of its own, put over the map faded)
+    const int barY = App::screenHeight - 24;
+    const bool barShown = any && local && !palette;
+    const SDL_Rect barRect {0, barY - TOOLBAR_H, App::screenWidth, App::screenHeight - (barY - TOOLBAR_H)};
     static SDL_Surface* barLayer = nullptr;
     SDL_Surface* const screen = blitdest;
-    const bool underBar = highest * TILESIZE < barRect.y + barRect.h;
+    const bool underBar = lowest * TILESIZE + TILESIZE > barRect.y;
     if (barShown && underBar && screen && !barLayer)
         barLayer = SDL_CreateSurface(App::screenWidth, App::screenHeight, SDL_PIXELFORMAT_ARGB8888);
     const bool seeThrough = barShown && underBar && screen && barLayer;
@@ -5725,66 +5492,68 @@ void GameplayState::drawEditMode()
         SDL_SetSurfaceAlphaMod(barLayer, 120);
         blitdest = barLayer;
     }
-    int tipSlot = -1;
     if (barShown) {
-        //(this machine's builder's strip: the first of them)
+        theme::statusBar(0, barY, App::screenWidth, 24);
+        //(this machine's builder's toolbar: the first of them)
         for (int slot = 0; slot < SLOTS; slot++) {
             if (building(slot) && localHuman(slot)) {
-                drawPartsStrip(slot, m.builders[slot]);
-                tipSlot = slot;
+                drawBrushCard(slot, m.builders[slot], barY, barY == 0);
                 break;
             }
         }
+        //(only the main ones; the rest on the controls sheet. The mouse's buttons if it was used last, else
+        //the keys)
+        const bool mouse = s_mouse.active;
+        std::vector<prompts::Prompt> row {{{Pad::A}, {mouse ? "LMB" : menuKey(prompts::MENU_SELECT)}, lowestTool == 1 ? "rectangle" : lowestTool == 2 ? "fill"
+                : lowestTool == 3 ? "copy" : lowestTool == 4 ? "paste" : "paint"},
+            {{Pad::B}, {mouse ? "RMB" : "Del"}, "erase"},
+            {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "parts"},
+            {{Pad::RB}, {"Bksp"}, "undo"}, {{Pad::LB, Pad::Up}, {"Tab"}, "play here"},
+            {{Pad::Start}, {"F1"}, "all controls"}};
+        //(the tips done (paint, the parts, undo: known): only these two, the rest on the controls sheet)
+        if (tipsDone() == (1 << TIPS) - 1)
+            row = {row[4], row[5]};
+        int gap = 14;
+        const int room = App::screenWidth - 8;
+        if (prompts::promptsWidth(row, gap) > room)
+            gap = 8;
+        if (prompts::promptsWidth(row, gap) > room && row.size() > 5)
+            row[5].label = "help";
+        prompts::drawPrompts(App::screenWidth / 2, barY + 2, row, gap);
     }
     if (seeThrough) {
         blitdest = screen;
         SDL_Rect to = barRect;
         SDL_BlitSurface(barLayer, &barRect, screen, &to);
     }
-    //A first-time hint (the first not done yet), by that builder's hand: what to press
-    bool anyWheel = false;
-    for (bool open : s_wheelOpen)
-        anyWheel = anyWheel || open;
-    if (barShown && tipSlot >= 0 && tipsDone() != (1 << TIPS) - 1 && !anyWheel) {
+    //A first-time hint (the first not done yet), at the top: what to press, for this machine's builder
+    if (barShown && tipsDone() != (1 << TIPS) - 1) {
         const bool mouse = s_mouse.active;
         int tip = 0;
         while ((tipsDone() >> tip) & 1)
             tip++;
         const prompts::Prompt hint = tip == 0 ? prompts::Prompt {{Pad::A}, {mouse ? "LMB" : menuKey(prompts::MENU_SELECT)}, "paints (hold it and move: a line)"}
-            : tip == 1 ? prompts::Prompt {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "the parts: blocks, items, hazards..."}
-                       : prompts::Prompt {{Pad::LT}, {"Bksp"}, "undoes (as far back as you like)"};
-        const int pw = prompts::promptsWidth({hint}, 14);
-        const int w = pw + 16, hh = 22;
-        const MapMakerBuilder& tb = m.builders[tipSlot];
-        const int handX = tb.cx * TILESIZE + TILESIZE / 2, handY = tb.cy * TILESIZE;
-        const int x = std::clamp(handX - w / 2, 4, App::screenWidth - w - 4);
-        //(over the hand; under it near the top, below the strip)
-        const int y = handY - hh - 26 > TOOLBAR_H + 4 ? handY - hh - 26 : handY + TILESIZE + 30;
-        prompts::fill(x, y, w, hh, SDL_Color {0, 0, 0, 255});
-        prompts::fill(x + 1, y + 1, w - 2, hh - 2, SDL_Color {200, 152, 24, 255});
-        prompts::fill(x + 2, y + 2, w - 4, hh - 4, SDL_Color {24, 40, 96, 255});
-        prompts::drawPrompts(x + w / 2, y + 3, {hint}, 14);
+            : tip == 1 ? prompts::Prompt {{Pad::X}, {mouse ? "MMB" : menuKey(prompts::MENU_RANDOM)}, "opens the parts: blocks, items, hazards..."}
+                       : prompts::Prompt {{Pad::RB}, {"Bksp"}, "undoes (as far back as you like)"};
+        const std::string head = "Tip " + std::to_string(tip + 1) + " of " + std::to_string(TIPS) + ":";
+        const int hw = rm->menu_font_small.getWidth(head.c_str());
+        const int w = hw + 10 + prompts::promptsWidth({hint}, 14) + 24, h = 24;
+        const int x = App::screenWidth / 2 - w / 2, y = barY == 0 ? 24 + TOOLBAR_H + 34 : 30;
+        prompts::fill(x, y, w, h, SDL_Color {0, 0, 0, 255});
+        prompts::fill(x + 1, y + 1, w - 2, h - 2, SDL_Color {200, 152, 24, 255});
+        prompts::fill(x + 2, y + 2, w - 4, h - 4, SDL_Color {24, 40, 96, 255});
+        rm->menu_font_small.draw(x + 12, y + 5, head.c_str());
+        prompts::drawPrompts(x + 12 + hw + 10 + prompts::promptsWidth({hint}, 14) / 2, y + 4, {hint}, 14);
     }
-    //A short message (what was just done), under the strip a moment
-    if (!s_toast.empty() && SDL_GetTicks() - s_toastAt < 1600 && !palette && !(barShown && s_toolbarTip) && !s_uiHidden) {
+    //A short message (what was just done), over the toolbar a moment
+    if (!s_toast.empty() && SDL_GetTicks() - s_toastAt < 1600 && !palette && !(barShown && s_toolbarTip)) {
         const int tw = rm->menu_font_small.getWidth(s_toast.c_str()) + 20, th = 20;
         const int tx = App::screenWidth / 2 - tw / 2;
-        const int ty = barShown ? TOOLBAR_H + 6 : 6;
+        const int ty = !barShown ? App::screenHeight - th - 6 : barY == 0 ? 24 + TOOLBAR_H + 6 : barY - TOOLBAR_H - th - 6;
         prompts::fill(tx, ty, tw, th, SDL_Color {0, 0, 0, 255});
         prompts::fill(tx + 1, ty + 1, tw - 2, th - 2, SDL_Color {24, 40, 96, 255});
         rm->menu_font_small.drawCentered(App::screenWidth / 2, ty + 3, s_toast.c_str());
     }
-    //The tool wheel (a pad's Y held), round its builder's hand: the eight items, the one chosen lit in the
-    //player's color, its name under the wheel
-    bool wheelUp = false;
-    for (int slot = 0; slot < SLOTS && !s_uiHidden; slot++) {
-        const MapMakerBuilder& b = m.builders[slot];
-        if (!building(slot) || !localHuman(slot) || b.palette || !s_wheelOpen[deviceOf(slot) & 3])
-            continue;
-        drawToolWheel(slot, b, s_wheelSel[deviceOf(slot) & 3]);
-        wheelUp = true;
-    }
-    (void)wheelUp;
     //The controls sheet over it all (paused: the pause menu draws it)
     if (s_helpOpen && !game_values.flags.pausegame)
         matchedit::drawControlsSheet();
@@ -5886,18 +5655,7 @@ bool GameplayState::autoTestEditScript(int f)
             add({562});
             add({0}, 6);
             add({563, 564});
-            add({0}, 10);
-            //(the tool wheel up (579: as Y held, Rectangle chosen), shot (580), put away (581))
-            add({579});
-            add({0}, 4);
-            add({580, 581});
-            //(the fire bar changed where it is: copied (the eyedropper), A on it, its length one more, shot
-            //(582), A: put back)
-            at(11, 6);
-            add({commandByte(CMD_PICK), 0, B_PAINT, 0, B_RIGHT, 0});
-            add({0}, 6);
-            add({582, B_PAINT, 0});
-            add({0}, 20);
+            add({0}, 30);
             return false;
         }
         if (cmd::g_autotest.mmDemo) {
@@ -6054,10 +5812,10 @@ bool GameplayState::autoTestEditScript(int f)
         //cells down, a flame cannon facing up (its facing: A, right twice, A))
         add({B_PALETTE, 0, B_PALETTE, 0, B_DOWN, 0, B_PAINT, 0, B_RIGHT, 0, B_RIGHT, 0, 256 + 12, B_PAINT, 0, B_ERASE, 0});
         add({B_PAINT, 0});
-        //(the brush's settings set back to the fire bar's first; the eyedropper on it: its length (7) again;
-        //A on it: its settings where it is (picked up), A again: put back, the same fire bar (522))
+        //(the brush's settings set back to the fire bar's first; the eyedropper on it: its length (7) again,
+        //painted, the same fire bar (522))
         add({521, B_PALETTE, 0, B_DOWN, 0, B_PAINT, 0, B_LEFT, 0, B_LEFT, 0, B_PAINT, 0, B_ERASE, 0});
-        add({commandByte(CMD_PICK), 0, B_PAINT, 0, B_PAINT, 0, 0, 522});
+        add({commandByte(CMD_PICK), 0, B_PAINT, 0, 0, 522});
         add({B_DOWN, 0}, 2);
         add({B_LEFT, 0}, 4);
         add({B_PALETTE, 0, B_RIGHT, 0, B_RIGHT, 0, B_RIGHT, 0, B_DOWN, 0, B_DOWN, 0, B_PAINT, 0, B_RIGHT, 0, B_RIGHT, 0, B_PAINT, 0, B_ERASE, 0});
@@ -6387,22 +6145,6 @@ bool GameplayState::autoTestEditScript(int f)
         } else if (byte == 517) {
             printf("keytest: paused %d, quitting %d, building %d\n", game_values.flags.pausegame ? 1 : 0, game_values.flags.exitinggame ? 1 : 0, building(0) ? 1 : 0);
             byte = 0;
-        } else if (byte >= 579 && byte <= 582) {
-            const int d = deviceOf(0) & 3;
-            if (byte == 582) {
-                shot("s5_edit");
-            } else if (byte == 579) {
-                s_wheelOpen[d] = true;
-                s_wheelSel[d] = 1;
-                s_wheelTestHold = true;
-            } else if (byte == 580) {
-                shot("s4_wheel");
-            } else {
-                s_wheelOpen[d] = false;
-                s_wheelSel[d] = -1;
-                s_wheelTestHold = false;
-            }
-            byte = -1;
         } else if (byte >= 570 && byte <= 577) {
             //(the layer key's test: 570/571 Left Shift down/up, 572/573 Up, 574/575 Down; 576 the layer;
             //577 nothing. No scripted byte: the builder's keys are read as a person's)

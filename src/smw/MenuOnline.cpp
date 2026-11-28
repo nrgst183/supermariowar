@@ -2,6 +2,8 @@
 // lobby to the usual match menus and back. The backend is rollback/NetGame.h and NetLobby.h.
 #include "GSMenu.h"
 
+#include "menu/ModeOptionsMenu.h"
+#include "rollback/MatchConfig.h"
 #include "rollback/NetGame.h"
 
 #include "GameValues.h"
@@ -449,6 +451,24 @@ void MenuState::HandleOnlineEvents()
                 break;
 
             case Type::ReturnedToLobby:
+                //A single game over (or the host ended it): everyone back to the match settings, the host to
+                //choose the next one, the others to see it
+                //(wherever the match was started from: the lobby or the settings)
+                if (!mOnlineSetup && !net.seriesActive() && net.editActivity() == 0 && !mGameSettingsMenu->MapMakerSession()
+                    && (net.isHost() ? mOnlineSeriesType == MatchType::SingleGame && !mOnlineMinigame
+                                     : lobby->modeId() >= 0 && lobby->modeId() < GAMEMODE_LAST && lobby->mapName() != "(minigame)")) {
+                    mGameSettingsMenu->SetOnlineView(UI_GameSettingsMenu::OnlineView::Off);
+                    mOnlineLobbyMenu->CloseDialog();
+                    if (net.isHost()) {
+                        mOnlineView = false;
+                        mOnlineSetup = true;
+                        mMatchSelectionMenu->SetOnlineMode(true, false);
+                        OpenOnlineGameSettings();
+                    } else {
+                        OpenOnlineSettingsView();
+                    }
+                    break;
+                }
                 if (mCurrentMenu != mOnlineLobbyMenu.get() && !mOnlineSetup) {
                     mOnlineView = false;
                     mGameSettingsMenu->SetOnlineView(UI_GameSettingsMenu::OnlineView::Off);
@@ -553,6 +573,7 @@ void MenuState::OpenOnlineSettingsView()
     mOnlineShownMode = -1;
     mOnlineShownGoal = -1;
     mOnlineShownMap.clear();
+    mOnlineShownHostMap.clear();
     mOnlineMapHere = false;
     mOnlineViewPending = 0;
 
@@ -590,6 +611,8 @@ void MenuState::SyncOnlineSettings()
 
     if (net.isHost()) {
         ApplyOnlineSettingRequests();
+        //(the others follow us to the settings screens and back)
+        lobby->setHostOnSettings(mOnlineSetup);
 
         // The lobby shows the mode, goal and map the host picks as it picks them
         if (mOnlineSetup && mCurrentMenu == mGameSettingsMenu.get() && mOnlineSeriesType == MatchType::SingleGame && !mOnlineMinigame) {
@@ -601,6 +624,29 @@ void MenuState::SyncOnlineSettings()
             }
         }
         return;
+    }
+
+    //The host opened its settings screens: ours open too (from the lobby, nothing else up); it went
+    //back: so do we. Only as it moves: we may go back to the lobby ourselves meanwhile
+    if (lobby->hostOnSettings() != mOnlineHostOnSettings) {
+        mOnlineHostOnSettings = lobby->hostOnSettings();
+        const bool single = lobby->modeId() >= 0 && lobby->modeId() < GAMEMODE_LAST && lobby->mapName() != "(minigame)";
+        if (mOnlineHostOnSettings && single && mCurrentMenu == mOnlineLobbyMenu.get() && mOnlineLobbyMenu->dialog() == UI_OnlineLobbyMenu::Dialog::None
+            && lobby->phase() == rollback::NetLobby::Phase::Lobby && net.editActivity() == 0 && !rollback::isEditorModeId(lobby->modeId()))
+            OpenOnlineSettingsView();
+        else if (!mOnlineHostOnSettings && mOnlineView && mCurrentMenu == mGameSettingsMenu.get())
+            CloseOnlineSettingsView();
+    }
+
+    //The host's rules and options (Frenzy's items, ...), as its menus have them: ours show the same, on
+    //the settings screen and the rules screens under it (changed here, they go back to the host's)
+    if (lobby->phase() == rollback::NetLobby::Phase::Lobby && !lobby->menuSettings().empty()) {
+        const bool arrived = lobby->menuSettingsRevision() != mOnlineMenuSettingsRevision;
+        if (arrived || (mOnlineView && ++mOnlineMenuSettingsCheck % 15 == 0 && rollback::captureLobbySettings() != lobby->menuSettings())) {
+            mOnlineMenuSettingsRevision = lobby->menuSettingsRevision();
+            if (rollback::applyLobbySettings(lobby->menuSettings()))
+                mModeOptionsMenu->Refresh();
+        }
     }
 
     if (mOnlineView && mCurrentMenu == mGameSettingsMenu.get())
@@ -705,8 +751,11 @@ void MenuState::SyncOnlineSettingsView()
             mOnlineShownGoal = menu.miGoalField[modeId]->currentValue();
         }
         // (looking for the map selects it in the map list, so only when it changed, or isn't here yet)
-        if (mOnlineShownMap != mapName || !mOnlineMapHere) {
-            mOnlineMapHere = !mapName.empty() && maplist->findexact(mapName.c_str(), false);
+        if (mOnlineShownHostMap != mapName || !mOnlineMapHere) {
+            mOnlineShownHostMap = mapName;
+            //(the preview from our own copy: by its name, else its file or contents, see localMapName)
+            const std::string local = rollback::localMapName(mapName, lobby->mapRef(), lobby->mapHash());
+            mOnlineMapHere = !local.empty() && maplist->findexact(local.c_str(), false);
             if (mOnlineMapHere) {
                 menu.miMapField->LoadCurrentMap();
                 mOnlineShownMap = menu.GetCurrentMapName();

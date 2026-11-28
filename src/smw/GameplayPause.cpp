@@ -67,7 +67,11 @@ void drawExitPauseDialog()
 
     if (game_values.flags.exitinggame) {
         menupanel::dialogBox(170, 172, 300, 128);
-        if (rollback::NetGame::instance().inMatch()) {
+        if (rollback::NetGame::instance().inMatch() && rollback::NetGame::instance().isHost()) {
+            //The host: the match ends for everyone, all back to the lobby's team and character selection
+            rm->menu_font_large.drawCentered(App::screenWidth / 2, 192, "End the match?");
+            rm->menu_font_small.drawCentered(App::screenWidth / 2, 222, "Everyone goes back to the lobby");
+        } else if (rollback::NetGame::instance().inMatch()) {
             //Leaving disconnects us from the others: the match ends for everyone
             rm->menu_font_large.drawCentered(App::screenWidth / 2, 192, "Leave the match?");
             rm->menu_font_small.drawCentered(App::screenWidth / 2, 222, "It ends for everyone");
@@ -118,6 +122,12 @@ void closeOnlinePanel()
 void drawOnlinePanel()
 {
     rollback::NetGame& net = rollback::NetGame::instance();
+    //(a desync, panel or not: the games on the machines differ from that frame on)
+    if (net.inMatch() && net.desyncFrame() >= 0) {
+        const std::string text = "Out of sync with player " + std::to_string(net.desyncPeer() + 1) + "'s machine since frame "
+            + std::to_string(net.desyncFrame());
+        rm->menu_font_small.drawCentered(320, 466, text);
+    }
     if (!onlinePanelOpen() || !net.inMatch())
         return;
 
@@ -293,6 +303,15 @@ bool updateExitPauseDialog(short iCountDownState) // true on exit
                     game_values.flags.exityes = false;
 
                 if (playerKeys->menu_select.fPressed) {
+                    //(the online host: the match ends for everyone at a frame they all agree on, then the lobby)
+                    if (game_values.flags.exityes && rollback::NetGame::instance().inMatch() && rollback::NetGame::instance().isHost()) {
+                        rollback::NetGame::instance().endMatchForEveryone();
+                        game_values.flags.exitinggame = false;
+                        game_values.flags.exityes = false;
+                        game_values.flags.pausegame = false;
+                        game_values.playerInput.ResetKeys();
+                        break;
+                    }
                     if (game_values.flags.exityes) {
                         CleanUp();
                         game_values.flags.exitinggame = false;

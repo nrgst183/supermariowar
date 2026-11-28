@@ -2746,14 +2746,17 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                     shotTaken = true;
                     shot("09_host_map_upload");
                 }
-                if (g_autoTestMatchesDone >= 1 && lobby && lobby->phase() == Phase::Lobby && mCurrentMenu == mOnlineLobbyMenu.get() && t > 40) {
-                    shot("10_team_host_after_match");
+                //(a single game over: back on the match settings, then to the lobby)
+                if (g_autoTestMatchesDone >= 1 && lobby && lobby->phase() == Phase::Lobby && mCurrentMenu == mGameSettingsMenu.get() && t > 40) {
+                    shot("10_host_settings_after_match");
                     next();
                 }
                 timedOut(60 * 60, "the match to end");
                 return MENU_CODE_NONE;
 
             case 11:
+                if (t == 2 && mCurrentMenu == mGameSettingsMenu.get())
+                    ReturnToOnlineLobby();    //(the screenshot taken: to the lobby)
                 if (t == 4)
                     return MENU_CODE_ONLINE_LEAVE;
                 if (t == 12)
@@ -2858,8 +2861,9 @@ MenuCodeEnum MenuState::ShotsMenuUpdate()
                 shotTaken = true;
                 shot("20_joiner_map_download");
             }
-            if (g_autoTestMatchesDone >= 1 && lobby && lobby->phase() == Phase::Lobby && mCurrentMenu == mOnlineLobbyMenu.get() && t > 40) {
-                shot("21_team_joiner_after_match");
+            //(a single game over: the host's match settings shown)
+            if (g_autoTestMatchesDone >= 1 && lobby && lobby->phase() == Phase::Lobby && mCurrentMenu == mGameSettingsMenu.get() && mOnlineView && t > 40) {
+                shot("21_joiner_settings_after_match");
                 next();
             }
             timedOut(60 * 60, "the match to end");

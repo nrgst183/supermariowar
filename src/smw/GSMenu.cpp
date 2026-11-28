@@ -826,6 +826,49 @@ void MenuState::onEnterState()
     OnlineSeriesAfterMatch();
 }
 
+// As many players on this machine as controllers are plugged in: when the game starts (once they've
+// been found) and each time one is plugged in or pulled out. Chosen otherwise in the menus, that
+// stays until the next change. No controller (a PC's keyboard): the players as they were
+void MenuState::FollowControllers()
+{
+    if (cmd::g_autotest.enabled)
+        return;
+    static int s_followed = -1;
+    int count = 0;
+#ifdef SMW_XBOX
+    count = SDL_XboxConnectedControllers();
+#else
+    SDL_free(SDL_GetGamepads(&count));
+#endif
+    static const void* s_followedLobby = nullptr;
+    rollback::NetLobby* lobby = rollback::NetGame::instance().lobby();
+    //(in a lobby: once we're in it (a joiner starts with one player), and again on a change)
+    const bool inLobby = lobby && lobby->localPeer() >= 0 && lobby->phase() == rollback::NetLobby::Phase::Lobby;
+    if (lobby && !inLobby)
+        return;
+    if (count <= 0 || (count == s_followed && lobby == s_followedLobby))
+        return;
+    s_followed = count;
+    s_followedLobby = lobby;
+    const int players = std::min(count, rollback::MAX_LOCAL_PLAYERS);
+
+    if (inLobby) {
+        lobby->setLocalPlayers(players);
+        return;
+    }
+    if (mLocalSetup.valid)
+        mLocalSetup.localPlayers = players;
+    //(the main menu's players: humans first, the CPUs kept; two at least, as the main menu has)
+    int cpus = 0;
+    for (int k = 0; k < 4; k++)
+        cpus += game_values.playercontrol[k] == 2;
+    cpus = std::min(cpus, 4 - players);
+    if (players + cpus < 2)
+        cpus = 2 - players;
+    for (int k = 0; k < 4; k++)
+        game_values.playercontrol[k] = k < players ? 1 : k < players + cpus ? 2 : 0;
+}
+
 void MenuState::update()
 {
 #ifdef SMW_HAS_EDITORS
@@ -900,6 +943,7 @@ void MenuState::update()
             UpdateOnlineVote();
         }
         SyncOnlineSettings();
+        FollowControllers();
 
         //--replay: plays it once, at startup
         static bool replayFromArgsStarted = false;

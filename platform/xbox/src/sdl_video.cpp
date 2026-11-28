@@ -57,6 +57,7 @@ constexpr int k_screen_w = 640;
 constexpr int k_screen_h = 480;
 
 SDL_Window* g_window = nullptr;
+bool g_device_up = false;
 D3DTexture* g_frame_textures[2] = {nullptr, nullptr};
 D3DTexture* g_frame_textures16[2] = {nullptr, nullptr};    //(a 16-bit frame's: an editor's own screens)
 int g_frame_index = 0;
@@ -138,6 +139,7 @@ bool createDevice(SDL_Renderer* renderer)
     g_sdlx_back_buffers = static_cast<int>(pp.BackBufferCount);
     if (FAILED(hr))
         return SDL_SetError("Direct3D_CreateDevice failed (0x%08x)", static_cast<unsigned>(hr));
+    g_device_up = true;
 
     D3DVIEWPORT8 vp;
     ZeroMemory(&vp, sizeof(vp));
@@ -265,6 +267,14 @@ DWORD presentTexture(const SDL_Texture* texture)
 void sdlx_video_quit()
 {
     // The display stays up until the title exits; nothing to tear down
+}
+
+void sdlx_video_shutdown()
+{
+    if (!g_device_up)
+        return;
+    D3DDevice_BlockUntilIdle();
+    D3DDevice_PersistDisplay();
 }
 
 

@@ -415,6 +415,7 @@ void NetGame::shutdown()
     if (m_transport)
         m_transport->close(500);
     m_inMatch = false;
+    m_endAtFrame = -1;
     FPSLimiter::instance().setTickStretch(1.0f);
     m_session.reset();
     m_lobby.reset();
@@ -582,6 +583,7 @@ void NetGame::endMatchToReconnect()
         printStats(true);
     m_session.reset();
     m_inMatch = false;
+    m_endAtFrame = -1;
     m_spectating = false;
     m_late = Late::None;
     m_waiting = false;
@@ -814,6 +816,18 @@ void NetGame::updateMatchInfo(uint32_t nowMs)
 {
     if (nowMs - m_lastInfoMs < 250)
         return;
+    //The CPU players' skins as picked here (random ones too): the others show the same
+    {
+        std::array<std::string, net::MAX_PEERS> names {};
+        for (int slot = 0; slot < net::MAX_PEERS && slot < INPUT_MAX_PLAYERS; slot++) {
+            const short skin = cpuSkin(slot);
+            if (skin >= 0 && skinlist && static_cast<size_t>(skin) < skinlist->count())
+                names[static_cast<size_t>(slot)] = skinlist->at(static_cast<size_t>(skin)).name;
+        }
+        m_lobby->setCpuSkins(names);
+    }
+    //(the rules and options the menus have: the others' settings screens show them)
+    m_lobby->setMenuSettings(captureLobbySettings());
     //A lobby that edits together: the editor and the document (the game's menus may not be there:
     //the editor runs)
     if (m_editActivity != 0) {
@@ -945,6 +959,8 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
             m_pendingConfig = true;
             m_configBytes.assign(bytes, bytes + length);
             m_matchId = matchId;
+            m_desyncFrame = -1;
+            m_endAtFrame = -1;
             m_configAccepted = false;
             m_waitingForMap = false;
             break;
@@ -984,6 +1000,17 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
             const uint8_t matchId = r.u8();
             if (r.ok() && peer == 0 && !isHost() && m_configAccepted && matchId == m_matchId && m_lobby->phase() == NetLobby::Phase::Starting)
                 beginMatch();
+            break;
+        }
+
+        case net::MsgType::MatchEnd: {
+            const uint8_t matchId = r.u8();
+            const uint32_t frame = r.u32();
+            if (!r.ok() || peer != 0 || isHost() || matchId != m_matchId || !inMatch())
+                break;
+            //(should it have come late, past that frame here: from the next one)
+            m_endAtFrame = std::max(static_cast<int>(frame), m_session ? m_session->frame() : g_sim.tick);
+            printf("netplay: the host ends match %d at frame %d\n", m_matchId, m_endAtFrame);
             break;
         }
 
@@ -1076,6 +1103,8 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
                     error = "no connection to " + peerName(slot.peer);
             }
             m_matchId = matchId;
+            m_desyncFrame = -1;
+            m_endAtFrame = -1;
             uint8_t buffer[256];
             net::ByteWriter w(buffer, sizeof(buffer));
             w.u8(static_cast<uint8_t>(net::MsgType::LateAck));
@@ -1449,6 +1478,9 @@ void NetGame::returnToLobby(const std::string& abortReason)
 
 void NetGame::beginMatch()
 {
+    //(a new match: nobody has ended it, nor gone out of sync in it)
+    m_endAtFrame = -1;
+    m_desyncFrame = -1;
     //Parse the host's own config from the bytes too: every peer starts from the same copy
     const std::vector<uint8_t> bytes = m_config.serialize();
     MatchConfig config;
@@ -1799,6 +1831,7 @@ void NetGame::endMatchHere(Outcome& outcome)
     printf("netplay: match %d ended at frame %d (watched)\n", m_matchId, g_sim.tick);
     outcome.ended = true;
     m_inMatch = false;
+    m_endAtFrame = -1;
     m_spectating = false;
     m_late = Late::None;
     m_matchEndMs = monotonicMs();
@@ -1872,6 +1905,23 @@ void NetGame::applyHandovers(uint32_t nowMs)
 }
 
 // ---- the match
+
+void NetGame::endMatchForEveryone()
+{
+    if (!m_session || !isHost() || !inMatch() || m_endAtFrame >= 0)
+        return;
+    //(far enough ahead that nobody has confirmed it yet: our inputs reach that far at most, plus a
+    //second for the message to get there)
+    const int frame = m_session->frame() + inputDelay() + 60;
+    m_endAtFrame = frame;
+    uint8_t buffer[8];
+    net::ByteWriter w(buffer, sizeof(buffer));
+    w.u8(static_cast<uint8_t>(net::MsgType::MatchEnd));
+    w.u8(m_matchId);
+    w.u32(static_cast<uint32_t>(frame));
+    m_lobby->sendGameMessage(-1, w.data(), w.size());
+    printf("netplay: the host ends match %d at frame %d\n", m_matchId, frame);
+}
 
 void NetGame::setPaused(bool paused)
 {
@@ -1976,6 +2026,7 @@ NetGame::Outcome NetGame::advance(const InputFrame& localInput)
         outcome.ended = true;
         m_waiting = false;
         m_inMatch = false;
+        m_endAtFrame = -1;
     FPSLimiter::instance().setTickStretch(1.0f);
         returnToLobby("");
         if (!m_closeAfterMatch.empty()) {
@@ -2009,6 +2060,11 @@ void NetGame::updateLostPeers(uint32_t nowMs)
                 m_lobby->removePeer(p, std::string(reason) == "timed out" ? "timed out" : "left the match", true);
             if (!isHost() && p == 0 && m_closeAfterMatch.empty())
                 m_closeAfterMatch = "Lost the connection to the host";
+            //(said at once: who it was; once the others agree on where it stopped, the CPU's takeover)
+            const bool left = std::string(reason) == "left";
+            m_dropNotice = p == 0 ? std::string(left ? "The host left" : "Lost the connection to the host") + " - the match goes on"
+                                  : name + (left ? " left" : " lost the connection");
+            m_dropNoticeMs = nowMs;
         }
         const int dropFrame = m_session->dropFrame(p);
         if (dropFrame >= 0 && !(m_dropsSeen & bit)) {
@@ -2035,6 +2091,7 @@ void NetGame::onSessionFailed()
     printStats(true);
     m_waiting = false;
     m_inMatch = false;
+    m_endAtFrame = -1;
     FPSLimiter::instance().setTickStretch(1.0f);
     if (m_series.active) {
         //The match doesn't count: its state isn't the same everywhere. Back to the series state it started from.
@@ -2052,6 +2109,11 @@ void NetGame::onSessionFailed()
     if (culprit == localPeer() && !isHost() && cmd::g_net.reconnect != 0 && m_access != LobbyAccess::Nobody && !m_joinedHost.empty() &&
         !m_series.active)
         beginReconnect(static_cast<int>(Reconnect::Kind::Rejoin), m_joinedHost, m_joinedPort, 60000, true, "You were dropped from the match", monotonicMs());
+}
+
+bool NetGame::peerLost(int peer) const
+{
+    return m_inMatch && m_session && peer >= 0 && peer < net::MAX_PEERS && (m_session->lostPeers() & (1u << peer)) != 0;
 }
 
 NetGame::DropNotice NetGame::dropNotice() const
@@ -2076,6 +2138,7 @@ void NetGame::leaveMatch(const char* reason)
         printStats(true);
     m_session.reset();
     m_inMatch = false;
+    m_endAtFrame = -1;
     FPSLimiter::instance().setTickStretch(1.0f);
     m_lastMatchError = std::string("You left the match (") + reason + ")";
     if (m_lobby) {
@@ -2169,6 +2232,10 @@ bool NetGame::matchEndRequested() const
     if (g_sim.gameoverTick >= 0 && g_sim.tick >= g_sim.gameoverTick + m_config.gameOverTicks)
         return true;
 
+    //(the host ended it: at the frame it said, on every machine)
+    if (m_endAtFrame >= 0 && g_sim.tick >= m_endAtFrame)
+        return true;
+
     return m_config.frameLimit > 0 && g_sim.tick >= m_config.frameLimit;
 }
 
@@ -2235,6 +2302,11 @@ void NetGame::onConfirmedChecksum(int frame, uint64_t sum)
 
 void NetGame::onDesync(int frame, int peer, uint64_t local, uint64_t remote)
 {
+    if (m_desyncFrame < 0 || m_desyncMatch != m_matchId) {
+        m_desyncFrame = frame;
+        m_desyncPeer = peer;
+        m_desyncMatch = m_matchId;
+    }
     printf("netplay: DESYNC at frame %d with peer %d: local checksum %016llx, peer's %016llx\n", frame, peer,
         static_cast<unsigned long long>(local), static_cast<unsigned long long>(remote));
 }

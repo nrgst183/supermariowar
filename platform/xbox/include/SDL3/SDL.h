@@ -819,6 +819,8 @@ typedef Uint32 SDL_AudioDeviceID;
 
 // Leaves the game and goes back to the dashboard. Doesn't return.
 void SDL_XboxReturnToDashboard(void);
+// The controllers plugged in now (SDL_GetJoysticks lists all four ports, plugged in or not)
+int SDL_XboxConnectedControllers(void);
 
 // Memory for the game's screen surface that the GPU displays directly (no copy
 // per frame): w*h 32-bit pixels, *pitch bytes per row. Create the screen

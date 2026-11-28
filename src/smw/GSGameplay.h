@@ -202,8 +202,6 @@ bool active();     // someone is building now
 // A builder has the parts window open: the moving platforms and the map's moving dangers held still till
 // it's shut (the map easier to see while choosing; from the simulation's state: the same everywhere)
 bool motionFrozen();
-// Everyone on this screen builds: the scoreboard isn't drawn (the screen the map's; back when one plays)
-bool hidesScoreboard();
 bool building(int slot);    // that player builds now
 bool edited();     // this match's map was edited: it differs from its file
 int hostSlot();    // the host's player: it builds always, it gives the rights

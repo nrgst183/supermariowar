@@ -184,6 +184,10 @@ public:
     // Round trip to a peer (the session's measure during a match), -1 if unknown
     int peerPingMs(int peer) const;
     // The running match's statistics (rollbacks, stalls...), null outside a match
+    // This match's first desync (the frame, -1: none): the machines' games went different ways
+    // (shown in the match: a console's log can't be read)
+    int desyncFrame() const { return m_inMatch && m_desyncMatch == m_matchId ? m_desyncFrame : -1; }
+    int desyncPeer() const { return m_desyncPeer; }
     const RollbackSession::Stats* matchStats() const { return (m_inMatch && m_session) ? &m_session->stats() : nullptr; }
     // The input delay of the running (or next) match
     int inputDelay() const;
@@ -227,9 +231,15 @@ public:
 
     // ---- gameplay
     bool inMatch() const { return m_inMatch; }
+    // A peer the running match has lost (left, or its connection is gone): no ping to show for it
+    bool peerLost(int peer) const;
     // The host's pause: every peer stops at the same frame (RollbackSession's PAUSE). The host
     // pauses and resumes; held() is true on every peer while the match stands still there
     void setPaused(bool paused);
+    // Host: ends the running match for everyone (at a frame a little ahead, the same on every machine);
+    // all go back to the lobby, as after a match
+    void endMatchForEveryone();
+    bool endingMatch() const { return m_inMatch && m_endAtFrame >= 0; }
     bool held() const;
     // The frame the host's pause holds at (-1: none): run-ahead stops there
     int holdFrame() const;
@@ -367,6 +377,10 @@ private:
 
     MatchConfig m_config;
     uint8_t m_matchId = 0;
+    int m_endAtFrame = -1;     // the host ended the match: it ends at this frame (-1: it doesn't)
+    int m_desyncFrame = -1;
+    int m_desyncPeer = -1;
+    uint8_t m_desyncMatch = 0;
     std::string m_hostSong;          // joiner: the song the host's match plays, and that match
     uint8_t m_hostSongMatch = 0xFF;
     int m_matchesStarted = 0;

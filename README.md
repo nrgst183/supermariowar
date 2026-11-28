@@ -50,7 +50,7 @@ See [docs/netplay.md](docs/netplay.md) for how to play and how it works.
 ![The Map Maker: the map being played by four players while it's built, a row of ? blocks just placed, the builder's glove resting on one with its name over it, a fire bar spinning, and the toolbar with the part in hand, the recent parts, the tools and the layers; the palette's Hazards group with a fire bar's length being changed; the controls sheet with every control for the controller, keyboard and mouse; and the world editor with its modes menu open](docs/gfx/fork/map_maker.png)
 
 - **Build a map while it's being played** (**Main menu, Editors, Maps**): pick a map or a blank one, and everyone with the right to build gets a glove cursor while the others, CPUs included, keep playing. It has everything the old level editor had.
-- **Back** (Tab) switches between building and playing; hold **Y** for the tool wheel, LB / RB go through your recent parts, LT / RT undo and redo, and F1 shows all the controls. It works with a controller or a mouse and keyboard.
+- **L + Up** (Tab) switches between building and playing; it works with a controller or a mouse and keyboard, and F1 shows the controls.
 - **The world editor** (**Main menu, Editors, Worlds**), with a mouse and keyboard or a controller.
 - **Edit together**: one player hosts a Map Maker game or a world in a lobby, the others find it in Join a Game, online or on one computer; anyone can join in while it's going.
 

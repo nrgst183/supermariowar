@@ -208,7 +208,8 @@ void UI_GameSettingsMenu::SetOnlineView(OnlineView view)
     for (MI_SelectField<short>* goal : miGoalField)
         goal->SetLocked(locked);
     miMapField->SetLocked(locked);
-    miModeSettingsButton->SetLocked(on);
+    //(the rules: the others see the host's, SyncOnlineSettings keeps them so)
+    miModeSettingsButton->SetLocked(false);
     miMapFiltersButton->SetLocked(on);
     miMapThumbnailsButton->SetLocked(on);
     miMapFavoritesButton->SetLocked(on);    //(choosing from them; starring one is still ours)

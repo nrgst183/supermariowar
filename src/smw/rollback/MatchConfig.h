@@ -93,6 +93,10 @@ bool checkMatchConfig(const MatchConfig& config, std::string& error, bool* needM
 void lobbyMapCheck(std::string& ref, uint64_t& hash);
 // Whether this machine has that map (the map list's choice isn't changed)
 bool haveMap(const std::string& ref, uint64_t hash);
+// The short name, in this machine's map list, of the host's map (its short name, reference and
+// contents' hash, as the lobby has them): its own name, else the file the reference names, else a
+// map with the same contents under another name (a console's shortened file names); "" if it isn't here
+std::string localMapName(const std::string& name, const std::string& ref, uint64_t hash);
 
 // The map file of a match here ("" or a file with other contents if it's missing)
 std::string matchMapPath(const MatchConfig& config);
@@ -131,6 +135,10 @@ void setSimulationPlayerDevices(const std::array<bool, INPUT_MAX_PLAYERS>* keybo
 // The simulation settings of game_values (see visitSimulationSettings), as
 // in MatchConfig::settings; the series send them too (NetSeries.h)
 std::vector<uint8_t> captureSimulationSettings();
+// The lobby's settings screens: the rules of every mode as the menus have them (Frenzy's items, ...)
+// and the match options, as bytes (the host's), and put into this machine's menus (a joiner's view)
+std::vector<uint8_t> captureLobbySettings();
+bool applyLobbySettings(const std::vector<uint8_t>& bytes);
 bool applySimulationSettings(const std::vector<uint8_t>& bytes);
 
 // Hash of the loaded simulation data that isn't part of a map: the tile types

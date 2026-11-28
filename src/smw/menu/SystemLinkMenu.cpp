@@ -118,7 +118,7 @@ std::string systemLinkNetworkStatus()
             const std::string kind = SDL_XboxGetNetworkAddressKind();
             //(not the static address the dashboard has: what the game found of its settings)
             const std::string note = SDL_XboxGetNetworkSettingsNote();
-            const bool unlike = kind != "static" && !note.empty() && note.rfind("static", 0) == 0;
+            const bool unlike = kind != "static" && !note.empty();
             return std::string("System link: this console is ") + address + (kind.empty() ? "" : " (" + kind + ")") + (unlike ? "; " + note : "");
         }
         case SDL_XBOX_NETWORK_NO_CABLE:
@@ -575,8 +575,18 @@ void UI_SystemLinkMenu::RefreshGames()
 
         //No message: the Xbox's network (if it isn't ready, a warning)
         if (m_showingStatus) {
-            const std::string network = systemLinkNetworkStatus();
+            std::string network = systemLinkNetworkStatus();
             const bool ready = network.rfind("System link:", 0) == 0;
+            //(what came in: an XLink Kai or network check (nothing heard: nothing reaches this console;
+            //heard, no games: the others' searches, or messages it can't read))
+            if (ready) {
+                const rollback::lan::Browser::Heard& heard = s_browser.heard();
+                network += ". Heard " + std::to_string(heard.packets) + " (" + std::to_string(heard.answers) + " games)";
+                if (heard.lastFrom != 0)
+                    network += ", last from " + rollback::lan::ipv4Text(heard.lastFrom);
+                if (!heard.announcePort)
+                    network += "; port 7302 busy";
+            }
             m_message->SetText(network, ready ? MI_WrappedText::Tone::Info : MI_WrappedText::Tone::Warn);
         }
     }

@@ -280,6 +280,17 @@ void Responder::answer(const HostInfo& info)
         if (message.empty())
             message = encodeAnswer(info);
         sendTo(m_socket, from.host, from.port, message);
+        //(and to all, at the asker's port: an answer straight to it may not get there (a tunnel that
+        //hasn't learned where it is, a console on another subnet), a broadcast does)
+        sendTo(m_socket, ENET_HOST_BROADCAST, from.port, message);
+    }
+    const uint32_t nowMs = enet_time_get();
+    if (!m_announced || nowMs - m_lastAnnounceMs >= QUERY_EVERY_MS) {
+        m_announced = true;
+        m_lastAnnounceMs = nowMs;
+        if (message.empty())
+            message = encodeAnswer(info);
+        sendTo(m_socket, ENET_HOST_BROADCAST, ANNOUNCE_PORT, message);
     }
 }
 
@@ -297,6 +308,12 @@ bool Browser::open()
     m_socket = openSocket(0);
     m_queried = false;
     m_games.clear();
+    m_heard = {};
+    if (isOpen() && m_announceSocket == INVALID)
+        m_announceSocket = openSocket(ANNOUNCE_PORT);
+    m_heard.announcePort = m_announceSocket != INVALID;
+    if (isOpen() && !m_heard.announcePort)
+        printf("netplay: can't listen for system link announcements on UDP port %u: searching only\n", ANNOUNCE_PORT);
     return isOpen();
 }
 
@@ -305,6 +322,9 @@ void Browser::close()
     if (isOpen())
         enet_socket_destroy(toSocket(m_socket));
     m_socket = INVALID;
+    if (m_announceSocket != INVALID)
+        enet_socket_destroy(toSocket(m_announceSocket));
+    m_announceSocket = INVALID;
     m_games.clear();
 }
 
@@ -333,10 +353,18 @@ void Browser::update(uint32_t nowMs)
     uint8_t data[MAX_MESSAGE];
     size_t size = 0;
     ENetAddress from;
-    while (receive(m_socket, data, size, from)) {
+    //(the answers to the queries, then the announcements: those not counted for the ping)
+    for (int source = 0; source < 2; source++) {
+    const uintptr_t socket = source == 0 ? m_socket : m_announceSocket;
+    if (socket == INVALID)
+        continue;
+    while (receive(socket, data, size, from)) {
+        m_heard.packets++;
+        m_heard.lastFrom = from.host;
         HostInfo info;
         if (!decodeAnswer(data, size, info))
             continue;
+        m_heard.answers++;
         //(a game on this computer answers each query more than once: from its loopback and its
         //adapters' addresses; it is listed once, at the loopback, which joining it from here can use)
         if (std::find(m_ownAddresses.begin(), m_ownAddresses.end(), from.host) != m_ownAddresses.end())
@@ -353,10 +381,11 @@ void Browser::update(uint32_t nowMs)
         it->lastSeenMs = nowMs;
         //How long since the last query: the round trip (to within a frame), smoothed
         const uint32_t since = nowMs - m_lastQueryMs;
-        if (since < QUERY_EVERY_MS) {
+        if (source == 0 && since < QUERY_EVERY_MS) {
             const int ping = static_cast<int>(since);
             it->pingMs = it->pingMs < 0 ? ping : (it->pingMs * 3 + ping) / 4;
         }
+    }
     }
 
     std::erase_if(m_games, [&](const FoundGame& game) { return nowMs - game.lastSeenMs > FORGET_AFTER_MS; });
