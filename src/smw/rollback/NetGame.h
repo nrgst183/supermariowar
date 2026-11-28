@@ -239,6 +239,23 @@ public:
     // Host: ends the running match for everyone (at a frame a little ahead, the same on every machine);
     // all go back to the lobby, as after a match
     void endMatchForEveryone();
+
+    // THEATER: watching a replay together. The host plays a replay in the theater; it is sent to
+    // everyone in the lobby (and whoever joins meanwhile), each plays it on its own machine (a
+    // replay plays the same everywhere) and follows the host's place in it, pause and speed. The
+    // host leaving it: everyone back to the lobby.
+    // Host: the replay (its file) is watched together now; its place in it (each frame); left it
+    bool startTheater(const std::string& replayFile);
+    void theaterPlace(int tick, bool paused, int speed);
+    void stopTheater();
+    bool hostingTheater() const { return m_theater.hosting; }
+    // Joiner: the host's replay is here (its file), to be watched (once: taken); watching it, the host's
+    // place in it (false: nothing heard yet), and whether the host left it (once: taken)
+    bool takeTheaterReplay(std::string& file);
+    bool watchingTheater() const { return m_theater.watching; }
+    void setWatchingTheater(bool on) { m_theater.watching = on; }
+    bool theaterHostPlace(int& tick, bool& paused, int& speed) const;
+    bool takeTheaterStopped();
     bool endingMatch() const { return m_inMatch && m_endAtFrame >= 0; }
     bool held() const;
     // The frame the host's pause holds at (-1: none): run-ahead stops there
@@ -378,6 +395,35 @@ private:
     MatchConfig m_config;
     uint8_t m_matchId = 0;
     int m_endAtFrame = -1;     // the host ended the match: it ends at this frame (-1: it doesn't)
+
+    struct Theater {
+        //(host)
+        bool hosting = false;
+        std::string name;
+        std::vector<uint8_t> bytes;
+        uint64_t hash = 0;
+        uint8_t started = 0;                         // the peers told (TheaterStart sent)
+        std::array<uint32_t, net::MAX_PEERS> sent {};    // the bytes sent to each
+        int lastTick = -1;
+        bool lastPaused = false;
+        int lastSpeed = -1;
+        uint32_t lastStateMs = 0;
+        //(joiner)
+        std::vector<uint8_t> incoming;
+        uint32_t size = 0;
+        uint64_t incomingHash = 0;
+        bool receiving = false;
+        std::string file;            // the replay, saved, to be watched (taken)
+        bool watching = false;
+        bool haveState = false;
+        int hostTick = 0;
+        bool hostPaused = false;
+        int hostSpeed = 2;
+        uint32_t stateMs = 0;
+        bool stopped = false;
+    } m_theater;
+    void updateTheater(uint32_t nowMs);
+    void handleTheaterMessage(int peer, const uint8_t* data, size_t size, uint32_t nowMs);
     int m_desyncFrame = -1;
     int m_desyncPeer = -1;
     uint8_t m_desyncMatch = 0;

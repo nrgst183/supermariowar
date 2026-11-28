@@ -39,6 +39,7 @@
 #include "ResourceManager.h"
 #include "SimulationState.h"
 #include "rollback/Replay.h"
+#include "rollback/NetGame.h"
 #include "ui/InputPrompts.h"
 #include "ui/SmwTheme.h"
 
@@ -768,6 +769,22 @@ void GameplayState::updateReplay()
         return;
     }
 
+    //Watching the host's replay together (NetGame's THEATER): the host plays, pauses, jumps and sets
+    //the speed; following, ours do nothing of that (the camera, the help and leaving are ours). The
+    //host left it: back to the lobby
+    rollback::NetGame& net = rollback::NetGame::instance();
+    const bool follower = net.watchingTheater() && !net.isHost();
+    if (follower) {
+        if (net.takeTheaterStopped()) {
+            leaveReplay();
+            return;
+        }
+        th.playPause = false;
+        th.speedChange = 0;
+        th.skip = 0;
+        th.moment = 0;
+    }
+
     const replay::PlaybackStatus& status = replay::playbackStatus();
     if (th.playPause) {
         if (status.finished) {
@@ -797,7 +814,7 @@ void GameplayState::updateReplay()
     };
     const bool* keys = SDL_GetKeyboardState(nullptr);
     const bool shift = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
-    const bool asking = th.confirmLeave;
+    const bool asking = th.confirmLeave || follower;    //(following: no jumps of our own)
     const bool padBack = !asking && th.pad.buttons[prompts::LB];
     const bool padForward = !asking && th.pad.buttons[prompts::RB];
     const bool back = repeat(th.holdBack, padBack) || th.skip < 0;
@@ -832,12 +849,30 @@ void GameplayState::updateReplay()
     }
 
     //Rewind (LT, Shift+Left held): backwards, faster the further it's pressed
-    const float rewind = std::max(th.pad.lt, shift && keys[SDL_SCANCODE_LEFT] ? 1.0f : 0.0f);
-    const float fastForward = std::max(th.pad.rt, shift && keys[SDL_SCANCODE_RIGHT] ? 1.0f : 0.0f);
+    const float rewind = follower ? 0.0f : std::max(th.pad.lt, shift && keys[SDL_SCANCODE_LEFT] ? 1.0f : 0.0f);
+    const float fastForward = follower ? 0.0f : std::max(th.pad.rt, shift && keys[SDL_SCANCODE_RIGHT] ? 1.0f : 0.0f);
     if (rewind > 0.05f) {
         seekTo(g_sim.tick - static_cast<int>(2 + 6 * rewind));
         lastUpdateTicked = false;
         showUi();
+    }
+
+    //Following the host: its pause and speed, and its place (a jump there when we're more than a
+    //fifth of a second off: it jumped, or we fell behind)
+    if (follower) {
+        int hostTick = 0, hostSpeed = NORMAL_SPEED;
+        bool hostPaused = false;
+        if (net.theaterHostPlace(hostTick, hostPaused, hostSpeed)) {
+            th.paused = hostPaused;
+            th.speed = std::clamp(hostSpeed, 0, static_cast<int>(SPEEDS.size()) - 1);
+            hostTick = std::clamp(hostTick, 0, std::max(0, status.total));
+            if (std::abs(g_sim.tick - hostTick) > 12) {
+                seekTo(hostTick);
+                lastUpdateTicked = false;
+            }
+        } else {
+            th.paused = true;    //(waiting for the host's word)
+        }
     }
 
     //Play
@@ -859,6 +894,10 @@ void GameplayState::updateReplay()
                 break;
         }
     }
+
+    //Hosting it: where we are, for the others
+    if (net.hostingTheater())
+        net.theaterPlace(g_sim.tick, th.paused || status.finished, th.speed);
 
     //The song recorded for this moment (after playing on, or a jump)
     replay::syncMusic();

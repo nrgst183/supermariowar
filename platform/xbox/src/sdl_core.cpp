@@ -438,21 +438,56 @@ void emptyFolder(const std::string& dir)
 }
 } // namespace
 
+namespace {
+// One of the hard disk's cache partitions (X, Y, Z: partitions 3, 4, 5) linked to its letter by hand,
+// and a folder of ours on it: when the title's own can't be mounted. It is a cache: another title
+// given that partition may wipe it, and then things are just made again
+const char* linkCachePartition()
+{
+    static char path[16];
+    const char letters[3] = {'X', 'Y', 'Z'};
+    for (int k = 0; k < 3; k++) {
+        char link[16], device[40], folder[16];
+        snprintf(link, sizeof(link), "\\??\\%c:", letters[k]);
+        snprintf(device, sizeof(device), "\\Device\\Harddisk0\\Partition%d", 3 + k);
+        OBJECT_STRING linkName, deviceName;
+        RtlInitAnsiString(&linkName, link);
+        RtlInitAnsiString(&deviceName, device);
+        IoDeleteSymbolicLink(&linkName);    //(a letter left linked elsewhere)
+        if (IoCreateSymbolicLink(&linkName, &deviceName) < 0)
+            continue;
+        snprintf(folder, sizeof(folder), "%c:\\smw", letters[k]);
+        CreateDirectoryA(folder, NULL);
+        if (GetFileAttributesA(folder) == INVALID_FILE_ATTRIBUTES)
+            continue;
+        snprintf(path, sizeof(path), "%c:/smw/", letters[k]);
+        return path;
+    }
+    return nullptr;
+}
+} // namespace
+
 const char* SDL_XboxGetCachePath(void)
 {
     static const char* path = nullptr;
     if (!path) {
-        // Maps Z: to the title's cache partition (keeping what it had when it
-        // was this title's last time)
+        // Maps Z: to the title's cache partition (keeping what it had when it was this title's last
+        // time). Never the title's data folder (T:, E:\TDATA): what is unpacked or decoded goes on the
+        // cache partitions (X, Y, Z) only
         if (XMountUtilityDrive(g_sdlx_fresh_cache ? TRUE : FALSE)) {
             path = "Z:/";
+        } else if ((path = linkCachePartition()) != nullptr) {
+            sdlx_log("[xbox] Couldn't mount the utility drive; the cache goes on %s\n", path);
         } else {
-            sdlx_log("[xbox] Couldn't mount the utility drive; the cache goes on T:\n");
-            CreateDirectoryA("T:\\cache", NULL);
-            path = "T:/cache/";
+            //(none: nothing is kept; images are decoded and thumbnails made each time)
+            sdlx_log("[xbox] No cache partition: nothing is cached\n");
+            path = "Z:/";
         }
         if (g_sdlx_fresh_cache) {
-            emptyFolder(path[0] == 'Z' ? "Z:\\" : "T:\\cache\\");
+            std::string dir = path;
+            for (char& c : dir)
+                c = c == '/' ? '\\' : c;
+            emptyFolder(dir);
             sdlx_log("[xbox] The cache emptied (--xbox-fresh-cache)\n");
         }
     }

@@ -610,6 +610,18 @@ void MenuState::onEnterState()
     //Back from a replay: the match history again (the replay changed nothing:
     //its match's result doesn't go to a tournament, tour or world)
     if (replay::takeReturnedFromReplay()) {
+        //(watched together in a lobby: back to it, the host's leaving taking everyone back)
+        rollback::NetGame& net = rollback::NetGame::instance();
+        if (net.lobby() && (mOnlineTheaterPick || net.watchingTheater() || net.hostingTheater())) {
+            net.stopTheater();
+            net.setWatchingTheater(false);
+            mOnlineTheaterPick = false;
+            mCurrentMenu = mOnlineLobbyMenu.get();
+            mOnlineLobbyMenu->Open(false);
+            if (game_values.music)
+                rm->backgroundmusic[2].play(false, false);
+            return;
+        }
         mMatchHistoryMenu->miHistory->Refresh();
         mCurrentMenu = mMatchHistoryMenu.get();
         if (game_values.music) {
@@ -944,6 +956,24 @@ void MenuState::update()
         }
         SyncOnlineSettings();
         FollowControllers();
+        //(--net-theater: the host watches a replay with the first who joins)
+        {
+            static bool theaterTested = false;
+            rollback::NetGame& net = rollback::NetGame::instance();
+            if (!cmd::g_net.theater.empty() && !theaterTested && net.lobby() && net.isHost() && net.hasOthers()
+                && net.lobby()->phase() == rollback::NetLobby::Phase::Lobby) {
+                theaterTested = true;
+                std::string error;
+                if (replay::startPlayback(cmd::g_net.theater, error)) {
+                    net.startTheater(cmd::g_net.theater);
+                    mOnlineTheaterPick = true;
+                    return;
+                }
+                printf("netplay: --net-theater: %s\n", error.c_str());
+            }
+        }
+        if (StartWatchingTheater())
+            return;
 
         //--replay: plays it once, at startup
         static bool replayFromArgsStarted = false;
@@ -1511,12 +1541,29 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
         mMatchHistoryMenu->miHistory->Refresh();
         mCurrentMenu = mMatchHistoryMenu.get();
     } else if (MENU_CODE_HISTORY_EXIT == code) {
-        mCurrentMenu = mMainMenu.get();
+        if (mOnlineTheaterPick && rollback::NetGame::instance().lobby()) {
+            //(picking one to watch together: back to the lobby)
+            mOnlineTheaterPick = false;
+            mCurrentMenu = mOnlineLobbyMenu.get();
+            mOnlineLobbyMenu->Open(false);
+        } else {
+            mCurrentMenu = mMainMenu.get();
+        }
+    } else if (MENU_CODE_ONLINE_THEATER == code) {
+        //The host: a replay from the match history, the lobby watching it too
+        mOnlineTheaterPick = true;
+        mMatchHistoryMenu->miHistory->Refresh();
+        mCurrentMenu = mMatchHistoryMenu.get();
     } else if (MENU_CODE_HISTORY_PLAY_REPLAY == code) {
         std::string error;
-        if (!replay::startPlayback(mMatchHistoryMenu->miHistory->selectedReplay(), error)) {
+        const std::string replayFile = mMatchHistoryMenu->miHistory->selectedReplay();
+        if (!replay::startPlayback(replayFile, error)) {
             mMatchHistoryMenu->miHistory->setMessage("Can't play it: " + error);
         } else {
+            //(picked from the lobby: the others watch it too)
+            rollback::NetGame& net = rollback::NetGame::instance();
+            if (mOnlineTheaterPick && net.lobby() && net.isHost())
+                net.startTheater(replayFile);
             rm->backgroundmusic[2].stop();
             return false;
         }
@@ -1598,6 +1645,8 @@ bool MenuState::HandleMenuCode(MenuCodeEnum code, bool& fGenerateMapThumbs)
     } else if (MENU_CODE_ONLINE_VIEW_SETTINGS == code) {
         OpenOnlineSettingsView();
     } else if (MENU_CODE_ONLINE_SETTINGS_BACK == code) {
+        //(the player's own Back: the lobby, though the host is on its settings, until it moves)
+        mOnlineStayInLobby = true;
         CloseOnlineSettingsView();
     } else if (MENU_CODE_ONLINE_MATCH_SETTINGS == code) {
         OpenOnlineMatchSettings();

@@ -87,6 +87,7 @@ private:
     MI_SelectField<short>* miEveryone = nullptr;
     MI_SelectField<short>* miKickWho = nullptr;
     MI_LobbyButton* miKickButton = nullptr;
+    MI_LobbyButton* miTheaterButton = nullptr;    // the host: watch a replay together
     MI_LockTag* miHostTag[4] {};
 
     MI_DialogBox* miDialogImage = nullptr;

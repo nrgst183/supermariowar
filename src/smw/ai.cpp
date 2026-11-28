@@ -1410,6 +1410,9 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
                 playerKeys->game_jump.fDown = true;
             if (ainav::PlatformAim(navPlatform, px, static_cast<int>(AIR_BRAKE_FRAMES), aim))
                 steerToX(aim);
+        } else if (navMove == static_cast<short>(ainav::Move::WarpUp)) {
+            // Up into the pipe over us: jump held (the pipe takes us only then), straight up
+            playerKeys->game_jump.fDown = true;
         } else if (navMove == static_cast<short>(ainav::Move::Jump)) {
             // Rise straight up until our feet are above the floor we're jumping onto, then steer
             const int floorTop = (navRow + 1) * TILESIZE;
@@ -1543,6 +1546,15 @@ bool CPlayerAI::NavigateTo(COutputControl * playerKeys, int x, int y)
                 else
                     playerKeys->game_down.fDown = true;
             }
+            break;
+        }
+        case ainav::Move::WarpUp: {
+            // Under the pipe, a fresh press of jump (held on the way up: see the air's, above)
+            const int d = col * TILESIZE + (TILESIZE - PW) / 2 - px;
+            if (d < -4 || d > 4)
+                steerTo(col);
+            else
+                playerKeys->game_jump.fDown = !pPlayer->lockjump;
             break;
         }
         case ainav::Move::Jump: {

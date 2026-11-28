@@ -254,6 +254,7 @@ Args parse_args(int argc, char* argv[])
             else if (arg == "--net-timeout") net.timeoutMs = atoi(val.c_str());
             else if (arg == "--net-quit-at") net.quitAt = atoi(val.c_str());
             else if (arg == "--net-end-at") net.endAt = atoi(val.c_str());
+            else if (arg == "--net-theater") net.theater = val;
             else if (arg == "--net-cut-at") {
                 net.cutAt = atoi(val.c_str());
                 const size_t comma = val.find(',');

@@ -93,6 +93,9 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
 
     miKickButton = new MI_LobbyButton(&rm->spr_selectfield, FIELD_X, 292, "Kick", 200, false);
     miKickButton->SetCode(MENU_CODE_ONLINE_KICK);
+    //(the host: a replay from the match history, everyone in the lobby watching it too)
+    miTheaterButton = new MI_LobbyButton(&rm->spr_selectfield, FIELD_X + 220, 292, "Watch a replay", 260, false);
+    miTheaterButton->SetCode(MENU_CODE_ONLINE_THEATER);
 
     // What only the host can change says so
     const short tagY[4] = {154, 190, 226, 262};
@@ -135,7 +138,8 @@ UI_OnlineLobbyMenu::UI_OnlineLobbyMenu()
     AddControl(miInputDelay, miCpuPlayers, miEveryone, nullptr, nullptr);
     AddControl(miEveryone, miInputDelay, miKickWho, nullptr, nullptr);
     AddControl(miKickWho, miEveryone, miKickButton, nullptr, nullptr);
-    AddControl(miKickButton, miKickWho, nullptr, nullptr, nullptr);    //(B, or the footer's "back": back to the team)
+    AddControl(miKickButton, miKickWho, nullptr, nullptr, miTheaterButton);    //(B, or the footer's "back": back to the team)
+    AddControl(miTheaterButton, miKickWho, nullptr, miKickButton, nullptr);
     for (MI_LockTag* tag : miHostTag)
         AddNonControl(tag);
 
@@ -218,7 +222,7 @@ void UI_OnlineLobbyMenu::ShowPage(Page page)
     miWhoCanJoin->setVisible(team && !joining);
     miOptionsButton->setVisible(team && !joining);
     miContinueButton->setVisible(team && !joining);
-    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton})
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton, miTheaterButton})
         control->setVisible(!team && !joining);
     for (MI_LockTag* tag : miHostTag)
         tag->setVisible(!team && !joining);
@@ -270,7 +274,7 @@ void UI_OnlineLobbyMenu::ApplyLayout(bool host, bool joining)
     miWhoCanJoin->setVisible(team && !joining);
     miOptionsButton->setVisible(team && !joining);
     miContinueButton->setVisible(team && !joining);
-    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton})
+    for (UI_Control* control : std::initializer_list<UI_Control*> {miLocalPlayers, miCpuPlayers, miInputDelay, miEveryone, miKickWho, miKickButton, miTheaterButton})
         control->setVisible(!team && !joining);
     for (MI_LockTag* tag : miHostTag)
         tag->setVisible(!team && !joining && !host);
@@ -373,6 +377,7 @@ void UI_OnlineLobbyMenu::Sync()
 
     RebuildKickItems();
     miKickButton->Disable(!host || localGame || miKickWho->currentValue() < 0);
+    miTheaterButton->Disable(!host || localGame);
 
     // That the match settings are the host's, or everyone's, in the header of the team page (a
     // local game: how to let the others in)

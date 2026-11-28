@@ -132,6 +132,11 @@ enum class MsgType : uint8_t {
     JumpIn = 94,       // joiner -> host: u8 match id, u32 the frame it caught up to (S), u16 its round trip (ms)
     JumpInReply = 95,  // host -> joiner: u8 match id, i8 slot (-1: none free, it watches; -2: not yet, catch up more), u32 J, u32 S,
                        // u8 handovers + (u8 slot, u8 peer, u32 J, u32 S) each
+    // Watching a replay together (the theater, NetGame's THEATER); in this range too
+    TheaterStart = 96, // host -> joiner: str name, u32 size, u64 hash: the replay the host watches (its bytes follow)
+    TheaterChunk = 97, // host -> joiner: u32 offset, u16 n, n bytes of it
+    TheaterState = 98, // host -> all: u32 tick, u8 paused, u8 speed (an index of the theater's speeds)
+    TheaterStop = 99,  // host -> all: the host left the replay: back to the lobby
 
     SkinInfo = 100,
     SkinRequest = 101,
@@ -145,7 +150,7 @@ enum class MsgType : uint8_t {
 };
 
 // The series messages are the range [SeriesBegin, SERIES_MSG_END)
-constexpr uint8_t SERIES_MSG_END = 96;
+constexpr uint8_t SERIES_MSG_END = 100;
 
 constexpr size_t INPUT_HEADER_SIZE = 22;
 constexpr uint8_t INPUT_RUNS = 0x80;    // in the frame count: the inputs are run-length coded

@@ -114,6 +114,7 @@ enum MenuCodeEnum {
     MENU_CODE_ONLINE_OPTIONS,           // the lobby's options page (players, CPUs, delay, who changes the settings, kick)
     MENU_CODE_ONLINE_OPTIONS_BACK,
     MENU_CODE_ONLINE_KICK,
+    MENU_CODE_ONLINE_THEATER,       // the host: a replay from the match history, watched together
     MENU_CODE_ONLINE_SETTINGS_BACK,     // a joiner leaves the settings view
     MENU_CODE_TO_SYSTEM_LINK_MENU,      // the games found on the local network (system link / LAN games)
     MENU_CODE_SYSTEM_LINK_JOIN,         // joins the game of the chosen row

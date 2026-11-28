@@ -4,9 +4,11 @@
 
 #include "menu/ModeOptionsMenu.h"
 #include "rollback/MatchConfig.h"
+#include "rollback/Replay.h"
 #include "rollback/NetGame.h"
 
 #include "GameValues.h"
+#include "ResourceManager.h"
 #include "MapList.h"
 #include "gamemodes/MiniBoss.h"
 #include "gamemodes/MiniBoxes.h"
@@ -170,9 +172,32 @@ void MenuState::ResetOnlineMenus()
 
 // The lobby is over (we left it, it was closed or we couldn't join): the menu it was entered from
 // (the main menu, the Online menu, or the System Link one), with the reason
+bool MenuState::StartWatchingTheater()
+{
+    rollback::NetGame& net = rollback::NetGame::instance();
+    rollback::NetLobby* lobby = net.lobby();
+    if (!lobby || net.isHost() || lobby->phase() != rollback::NetLobby::Phase::Lobby)
+        return false;
+    std::string file;
+    if (!net.takeTheaterReplay(file))
+        return false;
+    std::string error;
+    if (!replay::startPlayback(file, error)) {
+        mOnlineLobbyMenu->SetNotice("Can't watch the host's replay: " + error);
+        return false;
+    }
+    net.setWatchingTheater(true);
+    printf("netplay: watching the host's replay\n");
+    rm->backgroundmusic[2].stop();
+    return true;
+}
+
 void MenuState::LeaveOnlineLobby(const std::string& message)
 {
     ResetOnlineMenus();
+    mOnlineHostOnSettings = false;    //(the next lobby's host: followed from the start)
+    mOnlineTheaterPick = false;
+    mOnlineStayInLobby = false;
 
     if (mLobbyOrigin == LobbyOrigin::MainMenu) {
         mLocalSetup.valid = false;
@@ -626,17 +651,19 @@ void MenuState::SyncOnlineSettings()
         return;
     }
 
-    //The host opened its settings screens: ours open too (from the lobby, nothing else up); it went
-    //back: so do we. Only as it moves: we may go back to the lobby ourselves meanwhile
-    if (lobby->hostOnSettings() != mOnlineHostOnSettings) {
-        mOnlineHostOnSettings = lobby->hostOnSettings();
-        const bool single = lobby->modeId() >= 0 && lobby->modeId() < GAMEMODE_LAST && lobby->mapName() != "(minigame)";
-        if (mOnlineHostOnSettings && single && mCurrentMenu == mOnlineLobbyMenu.get() && mOnlineLobbyMenu->dialog() == UI_OnlineLobbyMenu::Dialog::None
-            && lobby->phase() == rollback::NetLobby::Phase::Lobby && net.editActivity() == 0 && !rollback::isEditorModeId(lobby->modeId()))
-            OpenOnlineSettingsView();
-        else if (!mOnlineHostOnSettings && mOnlineView && mCurrentMenu == mGameSettingsMenu.get())
+    //Where the host is: on its settings screens, ours are up too (whenever we're in the lobby with
+    //nothing else up: joining then, coming back from a match...), unless we went back to the lobby
+    //ourselves (Back: to change our character), until the host moves again. It went back: so do we
+    const bool hostThere = lobby->hostOnSettings();
+    if (hostThere != mOnlineHostOnSettings) {
+        mOnlineHostOnSettings = hostThere;
+        mOnlineStayInLobby = false;
+        if (!hostThere && mOnlineView && mCurrentMenu == mGameSettingsMenu.get())
             CloseOnlineSettingsView();
     }
+    if (hostThere && !mOnlineStayInLobby && mCurrentMenu == mOnlineLobbyMenu.get() && mOnlineLobbyMenu->dialog() == UI_OnlineLobbyMenu::Dialog::None
+        && lobby->phase() == rollback::NetLobby::Phase::Lobby && net.editActivity() == 0 && !rollback::isEditorModeId(lobby->modeId()))
+        OpenOnlineSettingsView();
 
     //The host's rules and options (Frenzy's items, ...), as its menus have them: ours show the same, on
     //the settings screen and the rules screens under it (changed here, they go back to the host's)

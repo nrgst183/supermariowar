@@ -10,6 +10,7 @@
 #include "FPSLimiter.h"
 #include "GSGameplay.h"
 #include "MapList.h"
+#include "path.h"
 #include "Resimulation.h"
 #include "SimulationState.h"
 #include "StateChecksum.h"
@@ -30,6 +31,7 @@
 #include <bit>
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 
@@ -480,6 +482,7 @@ void NetGame::pump()
     } else {
         updateSkins(now);
         updateMapCheck();
+        updateTheater(now);
         //Joiner: a config that arrived while the previous match was still ending
         //(or while the world map still has ticks to run before it)
         if (m_pendingConfig && !inMatch() && !(m_world.active() && m_world.pending() > 0))
@@ -1221,6 +1224,13 @@ void NetGame::handleMessage(int peer, const uint8_t* data, size_t size, uint32_t
                 m_editHandler(peer, data, size);
             break;
 
+        case net::MsgType::TheaterStart:
+        case net::MsgType::TheaterChunk:
+        case net::MsgType::TheaterState:
+        case net::MsgType::TheaterStop:
+            handleTheaterMessage(peer, data, size, nowMs);
+            break;
+
         default:
             if (data[0] >= static_cast<uint8_t>(net::MsgType::SeriesBegin) && data[0] < net::SERIES_MSG_END)
                 handleSeriesMessage(peer, data, size);
@@ -1905,6 +1915,230 @@ void NetGame::applyHandovers(uint32_t nowMs)
 }
 
 // ---- the match
+
+// ---- THEATER (see NetGame.h)
+
+namespace {
+uint64_t bytesHash(const std::vector<uint8_t>& bytes)
+{
+    uint64_t h = 1469598103934665603ull;
+    for (uint8_t b : bytes)
+        h = (h ^ b) * 1099511628211ull;
+    return h;
+}
+constexpr size_t THEATER_CHUNK = 1000;
+constexpr int THEATER_CHUNKS_PER_PUMP = 4;
+constexpr uint32_t THEATER_STATE_EVERY_MS = 250;
+} // namespace
+
+bool NetGame::startTheater(const std::string& replayFile)
+{
+    if (!m_lobby || !isHost())
+        return false;
+    std::ifstream in(replayFile, std::ios::binary);
+    if (!in)
+        return false;
+    m_theater = Theater();
+    m_theater.bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    if (m_theater.bytes.empty() || m_theater.bytes.size() > 16u * 1024u * 1024u) {
+        m_theater = Theater();
+        return false;
+    }
+    const size_t slash = replayFile.find_last_of("/\\");
+    m_theater.name = slash == std::string::npos ? replayFile : replayFile.substr(slash + 1);
+    m_theater.hash = bytesHash(m_theater.bytes);
+    m_theater.hosting = true;
+    printf("netplay: watching %s together (%u bytes)\n", m_theater.name.c_str(), static_cast<unsigned>(m_theater.bytes.size()));
+    return true;
+}
+
+void NetGame::theaterPlace(int tick, bool paused, int speed)
+{
+    if (!m_theater.hosting || !m_lobby)
+        return;
+    const uint32_t now = monotonicMs();
+    //(when it changes (a pause, a jump, the speed), and every so often: where we are)
+    const bool jumped = m_theater.lastTick >= 0 && (tick < m_theater.lastTick || tick > m_theater.lastTick + 20);
+    if (!jumped && paused == m_theater.lastPaused && speed == m_theater.lastSpeed && now - m_theater.lastStateMs < THEATER_STATE_EVERY_MS) {
+        m_theater.lastTick = tick;
+        return;
+    }
+    m_theater.lastTick = tick;
+    m_theater.lastPaused = paused;
+    m_theater.lastSpeed = speed;
+    m_theater.lastStateMs = now;
+    uint8_t buffer[8];
+    net::ByteWriter w(buffer, sizeof(buffer));
+    w.u8(static_cast<uint8_t>(net::MsgType::TheaterState));
+    w.u32(static_cast<uint32_t>(std::max(0, tick)));
+    w.u8(paused ? 1 : 0);
+    w.u8(static_cast<uint8_t>(std::clamp(speed, 0, 255)));
+    m_lobby->sendGameMessage(-1, w.data(), w.size());
+}
+
+void NetGame::stopTheater()
+{
+    if (!m_theater.hosting)
+        return;
+    if (m_lobby) {
+        const uint8_t stop = static_cast<uint8_t>(net::MsgType::TheaterStop);
+        m_lobby->sendGameMessage(-1, &stop, 1);
+    }
+    printf("netplay: stopped watching %s together\n", m_theater.name.c_str());
+    m_theater = Theater();
+}
+
+// Host: the replay to everyone in the lobby (whoever joined meanwhile too), a few pieces a pump
+void NetGame::updateTheater(uint32_t nowMs)
+{
+    (void)nowMs;
+    if (!m_theater.hosting || !isHost())
+        return;
+    for (int p = 1; p < net::MAX_PEERS; p++) {
+        const uint8_t bit = static_cast<uint8_t>(1u << p);
+        if (!m_lobby->peer(p).present) {
+            m_theater.started &= static_cast<uint8_t>(~bit);
+            continue;
+        }
+        if (!(m_theater.started & bit)) {
+            std::vector<uint8_t> buffer(m_theater.name.size() + 32);
+            net::ByteWriter w(buffer.data(), buffer.size());
+            w.u8(static_cast<uint8_t>(net::MsgType::TheaterStart));
+            w.str(m_theater.name);
+            w.u32(static_cast<uint32_t>(m_theater.bytes.size()));
+            w.u64(m_theater.hash);
+            m_lobby->sendGameMessage(p, w.data(), w.size());
+            m_theater.started |= bit;
+            m_theater.sent[static_cast<size_t>(p)] = 0;
+            m_theater.lastStateMs = 0;    //(and where we are, soon after)
+        }
+        uint32_t& sent = m_theater.sent[static_cast<size_t>(p)];
+        for (int k = 0; k < THEATER_CHUNKS_PER_PUMP && sent < m_theater.bytes.size(); k++) {
+            const size_t n = std::min(THEATER_CHUNK, m_theater.bytes.size() - sent);
+            uint8_t buffer[THEATER_CHUNK + 16];
+            net::ByteWriter w(buffer, sizeof(buffer));
+            w.u8(static_cast<uint8_t>(net::MsgType::TheaterChunk));
+            w.u32(sent);
+            w.u16(static_cast<uint16_t>(n));
+            w.bytes(m_theater.bytes.data() + sent, n);
+            m_lobby->sendGameMessage(p, w.data(), w.size());
+            sent += static_cast<uint32_t>(n);
+        }
+    }
+}
+
+void NetGame::handleTheaterMessage(int peer, const uint8_t* data, size_t size, uint32_t nowMs)
+{
+    if (peer != 0 || isHost() || size == 0)
+        return;
+    net::ByteReader r(data + 1, size - 1);
+    Theater& th = m_theater;
+    switch (static_cast<net::MsgType>(data[0])) {
+        case net::MsgType::TheaterStart: {
+            std::string name = r.str();
+            const uint32_t total = r.u32();
+            const uint64_t hash = r.u64();
+            if (!r.ok() || total == 0 || total > 16u * 1024u * 1024u)
+                return;
+            th.incoming.clear();
+            th.incoming.reserve(total);
+            th.size = total;
+            th.incomingHash = hash;
+            th.receiving = true;
+            th.haveState = false;
+            th.stopped = false;
+            th.file.clear();
+            printf("netplay: the host watches %s: getting it (%u bytes)\n", name.c_str(), static_cast<unsigned>(total));
+            break;
+        }
+        case net::MsgType::TheaterChunk: {
+            const uint32_t offset = r.u32();
+            const size_t n = r.u16();
+            if (!r.ok() || !th.receiving || offset != th.incoming.size() || r.remaining() < n || offset + n > th.size)
+                return;
+            const uint8_t* bytes = data + (size - r.remaining());
+            th.incoming.insert(th.incoming.end(), bytes, bytes + n);
+            if (th.incoming.size() == th.size) {
+                th.receiving = false;
+                if (bytesHash(th.incoming) != th.incomingHash) {
+                    printf("netplay: the host's replay arrived damaged\n");
+                    th.incoming.clear();
+                    return;
+                }
+                //(saved apart from our own replays: not in our match history)
+                std::error_code ec;
+                const std::string dir = GetHomeDirectory() + "replays/net/";
+                std::filesystem::create_directories(dir, ec);
+                const std::string file = dir + "watching.smwr";
+                std::ofstream out(file, std::ios::binary | std::ios::trunc);
+                out.write(reinterpret_cast<const char*>(th.incoming.data()), static_cast<std::streamsize>(th.incoming.size()));
+                out.close();
+                th.incoming.clear();
+                th.incoming.shrink_to_fit();
+                if (out)
+                    th.file = file;
+                else
+                    printf("netplay: can't save the host's replay to %s\n", file.c_str());
+            }
+            break;
+        }
+        case net::MsgType::TheaterState: {
+            const uint32_t tick = r.u32();
+            const uint8_t paused = r.u8();
+            const uint8_t speed = r.u8();
+            if (!r.ok())
+                return;
+            th.hostTick = static_cast<int>(tick);
+            th.hostPaused = paused != 0;
+            th.hostSpeed = speed;
+            th.stateMs = nowMs;
+            th.haveState = true;
+            break;
+        }
+        case net::MsgType::TheaterStop:
+            th.receiving = false;
+            th.incoming.clear();
+            th.file.clear();
+            th.haveState = false;
+            if (th.watching)
+                th.stopped = true;
+            break;
+        default:
+            break;
+    }
+}
+
+bool NetGame::takeTheaterReplay(std::string& file)
+{
+    if (m_theater.file.empty() || !m_lobby || isHost())
+        return false;
+    file = m_theater.file;
+    m_theater.file.clear();
+    return true;
+}
+
+bool NetGame::theaterHostPlace(int& tick, bool& paused, int& speed) const
+{
+    const Theater& th = m_theater;
+    if (!th.haveState)
+        return false;
+    //(where the host is now: its last word, and the time since at its speed (62.5 ticks a second at 1x))
+    static constexpr float SPEEDS[] = {0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
+    const float rate = th.hostSpeed >= 0 && th.hostSpeed < 6 ? SPEEDS[th.hostSpeed] : 1.0f;
+    const uint32_t age = monotonicMs() - th.stateMs;
+    tick = th.hostTick + (th.hostPaused ? 0 : static_cast<int>(static_cast<float>(age) / 16.0f * rate));
+    paused = th.hostPaused;
+    speed = th.hostSpeed;
+    return true;
+}
+
+bool NetGame::takeTheaterStopped()
+{
+    if (!m_theater.stopped)
+        return false;
+    m_theater.stopped = false;
+    return true;
+}
 
 void NetGame::endMatchForEveryone()
 {

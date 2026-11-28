@@ -301,14 +301,23 @@ void build()
 void addWarps(std::vector<std::vector<Edge>>& extra)
 {
     Graph& gr = g_graph;
-    // Where a player coming out of an exit ends up standing
+    // Where a player coming out of an exit ends up standing: the game puts it at the exit and moves
+    // it out of the pipe (PlayerWarpStatus::chooseWarpExit): up its height, down a tile, or aside
+    // its width; from there it stands, or falls onto what is below
     auto exitSpot = [](const WarpExit& e) {
         int c = -1, r = -1;
         int x = e.x;
+        int y = e.y;
         if (e.direction == WarpExitDirection::Right)
-            x += TILESIZE;
+            x += PW + PWOFFSET;
         else if (e.direction == WarpExitDirection::Left)
-            x -= TILESIZE;
+            x -= PW + PWOFFSET;
+        else if (e.direction == WarpExitDirection::Up)
+            y -= PH + PHOFFSET;
+        else if (e.direction == WarpExitDirection::Down)
+            y += TILESIZE - PHOFFSET;
+        if (y < 0)
+            return -1;
         //(as PlayerSpot, without building the graph again)
         int cx = x + PW / 2;
         if (cx < 0)
@@ -316,7 +325,7 @@ void addWarps(std::vector<std::vector<Edge>>& extra)
         else if (cx >= App::screenWidth)
             cx -= App::screenWidth;
         c = wrapCol(cx / TILESIZE);
-        r = (e.y + PH - 1) / TILESIZE;
+        r = (y + PH - 1) / TILESIZE;
         if (r < 0 || r >= H)
             return -1;
         if (!g_graph.spot[node(c, r)]) {
@@ -348,6 +357,25 @@ void addWarps(std::vector<std::vector<Edge>>& extra)
                         continue;
                     extra[node(c, r)].push_back(Edge {static_cast<uint16_t>(to), 8, Move::Warp});
                 }
+            }
+            //A pipe over us, entered from below (a jump straight up into it, jump held): within a
+            //jump's reach (about 3 tiles up), nothing solid between
+            for (int up = 1; up <= 4 && r - up >= 0; up++) {
+                Warp* w = g_map->warp(static_cast<short>(c), static_cast<short>(r - up));
+                if (w && w->connection >= 0 && w->direction == WARP_UP) {
+                    for (int k = 0; k < g_map->warpExitCount(); k++) {
+                        const WarpExit& e = g_map->warpExit(k);
+                        if (e.connection != w->connection || e.id == w->id)
+                            continue;
+                        const int to = exitSpot(e);
+                        if (to < 0 || to == node(c, r))
+                            continue;
+                        extra[node(c, r)].push_back(Edge {static_cast<uint16_t>(to), static_cast<uint8_t>(8 + up), Move::WarpUp});
+                    }
+                    break;
+                }
+                if (!passable(c, r - up))
+                    break;
             }
         }
     }

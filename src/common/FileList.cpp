@@ -277,7 +277,23 @@ SimpleDirectoryList::SimpleDirectoryList(const fs::path& path)
         printf("ERROR: Empty directory.  %s\n", path.generic_string().c_str());
     }
 
+    //In name order, any case (a console's drive lists folders in the order they were copied: the
+    //packs' order, and the saved settings' indices into it, the same everywhere)
+    auto lower = [](std::string text) {
+        for (char& c : text)
+            c = static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
+        return text;
+    };
+    std::sort(m_filelist.begin(), m_filelist.end(), [&](const fs::path& a, const fs::path& b) {
+        return lower(a.filename().string()) < lower(b.filename().string());
+    });
+
+    //The default: the Classic pack, if there is one
     m_index = 0;
+    for (size_t k = 0; k < m_filelist.size(); k++) {
+        if (lower(m_filelist[k].filename().string()) == "classic")
+            m_index = k;
+    }
 }
 
 ///////////// MusicList ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

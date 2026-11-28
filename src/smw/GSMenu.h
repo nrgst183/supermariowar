@@ -183,6 +183,10 @@ class MenuState : public GameState
         void OpenLocalLobby(LobbyOrigin origin = LobbyOrigin::MainMenu);
         // The players on this machine follow the controllers plugged in (when their number changes)
         void FollowControllers();
+        // Watching a replay together (NetGame's THEATER): the host picks it in the match history; a
+        // joiner's starts once the host's replay is here (true: it did, the theater is up)
+        bool mOnlineTheaterPick = false;
+        bool StartWatchingTheater();
         bool OpenLobby(rollback::LobbyAccess access, LobbyOrigin origin, std::string& error);
         void StartLocalFromLobby();
         // A lobby that edits together (CoEdit.h): Editors > Online > Host opens it; its Start (the host)
@@ -273,6 +277,7 @@ class MenuState : public GameState
         uint32_t mOnlineMenuSettingsRevision = 0;    //The host's rules and options last put into our menus
         uint32_t mOnlineMenuSettingsCheck = 0;
         bool mOnlineHostOnSettings = false;     //The host on its settings screens, as last followed
+        bool mOnlineStayInLobby = false;        //We went back to the lobby ourselves (the host on its settings)
         std::string mOnlineShownHostMap;        //The host's map (its name) the settings view last showed
         std::string mOnlineAppliedKey;  //What the host's menus last published to the lobby
         bool mOnlineSetup = false;      //The host is choosing the match from the lobby (the match menus lead back to it)

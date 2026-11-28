@@ -25,6 +25,7 @@ enum class Move : unsigned char {
             // (dir: the way to it; a tile of run-up behind), then onto it
     Warp,   // into a warp pipe next to us (dir -1/1: walk into its side; 0: press down on it), out of
             // one of its exits (where its connection leads)
+    WarpUp, // up into a warp pipe over us (a jump straight up, jump held), out of one of its exits
     Board,  // onto a moving platform: wait beside its way until it's in reach (BoardNow), then walk,
             // jump or drop onto it (board)
     Ride,   // stay on the platform we're on (it carries us toward where we get off)
