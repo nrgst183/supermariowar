@@ -481,11 +481,26 @@ void drawIconBigger(Control c, int x, int y)
     drawBigger({x - 12, y - 12, 48, 48}, [c] { drawIcon(c, 8, 8); });
 }
 
+// Watching the host's replay together, not hosting it: the host's controls are only the host's
+bool following()
+{
+    const rollback::NetGame& net = rollback::NetGame::instance();
+    return net.watchingTheater() && !net.isHost();
+}
+
+// The controls only the host has, watching together (play, the jumps, the speed)
+bool hostsControl(Control c)
+{
+    return c == BACK5 || c == PLAY || c == FORWARD5 || c == SPEED;
+}
+
 void drawButton(Control c, const SDL_Rect& r, bool hover, bool active)
 {
     const Theater& th = g_theater;
+    //Following the host: its controls grayed out, as the menus' locked fields, "Host" for the button
+    const bool locked = following() && hostsControl(c);
     //Like the menus' fields: gray, green when selected (here: under the mouse, or switched on)
-    theme::block(r.x, r.y, r.w, r.h, hover ? theme::Tone::Green : active ? theme::Tone::Gold : theme::Tone::Gray);
+    theme::block(r.x, r.y, r.w, r.h, locked ? theme::Tone::Dark : hover ? theme::Tone::Green : active ? theme::Tone::Gold : theme::Tone::Gray);
     //(the icon at the left, the button or key that does it at the right)
     const int iy = r.y + (r.h - 16) / 2;
     if (c == SPEED)
@@ -493,6 +508,16 @@ void drawButton(Control c, const SDL_Rect& r, bool hover, bool active)
     else
         drawIconBigger(c, r.x + g_buttonPad, r.y + (r.h - BUTTON_ICON) / 2);
     const ControlInfo& info = CONTROLS[static_cast<size_t>(c)];
+    if (locked) {
+        //(dimmed: every other row darkened, over the icon too)
+        for (int y = r.y + 3; y < r.y + r.h - 3; y += 2)
+            prompts::fill(r.x + 3, y, r.w - 6, 1, SDL_Color {38, 42, 54, 255});
+        //("Host" where it fits beside the icon: the narrow buttons are dimmed only)
+        const int iconW = c == SPEED ? theme::font().getWidth("1/4x") : BUTTON_ICON;
+        if (r.w - 2 * g_buttonPad >= iconW + 6 + theme::font().getWidth("Host"))
+            theme::font().drawRightJustified(r.x + r.w - g_buttonPad, r.y + (r.h - theme::font().getHeight()) / 2, "Host");
+        return;
+    }
     prompts::drawPrompt(r.x + r.w - g_buttonPad - prompts::promptWidth(info.pad, info.key, ""), iy, info.pad, info.key, "");
 }
 
@@ -633,9 +658,11 @@ void GameplayState::theaterEvent(const SDL_Event& event)
             else if (key == SDLK_PAGEDOWN || key == SDLK_PERIOD)
                 th.moment = 1;
             else if (key == SDLK_HOME)
-                seekTo(0);
+                if (!following())
+                    seekTo(0);
             else if (key == SDLK_END)
-                seekTo(replay::playbackStatus().total);
+                if (!following())
+                    seekTo(replay::playbackStatus().total);
             break;
         }
         case SDL_EVENT_MOUSE_BUTTON_DOWN: {
@@ -648,7 +675,7 @@ void GameplayState::theaterEvent(const SDL_Event& event)
             }
             if (!barShown())
                 break;
-            if (event.button.button == SDL_BUTTON_LEFT && y >= TRACK_Y - 10 && y < TRACK_Y + TRACK_H + 6 && x >= TRACK_X - 8 &&
+            if (event.button.button == SDL_BUTTON_LEFT && !following() && y >= TRACK_Y - 10 && y < TRACK_Y + TRACK_H + 6 && x >= TRACK_X - 8 &&
                     x < TRACK_X + TRACK_W + 8) {
                 th.dragging = true;
                 seekTo(tickAt(x));
@@ -769,6 +796,22 @@ void GameplayState::updateReplay()
         return;
     }
 
+    //(--net-theater: the host's part of the test: pause, play on at 4x, a jump, 1x, 1/2x, then leave)
+    if (!cmd::g_net.theater.empty() && rollback::NetGame::instance().hostingTheater()) {
+        static int script = 0;
+        ++script;
+        if (script == 180) th.playPause = true;                       //pause
+        if (script == 300) { th.playPause = true; th.speed = 4; }    //play on, 4x
+        if (script == 420) seekTo(2500);                               //a jump
+        if (script == 480) th.speed = 2;                               //1x
+        if (script == 600) th.speed = 1;                               //1/2x
+        if (script == 720) th.leave = true;                            //leave: everyone back
+        if (th.leave) {
+            leaveReplay();
+            return;
+        }
+    }
+
     //Watching the host's replay together (NetGame's THEATER): the host plays, pauses, jumps and sets
     //the speed; following, ours do nothing of that (the camera, the help and leaving are ours). The
     //host left it: back to the lobby
@@ -866,7 +909,8 @@ void GameplayState::updateReplay()
             th.paused = hostPaused;
             th.speed = std::clamp(hostSpeed, 0, static_cast<int>(SPEEDS.size()) - 1);
             hostTick = std::clamp(hostTick, 0, std::max(0, status.total));
-            if (std::abs(g_sim.tick - hostTick) > 12) {
+            //(paused: exactly the host's frame; playing: within a fifth of a second)
+            if (hostPaused ? g_sim.tick != hostTick : std::abs(g_sim.tick - hostTick) > 12) {
                 seekTo(hostTick);
                 lastUpdateTicked = false;
             }
